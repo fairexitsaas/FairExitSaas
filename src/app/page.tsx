@@ -1,69 +1,188 @@
-import Image from "next/image";
+import type { Metadata } from 'next'
+import Link from 'next/link'
+import Navbar from '@/components/ui/Navbar'
+import { createClient } from '@/lib/supabase/server'
+import { isSupabaseConfigured } from '@/lib/supabase/client'
 
-export default function Home() {
+export const metadata: Metadata = {
+  title: 'Fairexit — Modern Next.js & Supabase Authentication',
+  description:
+    'Production-ready Next.js application template with official Supabase SSR authentication.',
+}
+
+export default async function HomePage() {
+  const isConfigured = isSupabaseConfigured()
+  let user = null
+
+  if (isConfigured) {
+    try {
+      const supabase = await createClient()
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser()
+      user = authUser
+    } catch {
+      // Unauthenticated or network issue
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
+      <Navbar />
+
+      <main className="flex-1">
+        {/* Setup Notification Banner if credentials not configured */}
+        {!isConfigured && (
+          <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200">
+            <div className="mx-auto flex max-w-7xl items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="font-semibold">Setup Required:</span>
+                <span>
+                  Supabase credentials are not configured. Please set{' '}
+                  <code className="rounded bg-amber-200/60 px-1 py-0.5 font-mono text-xs dark:bg-amber-900/60">
+                    NEXT_PUBLIC_SUPABASE_URL
+                  </code>{' '}
+                  and{' '}
+                  <code className="rounded bg-amber-200/60 px-1 py-0.5 font-mono text-xs dark:bg-amber-900/60">
+                    NEXT_PUBLIC_SUPABASE_ANON_KEY
+                  </code>{' '}
+                  in your <code className="font-mono font-semibold">.env.local</code> file.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Hero Section */}
+        <div className="relative overflow-hidden px-4 pt-16 pb-20 sm:px-6 sm:pt-24 sm:pb-28 lg:px-8">
+          <div className="mx-auto max-w-4xl text-center">
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50/70 px-3.5 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300">
+              <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
+              Next.js 16 + Supabase SSR Auth
+            </div>
+
+            <h1 className="mt-6 text-4xl font-extrabold tracking-tight text-slate-900 sm:text-6xl dark:text-white">
+              Secure authentication for <span className="text-indigo-600">modern web apps</span>
+            </h1>
+
+            <p className="mx-auto mt-6 max-w-2xl text-lg text-slate-600 dark:text-slate-300">
+              Fairexit is a production-ready Next.js application equipped with official Supabase SSR
+              authentication, automatic cookie refresh, server-level route guards, and type safety.
+            </p>
+
+            <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
+              {user ? (
+                <>
+                  <Link
+                    href="/dashboard"
+                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 transition-all"
+                  >
+                    Go to Dashboard
+                    <svg
+                      className="ml-2 h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </Link>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">
+                    Logged in as <strong className="text-slate-800 dark:text-slate-200">{user.email}</strong>
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href="/signup"
+                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 transition-all"
+                  >
+                    Create Account
+                    <svg
+                      className="ml-2 h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      strokeWidth={2}
+                      stroke="currentColor"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
+                  </Link>
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-base font-semibold text-slate-800 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800 transition-all"
+                  >
+                    Sign In
+                  </Link>
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        {/* Feature Highlights Section */}
+        <div className="border-t border-slate-200 bg-white py-16 dark:border-slate-800 dark:bg-slate-900/50">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400 font-bold">
+                  SSR
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-white">
+                  Server-Side Authentication
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Leveraging <code className="font-mono text-xs">@supabase/ssr</code> with secure cookie handling,
+                  token validation via <code className="font-mono text-xs">getUser()</code>, and PKCE exchange flows.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400 font-bold">
+                  🔒
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-white">
+                  Route Protection
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Middleware session synchronization and server-component route validation prevent unauthorized access to dashboards.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-6 dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-950 dark:text-purple-400 font-bold">
+                  ⚡
+                </div>
+                <h3 className="mt-4 text-lg font-bold text-slate-900 dark:text-white">
+                  Tailwind & TypeScript
+                </h3>
+                <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                  Built on Next.js App Router with TypeScript and Tailwind CSS for accessible, responsive, and maintainable styling.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 bg-white py-6 dark:border-slate-800 dark:bg-slate-950">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6 lg:px-8 text-sm text-slate-500 dark:text-slate-400">
+          <p>© 2026 Fairexit. All rights reserved.</p>
+          <div className="flex items-center gap-6">
+            <Link href="/login" className="hover:text-slate-900 dark:hover:text-white">
+              Log In
+            </Link>
+            <Link href="/signup" className="hover:text-slate-900 dark:hover:text-white">
+              Sign Up
+            </Link>
+            <Link href="/dashboard" className="hover:text-slate-900 dark:hover:text-white">
+              Dashboard
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
-  );
+  )
 }
