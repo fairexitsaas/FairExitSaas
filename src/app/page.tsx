@@ -1,8 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import Navbar from '@/components/ui/Navbar'
-import { createClient } from '@/lib/supabase/server'
-import { isSupabaseConfigured } from '@/lib/supabase/client'
 
 export const metadata: Metadata = {
   title: 'Fairexit — Modern Next.js & Supabase Authentication',
@@ -10,49 +8,12 @@ export const metadata: Metadata = {
     'Production-ready Next.js application template with official Supabase SSR authentication.',
 }
 
-export default async function HomePage() {
-  const isConfigured = isSupabaseConfigured()
-  let user = null
-
-  if (isConfigured) {
-    try {
-      const supabase = await createClient()
-      const {
-        data: { user: authUser },
-      } = await supabase.auth.getUser()
-      user = authUser
-    } catch {
-      // Unauthenticated or network issue
-    }
-  }
-
+export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
       <Navbar />
 
       <main className="flex-1">
-        {/* Setup Notification Banner if credentials not configured */}
-        {!isConfigured && (
-          <div className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/40 dark:text-amber-200">
-            <div className="mx-auto flex max-w-7xl items-center justify-between text-sm">
-              <div className="flex items-center gap-2">
-                <span className="font-semibold">Setup Required:</span>
-                <span>
-                  Supabase credentials are not configured. Please set{' '}
-                  <code className="rounded bg-amber-200/60 px-1 py-0.5 font-mono text-xs dark:bg-amber-900/60">
-                    NEXT_PUBLIC_SUPABASE_URL
-                  </code>{' '}
-                  and{' '}
-                  <code className="rounded bg-amber-200/60 px-1 py-0.5 font-mono text-xs dark:bg-amber-900/60">
-                    NEXT_PUBLIC_SUPABASE_ANON_KEY
-                  </code>{' '}
-                  in your <code className="font-mono font-semibold">.env.local</code> file.
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Hero Section */}
         <div className="relative overflow-hidden px-4 pt-16 pb-20 sm:px-6 sm:pt-24 sm:pb-28 lg:px-8">
           <div className="mx-auto max-w-4xl text-center">
@@ -71,52 +32,27 @@ export default async function HomePage() {
             </p>
 
             <div className="mt-10 flex flex-wrap items-center justify-center gap-4">
-              {user ? (
-                <>
-                  <Link
-                    href="/dashboard"
-                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 transition-all"
-                  >
-                    Go to Dashboard
-                    <svg
-                      className="ml-2 h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                    </svg>
-                  </Link>
-                  <span className="text-sm text-slate-500 dark:text-slate-400">
-                    Logged in as <strong className="text-slate-800 dark:text-slate-200">{user.email}</strong>
-                  </span>
-                </>
-              ) : (
-                <>
-                  <Link
-                    href="/signup"
-                    className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 transition-all"
-                  >
-                    Create Account
-                    <svg
-                      className="ml-2 h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                    >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                    </svg>
-                  </Link>
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-base font-semibold text-slate-800 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800 transition-all"
-                  >
-                    Sign In
-                  </Link>
-                </>
-              )}
+              <Link
+                href="/signup"
+                className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-indigo-600/20 hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 transition-all"
+              >
+                Create Account
+                <svg
+                  className="ml-2 h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  strokeWidth={2}
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+              </Link>
+              <Link
+                href="/login"
+                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-3.5 text-base font-semibold text-slate-800 shadow-sm hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 dark:border-slate-700 dark:bg-slate-900 dark:text-white dark:hover:bg-slate-800 transition-all"
+              >
+                Sign In
+              </Link>
             </div>
           </div>
         </div>

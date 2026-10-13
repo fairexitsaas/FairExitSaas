@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 
 interface GoogleSignInButtonProps {
   onError?: (error: string) => void
@@ -15,16 +15,8 @@ export default function GoogleSignInButton({
   text = 'Continue with Google',
 }: GoogleSignInButtonProps) {
   const [loading, setLoading] = useState(false)
-  const isConfigured = isSupabaseConfigured()
 
   const handleGoogleSignIn = async () => {
-    if (!isConfigured) {
-      onError?.(
-        'Supabase is not configured yet. Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.'
-      )
-      return
-    }
-
     setLoading(true)
 
     try {

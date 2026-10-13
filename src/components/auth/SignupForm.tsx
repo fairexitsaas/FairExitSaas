@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { createClient, isSupabaseConfigured } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/client'
 import GoogleSignInButton from './GoogleSignInButton'
 
 export default function SignupForm() {
@@ -18,19 +18,10 @@ export default function SignupForm() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
 
-  const isConfigured = isSupabaseConfigured()
-
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setErrorMessage(null)
     setSuccessMessage(null)
-
-    if (!isConfigured) {
-      setErrorMessage(
-        'Supabase is not configured yet. Please configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env.local file.'
-      )
-      return
-    }
 
     if (!fullName.trim()) {
       setErrorMessage('Please enter your full name.')
@@ -112,17 +103,6 @@ export default function SignupForm() {
           Get started with Fairexit today
         </p>
       </div>
-
-      {!isConfigured && (
-        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/40 dark:text-amber-300">
-          <div className="flex gap-2">
-            <span className="font-semibold">Setup Notice:</span>
-            <span>
-              Please configure <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-xs dark:bg-amber-900/60">NEXT_PUBLIC_SUPABASE_URL</code> and <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-xs dark:bg-amber-900/60">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> in <code className="rounded bg-amber-100 px-1 py-0.5 font-mono text-xs dark:bg-amber-900/60">.env.local</code>.
-            </span>
-          </div>
-        </div>
-      )}
 
       {errorMessage && (
         <div

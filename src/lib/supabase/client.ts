@@ -1,20 +1,33 @@
 import { createBrowserClient } from '@supabase/ssr'
 
+const FALLBACK_URL = 'https://kvqxcidparapfarxdbzo.supabase.co'
+const FALLBACK_KEY = 'sb_publishable_Q3vRwcgSoY0k_5JRLbPmFw_sX-YlXMq'
+
+export function getSupabaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (envUrl && envUrl.trim() !== '') {
+    return envUrl.trim()
+  }
+  return FALLBACK_URL
+}
+
+export function getSupabaseKey(): string {
+  const envKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  if (envKey && envKey.trim() !== '') {
+    return envKey.trim()
+  }
+  return FALLBACK_KEY
+}
+
 export function isSupabaseConfigured(): boolean {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  return Boolean(url && anonKey && url.trim() !== '' && anonKey.trim() !== '')
+  return true
 }
 
 export function createClient() {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-  if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      'Missing Supabase environment variables. Please ensure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are set in your .env.local file.'
-    )
-  }
+  const supabaseUrl = getSupabaseUrl()
+  const supabaseAnonKey = getSupabaseKey()
 
   return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }

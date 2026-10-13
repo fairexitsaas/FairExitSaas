@@ -6,13 +6,19 @@ export async function updateSession(request: NextRequest) {
     request,
   })
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const FALLBACK_URL = 'https://kvqxcidparapfarxdbzo.supabase.co'
+  const FALLBACK_KEY = 'sb_publishable_Q3vRwcgSoY0k_5JRLbPmFw_sX-YlXMq'
 
-  // If Supabase credentials are not yet configured, allow request to proceed
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return supabaseResponse
-  }
+  const supabaseUrl =
+    (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.trim() !== '')
+      ? process.env.NEXT_PUBLIC_SUPABASE_URL.trim()
+      : FALLBACK_URL
+  const supabaseAnonKey =
+    (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.trim() !== '')
+      ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.trim()
+      : (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.trim() !== '')
+        ? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.trim()
+        : FALLBACK_KEY
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {

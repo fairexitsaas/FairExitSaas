@@ -31,7 +31,7 @@ export async function GET(request: Request) {
       const errorUrl = new URL('/login', requestUrl.origin)
       errorUrl.searchParams.set(
         'error',
-        'Supabase configuration missing. Please configure your .env.local file.'
+        'Authentication service is currently unavailable. Please try again.'
       )
       return NextResponse.redirect(errorUrl)
     }

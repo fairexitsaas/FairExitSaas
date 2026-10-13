@@ -1,32 +1,14 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
 import Navbar from '@/components/ui/Navbar'
 import LoginForm from '@/components/auth/LoginForm'
-import { createClient } from '@/lib/supabase/server'
-import { isSupabaseConfigured } from '@/lib/supabase/client'
 
 export const metadata: Metadata = {
   title: 'Log In — Fairexit',
   description: 'Log in to your Fairexit account.',
 }
 
-export default async function LoginPage() {
-  if (isSupabaseConfigured()) {
-    try {
-      const supabase = await createClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
-
-      if (user) {
-        redirect('/dashboard')
-      }
-    } catch {
-      // Allow rendering the login page on session read error
-    }
-  }
-
+export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
       <Navbar />

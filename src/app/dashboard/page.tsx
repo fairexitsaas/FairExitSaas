@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { connection } from 'next/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import LogoutButton from '@/components/auth/LogoutButton'
@@ -11,6 +12,8 @@ export const metadata: Metadata = {
 }
 
 export default async function DashboardPage() {
+  await connection()
+
   if (!isSupabaseConfigured()) {
     redirect('/login')
   }
