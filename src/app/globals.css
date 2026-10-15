@@ -1,26 +1,277 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: var(--font-dm-sans), 'DM Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: var(--font-newsreader), 'Newsreader', Georgia, serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --breakpoint-sm: 601px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 961px;
+  --breakpoint-xl: 1200px;
+
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-navy-dark: var(--brand-navy-dark);
+  --color-brand-green: var(--brand-green);
+  --color-brand-green-hover: var(--brand-green-hover);
+  --color-brand-green-text: var(--brand-green-text);
+  --color-brand-mint: var(--brand-mint);
+  --color-brand-mint-bg: var(--brand-mint-bg);
+
+  --color-page: var(--page-bg);
+  --color-section-white: var(--section-white);
+  --color-section-gray: var(--section-gray);
+
+  --color-nav-bg: var(--nav-bg);
+  --color-nav-border: var(--nav-border);
+
+  --color-card: var(--card-bg);
+  --color-card-border: var(--card-border);
+
+  --color-input-bg: var(--input-bg);
+  --color-input-border: var(--input-border);
+  --color-input-border-focus: var(--input-border-focus);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-body: var(--text-body);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+
+  --color-divider: var(--divider);
+  --color-navy: var(--navy);
+  --color-greend: var(--greend);
+  --color-green: var(--green);
+  --color-line: var(--line);
+  --color-slate: var(--slate);
+  --color-ink: var(--ink);
+
+  --shadow-card: 0 4px 20px 0 rgba(6,44,85,0.06);
+  --shadow-card-elevated: 0 12px 40px rgba(6,44,85,.08), 0 2px 8px rgba(6,44,85,.04);
+  --shadow-navy-card: 0 20px 50px rgba(6,44,85,.25);
+  --shadow-banner: 0 16px 48px rgba(6,44,85,.22);
+  --shadow-modal: 0 40px 90px -30px rgba(6,44,85,.6);
+  --shadow-fab: 0 8px 24px rgba(6,44,85,.3);
+  --shadow-panel: 0 20px 50px rgba(6,44,85,.2);
+  --shadow-button: 0 4px 14px rgba(14, 178, 141, 0.35);
+  --shadow-button-hover: 0 6px 18px rgba(12, 143, 114, 0.4);
+}
+
+/* ==========================================================================
+   DESIGN TOKENS — Source of truth: CANADA.css & US.css
+   ========================================================================== */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Brand */
+  --brand-navy:       #062C55;   /* Figma primary dark navy */
+  --brand-navy-dark:  #041D38;
+  --brand-green:      #0EB28D;   /* Figma action green (buttons) */
+  --brand-green-hover:#0C8F72;   /* Figma action green hover */
+  --brand-green-text: #0C8F72;   /* Figma text green / highlights */
+  --brand-mint:       #7FF0CF;   /* Figma bright mint accent */
+  --brand-mint-bg:    #EEF8F3;   /* Figma comparison engine mint highlight */
+
+  /* Page */
+  --page-bg:          #F6F4EF;   /* Figma warm off-white / sand */
+  --section-white:    #FFFFFF;   /* Pure white */
+  --section-gray:     #F6F4EF;   /* Alias for odd sections */
+
+  /* Navbar */
+  --nav-bg:           rgba(246,244,239,0.96);
+  --nav-border:       #E7E4DD;
+
+  /* Card / form surface */
+  --card-bg:          #FFFFFF;
+  --card-border:      #E7E4DD;
+  --card-shadow:      0 4px 20px 0 rgba(6,44,85,0.06);
+
+  /* Input */
+  --input-bg:         #FFFFFF;
+  --input-border:     #E2D9CC;
+  --input-border-focus: #0EB28D;
+
+  /* Text */
+  --text-primary:     #062C55;
+  --text-body:        #17242F;
+  --text-secondary:   #5A6B78;
+  --text-muted:       #9AA3AB;
+
+  /* Borders & dividers */
+  --divider:          #E7E4DD;
+
+  /* Output / Navy Banner */
+  --navy-banner-bg:   #062C55;
+  --navy-card-border: rgba(255, 255, 255, 0.16);
+
+  /* Prototype token aliases */
+  --navy:             #062C55;
+  --greend:           #0C8F72;
+  --green:            #0EB28D;
+  --line:             #E7E4DD;
+  --slate:            #5A6B78;
+  --ink:              #17242F;
+  --serif:            var(--font-newsreader), 'Newsreader', Georgia, serif;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ==========================================================================
+   DARK MODE TOKENS  (applied by AccessibilityContext → html.dark)
+   ========================================================================== */
+html.dark {
+  --page-bg:          #071524;
+  --section-white:    #0B1E32;
+  --section-gray:     #071524;
+
+  --nav-bg:           rgba(7,21,36,0.96);
+  --nav-border:       #183654;
+
+  --card-bg:          #0D2238;
+  --card-border:      #183654;
+  --card-shadow:      0 4px 24px 0 rgba(0,0,0,0.50);
+
+  --input-bg:         #071422;
+  --input-border:     #1E3B5C;
+
+  --text-primary:     #F0F6FC;
+  --text-body:        #E1E7ED;
+  --text-secondary:   #9AB1C6;
+  --text-muted:       #647B91;
+
+  --divider:          #183654;
+
+  --navy-banner-bg:   #0B1E32;
+  --navy-card-border: rgba(255, 255, 255, 0.12);
+
+  --navy:             #0B1E32;
+  --greend:           #12D29E;
+  --green:            #0EB28D;
+  --line:             #183654;
+  --slate:            #9AB1C6;
+  --ink:              #E1E7ED;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ==========================================================================
+   HIGH CONTRAST TOKENS
+   ========================================================================== */
+html.high-contrast {
+  --page-bg:          #FFFFFF;
+  --section-white:    #FFFFFF;
+  --section-gray:     #F0F0F0;
+  --nav-bg:           rgba(255,255,255,0.98);
+  --nav-border:       #000000;
+  --card-bg:          #FFFFFF;
+  --card-border:      #000000;
+  --input-bg:         #FFFFFF;
+  --input-border:     #000000;
+  --text-primary:     #000000;
+  --text-secondary:   #111111;
+  --text-muted:       #333333;
+  --divider:          #000000;
 }
+
+html.high-contrast.dark {
+  --page-bg:          #000000;
+  --section-white:    #000000;
+  --section-gray:     #0A0A0A;
+  --nav-bg:           rgba(0,0,0,0.98);
+  --nav-border:       #FFFFFF;
+  --card-bg:          #000000;
+  --card-border:      #FFFFFF;
+  --input-bg:         #000000;
+  --input-border:     #FFFFFF;
+  --text-primary:     #FFFFFF;
+  --text-secondary:   #EEEEEE;
+  --text-muted:       #CCCCCC;
+  --divider:          #FFFFFF;
+}
+
+/* ==========================================================================
+   BASE STYLES
+   ========================================================================== */
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--page-bg);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
+
+/* ==========================================================================
+   HIGH CONTRAST — form controls & focus
+   ========================================================================== */
+html.high-contrast input,
+html.high-contrast select,
+html.high-contrast button,
+html.high-contrast textarea {
+  border-width: 2px !important;
+  border-color: var(--input-border) !important;
+  font-weight: 600 !important;
+}
+
+html.high-contrast *:focus-visible {
+  outline: 3px solid #000000 !important;
+  outline-offset: 2px !important;
+}
+
+html.high-contrast.dark *:focus-visible {
+  outline-color: #FFFFFF !important;
+}
+
+/* ==========================================================================
+   REDUCE MOTION
+   ========================================================================== */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration:       0.001ms !important;
+  animation-iteration-count: 1      !important;
+  transition-duration:      0.001ms !important;
+  scroll-behavior:          auto    !important;
+}
+
+/* ==========================================================================
+   TEXT SIZE SCALING
+   All 4 levels control html font-size; Tailwind rem values scale automatically.
+   ========================================================================== */
+
+/* A- (small) */
+html[data-text-size="small"] {
+  font-size: 14px;
+}
+html[data-text-size="small"] h1 { font-size: clamp(1.75rem, 4vw, 2.5rem)  !important; }
+html[data-text-size="small"] h2 { font-size: clamp(1.25rem, 3vw, 1.75rem) !important; }
+html[data-text-size="small"] h3 { font-size: clamp(1rem,   2.5vw, 1.25rem) !important; }
+
+/* A (default — 16 px baseline) */
+html[data-text-size="default"] {
+  font-size: 16px;
+}
+
+/* A+ (large) */
+html[data-text-size="large"] {
+  font-size: 18px;
+}
+html[data-text-size="large"] h1 { font-size: clamp(2.5rem, 5vw, 3.75rem) !important; }
+html[data-text-size="large"] h2 { font-size: clamp(1.75rem, 4vw, 2.5rem) !important; }
+html[data-text-size="large"] h3 { font-size: clamp(1.25rem, 3vw, 1.75rem) !important; }
+html[data-text-size="large"] p,
+html[data-text-size="large"] label,
+html[data-text-size="large"] input,
+html[data-text-size="large"] select,
+html[data-text-size="large"] button,
+html[data-text-size="large"] li,
+html[data-text-size="large"] a   { font-size: 1.125rem !important; }
+
+/* A++ (extra large) */
+html[data-text-size="extraLarge"] {
+  font-size: 20px;
+}
+html[data-text-size="extraLarge"] h1 { font-size: clamp(2.75rem, 6vw, 4.25rem) !important; }
+html[data-text-size="extraLarge"] h2 { font-size: clamp(2rem,   5vw, 3rem)    !important; }
+html[data-text-size="extraLarge"] h3 { font-size: clamp(1.5rem, 4vw, 2rem)    !important; }
+html[data-text-size="extraLarge"] p,
+html[data-text-size="extraLarge"] label,
+html[data-text-size="extraLarge"] input,
+html[data-text-size="extraLarge"] select,
+html[data-text-size="extraLarge"] button,
+html[data-text-size="extraLarge"] li,
+html[data-text-size="extraLarge"] a   { font-size: 1.25rem !important; }
