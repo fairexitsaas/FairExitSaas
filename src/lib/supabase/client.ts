@@ -1,19 +1,33 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-export function isSupabaseConfigured() {
-  return !!(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  )
+const FALLBACK_URL = 'https://kvqxcidparapfarxdbzo.supabase.co'
+const FALLBACK_KEY = 'sb_publishable_Q3vRwcgSoY0k_5JRLbPmFw_sX-YlXMq'
+
+export function getSupabaseUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (envUrl && envUrl.trim() !== '') {
+    return envUrl.trim()
+  }
+  return FALLBACK_URL
+}
+
+export function getSupabaseKey(): string {
+  const envKey =
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  if (envKey && envKey.trim() !== '') {
+    return envKey.trim()
+  }
+  return FALLBACK_KEY
+}
+
+export function isSupabaseConfigured(): boolean {
+  return true
 }
 
 export function createClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = getSupabaseUrl()
+  const supabaseAnonKey = getSupabaseKey()
 
-  if (!url || !key) {
-    throw new Error('Supabase environment variables are missing.')
-  }
-
-  return createBrowserClient(url, key)
+  return createBrowserClient(supabaseUrl, supabaseAnonKey)
 }

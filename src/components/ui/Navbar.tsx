@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { createClient, isSupabaseConfigured } from '@/lib/supabase/client'
-import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
+import type { User } from '@supabase/supabase-js'
 
 export default function Navbar() {
   const isConfigured = isSupabaseConfigured()
@@ -11,22 +11,20 @@ export default function Navbar() {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    queueMicrotask(() => {
-      setMounted(true)
-    })
+    setMounted(true)
 
     if (!isConfigured) {
       return
     }
 
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
-      setUser(data.user)
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      setUser(user)
     })
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
     })
 

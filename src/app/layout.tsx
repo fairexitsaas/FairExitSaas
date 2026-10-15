@@ -1,26 +1,24 @@
 import type { Metadata } from 'next'
-import { DM_Sans, Newsreader } from 'next/font/google'
+import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
-import Provider from './Provider'
 
-const dmSans = DM_Sans({
-  variable: '--font-dm-sans',
+const geistSans = Geist({
+  variable: '--font-geist-sans',
   subsets: ['latin'],
 })
 
-const newsreader = Newsreader({
-  variable: '--font-newsreader',
+const geistMono = Geist_Mono({
+  variable: '--font-geist-mono',
   subsets: ['latin'],
-  style: ['normal', 'italic'],
 })
 
 export const metadata: Metadata = {
   title: {
-    default: 'Fairexit — Challenge your severance offer',
+    default: 'Fairexit — Next.js & Supabase Authentication',
     template: '%s | Fairexit',
   },
   description:
-    'Free severance check for Canada and layoff rights check for the United States.',
+    'Production-ready authentication platform built with Next.js App Router and Supabase SSR.',
 }
 
 export default function RootLayout({
@@ -34,8 +32,8 @@ export default function RootLayout({
       className={`${dmSans.variable} ${newsreader.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans">
-        <Provider>{children}</Provider>
+        {children}
       </body>
     </html>
-  );
+  )
 }
