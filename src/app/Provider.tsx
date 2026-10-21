@@ -4,6 +4,7 @@ import { CountryContext, CountryCode } from "@/context/CountryContext";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
 import { GetAppProvider } from "@/context/GetAppContext";
 import React, { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import CountrySelectionDialog from "@/components/dialogs/CountrySelectionDialog";
 import AccessibilityDialog from "@/components/accessibility/AccessibilityDialog";
 
@@ -12,6 +13,7 @@ type ProviderProp = {
 };
 
 export default function Provider({ children }: ProviderProp) {
+  const pathname = usePathname();
   // Default to US so page content renders immediately behind the dialog
   const [Country, setCountryState] = useState<CountryCode>("US");
   const [isCountryModalOpen, setIsCountryModalOpen] = useState<boolean>(false);
@@ -49,12 +51,14 @@ export default function Provider({ children }: ProviderProp) {
     setIsCountryModalOpen(false);
   };
 
+  const isAdminRoute = pathname?.startsWith("/admin");
+
   return (
     <AccessibilityProvider>
       <GetAppProvider>
         <CountryContext.Provider value={{ Country, setCountry }}>
           {children}
-          {mounted && (
+          {mounted && !isAdminRoute && (
             <CountrySelectionDialog
               isOpen={isCountryModalOpen}
               onSelect={handleSelectCountry}

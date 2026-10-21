@@ -7,6 +7,7 @@ import { QuestionBackButton, QuestionNextButton } from "@/components/common/Ques
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import { triggerGetApp } from "@/context/GetAppContext";
+import { useAccessibility } from "@/context/AccessibilityContext";
 
 // Roles & occupation factors
 const OCCUPATIONS = [
@@ -67,6 +68,10 @@ export default function USFlow() {
   const [infoModal, setInfoModal] = useState<null | "report" | "lawyer">(null);
   const [checklistOpen, setChecklistOpen] = useState<boolean>(false);
   const [askLawyerOpen, setAskLawyerOpen] = useState<boolean>(false);
+  const [emailModalOpen, setEmailModalOpen] = useState<boolean>(false);
+  const [emailInput, setEmailInput] = useState<string>("");
+  const [emailSent, setEmailSent] = useState<boolean>(false);
+  const { toggleDialog } = useAccessibility();
 
   // US Form State matching demo-v3.html
   const [state, setState] = useState({
@@ -425,6 +430,9 @@ export default function USFlow() {
       st === "Other state"
     ) {
       setCurrentStep("us-state-stop");
+    } else {
+      // Normal flow entry: always display questions from the beginning!
+      setCurrentStep("us-situation-q1");
     }
   }, [searchParams]);
 
@@ -690,6 +698,13 @@ export default function USFlow() {
 
   const isSituationStep = currentStep.startsWith("us-situation-");
 
+  const handleExit = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setCurrentStep("us-situation-q1");
+    setAnsweredFields({});
+    window.location.href = "/";
+  };
+
   return (
     <div className="min-h-screen bg-[#f6f4ef] text-[#17242f] font-sans antialiased pb-20 selection:bg-[#cbf3e4]">
       {/* ── HEADER NAVBAR ── */}
@@ -746,12 +761,13 @@ export default function USFlow() {
             >
               Get the app
             </button>
-            <NextLink
-              href="/"
-              className="hidden sm:inline-flex items-center text-[13px] font-semibold text-[#5a6b78] hover:text-[#062c55] transition-colors whitespace-nowrap"
+            <button
+              type="button"
+              onClick={handleExit}
+              className="hidden sm:inline-flex items-center text-[13px] font-semibold text-[#5a6b78] hover:text-[#062c55] transition-colors whitespace-nowrap cursor-pointer bg-transparent border-none p-0"
             >
               Exit ✕
-            </NextLink>
+            </button>
 
             {/* Mobile Your Details Trigger Button */}
             <button
@@ -825,9 +841,13 @@ export default function USFlow() {
               >
                 Get the app
               </button>
-              <NextLink href="/" className="font-bold text-[#5a6b78]">
+              <button
+                type="button"
+                onClick={handleExit}
+                className="font-bold text-[#5a6b78] hover:text-[#062c55] cursor-pointer bg-transparent border-none p-0"
+              >
                 Exit ✕
-              </NextLink>
+              </button>
             </div>
           </div>
         )}
@@ -2658,26 +2678,26 @@ export default function USFlow() {
                 STEP 6: RESULTS & VERDICT
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "step-results" && (
-              <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-300">
-                {/* ── MAIN RESULTS CARD ── */}
-                <div className="bg-white border border-[#e7e4dd] rounded-[14px] sm:rounded-[18px] p-5 sm:p-8 md:p-10 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-5 sm:p-8 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+                {/* ── VERDICT CARD (encompasses tag, title, reasons, and srcbadge) ── */}
+                <div className="text-center p-5 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
                   {/* Upper Badges */}
-                  <div className="mb-2.5">
+                  <div className="mb-2">
                     <span className="inline-block font-sans font-[800] uppercase text-[#8a6400] bg-[#fbf3df] border border-[#eeddb0] text-[10.5px] leading-[16.5px] tracking-[0.5px] px-[10px] py-[3px] rounded-[6px] mb-2">
                       NOT AN ASSESSMENT OF YOUR SITUATION
                     </span>
-                    <div className="font-sans font-[800] uppercase text-[#0c8f72] text-[11.5px] leading-[18px] tracking-[1px] mb-2.5">
+                    <div className="font-sans font-[800] uppercase text-[#0c8f72] text-[11.5px] leading-[18px] tracking-[1px] mb-2">
                       WORTH AN ATTORNEY&apos;S LOOK
                     </div>
                   </div>
 
                   {/* Main Title */}
-                  <h1 className="font-serif font-[600] text-[28px] sm:text-[32px] text-[#062c55] leading-[31.5px] sm:leading-[36px] tracking-normal max-w-[620px] mx-auto mb-3">
+                  <h2 className="font-serif font-[600] text-[26px] sm:text-[30px] md:text-[32px] text-[#062c55] leading-[31.5px] sm:leading-[36px] tracking-normal max-w-[580px] mx-auto mb-3">
                     A few things here are worth an attorney&apos;s look.
-                  </h1>
+                  </h2>
 
                   {/* Intro Description */}
-                  <p className="font-sans font-normal text-[15px] text-[#17242f] max-w-[460px] mx-auto leading-[23.5px] tracking-normal mb-6 sm:mb-7">
+                  <p className="font-sans font-normal text-[14.5px] sm:text-[15px] text-[#17242f] max-w-[460px] mx-auto leading-[23.5px] tracking-normal mb-5 sm:mb-6">
                     Some of your answers point to federal rules worth confirming — in
                     the US the question usually isn&apos;t a legal minimum (there
                     isn&apos;t one), it&apos;s the process and the notice. A free
@@ -2686,15 +2706,15 @@ export default function USFlow() {
                   </p>
 
                   {/* Federal Law Expects Intro */}
-                  <p className="font-sans font-normal text-[12.5px] text-[#5a6b78] leading-[19px] tracking-normal mb-3 text-left">
+                  <p className="font-sans font-normal text-[12.5px] text-[#5a6b78] leading-[19px] tracking-normal mb-3 text-left max-w-[440px] mx-auto">
                     What federal law generally expects — and what your answers
                     suggest to double-check with an attorney:
                   </p>
 
                   {/* 5 Bullet Points with Teal Exclamation */}
-                  <div className="space-y-3 mb-6 sm:mb-7 text-left max-w-[580px]">
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] tracking-normal">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] leading-[21px] shrink-0">
+                  <div className="space-y-2 mb-4 text-left max-w-[440px] mx-auto">
+                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
+                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
                         !
                       </span>
                       <span>
@@ -2703,8 +2723,8 @@ export default function USFlow() {
                         earlier)
                       </span>
                     </div>
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] tracking-normal">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] leading-[21px] shrink-0">
+                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
+                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
                         !
                       </span>
                       <span>
@@ -2712,8 +2732,8 @@ export default function USFlow() {
                         for age-40+ releases — worth confirming yours has one
                       </span>
                     </div>
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] tracking-normal">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] leading-[21px] shrink-0">
+                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
+                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
                         !
                       </span>
                       <span>
@@ -2722,8 +2742,8 @@ export default function USFlow() {
                         the attorney
                       </span>
                     </div>
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] tracking-normal">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] leading-[21px] shrink-0">
+                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
+                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
                         !
                       </span>
                       <span>
@@ -2733,8 +2753,8 @@ export default function USFlow() {
                         with an attorney
                       </span>
                     </div>
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] tracking-normal">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] leading-[21px] shrink-0">
+                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
+                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
                         !
                       </span>
                       <span>
@@ -2750,7 +2770,7 @@ export default function USFlow() {
                   </div>
 
                   {/* Amber/Yellow Callout Box (warnbox) */}
-                  <div className="p-[13px_16px] rounded-[12px] bg-[#fffdf6] border border-[#f0dca8] font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] tracking-normal mb-5 text-left">
+                  <div className="p-[13px_16px] rounded-[12px] bg-[#fffdf6] border border-[#f0dca8] font-sans font-normal text-[13px] text-[#17242f] leading-[20px] mb-4 text-left max-w-[440px] mx-auto">
                     <b className="font-[700] text-[#8a6400]">
                       Advance-notice (WARN) rules may apply.
                     </b>{" "}
@@ -2765,165 +2785,167 @@ export default function USFlow() {
 
                   {/* Official Government Source Card (srcbadge) */}
                   <a
-                    href="https://www.dol.gov/agencies/eta/layoffs/warn"
+                    href="https://www.eeoc.gov/laws/guidance/understanding-waivers-discrimination-claims-employee-severance-agreements"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="border border-[#cbdcee] bg-white hover:border-[#0c8f72] rounded-[6px] p-[9px_12px_9px_14px] flex items-center justify-between transition-all group text-left cursor-pointer shadow-[0_6px_16px_-12px_rgba(11,46,79,0.4)]"
+                    className="border border-[#cbdcee] bg-white hover:border-[#0c8f72] rounded-[11px] p-[9px_12px_9px_14px] flex items-center justify-between transition-all group text-left cursor-pointer shadow-[0_6px_16px_-12px_rgba(11,46,79,0.4)] max-w-[440px] mx-auto mt-4"
                   >
                     <div>
                       <div className="font-sans font-[800] uppercase text-[11px] leading-[15px] tracking-[0.5px] text-[#062c55] mb-0.5">
                         Official government source
                       </div>
                       <div className="font-sans font-[600] text-[12px] leading-[16px] text-[#5a6b78] group-hover:text-[#0c8f72] transition-colors">
-                        U.S. Department of Labor — WARN Act · dol.gov · last
-                        reviewed Sept 2026
+                        EEOC — severance &amp; age-claim waivers · eeoc.gov ·{" "}
+                        <i className="italic">last reviewed Sept 2026</i>
                       </div>
                     </div>
-                    <span className="text-[#0c8f72] font-[800] text-[15px] group-hover:translate-x-1 transition-transform">
+                    <span className="text-[#0c8f72] font-[800] text-[15px] group-hover:translate-x-1 transition-transform ml-3">
                       →
                     </span>
                   </a>
                 </div>
+                {/* ── END VERDICT CARD ── */}
 
                 {/* Free Check Done Pill + Email Link */}
-                <div className="text-center my-5 sm:my-6">
+                <div className="text-center my-6">
                   <div className="inline-block bg-[#e6f5ef] text-[#0c7a60] font-sans font-[800] text-[12.5px] leading-[18px] px-3.5 py-1.5 rounded-[6px] mb-2.5">
                     Your free check is done · no card, no signup, nothing owed
                   </div>
                   <div>
                     <button
                       type="button"
-                      onClick={() => alert("Email me my free result")}
-                      className="font-sans font-[700] text-[14px] leading-[20px] text-[#0c8f72] hover:underline cursor-pointer"
+                      onClick={() => setEmailModalOpen(true)}
+                      className="font-sans font-[700] text-[14px] leading-[20px] text-[#0c8f72] underline hover:no-underline cursor-pointer"
                     >
                       Email me my free result →
                     </button>
                   </div>
                 </div>
 
+                {/* Divider Line */}
+                <div className="my-7 border-t border-[#e7e4dd]" />
+
                 {/* NEXT STEP · OPTIONAL SECTION */}
-                <div className="mt-8 sm:mt-10 mb-6 sm:mb-8 text-center">
+                <div className="text-center mb-6">
                   <div className="font-sans font-[800] uppercase tracking-[0.9px] text-[11px] leading-[16px] text-[#0c8f72] mb-1">
                     Next step · optional
                   </div>
-                  <h2 className="font-serif font-[600] text-[25px] sm:text-[32px] text-[#062c55] leading-[30px] sm:leading-[36px] tracking-normal mb-2">
+                  <h2 className="font-serif font-[600] text-[26px] sm:text-[32px] text-[#062c55] leading-[32px] sm:leading-[36px] tracking-normal mb-2">
                     Want to take it a step further?
                   </h2>
-                  <p className="font-sans font-normal text-[14px] sm:text-[15px] leading-[20px] text-[#5a6b78] max-w-[540px] mx-auto mb-6">
+                  <p className="font-sans font-normal text-[14px] sm:text-[15px] leading-[20px] text-[#5a6b78] max-w-[540px] mx-auto">
                     Two ways, both optional. Tap the ⓘ on either card for detail.
                   </p>
+                </div>
 
-                  {/* 2 Cards Grid */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
-                    {/* Card 1: Do It Yourself */}
-                    <div className="relative border border-[#e7e4dd] rounded-[12px] p-5 sm:p-6 bg-white flex flex-col justify-between shadow-xs hover:border-[#062c55] transition-all">
-                      <button
-                        type="button"
-                        onClick={() => setInfoModal("report")}
-                        className="absolute top-3.5 right-3.5 w-[27px] h-[27px] rounded-full bg-[#062c55] text-white flex items-center justify-center hover:bg-[#0c8f72] transition-colors cursor-pointer shadow-[0_2px_6px_-1px_rgba(6,44,85,0.4)] z-10"
-                        aria-label="Info about Severance Report"
+                {/* 2 Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left max-w-[640px] mx-auto">
+                  {/* Card 1: Do It Yourself */}
+                  <div className="relative border-[1.5px] border-[#e7e4dd] rounded-[15px] p-5 sm:p-6 bg-white flex flex-col justify-between shadow-xs hover:border-[#062c55] transition-all">
+                    <button
+                      type="button"
+                      onClick={() => setInfoModal("report")}
+                      className="absolute top-3.5 right-3.5 w-[27px] h-[27px] rounded-full bg-[#062c55] text-white flex items-center justify-center hover:bg-[#0c8f72] transition-colors cursor-pointer shadow-[0_2px_6px_-1px_rgba(6,44,85,0.4)] z-10"
+                      aria-label="Info about Severance Report"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        className="w-[15px] h-[15px] block"
+                        aria-hidden="true"
                       >
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          className="w-[15px] h-[15px] block"
-                          aria-hidden="true"
-                        >
-                          <circle cx="12" cy="6.6" r="1.7" />
-                          <rect x="10.5" y="10" width="3" height="8.4" rx="1.5" />
-                        </svg>
-                      </button>
-                      <div>
-                        <span className="font-sans font-[800] uppercase tracking-[0.8px] text-[11px] leading-[16px] text-[#5a6b78]">
-                          Do it yourself
+                        <circle cx="12" cy="6.6" r="1.7" />
+                        <rect x="10.5" y="10" width="3" height="8.4" rx="1.5" />
+                      </svg>
+                    </button>
+                    <div>
+                      <span className="font-sans font-[800] uppercase tracking-[0.8px] text-[11px] leading-[16px] text-[#5a6b78]">
+                        Do it yourself
+                      </span>
+                      <h3 className="font-serif font-[600] text-[19px] leading-[24px] text-[#062c55] mt-1 mb-2">
+                        Get your Severance Report
+                      </h3>
+                      <div className="font-serif font-[600] text-[30px] leading-none text-[#062c55] mb-2 flex items-baseline gap-2 flex-wrap">
+                        $59{" "}
+                        <span className="font-sans font-[700] text-[11px] leading-none text-[#5a6b78]">
+                          one-time · no subscription
                         </span>
-                        <h3 className="font-serif font-[600] text-[19px] leading-[24px] text-[#062c55] mt-1 mb-2">
-                          Get your Severance Report
-                        </h3>
-                        <div className="font-serif font-[600] text-[30px] leading-none text-[#062c55] mb-2 flex items-baseline gap-2 flex-wrap">
-                          $59{" "}
-                          <span className="font-sans font-[700] text-[11px] leading-none text-[#5a6b78]">
-                            one-time · no subscription
-                          </span>
-                        </div>
-                        <p className="font-sans font-normal text-[13px] leading-[19.5px] text-[#5a6b78] mb-5">
-                          Your agreement organized, the federal rules that may
-                          apply, your dates — a 15-page review to take into any
-                          conversation.
-                        </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setInfoModal("report")}
-                        className="w-full py-3 px-4 rounded-[9px] bg-[#062c55] hover:bg-[#041D38] text-white font-sans font-[700] text-[13.5px] leading-[20px] shadow-xs transition-all cursor-pointer text-center min-h-[44px] flex items-center justify-center"
-                      >
-                        Get my report
-                      </button>
+                      <p className="font-sans font-normal text-[13px] leading-[19.5px] text-[#5a6b78] mb-5">
+                        Your agreement organized, the federal rules that may
+                        apply, your dates — a 15-page review to take into any
+                        conversation.
+                      </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setInfoModal("report")}
+                      className="w-full py-3 px-4 rounded-[9px] bg-[#062c55] hover:bg-[#041D38] text-white font-sans font-[800] text-[14px] leading-[20px] shadow-xs transition-all cursor-pointer text-center min-h-[50px] flex items-center justify-center"
+                    >
+                      Get my report
+                    </button>
+                  </div>
 
-                    {/* Card 2: Get Help */}
-                    <div className="relative border-2 border-[#0eb28d] rounded-[12px] p-5 sm:p-6 bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] flex flex-col justify-between shadow-[0_18px_34px_-22px_rgba(12,143,114,0.45)] hover:shadow-lg transition-all">
-                      <button
-                        type="button"
-                        onClick={() => setInfoModal("lawyer")}
-                        className="absolute top-3.5 right-3.5 w-[27px] h-[27px] rounded-full bg-[#062c55] text-white flex items-center justify-center hover:bg-[#0c8f72] transition-colors cursor-pointer shadow-[0_2px_6px_-1px_rgba(6,44,85,0.4)] z-10"
-                        aria-label="Info about talking to an attorney"
+                  {/* Card 2: Get Help */}
+                  <div className="relative border-2 border-[#0eb28d] rounded-[15px] p-5 sm:p-6 bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] flex flex-col justify-between shadow-[0_18px_34px_-22px_rgba(12,143,114,0.45)] hover:shadow-lg transition-all">
+                    <button
+                      type="button"
+                      onClick={() => setInfoModal("lawyer")}
+                      className="absolute top-3.5 right-3.5 w-[27px] h-[27px] rounded-full bg-[#062c55] text-white flex items-center justify-center hover:bg-[#0c8f72] transition-colors cursor-pointer shadow-[0_2px_6px_-1px_rgba(6,44,85,0.4)] z-10"
+                      aria-label="Info about talking to an attorney"
+                    >
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="currentColor"
+                        className="w-[15px] h-[15px] block"
+                        aria-hidden="true"
                       >
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="currentColor"
-                          className="w-[15px] h-[15px] block"
-                          aria-hidden="true"
-                        >
-                          <circle cx="12" cy="6.6" r="1.7" />
-                          <rect x="10.5" y="10" width="3" height="8.4" rx="1.5" />
-                        </svg>
-                      </button>
-                      <div>
-                        <span className="font-sans font-[800] uppercase tracking-[0.8px] text-[11px] leading-[16px] text-[#0c7a60]">
-                          Get help
+                        <circle cx="12" cy="6.6" r="1.7" />
+                        <rect x="10.5" y="10" width="3" height="8.4" rx="1.5" />
+                      </svg>
+                    </button>
+                    <div>
+                      <span className="font-sans font-[800] uppercase tracking-[0.8px] text-[11px] leading-[16px] text-[#0c7a60]">
+                        Get help
+                      </span>
+                      <h3 className="font-serif font-[600] text-[19px] leading-[24px] text-[#062c55] mt-1 mb-2">
+                        Talk to an attorney
+                      </h3>
+                      <div className="font-serif font-[600] text-[30px] leading-none text-[#062c55] mb-2 flex items-baseline gap-2 flex-wrap">
+                        Free{" "}
+                        <span className="font-sans font-[700] text-[11px] leading-none text-[#0c7a60]">
+                          first call · free to connect
                         </span>
-                        <h3 className="font-serif font-[600] text-[19px] leading-[24px] text-[#062c55] mt-1 mb-2">
-                          Talk to an attorney
-                        </h3>
-                        <div className="font-serif font-[600] text-[30px] leading-none text-[#062c55] mb-2 flex items-baseline gap-2 flex-wrap">
-                          Free{" "}
-                          <span className="font-sans font-[700] text-[11px] leading-none text-[#0c7a60]">
-                            first call · free to connect
-                          </span>
-                        </div>
-                        <p className="font-sans font-normal text-[13px] leading-[19.5px] text-[#5a6b78] mb-5">
-                          The clearest way to understand what actually applies
-                          to your situation.
-                        </p>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setAskLawyerOpen(true)}
-                        className="w-full py-3 px-4 rounded-[9px] bg-[#0eb28d] hover:bg-[#0c8f72] text-white font-sans font-[700] text-[13.5px] leading-[20px] shadow-xs transition-all cursor-pointer text-center min-h-[44px] flex items-center justify-center"
-                      >
-                        Ask an attorney to contact me — free
-                      </button>
+                      <p className="font-sans font-normal text-[13px] leading-[19.5px] text-[#5a6b78] mb-5">
+                        The clearest way to understand what actually applies
+                        to your situation.
+                      </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => setAskLawyerOpen(true)}
+                      className="w-full py-3 px-4 rounded-[9px] bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] hover:brightness-105 text-white font-sans font-[800] text-[14px] leading-[20px] shadow-[0_12px_22px_-14px_rgba(12,143,114,0.7)] transition-all cursor-pointer text-center min-h-[50px] flex items-center justify-center"
+                    >
+                      Ask an attorney to contact me — free
+                    </button>
                   </div>
                 </div>
 
                 {/* Checklist Link */}
-                <div className="text-center mb-5">
-                  <p className="font-sans font-normal text-[13.5px] leading-[20px] text-[#5a6b78]">
-                    Happy with the offer as it is?{" "}
-                    <button
-                      type="button"
-                      onClick={() => setChecklistOpen(true)}
-                      className="font-sans font-[700] text-[#0c8f72] hover:underline cursor-pointer"
-                    >
-                      Get your free 3-point checklist →
-                    </button>
-                  </p>
+                <div className="text-center my-4 font-sans font-normal text-[13.5px] leading-[20px] text-[#5a6b78]">
+                  Happy with the offer as it is?{" "}
+                  <button
+                    type="button"
+                    onClick={() => setChecklistOpen(true)}
+                    className="font-sans font-[700] text-[#0c8f72] underline hover:no-underline cursor-pointer"
+                  >
+                    Get your free 3-point checklist →
+                  </button>
                 </div>
 
                 {/* Why talk to an attorney? Callout (whylaw) */}
-                <div className="rounded-[12px] p-[14px_18px] bg-[#f0f9f5] border border-[#c7e6d6] font-sans font-normal text-[13.5px] leading-[21px] text-[#12523f] mb-7 text-left">
+                <div className="rounded-[12px] p-[14px_18px] bg-[#f0f9f5] border border-[#c7e6d6] font-sans font-normal text-[13.5px] leading-[21px] text-[#12523f] my-4 text-center max-w-[640px] mx-auto">
                   <b className="font-bold text-[#062c55]">Why talk to an attorney?</b> In
                   the US there&apos;s no set severance amount — the value is in
                   the <b>process</b>: whether the release and notice followed the
@@ -2933,7 +2955,7 @@ export default function USFlow() {
                 </div>
 
                 {/* Legal Disclaimer Text (disc) */}
-                <p className="font-sans font-normal text-[11px] leading-[16.5px] text-[#8a98a4] leading-relaxed text-left mb-6">
+                <p className="font-sans font-normal text-[11.5px] leading-[17px] text-[#5a6b78] leading-relaxed text-left mt-6 max-w-[640px] mx-auto">
                   Educational and organizational information — not legal advice.
                   FairExit does not assess whether your layoff was lawful,
                   evaluate compliance, or tell you what you&apos;re owed. Federal
@@ -2944,20 +2966,6 @@ export default function USFlow() {
                   advertising fee by attorneys; never a cut of your outcome, and
                   you always choose who to talk to.
                 </p>
-
-                {/* Start Over Button */}
-                <div className="text-center pb-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCurrentStep("us-situation-q1");
-                      window.scrollTo({ top: 0, behavior: "smooth" });
-                    }}
-                    className="font-sans font-[700] text-xs text-[#5a6b78] hover:text-[#062c55] cursor-pointer"
-                  >
-                    ← Start over
-                  </button>
-                </div>
               </div>
             )}
           </div>
@@ -3065,8 +3073,13 @@ export default function USFlow() {
       <div className="fixed bottom-6 right-6 z-30 hidden md:flex flex-col items-center gap-2.5">
         <button
           type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            triggerGetApp();
+          }}
           className="w-10 h-10 rounded-full bg-white border border-[#d5dde4] shadow-[0_4px_14px_rgba(6,44,85,0.12)] flex items-center justify-center text-[#062c55] hover:scale-105 transition-transform cursor-pointer"
-          aria-label="Call or chat"
+          aria-label="Get the app"
+          title="Get the app"
         >
           <svg
             viewBox="0 0 24 24"
@@ -3083,8 +3096,13 @@ export default function USFlow() {
         </button>
         <button
           type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleDialog();
+          }}
           className="w-10 h-10 rounded-full bg-[#062c55] text-white shadow-[0_4px_14px_rgba(6,44,85,0.25)] flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
           aria-label="Accessibility options"
+          title="Accessibility options"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
             <path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm9 7h-6v13h-2v-6h-2v6H9V9H3V7h18v2z" />
@@ -3248,6 +3266,47 @@ export default function USFlow() {
         </div>
       )}
 
+      {/* Floating action buttons at bottom-right (Desktop) */}
+      <div className="fixed bottom-6 right-6 z-30 hidden md:flex flex-col items-center gap-2.5">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            triggerGetApp();
+          }}
+          className="w-10 h-10 rounded-full bg-white dark:bg-[#133863] border border-[#d5dde4] dark:border-[#2A5A8C] shadow-[0_4px_14px_rgba(6,44,85,0.12)] flex items-center justify-center text-[#062c55] dark:text-white hover:scale-105 transition-transform cursor-pointer"
+          aria-label="Get the app"
+          title="Get the app"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="w-5 h-5"
+          >
+            <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
+            <line x1="12" y1="18" x2="12.01" y2="18" />
+          </svg>
+        </button>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleDialog();
+          }}
+          className="w-10 h-10 rounded-full bg-[#062c55] dark:bg-[#0EB28D] text-white dark:text-[#062C55] shadow-[0_4px_14px_rgba(6,44,85,0.25)] flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
+          aria-label="Accessibility options"
+          title="Accessibility options"
+        >
+          <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
+            <path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm9 7h-6v13h-2v-6h-2v6H9V9H3V7h18v2z" />
+          </svg>
+        </button>
+      </div>
+
       {/* ── 3-POINT CHECKLIST MODAL (PHOTO 1 & PHOTO 4) ── */}
       <ChecklistModal
         isOpen={checklistOpen}
@@ -3264,6 +3323,66 @@ export default function USFlow() {
         country="US"
         regionName={state.usState || "your state"}
       />
+
+      {/* ── EMAIL ME MY FREE RESULTS MODAL ── */}
+      {emailModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-[#062c55]/45 backdrop-blur-xs transition-opacity"
+            onClick={() => setEmailModalOpen(false)}
+          />
+          <div className="relative bg-white rounded-2xl border border-[#e7e4dd] p-6 sm:p-7 max-w-[420px] w-full shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-200 text-center">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0c8f72] block mb-1">
+              Free · No card needed
+            </span>
+            <h3 className="font-serif font-bold text-2xl text-[#062c55] mb-2 leading-tight">
+              Email me my free results
+            </h3>
+            <p className="text-xs sm:text-[13px] text-[#5a6b78] leading-relaxed mb-4">
+              We&apos;ll send a clean PDF summary of your checklist and
+              details so you have them for reference.
+            </p>
+
+            {emailSent ? (
+              <div className="p-4 bg-[#e6f5ef] border border-[#b9e6d4] rounded-xl text-sm font-bold text-[#0c7a60] mb-4">
+                ✓ Check your inbox! Your results have been sent.
+              </div>
+            ) : (
+              <div className="space-y-3 mb-4">
+                <input
+                  type="email"
+                  value={emailInput}
+                  onChange={(e) => setEmailInput(e.target.value)}
+                  placeholder="your.email@example.com"
+                  className="w-full border border-[#cdd3d8] rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:border-[#0eb28d]"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (emailInput.includes("@")) {
+                      setEmailSent(true);
+                    }
+                  }}
+                  className="w-full py-3 rounded-xl bg-[#0eb28d] hover:bg-[#0c8f72] text-white font-bold text-sm shadow-md transition-all cursor-pointer"
+                >
+                  Send my results →
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setEmailModalOpen(false);
+                setEmailSent(false);
+              }}
+              className="text-xs font-bold text-[#5a6b78] hover:text-[#062c55] cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

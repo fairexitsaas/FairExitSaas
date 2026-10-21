@@ -33,7 +33,7 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 w-7 h-7 rounded-full bg-[#f4f6f8] text-[#5a6b78] hover:text-[#062c55] hover:bg-[#e6ebf0] flex items-center justify-center text-sm font-bold transition-colors cursor-pointer"
+          className="absolute top-4 right-4 w-7 h-7 rounded-full bg-[#f4f6f8] dark:bg-[#133863] text-[#5a6b78] dark:text-white hover:text-[#062c55] hover:bg-[#e6ebf0] dark:hover:bg-[#184878] flex items-center justify-center text-sm font-bold transition-colors cursor-pointer"
           aria-label="Close"
         >
           ✕
@@ -52,14 +52,14 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
           for your phone.
         </p>
 
-        {/* QR Code Container */}
-        <div className="inline-block p-2 rounded-[12px] border border-[#eef1f4] bg-white shadow-xs mb-2">
+        {/* QR Code Container - Must stay crisp white in dark & high-contrast so phone cameras scan it */}
+        <div className="inline-block p-2.5 rounded-[12px] border border-[#eef1f4] bg-white shadow-xs mb-2 qr-code-surface">
           <Image
             src="/assets/brand/store/app-qr.svg"
             alt="Scan QR code to download the FairExit app"
             width={160}
             height={160}
-            className="w-[150px] sm:w-[165px] h-[150px] sm:h-[165px] object-contain"
+            className="w-[150px] sm:w-[165px] h-[150px] sm:h-[165px] object-contain rounded-[8px]"
             priority
           />
         </div>
@@ -69,17 +69,17 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
         </div>
 
         {/* Link Row */}
-        <div className="flex items-center border border-[#cdd3d8] rounded-[9px] overflow-hidden mb-4 bg-white">
+        <div className="flex items-center border border-[#cdd3d8] rounded-[9px] overflow-hidden mb-4 bg-white dark:bg-[#071422] dark:border-[#1E3B5C]">
           <input
             type="text"
             readOnly
             value={appUrl}
-            className="flex-1 px-3 py-2 text-[12px] text-[#5a6b78] bg-transparent outline-none truncate"
+            className="flex-1 px-3 py-2 text-[12px] text-[#5a6b78] dark:text-[#9AB1C6] bg-transparent outline-none truncate"
           />
           <button
             type="button"
             onClick={handleCopy}
-            className="bg-[#062c55] hover:bg-[#041D38] text-white px-3.5 py-2 text-[12px] font-bold transition-colors cursor-pointer"
+            className="bg-[#062c55] dark:bg-[#0EB28D] hover:bg-[#041D38] dark:hover:bg-[#0C8F72] text-white dark:text-[#062C55] px-3.5 py-2 text-[12px] font-bold transition-colors cursor-pointer"
           >
             {copied ? "Copied!" : "Copy"}
           </button>
