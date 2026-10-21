@@ -2,6 +2,7 @@
 
 import { CountryContext, CountryCode } from "@/context/CountryContext";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
+import { GetAppProvider } from "@/context/GetAppContext";
 import React, { useState, useEffect } from "react";
 import CountrySelectionDialog from "@/components/dialogs/CountrySelectionDialog";
 import AccessibilityDialog from "@/components/accessibility/AccessibilityDialog";
@@ -50,16 +51,18 @@ export default function Provider({ children }: ProviderProp) {
 
   return (
     <AccessibilityProvider>
-      <CountryContext.Provider value={{ Country, setCountry }}>
-        {children}
-        {mounted && (
-          <CountrySelectionDialog
-            isOpen={isCountryModalOpen}
-            onSelect={handleSelectCountry}
-          />
-        )}
-        <AccessibilityDialog />
-      </CountryContext.Provider>
+      <GetAppProvider>
+        <CountryContext.Provider value={{ Country, setCountry }}>
+          {children}
+          {mounted && (
+            <CountrySelectionDialog
+              isOpen={isCountryModalOpen}
+              onSelect={handleSelectCountry}
+            />
+          )}
+          <AccessibilityDialog />
+        </CountryContext.Provider>
+      </GetAppProvider>
     </AccessibilityProvider>
   );
 }

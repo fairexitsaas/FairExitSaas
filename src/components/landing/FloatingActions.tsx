@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAccessibility, TextSize } from "@/context/AccessibilityContext";
 import { useCountry } from "@/context/CountryContext";
+import { triggerGetApp } from "@/context/GetAppContext";
 
 export default function FloatingActions() {
   const { settings, updateSetting, isDialogOpen, toggleDialog, closeDialog } =
@@ -51,7 +52,7 @@ export default function FloatingActions() {
         aria-label="Get the app"
         onClick={(e) => {
           e.preventDefault();
-          setAppBoxOpen(true);
+          triggerGetApp();
         }}
       >
         <svg

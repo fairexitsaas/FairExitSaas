@@ -237,9 +237,6 @@ html.reduce-motion *::after {
 html[data-text-size="small"] {
   font-size: 14px;
 }
-html[data-text-size="small"] h1 { font-size: clamp(1.75rem, 4vw, 2.5rem)  !important; }
-html[data-text-size="small"] h2 { font-size: clamp(1.25rem, 3vw, 1.75rem) !important; }
-html[data-text-size="small"] h3 { font-size: clamp(1rem,   2.5vw, 1.25rem) !important; }
 
 /* A (default — 16 px baseline) */
 html[data-text-size="default"] {
@@ -250,28 +247,8 @@ html[data-text-size="default"] {
 html[data-text-size="large"] {
   font-size: 18px;
 }
-html[data-text-size="large"] h1 { font-size: clamp(2.5rem, 5vw, 3.75rem) !important; }
-html[data-text-size="large"] h2 { font-size: clamp(1.75rem, 4vw, 2.5rem) !important; }
-html[data-text-size="large"] h3 { font-size: clamp(1.25rem, 3vw, 1.75rem) !important; }
-html[data-text-size="large"] p,
-html[data-text-size="large"] label,
-html[data-text-size="large"] input,
-html[data-text-size="large"] select,
-html[data-text-size="large"] button,
-html[data-text-size="large"] li,
-html[data-text-size="large"] a   { font-size: 1.125rem !important; }
 
 /* A++ (extra large) */
 html[data-text-size="extraLarge"] {
   font-size: 20px;
 }
-html[data-text-size="extraLarge"] h1 { font-size: clamp(2.75rem, 6vw, 4.25rem) !important; }
-html[data-text-size="extraLarge"] h2 { font-size: clamp(2rem,   5vw, 3rem)    !important; }
-html[data-text-size="extraLarge"] h3 { font-size: clamp(1.5rem, 4vw, 2rem)    !important; }
-html[data-text-size="extraLarge"] p,
-html[data-text-size="extraLarge"] label,
-html[data-text-size="extraLarge"] input,
-html[data-text-size="extraLarge"] select,
-html[data-text-size="extraLarge"] button,
-html[data-text-size="extraLarge"] li,
-html[data-text-size="extraLarge"] a   { font-size: 1.25rem !important; }
