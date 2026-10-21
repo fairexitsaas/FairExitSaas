@@ -33,7 +33,7 @@ export default function RootLayout({
       lang="en"
       className={`${dmSans.variable} ${newsreader.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 font-sans">
+      <body className="min-h-full flex flex-col bg-[#f6f4ef] text-[#17242f] font-sans">
         <Provider>{children}</Provider>
       </body>
     </html>
