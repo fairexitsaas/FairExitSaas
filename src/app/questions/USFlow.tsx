@@ -718,7 +718,12 @@ export default function USFlow() {
             <img
               src="/fairexit-wordmark.png"
               alt="FairExit"
-              className="h-[26px] w-auto"
+              className="h-[26px] w-auto dark:hidden"
+            />
+            <img
+              src="/fairexit-wordmark-dark.png"
+              alt="FairExit"
+              className="h-[26px] w-auto hidden dark:block"
             />
           </NextLink>
 

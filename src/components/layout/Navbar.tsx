@@ -148,8 +148,16 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
             }}
           >
             <Image
-              className="h-7 w-auto object-contain"
+              className="h-7 w-auto object-contain dark:hidden"
               src="/fairexit-wordmark.png"
+              alt="FairExit"
+              width={140}
+              height={32}
+              priority
+            />
+            <Image
+              className="h-7 w-auto object-contain hidden dark:block"
+              src="/fairexit-wordmark-dark.png"
               alt="FairExit"
               width={140}
               height={32}
@@ -164,7 +172,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
         </div>
 
         {/* Desktop Links */}
-        <div className="hidden lg:flex items-center gap-[18px] xl:gap-[22px]">
+        <div className="hidden lg:flex items-center gap-[18px] xl:gap-[22px] mr-4 xl:mr-6">
           <a
             className="text-[#5a6b78] hover:text-[#062c55] no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
             href={isCanada ? "#how" : "#check"}
@@ -217,7 +225,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
             onClick={handleA11yClick}
             aria-label="Accessibility options"
             title="Accessibility"
-            className="hidden lg:inline-flex items-center justify-center w-[34px] h-[34px] rounded-full border border-[#e7e4dd] bg-white text-[#062c55] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#0eb28d] hover:scale-105 transition-all"
+            className="hidden lg:inline-flex items-center justify-center w-[34px] h-[34px] rounded-full border border-[#e7e4dd] dark:border-[#183654] bg-white dark:bg-[#0D2238] text-[#062c55] dark:text-[#F0F6FC] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#0eb28d] hover:scale-105 transition-all"
           >
             <svg
               viewBox="0 0 24 24"
@@ -232,7 +240,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
 
           {/* Country Pill Switcher */}
           <a
-            className="hidden lg:inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#062c55] bg-[#eef4fa] border border-[#d9e6f2] rounded-[6px] px-[11px] py-[5px] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#b0ccdf] transition-all no-underline"
+            className="hidden lg:inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#062c55] dark:text-[#F0F6FC] bg-[#eef4fa] dark:bg-[#0E2742] border border-[#d9e6f2] dark:border-[#1E3B5C] rounded-[6px] px-[11px] py-[5px] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#b0ccdf] transition-all no-underline"
             href={
               isCanada
                 ? "../resource-hub-us/index-v3.html"

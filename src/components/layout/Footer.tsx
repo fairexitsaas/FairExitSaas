@@ -48,8 +48,15 @@ export default function Footer({
       <div className="max-w-[1200px] mx-auto px-6 w-full box-border grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-9 lg:gap-12">
         <div>
           <Image
-            className="h-7 w-auto object-contain"
+            className="h-7 w-auto object-contain dark:hidden"
             src="/fairexitlogo.png"
+            alt="FairExit"
+            width={140}
+            height={32}
+          />
+          <Image
+            className="h-7 w-auto object-contain hidden dark:block"
+            src="/fairexitlogo-dark.png"
             alt="FairExit"
             width={140}
             height={32}

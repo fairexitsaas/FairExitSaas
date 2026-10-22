@@ -117,12 +117,20 @@ export function AccessibilitySymbol({
 
 export function FairExitLogoGraphic({ className = "h-8 w-auto" }: { className?: string }) {
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src="/fairexitlogo.png"
-      alt="FairExit"
-      className={`object-contain ${className}`}
-    />
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/fairexitlogo.png"
+        alt="FairExit"
+        className={`object-contain dark:hidden ${className}`}
+      />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/fairexitlogo-dark.png"
+        alt="FairExit"
+        className={`object-contain hidden dark:block ${className}`}
+      />
+    </>
   );
 }
 
