@@ -171,11 +171,31 @@ html.dark .bg-white,
 html.dark [class*="bg-white"],
 html.dark [class*="bg-[#ffffff]"],
 html.dark [class*="bg-[#fafbfc]"],
+html.dark [class*="bg-[#fafcfb]"],
+html.dark [class*="bg-[#fafbfb]"],
 html.dark [class*="bg-[#fbfdfc]"],
+html.dark [class*="bg-[#fbfbfa]"],
+html.dark [class*="bg-[#faf9f5]"],
+html.dark [class*="bg-[#faf9f6]"],
+html.dark [class*="bg-[#fffdf6]"],
 html.dark [class*="bg-[#f4f6f8]"],
 html.dark [class*="bg-[#f8fafc]"],
-html.dark [class*="bg-[#fafafa]"] {
+html.dark [class*="bg-[#fafafa]"],
+html.dark [class*="bg-[#f0ede6]"],
+html.dark [class*="bg-[#eae6df]"],
+html.dark [class*="bg-[#eef0f2]"],
+html.dark [class*="bg-[#e6ebf0]"] {
   background-color: #0D2238 !important;
+}
+
+/* Inset breakdown and checklist boxes inside cards */
+html.dark .grid > [class*="bg-[#fafcfb]"],
+html.dark .grid > [class*="bg-[#fafbfb]"],
+html.dark [class*="rounded-[10px]"][class*="bg-[#fafcfb]"],
+html.dark [class*="rounded-xl"][class*="bg-[#fafcfb]"],
+html.dark [class*="rounded-xl"][class*="bg-[#fafbfb]"] {
+  background-color: #071524 !important;
+  border-color: #183654 !important;
 }
 
 /* Questions Summary Sidebar & Bottom Sheets */
@@ -202,17 +222,37 @@ html.dark [class*="bg-[#eef8f3]"],
 html.dark [class*="bg-[#e6f5ef]"],
 html.dark [class*="bg-[#e5f5ee]"],
 html.dark [class*="bg-[#f3faf6]"],
-html.dark [class*="bg-[#e6f8f1]"] {
+html.dark [class*="bg-[#e6f8f1]"],
+html.dark [class*="bg-[#f0fdf8]"],
+html.dark [class*="bg-[#f4f7f5]"],
+html.dark [class*="bg-[#f7fbf9]"],
+html.dark [class*="bg-[#cbf3e4]"] {
   background-color: #0A261E !important;
   border-color: #125E4A !important;
 }
 
 /* Gradients on cards become dark surfaces in dark mode */
 html.dark [class*="bg-gradient-to-r"][class*="from-[#e6f8f1]"],
-html.dark [class*="bg-gradient-to-r"][class*="to-[#f3faf6]"] {
+html.dark [class*="bg-gradient-to-r"][class*="to-[#f3faf6]"],
+html.dark [class*="bg-gradient-to-b"][class*="from-[#fbfdfc]"],
+html.dark [class*="bg-gradient-to-b"][class*="to-[#eef8f3]"],
+html.dark [class*="bg-gradient-to-b"][class*="from-white"],
+html.dark [class*="bg-gradient-to-b"][class*="to-[#fafcfb]"] {
   background-image: none !important;
   background-color: #0A261E !important;
   border-color: #125E4A !important;
+}
+
+/* Amber / Warning Badges in dark mode */
+html.dark [class*="bg-[#fbf3df]"],
+html.dark [class*="bg-[#fef3c7]"] {
+  background-color: #2E2205 !important;
+  border-color: #5C450A !important;
+  color: #FCD34D !important;
+}
+
+html.dark [class*="text-[#8a6400]"] {
+  color: #FCD34D !important;
 }
 
 html.dark [class*="bg-[#eef4fa]"] {
@@ -314,15 +354,23 @@ html.dark select option {
   color: #F0F6FC !important;
 }
 
-/* Dropdown arrow on dark selects */
+/* Dropdown arrow on dark selects (no-repeat prevents zigzag mesh) */
 html.dark select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.75L6 6.25L10.5 1.75' stroke='%23F0F6FC' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: right 1rem center !important;
+  background-size: 12px 8px !important;
 }
 
-/* Logo inversion on dark background */
-html.dark img[src*="fairexit-wordmark"],
-html.dark img[src*="fairexitlogo"] {
-  filter: brightness(0) invert(1) !important;
+/* Disabled buttons in dark mode */
+html.dark button:disabled,
+html.dark [class*="bg-[#dce3e0]"],
+html.dark [class*="bg-[#e2ddd4]"],
+html.dark [class*="bg-[#a1cfc4]"] {
+  background-color: #152E46 !important;
+  color: #5A6B78 !important;
+  border-color: #1E3B5C !important;
+  box-shadow: none !important;
 }
 
 /* Dialogs & Modals */
@@ -339,13 +387,13 @@ html.dark a:hover[class*="text-[#062c55]"] {
 }
 
 /* Buttons with navy background become elevated rich navy with white text */
-html.dark button[class*="bg-[#062c55]"]:not(#a11yFab) {
+html.dark button[class*="bg-[#062c55]"]:not(#a11yFab):not(:disabled) {
   background-color: #153E66 !important;
   border-color: #0EB28D !important;
   color: #FFFFFF !important;
 }
 
-html.dark button[class*="bg-[#062c55]"]:not(#a11yFab):hover {
+html.dark button[class*="bg-[#062c55]"]:not(#a11yFab):not(:disabled):hover {
   background-color: #1A4A78 !important;
 }
 
@@ -356,11 +404,16 @@ html.dark #a11yFab {
   border-color: transparent !important;
 }
 
-html.dark a[href="#app"],
-html.dark button[aria-label="Get the app"] {
-  background-color: #133863 !important;
-  border: 1px solid #2A5A8C !important;
-  color: #FFFFFF !important;
+html.dark #appFab {
+  background-color: #0D2238 !important;
+  color: #F0F6FC !important;
+  border: 1.5px solid #1E3B5C !important;
+}
+
+html.dark #appFab:hover {
+  background-color: #133A63 !important;
+  border-color: #0EB28D !important;
+  color: #0EB28D !important;
 }
 
 /* Hamburger menu icon bars */
@@ -733,14 +786,17 @@ html.dark.high-contrast .a11y-toggle-btn .a11y-toggle-knob {
 }
 
 /* ── FLOATING BUTTON IN HIGH CONTRAST ── */
-html.high-contrast:not(.dark) #a11yFab {
+html.high-contrast:not(.dark) #a11yFab,
+html.high-contrast:not(.dark) #appFab {
   background-color: #FFFFFF !important;
   color: #000000 !important;
   border: 2px solid #000000 !important;
 }
 
 html.high-contrast.dark #a11yFab,
-html.dark.high-contrast #a11yFab {
+html.dark.high-contrast #a11yFab,
+html.high-contrast.dark #appFab,
+html.dark.high-contrast #appFab {
   background-color: #000000 !important;
   color: #FFFFFF !important;
   border: 2px solid #FFFFFF !important;

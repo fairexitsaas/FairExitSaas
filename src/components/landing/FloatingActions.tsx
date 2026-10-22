@@ -11,7 +11,8 @@ export default function FloatingActions() {
     <>
       {/* ── Floating App Button ── */}
       <a
-        className="fixed bottom-[84px] right-6 w-12 h-12 rounded-full bg-navy text-white flex items-center justify-center shadow-[0_8px_24px_rgba(6,44,85,0.3)] z-[100] no-underline hover:scale-108 transition-transform group"
+        id="appFab"
+        className="fixed bottom-[84px] right-6 w-12 h-12 rounded-full bg-[#062c55] dark:bg-[#0D2238] border-[1.5px] border-transparent dark:border-[#1E3B5C] text-white dark:text-[#F0F6FC] hover:dark:border-[#0EB28D] hover:dark:text-[#0EB28D] flex items-center justify-center shadow-[0_8px_24px_rgba(6,44,85,0.3)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-[100] no-underline hover:scale-108 transition-all group"
         href="#app"
         aria-label="Get the app"
         onClick={(e) => {
@@ -32,7 +33,7 @@ export default function FloatingActions() {
           <rect x="6" y="2.5" width="12" height="19" rx="2.5"></rect>
           <path d="M10.5 18.5h3"></path>
         </svg>
-        <span className="absolute right-14 bg-navy text-white py-1 px-2.5 rounded-md text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity">
+        <span className="absolute right-14 bg-[#062c55] dark:bg-[#0D2238] border border-transparent dark:border-[#1E3B5C] text-white dark:text-[#F0F6FC] py-1 px-2.5 rounded-md text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity">
           Get the app
         </span>
       </a>

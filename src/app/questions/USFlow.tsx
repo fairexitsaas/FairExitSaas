@@ -1379,22 +1379,22 @@ export default function USFlow() {
                       }
                       className={`p-3.5 sm:p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-3 select-none ${
                         state.agreed
-                          ? "bg-[#f3faf6] border-[#0eb28d]"
-                          : "bg-[#fafbfb] border-[#e2dfd7] hover:border-[#c9c5bd]"
+                          ? "bg-[#f3faf6] border-[#0eb28d] dark:bg-[#0A261E] dark:border-[#125E4A]"
+                          : "bg-[#fafbfb] border-[#e2dfd7] dark:bg-[#0A1C2E] dark:border-[#1E3B5C] hover:border-[#c9c5bd]"
                       }`}
                     >
                       <div
                         className={`w-5 h-5 rounded border mt-0.5 flex items-center justify-center shrink-0 transition-colors ${
                           state.agreed
                             ? "bg-[#0eb28d] border-[#0eb28d] text-white text-xs font-bold"
-                            : "border-[#b0bac3] bg-white"
+                            : "border-[#b0bac3] dark:border-[#416285] bg-white dark:bg-[#071524]"
                         }`}
                       >
                         {state.agreed ? "✓" : ""}
                       </div>
-                      <div className="text-xs text-[#2b3a45] leading-relaxed">
+                      <div className="text-xs text-[#2b3a45] dark:text-[#E1E7ED] leading-relaxed">
                         I understand this is{" "}
-                        <b>
+                        <b className="dark:text-white">
                           information to help me get oriented — not legal advice
                         </b>
                         , and not an assessment of my case. The full{" "}
@@ -1403,7 +1403,7 @@ export default function USFlow() {
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
-                          className="text-[#0c8f72] font-bold underline"
+                          className="text-[#0c8f72] dark:text-[#34D399] font-bold underline"
                         >
                           Terms &amp; Disclaimer
                         </a>{" "}
@@ -1420,7 +1420,7 @@ export default function USFlow() {
                             window.scrollTo({ top: 0, behavior: "smooth" });
                           }}
                         />
-                        <span className="text-xs font-bold text-[#0c8f72]">
+                        <span className="text-xs font-bold text-[#0c8f72] dark:text-[#34D399]">
                           Ready — continue below ↓
                         </span>
                       </div>
@@ -1435,7 +1435,7 @@ export default function USFlow() {
                         className={`w-full py-3.5 px-6 rounded-[9px] font-bold text-sm sm:text-base transition-all ${
                           state.agreed
                             ? "bg-[#0eb28d] hover:bg-[#0c8f72] text-white shadow-[0_8px_20px_-8px_rgba(14,178,141,0.7)] cursor-pointer"
-                            : "bg-[#a1cfc4] text-white cursor-not-allowed opacity-70"
+                            : "bg-[#a1cfc4] dark:bg-[#152E46] text-white dark:text-[#5A6B78] cursor-not-allowed opacity-70"
                         }`}
                       >
                         Continue →

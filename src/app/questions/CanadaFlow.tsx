@@ -1530,22 +1530,22 @@ function QuestionsContent() {
                   onClick={() => setState({ ...state, agreed: !state.agreed })}
                   className={`flex gap-3 items-start mt-5 p-3.5 px-4 rounded-[14px] border-[1.5px] cursor-pointer transition-all ${
                     state.agreed
-                      ? "border-[#0eb28d] bg-[#f3faf6]"
-                      : "border-[#cdd3d8] bg-[#fafcfb] hover:border-[#0eb28d]"
+                      ? "border-[#0eb28d] bg-[#f3faf6] dark:bg-[#0A261E] dark:border-[#125E4A]"
+                      : "border-[#cdd3d8] dark:border-[#1E3B5C] bg-[#fafcfb] dark:bg-[#0A1C2E] hover:border-[#0eb28d]"
                   }`}
                 >
                   <div
                     className={`w-[18px] h-[18px] rounded-md border-2 flex items-center justify-center shrink-0 mt-0.5 text-xs font-extrabold ${
                       state.agreed
                         ? "bg-[#0eb28d] border-[#0eb28d] text-white"
-                        : "border-[#c3ccd3] text-transparent"
+                        : "border-[#c3ccd3] dark:border-[#416285] dark:bg-[#071524] text-transparent"
                     }`}
                   >
                     ✓
                   </div>
-                  <div className="text-[12.5px] sm:text-[13px] text-[#17242f] leading-snug">
+                  <div className="text-[12.5px] sm:text-[13px] text-[#17242f] dark:text-[#E1E7ED] leading-snug">
                     I understand this is{" "}
-                    <b>
+                    <b className="dark:text-white">
                       information to help me get oriented — not legal advice
                     </b>
                     . Any range shown is an estimate, not what I&apos;m owed.
@@ -1553,7 +1553,7 @@ function QuestionsContent() {
                     <a
                       href="#legal"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-[#0c8f72] font-bold underline"
+                      className="text-[#0c8f72] dark:text-[#34D399] font-bold underline"
                     >
                       Terms &amp; Disclaimer
                     </a>{" "}
@@ -1564,7 +1564,7 @@ function QuestionsContent() {
                 {/* Navigation and Confirmation Row */}
                 <div className="mt-5 flex items-center justify-between">
                   <QuestionBackButton onClick={goToQ3} />
-                  <span className="text-xs font-bold text-[#0c8f72]">
+                  <span className="text-xs font-bold text-[#0c8f72] dark:text-[#34D399]">
                     Ready — continue below ↓
                   </span>
                 </div>
@@ -1577,7 +1577,7 @@ function QuestionsContent() {
                   className={`w-full mt-3.5 py-3.5 px-6 rounded-[9px] font-bold text-sm sm:text-base transition-all ${
                     state.agreed
                       ? "bg-[#0eb28d] hover:bg-[#0c8f72] text-white shadow-[0_8px_20px_-8px_rgba(14,178,141,0.7)] cursor-pointer"
-                      : "bg-[#dce3e0] text-[#8c9693] cursor-not-allowed shadow-none"
+                      : "bg-[#dce3e0] dark:bg-[#152E46] text-[#8c9693] dark:text-[#5A6B78] cursor-not-allowed shadow-none"
                   }`}
                 >
                   Continue →

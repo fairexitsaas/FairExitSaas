@@ -148,15 +148,23 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
             }}
           >
             <Image
-              className="h-7 w-auto object-contain"
+              className="h-7 w-auto object-contain dark:hidden"
               src="/fairexit-wordmark.png"
               alt="FairExit"
               width={140}
               height={32}
               priority
             />
+            <Image
+              className="h-7 w-auto object-contain hidden dark:block"
+              src="/fairexit-wordmark-dark.png"
+              alt="FairExit"
+              width={140}
+              height={32}
+              priority
+            />
           </Link>
-          <span className="text-[11.5px] text-[#5a6b78] font-semibold mt-0.5 text-left tracking-[0.1px]">
+          <span className="text-[11.5px] text-[#5a6b78] dark:text-[#9ab1c6] font-semibold mt-0.5 text-left tracking-[0.1px]">
             {isCanada
               ? "Challenge your severance offer"
               : "Make sense of your offer"}
@@ -164,44 +172,44 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
         </div>
 
         {/* Desktop Links */}
-        <div className="hidden lg:flex items-center gap-[18px] xl:gap-[22px]">
+        <div className="hidden lg:flex items-center gap-3.5 xl:gap-5">
           <a
-            className="text-[#5a6b78] hover:text-[#062c55] no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
+            className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
             href={isCanada ? "#how" : "#check"}
             onClick={(e) => handleNavLinkClick(isCanada ? "#how" : "#check", e)}
           >
             How it works
           </a>
           <a
-            className="text-[#5a6b78] hover:text-[#062c55] no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
+            className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
             href="#paths"
             onClick={(e) => handleNavLinkClick("#paths", e)}
           >
             Pricing
           </a>
           <a
-            className="text-[#5a6b78] hover:text-[#062c55] no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
+            className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
             href="faq.html"
             onClick={(e) => handleNavLinkClick("faq.html", e)}
           >
             FAQ
           </a>
           <a
-            className="text-[#5a6b78] hover:text-[#062c55] no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
+            className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
             href="blog/index.html"
             onClick={(e) => handleNavLinkClick("blog/index.html", e)}
           >
             Blog
           </a>
           <a
-            className="text-[#5a6b78] hover:text-[#062c55] no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
+            className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
             href="#app"
             onClick={(e) => handleNavLinkClick("#app", e)}
           >
             Get the app
           </a>
           <a
-            className="text-[#5a6b78] hover:text-[#062c55] no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
+            className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
             href="about.html"
             onClick={(e) => handleNavLinkClick("about.html", e)}
           >
@@ -210,14 +218,14 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
         </div>
 
         {/* Nav Right */}
-        <div className="hidden sm:flex items-center gap-3 shrink-0 ml-auto">
+        <div className="hidden sm:flex items-center gap-3 shrink-0 ml-4 lg:ml-6">
           {/* Accessibility button */}
           <button
             type="button"
             onClick={handleA11yClick}
             aria-label="Accessibility options"
             title="Accessibility"
-            className="hidden lg:inline-flex items-center justify-center w-[34px] h-[34px] rounded-full border border-[#e7e4dd] bg-white text-[#062c55] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#0eb28d] hover:scale-105 transition-all"
+            className="hidden lg:inline-flex items-center justify-center w-[34px] h-[34px] rounded-full border border-[#e7e4dd] dark:border-[#1e3b5c] bg-white dark:bg-[#0d2238] text-[#062c55] dark:text-[#f0f6fc] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#0eb28d] dark:hover:border-[#0eb28d] hover:scale-105 transition-all"
           >
             <svg
               viewBox="0 0 24 24"
@@ -232,7 +240,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
 
           {/* Country Pill Switcher */}
           <a
-            className="hidden lg:inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#062c55] bg-[#eef4fa] border border-[#d9e6f2] rounded-[6px] px-[11px] py-[5px] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#b0ccdf] transition-all no-underline"
+            className="hidden lg:inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#062c55] dark:text-[#f0f6fc] bg-[#eef4fa] dark:bg-[#0e2742] border border-[#d9e6f2] dark:border-[#1a4269] rounded-[6px] px-[11px] py-[5px] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#b0ccdf] dark:hover:border-[#0eb28d] transition-all no-underline"
             href={
               isCanada
                 ? "../resource-hub-us/index-v3.html"
