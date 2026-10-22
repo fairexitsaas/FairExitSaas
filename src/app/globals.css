@@ -117,6 +117,8 @@
    DARK MODE TOKENS  (applied by AccessibilityContext → html.dark)
    ========================================================================== */
 html.dark {
+  color-scheme: dark;
+
   --page-bg:          #071524;
   --section-white:    #0B1E32;
   --section-gray:     #071524;
@@ -141,7 +143,7 @@ html.dark {
   --navy-banner-bg:   #0B1E32;
   --navy-card-border: rgba(255, 255, 255, 0.12);
 
-  --navy:             #0B1E32;
+  --navy:             #F0F6FC;
   --greend:           #12D29E;
   --green:            #0EB28D;
   --line:             #183654;
@@ -150,70 +152,610 @@ html.dark {
 }
 
 /* ==========================================================================
-   HIGH CONTRAST TOKENS
+   DARK MODE SURFACE & TEXT INVERSION (Dark & White swap)
    ========================================================================== */
-html.high-contrast {
+html.dark body {
+  background-color: #071524 !important;
+  color: #F0F6FC !important;
+}
+
+/* Headers & Navbars */
+html.dark header,
+html.dark [class*="bg-[#f6f4ef]"] {
+  background-color: rgba(7, 21, 36, 0.96) !important;
+  border-color: #183654 !important;
+}
+
+/* White & Off-white cards become dark surfaces */
+html.dark .bg-white,
+html.dark [class*="bg-white"],
+html.dark [class*="bg-[#ffffff]"],
+html.dark [class*="bg-[#fafbfc]"],
+html.dark [class*="bg-[#fbfdfc]"],
+html.dark [class*="bg-[#f4f6f8]"],
+html.dark [class*="bg-[#f8fafc]"],
+html.dark [class*="bg-[#fafafa]"] {
+  background-color: #0D2238 !important;
+}
+
+/* Questions Summary Sidebar & Bottom Sheets */
+html.dark [class*="bg-[#EEF1F4]"],
+html.dark [class*="bg-[#eef1f4]"],
+html.dark [class*="bg-[#f0f4f8]"] {
+  background-color: #0D2238 !important;
+  border-color: #1E3B5C !important;
+}
+
+/* Selected option pills in Questions pages: deep navy with bright teal border */
+html.dark [class*="bg-[#f0f4f8]"][class*="border-[#062c55]"],
+html.dark [class*="bg-[#f0f4f8]"][class*="border-[#062C55]"],
+html.dark div[class*="border-[#062c55]"][class*="bg-[#f0f4f8]"],
+html.dark div[class*="border-[#062C55]"][class*="bg-[#f0f4f8]"] {
+  background-color: #133A63 !important;
+  border-color: #0EB28D !important;
+  color: #FFFFFF !important;
+}
+
+/* Soft green / mint tinted backgrounds darken gracefully */
+html.dark [class*="bg-[#f0f9f5]"],
+html.dark [class*="bg-[#eef8f3]"],
+html.dark [class*="bg-[#e6f5ef]"],
+html.dark [class*="bg-[#e5f5ee]"],
+html.dark [class*="bg-[#f3faf6]"],
+html.dark [class*="bg-[#e6f8f1]"] {
+  background-color: #0A261E !important;
+  border-color: #125E4A !important;
+}
+
+/* Gradients on cards become dark surfaces in dark mode */
+html.dark [class*="bg-gradient-to-r"][class*="from-[#e6f8f1]"],
+html.dark [class*="bg-gradient-to-r"][class*="to-[#f3faf6]"] {
+  background-image: none !important;
+  background-color: #0A261E !important;
+  border-color: #125E4A !important;
+}
+
+html.dark [class*="bg-[#eef4fa]"] {
+  background-color: #0E2742 !important;
+  border-color: #1A4269 !important;
+}
+
+/* Progress rail track & background bars */
+html.dark [class*="bg-[#e9e5dc]"],
+html.dark [class*="bg-[#e2d9cc]"] {
+  background-color: #152E46 !important;
+}
+
+/* Steps bar indicators in Questions */
+html.dark #stepsBar li i[class*="bg-[#062c55]"],
+html.dark #stepsBar li i[class*="border-[#062c55]"] {
+  background-color: #0EB28D !important;
+  border-color: #0EB28D !important;
+  color: #062C55 !important;
+  box-shadow: 0 0 0 4px rgba(14, 178, 141, 0.25) !important;
+}
+
+html.dark #stepsBar li i[class*="bg-white"] {
+  background-color: #091C30 !important;
+  border-color: #1E3B5C !important;
+  color: #647B91 !important;
+}
+
+/* Text: Invert dark navy & charcoal to crisp white / light */
+html.dark [class*="text-[#062c55]"],
+html.dark [class*="text-[#062C55]"],
+html.dark [class*="text-[#17242f]"],
+html.dark [class*="text-[#17242F]"],
+html.dark [class*="text-[#2b3a45]"],
+html.dark [class*="text-[#334155]"],
+html.dark .text-navy,
+html.dark .text-ink {
+  color: #F0F6FC !important;
+}
+
+/* Text: Slate / muted text becomes readable light-slate */
+html.dark [class*="text-[#5a6b78]"],
+html.dark [class*="text-[#5A6B78]"],
+html.dark [class*="text-[#8a98a4]"],
+html.dark [class*="text-[#6c7d8a]"],
+html.dark .text-slate {
+  color: #9AB1C6 !important;
+}
+
+html.dark [class*="text-[#12523f]"] {
+  color: #6EE7B7 !important;
+}
+
+html.dark [class*="text-[#1f3b32]"] {
+  color: #A7F3D0 !important;
+}
+
+html.dark [class*="text-[#0c7a60]"] {
+  color: #34D399 !important;
+}
+
+/* Borders & Dividers */
+html.dark [class*="border-[#e7e4dd]"],
+html.dark [class*="border-[#cdd3d8]"],
+html.dark [class*="border-[#e0ddd4]"],
+html.dark [class*="border-[#d5dde4]"],
+html.dark [class*="border-[#e2d9cc]"],
+html.dark [class*="border-[#d9e6f2]"],
+html.dark [class*="border-[#b9e6d4]"],
+html.dark [class*="border-[#c7e6d6]"],
+html.dark [class*="border-[#cfe8dd]"],
+html.dark [class*="border-[#dbe3ea]"],
+html.dark .border-line {
+  border-color: #183654 !important;
+}
+
+/* Active option borders become emerald */
+html.dark [class*="border-[#062c55]"],
+html.dark [class*="border-[#062C55]"] {
+  border-color: #0EB28D !important;
+}
+
+/* Form Controls (Inputs, Selects, Textareas) */
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark select,
+html.dark textarea {
+  background-color: #071422 !important;
+  color: #F0F6FC !important;
+  border-color: #1E3B5C !important;
+}
+
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #647B91 !important;
+}
+
+html.dark select option {
+  background-color: #071422 !important;
+  color: #F0F6FC !important;
+}
+
+/* Dropdown arrow on dark selects */
+html.dark select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1.5 1.75L6 6.25L10.5 1.75' stroke='%23F0F6FC' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") !important;
+}
+
+/* Logo inversion on dark background */
+html.dark img[src*="fairexit-wordmark"],
+html.dark img[src*="fairexitlogo"] {
+  filter: brightness(0) invert(1) !important;
+}
+
+/* Dialogs & Modals */
+html.dark [role="dialog"],
+html.dark .relative.bg-white {
+  background-color: #0D2238 !important;
+  border-color: #183654 !important;
+  color: #F0F6FC !important;
+}
+
+/* Hover effects for dark mode */
+html.dark a:hover[class*="text-[#062c55]"] {
+  color: #FFFFFF !important;
+}
+
+/* Buttons with navy background become elevated rich navy with white text */
+html.dark button[class*="bg-[#062c55]"]:not(#a11yFab) {
+  background-color: #153E66 !important;
+  border-color: #0EB28D !important;
+  color: #FFFFFF !important;
+}
+
+html.dark button[class*="bg-[#062c55]"]:not(#a11yFab):hover {
+  background-color: #1A4A78 !important;
+}
+
+/* Floating Action buttons in dark mode */
+html.dark #a11yFab {
+  background-color: #0EB28D !important;
+  color: #062C55 !important;
+  border-color: transparent !important;
+}
+
+html.dark a[href="#app"],
+html.dark button[aria-label="Get the app"] {
+  background-color: #133863 !important;
+  border: 1px solid #2A5A8C !important;
+  color: #FFFFFF !important;
+}
+
+/* Hamburger menu icon bars */
+html.dark span[class*="bg-[#062c55]"] {
+  background-color: #F0F6FC !important;
+}
+
+/* SVGs with navy strokes or fills */
+html.dark svg[class*="text-[#062c55]"],
+html.dark svg [stroke="#062C55"],
+html.dark svg [stroke="#062c55"] {
+  stroke: #F0F6FC !important;
+}
+
+html.dark svg [fill="#062C55"],
+html.dark svg [fill="#062c55"] {
+  fill: #F0F6FC !important;
+}
+
+/* QR Code Container - NEVER invert background: must stay clean white with black modules */
+.qr-code-surface,
+html.dark .qr-code-surface,
+html.high-contrast .qr-code-surface,
+html.dark.high-contrast .qr-code-surface {
+  background-color: #FFFFFF !important;
+  border-color: #E2E8F0 !important;
+}
+
+html.dark img[src*="app-qr"],
+html.high-contrast img[src*="app-qr"] {
+  filter: none !important;
+}
+
+/* ==========================================================================
+   HIGH CONTRAST TOKENS & RULES (Absolute priority in both Dark & Light modes)
+   ========================================================================== */
+
+/* ── HIGH CONTRAST TOKENS (Light) ── */
+html.high-contrast:not(.dark) {
   --page-bg:          #FFFFFF;
   --section-white:    #FFFFFF;
-  --section-gray:     #F0F0F0;
-  --nav-bg:           rgba(255,255,255,0.98);
+  --section-gray:     #FFFFFF;
+
+  --nav-bg:           #FFFFFF;
   --nav-border:       #000000;
+
   --card-bg:          #FFFFFF;
   --card-border:      #000000;
+  --card-shadow:      none;
+
   --input-bg:         #FFFFFF;
   --input-border:     #000000;
+  --input-border-focus: #000000;
+
   --text-primary:     #000000;
-  --text-secondary:   #111111;
-  --text-muted:       #333333;
+  --text-body:        #000000;
+  --text-secondary:   #000000;
+  --text-muted:       #111111;
+
   --divider:          #000000;
+  --navy:             #000000;
+  --greend:           #005A36;
+  --green:            #000000;
+  --line:             #000000;
+  --slate:            #000000;
+  --ink:              #000000;
 }
 
-html.high-contrast.dark {
+/* ── HIGH CONTRAST TOKENS (Dark) ── */
+html.high-contrast.dark,
+html.dark.high-contrast {
+  color-scheme: dark;
+
   --page-bg:          #000000;
   --section-white:    #000000;
-  --section-gray:     #0A0A0A;
-  --nav-bg:           rgba(0,0,0,0.98);
+  --section-gray:     #000000;
+
+  --nav-bg:           #000000;
   --nav-border:       #FFFFFF;
+
   --card-bg:          #000000;
   --card-border:      #FFFFFF;
+  --card-shadow:      none;
+
   --input-bg:         #000000;
   --input-border:     #FFFFFF;
+  --input-border-focus: #FFFFFF;
+
   --text-primary:     #FFFFFF;
-  --text-secondary:   #EEEEEE;
-  --text-muted:       #CCCCCC;
+  --text-body:        #FFFFFF;
+  --text-secondary:   #FFFFFF;
+  --text-muted:       #EEEEEE;
+
   --divider:          #FFFFFF;
+  --navy:             #FFFFFF;
+  --greend:           #00FFCC;
+  --green:            #FFFFFF;
+  --line:             #FFFFFF;
+  --slate:            #FFFFFF;
+  --ink:              #FFFFFF;
 }
 
-/* ==========================================================================
-   BASE STYLES
-   ========================================================================== */
-
-body {
-  background-color: var(--page-bg);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  transition: background-color 0.25s ease, color 0.25s ease;
+/* ── CRITICAL: TRANSPARENT BACKDROPS & OVERLAYS MUST NEVER TURN OPAQUE ── */
+html.high-contrast .a11y-backdrop,
+html.high-contrast .bg-transparent,
+html.high-contrast [class*="bg-transparent"],
+html.high-contrast [class*="backdrop-"],
+html.high-contrast div[aria-hidden="true"].fixed.inset-0 {
+  background-color: transparent !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
 }
 
-/* ==========================================================================
-   HIGH CONTRAST — form controls & focus
-   ========================================================================== */
-html.high-contrast input,
-html.high-contrast select,
-html.high-contrast button,
-html.high-contrast textarea {
+/* ── HIGH CONTRAST LIGHT MODE ── */
+html:not([data-admin]).high-contrast:not(.dark) body {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+}
+
+/* Primary layout surfaces */
+html:not([data-admin]).high-contrast:not(.dark) main,
+html:not([data-admin]).high-contrast:not(.dark) section,
+html:not([data-admin]).high-contrast:not(.dark) header,
+html:not([data-admin]).high-contrast:not(.dark) footer,
+html:not([data-admin]).high-contrast:not(.dark) aside {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+}
+
+/* Cards & Dialogs in Light High Contrast */
+html:not([data-admin]).high-contrast:not(.dark) [role="dialog"],
+html:not([data-admin]).high-contrast:not(.dark) .bg-card,
+html:not([data-admin]).high-contrast:not(.dark) .bg-white,
+html:not([data-admin]).high-contrast:not(.dark) [class*="bg-white"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="bg-[#ffffff]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="bg-[#f6f4ef]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="bg-[#EEF1F4]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="bg-[#f0f4f8]"] {
+  background-color: #FFFFFF !important;
+  border-color: #000000 !important;
+  color: #000000 !important;
+}
+
+html:not([data-admin]).high-contrast:not(.dark) [role="dialog"] {
+  border: 2px solid #000000 !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Text in Light High Contrast */
+html:not([data-admin]).high-contrast:not(.dark) h1,
+html:not([data-admin]).high-contrast:not(.dark) h2,
+html:not([data-admin]).high-contrast:not(.dark) h3,
+html:not([data-admin]).high-contrast:not(.dark) h4,
+html:not([data-admin]).high-contrast:not(.dark) h5,
+html:not([data-admin]).high-contrast:not(.dark) h6,
+html:not([data-admin]).high-contrast:not(.dark) p,
+html:not([data-admin]).high-contrast:not(.dark) span:not(.a11y-toggle-knob),
+html:not([data-admin]).high-contrast:not(.dark) label,
+html:not([data-admin]).high-contrast:not(.dark) [class*="text-[#062c55]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="text-[#062C55]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="text-[#17242f]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="text-[#17242F]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="text-[#5a6b78]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="text-[#5A6B78]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="text-[#647B91]"],
+html:not([data-admin]).high-contrast:not(.dark) .text-navy,
+html:not([data-admin]).high-contrast:not(.dark) .text-ink,
+html:not([data-admin]).high-contrast:not(.dark) .text-slate {
+  color: #000000 !important;
+}
+
+/* Borders in Light High Contrast */
+html:not([data-admin]).high-contrast:not(.dark) [class*="border-"] {
+  border-color: #000000 !important;
+}
+
+/* Form inputs & buttons in Light High Contrast */
+html:not([data-admin]).high-contrast:not(.dark) input,
+html:not([data-admin]).high-contrast:not(.dark) select,
+html:not([data-admin]).high-contrast:not(.dark) textarea {
+  background-color: #FFFFFF !important;
+  border: 2px solid #000000 !important;
+  color: #000000 !important;
+}
+
+html:not([data-admin]).high-contrast:not(.dark) button:not(#a11yFab):not(.a11y-toggle-btn) {
+  border: 2px solid #000000 !important;
+}
+
+/* Selected option pills in Light High Contrast */
+html:not([data-admin]).high-contrast:not(.dark) [class*="border-[#062c55]"],
+html:not([data-admin]).high-contrast:not(.dark) [class*="bg-[#f0f4f8]"] {
+  background-color: #F0F0F0 !important;
+  border: 3px solid #000000 !important;
+  color: #000000 !important;
+  outline: 2px solid #000000 !important;
+}
+
+/* ── HIGH CONTRAST DARK MODE ── */
+html:not([data-admin]).high-contrast.dark body,
+html:not([data-admin]).dark.high-contrast body {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+/* Primary layout surfaces in Dark High Contrast */
+html:not([data-admin]).high-contrast.dark main,
+html:not([data-admin]).high-contrast.dark section,
+html:not([data-admin]).high-contrast.dark header,
+html:not([data-admin]).high-contrast.dark footer,
+html:not([data-admin]).high-contrast.dark aside,
+html:not([data-admin]).dark.high-contrast main,
+html:not([data-admin]).dark.high-contrast section,
+html:not([data-admin]).dark.high-contrast header,
+html:not([data-admin]).dark.high-contrast footer,
+html:not([data-admin]).dark.high-contrast aside {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+}
+
+/* Cards & Dialogs in Dark High Contrast */
+html:not([data-admin]).high-contrast.dark [role="dialog"],
+html:not([data-admin]).high-contrast.dark .bg-card,
+html:not([data-admin]).high-contrast.dark .bg-white,
+html:not([data-admin]).high-contrast.dark [class*="bg-white"],
+html:not([data-admin]).high-contrast.dark [class*="bg-[#ffffff]"],
+html:not([data-admin]).high-contrast.dark [class*="bg-[#f6f4ef]"],
+html:not([data-admin]).high-contrast.dark [class*="bg-[#071524]"],
+html:not([data-admin]).high-contrast.dark [class*="bg-[#0d2238]"],
+html:not([data-admin]).high-contrast.dark [class*="bg-[#EEF1F4]"],
+html:not([data-admin]).high-contrast.dark [class*="bg-[#f0f4f8]"],
+html:not([data-admin]).dark.high-contrast [role="dialog"],
+html:not([data-admin]).dark.high-contrast .bg-card,
+html:not([data-admin]).dark.high-contrast .bg-white,
+html:not([data-admin]).dark.high-contrast [class*="bg-white"],
+html:not([data-admin]).dark.high-contrast [class*="bg-[#ffffff]"],
+html:not([data-admin]).dark.high-contrast [class*="bg-[#f6f4ef]"],
+html:not([data-admin]).dark.high-contrast [class*="bg-[#071524]"],
+html:not([data-admin]).dark.high-contrast [class*="bg-[#0d2238]"],
+html:not([data-admin]).dark.high-contrast [class*="bg-[#EEF1F4]"],
+html:not([data-admin]).dark.high-contrast [class*="bg-[#f0f4f8]"] {
+  background-color: #000000 !important;
+  border-color: #FFFFFF !important;
+  color: #FFFFFF !important;
+}
+
+html:not([data-admin]).high-contrast.dark [role="dialog"],
+html:not([data-admin]).dark.high-contrast [role="dialog"] {
+  border: 2px solid #FFFFFF !important;
+  box-shadow: 0 10px 30px rgba(255, 255, 255, 0.15) !important;
+}
+
+/* Text in Dark High Contrast */
+html:not([data-admin]).high-contrast.dark h1,
+html:not([data-admin]).high-contrast.dark h2,
+html:not([data-admin]).high-contrast.dark h3,
+html:not([data-admin]).high-contrast.dark h4,
+html:not([data-admin]).high-contrast.dark h5,
+html:not([data-admin]).high-contrast.dark h6,
+html:not([data-admin]).high-contrast.dark p,
+html:not([data-admin]).high-contrast.dark span:not(.a11y-toggle-knob),
+html:not([data-admin]).high-contrast.dark label,
+html:not([data-admin]).high-contrast.dark [class*="text-[#062c55]"],
+html:not([data-admin]).high-contrast.dark [class*="text-[#062C55]"],
+html:not([data-admin]).high-contrast.dark [class*="text-[#17242f]"],
+html:not([data-admin]).high-contrast.dark [class*="text-[#17242F]"],
+html:not([data-admin]).high-contrast.dark [class*="text-[#5a6b78]"],
+html:not([data-admin]).high-contrast.dark [class*="text-[#5A6B78]"],
+html:not([data-admin]).high-contrast.dark [class*="text-[#647B91]"],
+html:not([data-admin]).high-contrast.dark .text-navy,
+html:not([data-admin]).high-contrast.dark .text-ink,
+html:not([data-admin]).high-contrast.dark .text-slate,
+html:not([data-admin]).dark.high-contrast h1,
+html:not([data-admin]).dark.high-contrast h2,
+html:not([data-admin]).dark.high-contrast h3,
+html:not([data-admin]).dark.high-contrast h4,
+html:not([data-admin]).dark.high-contrast h5,
+html:not([data-admin]).dark.high-contrast h6,
+html:not([data-admin]).dark.high-contrast p,
+html:not([data-admin]).dark.high-contrast span:not(.a11y-toggle-knob),
+html:not([data-admin]).dark.high-contrast label,
+html:not([data-admin]).dark.high-contrast [class*="text-[#062c55]"],
+html:not([data-admin]).dark.high-contrast [class*="text-[#062C55]"],
+html:not([data-admin]).dark.high-contrast [class*="text-[#17242f]"],
+html:not([data-admin]).dark.high-contrast [class*="text-[#17242F]"],
+html:not([data-admin]).dark.high-contrast [class*="text-[#5a6b78]"],
+html:not([data-admin]).dark.high-contrast [class*="text-[#5A6B78]"],
+html:not([data-admin]).dark.high-contrast [class*="text-[#647B91]"],
+html:not([data-admin]).dark.high-contrast .text-navy,
+html:not([data-admin]).dark.high-contrast .text-ink,
+html:not([data-admin]).dark.high-contrast .text-slate {
+  color: #FFFFFF !important;
+}
+
+/* Borders in Dark High Contrast */
+html:not([data-admin]).high-contrast.dark [class*="border-"],
+html:not([data-admin]).dark.high-contrast [class*="border-"] {
+  border-color: #FFFFFF !important;
+}
+
+/* Form inputs & buttons in Dark High Contrast */
+html:not([data-admin]).high-contrast.dark input,
+html:not([data-admin]).high-contrast.dark select,
+html:not([data-admin]).high-contrast.dark textarea,
+html:not([data-admin]).dark.high-contrast input,
+html:not([data-admin]).dark.high-contrast select,
+html:not([data-admin]).dark.high-contrast textarea {
+  background-color: #000000 !important;
+  border: 2px solid #FFFFFF !important;
+  color: #FFFFFF !important;
+}
+
+html:not([data-admin]).high-contrast.dark button:not(#a11yFab):not(.a11y-toggle-btn),
+html:not([data-admin]).dark.high-contrast button:not(#a11yFab):not(.a11y-toggle-btn) {
+  border: 2px solid #FFFFFF !important;
+}
+
+/* Selected option pills in Dark High Contrast */
+html:not([data-admin]).high-contrast.dark [class*="border-[#062c55]"],
+html:not([data-admin]).high-contrast.dark [class*="bg-[#f0f4f8]"],
+html:not([data-admin]).dark.high-contrast [class*="border-[#062c55]"],
+html:not([data-admin]).dark.high-contrast [class*="bg-[#f0f4f8]"] {
+  background-color: #111111 !important;
+  border: 3px solid #FFFFFF !important;
+  color: #FFFFFF !important;
+  outline: 2px solid #00FFCC !important;
+}
+
+/* ── TOGGLE SWITCHES IN HIGH CONTRAST ── */
+html.high-contrast .a11y-toggle-btn {
   border-width: 2px !important;
-  border-color: var(--input-border) !important;
-  font-weight: 600 !important;
+  border-style: solid !important;
 }
 
-html.high-contrast *:focus-visible {
+html.high-contrast:not(.dark) .a11y-toggle-btn[aria-checked="true"] {
+  background-color: #000000 !important;
+  border-color: #000000 !important;
+}
+
+html.high-contrast:not(.dark) .a11y-toggle-btn[aria-checked="false"] {
+  background-color: #FFFFFF !important;
+  border-color: #000000 !important;
+}
+
+html.high-contrast:not(.dark) .a11y-toggle-btn[aria-checked="true"] .a11y-toggle-knob {
+  background-color: #FFFFFF !important;
+}
+
+html.high-contrast:not(.dark) .a11y-toggle-btn[aria-checked="false"] .a11y-toggle-knob {
+  background-color: #000000 !important;
+}
+
+html.high-contrast.dark .a11y-toggle-btn[aria-checked="true"],
+html.dark.high-contrast .a11y-toggle-btn[aria-checked="true"] {
+  background-color: #0EB28D !important;
+  border-color: #FFFFFF !important;
+}
+
+html.high-contrast.dark .a11y-toggle-btn[aria-checked="false"],
+html.dark.high-contrast .a11y-toggle-btn[aria-checked="false"] {
+  background-color: #000000 !important;
+  border-color: #FFFFFF !important;
+}
+
+html.high-contrast.dark .a11y-toggle-btn .a11y-toggle-knob,
+html.dark.high-contrast .a11y-toggle-btn .a11y-toggle-knob {
+  background-color: #FFFFFF !important;
+}
+
+/* ── FLOATING BUTTON IN HIGH CONTRAST ── */
+html.high-contrast:not(.dark) #a11yFab {
+  background-color: #FFFFFF !important;
+  color: #000000 !important;
+  border: 2px solid #000000 !important;
+}
+
+html.high-contrast.dark #a11yFab,
+html.dark.high-contrast #a11yFab {
+  background-color: #000000 !important;
+  color: #FFFFFF !important;
+  border: 2px solid #FFFFFF !important;
+}
+
+/* ── FOCUS VISIBLE OUTLINES ── */
+html:not([data-admin]).high-contrast *:focus-visible {
   outline: 3px solid #000000 !important;
   outline-offset: 2px !important;
 }
 
-html.high-contrast.dark *:focus-visible {
-  outline-color: #FFFFFF !important;
+html.high-contrast.dark *:focus-visible,
+html.dark.high-contrast *:focus-visible {
+  outline: 3px solid #FFFFFF !important;
+  outline-offset: 2px !important;
 }
 
 /* ==========================================================================

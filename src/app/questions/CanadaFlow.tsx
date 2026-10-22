@@ -8,6 +8,7 @@ import { QuestionBackButton, QuestionNextButton } from "@/components/common/Ques
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import { triggerGetApp } from "@/context/GetAppContext";
+import { useAccessibility } from "@/context/AccessibilityContext";
 
 // Roles & occupation factors
 const OCCUPATIONS = [
@@ -114,6 +115,7 @@ function QuestionsContent() {
   const [emailSent, setEmailSent] = useState<boolean>(false);
   const [checklistModalOpen, setChecklistModalOpen] = useState<boolean>(false);
   const [askLawyerOpen, setAskLawyerOpen] = useState<boolean>(false);
+  const { toggleDialog } = useAccessibility();
 
   // User answers tracking via useState for FairExit summary box
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
@@ -311,6 +313,9 @@ function QuestionsContent() {
         roleFactor: r ? parseFloat(r) : state.roleFactor,
         offer: off ? parseInt(off.replace(/\D/g, ""), 10) : state.offer,
       });
+    } else {
+      // Normal flow entry: always display questions from the beginning!
+      setCurrentStep("q1");
     }
   }, [searchParams]);
 
@@ -492,6 +497,13 @@ function QuestionsContent() {
     return 0;
   }, [currentStep]);
 
+  const handleExit = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setCurrentStep("q1");
+    setUserAnswers({});
+    window.location.href = "/";
+  };
+
   // Navigation handlers for the Canada steps
   const goToQ1 = () => {
     setCurrentStep("q1");
@@ -611,12 +623,13 @@ function QuestionsContent() {
             >
               Get the app
             </button>
-            <NextLink
-              href="/"
-              className="hidden md:inline-block text-[13px] font-semibold text-[#5a6b78] hover:text-[#062c55] transition-colors whitespace-nowrap"
+            <button
+              type="button"
+              onClick={handleExit}
+              className="hidden md:inline-block text-[13px] font-semibold text-[#5a6b78] hover:text-[#062c55] transition-colors whitespace-nowrap cursor-pointer bg-transparent border-none p-0"
             >
               Exit ✕
-            </NextLink>
+            </button>
 
             {/* Mobile Your Details Trigger Button */}
             <button
@@ -699,6 +712,25 @@ function QuestionsContent() {
             >
               About
             </NextLink>
+            <div className="pt-2 border-t border-[#e7e4dd] flex justify-between text-xs text-[#5a6b78]">
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  triggerGetApp();
+                }}
+                className="font-bold text-[#0c8f72] cursor-pointer bg-transparent border-none p-0"
+              >
+                Get the app
+              </button>
+              <button
+                type="button"
+                onClick={handleExit}
+                className="font-bold text-[#5a6b78] hover:text-[#062c55] cursor-pointer bg-transparent border-none p-0"
+              >
+                Exit ✕
+              </button>
+            </div>
           </div>
         )}
       </header>
@@ -3444,9 +3476,9 @@ function QuestionsContent() {
                 const offerPct = pct(offerAmt);
 
                 return (
-                  <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+                  <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-5 sm:p-8 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
                     {/* ── VERDICT CARD (encompasses tag, title, reasons, estbox, and srcbadge) ── */}
-                    <div className="text-center p-6 sm:p-7 bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[14px]">
+                    <div className="text-center p-5 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
                       <span className="text-[11.5px] font-extrabold uppercase tracking-[0.8px] text-[#0c8f72] block mb-1.5">
                         Often worth a closer look
                       </span>
@@ -3637,187 +3669,173 @@ function QuestionsContent() {
 
                     {/* Free Check Done Ribbon & Email Link */}
                     <div className="text-center my-6">
-                      <span className="inline-block bg-[#e6f5ef] text-[#0c7a60] font-extrabold text-[12.5px] px-3 py-1.5 rounded-[6px]">
-                        Your free check is done · no card, no signup, nothing
-                        owed
-                      </span>
-                      <div className="mt-2.5">
+                      <div className="inline-block bg-[#e6f5ef] text-[#0c7a60] font-sans font-[800] text-[12.5px] leading-[18px] px-3.5 py-1.5 rounded-[6px] mb-2.5">
+                        Your free check is done · no card, no signup, nothing owed
+                      </div>
+                      <div>
                         <button
                           type="button"
                           onClick={() => setEmailModalOpen(true)}
-                          className="text-xs sm:text-[13.5px] font-bold text-[#0c8f72] hover:underline cursor-pointer"
+                          className="font-sans font-[700] text-[14px] leading-[20px] text-[#0c8f72] underline hover:no-underline cursor-pointer"
                         >
                           Email me my free result →
                         </button>
                       </div>
                     </div>
 
+                    {/* Divider Line */}
+                    <div className="my-7 border-t border-[#e7e4dd]" />
+
                     {/* ── NEXT STEP · OPTIONAL ── */}
-                    <div className="mt-8 text-center">
-                      <div className="text-[11px] font-extrabold uppercase tracking-[0.9px] text-[#0c8f72] mb-1">
+                    <div className="text-center mb-6">
+                      <div className="font-sans font-[800] uppercase tracking-[0.9px] text-[11px] leading-[16px] text-[#0c8f72] mb-1">
                         Next step · optional
                       </div>
-                      <h3 className="font-serif font-bold text-2xl sm:text-[30px] text-[#062c55] leading-tight mb-2">
+                      <h2 className="font-serif font-[600] text-[26px] sm:text-[32px] text-[#062c55] leading-[32px] sm:leading-[36px] tracking-normal mb-2">
                         Want to take it a step further?
-                      </h3>
-                      <p className="text-xs sm:text-[13.5px] text-[#5a6b78] max-w-[520px] mx-auto mb-6">
-                        Two ways, both optional. Tap the ⓘ on either card for
-                        detail.
+                      </h2>
+                      <p className="font-sans font-normal text-[14px] sm:text-[15px] leading-[20px] text-[#5a6b78] max-w-[540px] mx-auto">
+                        Two ways, both optional. Tap the ⓘ on either card for detail.
                       </p>
+                    </div>
 
-                      {/* 2 Options Cards */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-[620px] mx-auto text-left">
-                        {/* Card 1: Do It Yourself */}
-                        <div className="relative border border-[#e7e4dd] rounded-[12px] p-5 sm:p-6 bg-white flex flex-col justify-between shadow-xs hover:border-[#062c55] transition-all">
-                          <button
-                            type="button"
-                            onClick={() => setInfoModal("report")}
-                            className="absolute top-3.5 right-3.5 w-[27px] h-[27px] rounded-full bg-[#062c55] text-white flex items-center justify-center hover:bg-[#0c8f72] transition-colors cursor-pointer shadow-[0_2px_6px_-1px_rgba(6,44,85,0.4)] z-10"
-                            aria-label="Info about Severance Report"
-                          >
-                            <svg
-                              viewBox="0 0 24 24"
-                              fill="currentColor"
-                              className="w-[15px] h-[15px] block"
-                              aria-hidden="true"
-                            >
-                              <circle cx="12" cy="6.6" r="1.7" />
-                              <rect x="10.5" y="10" width="3" height="8.4" rx="1.5" />
-                            </svg>
-                          </button>
-                          <div>
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#5a6b78]">
-                              Do it yourself
-                            </span>
-                            <h4 className="font-serif font-bold text-lg sm:text-[19px] text-[#062c55] mt-1 mb-2">
-                              Get your Severance Report
-                            </h4>
-                            <div className="font-serif text-3xl font-bold text-[#062c55] leading-none mb-1">
-                              $59
-                            </div>
-                            <div className="text-[11px] font-bold text-[#5a6b78] mb-3">
-                              one-time · no subscription
-                            </div>
-                            <p className="text-xs text-[#5a6b78] leading-relaxed mb-5">
-                              Your offer organized, your dates, your questions —
-                              a 13-page report to take into any conversation.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setInfoModal("report")}
-                            className="w-full py-3 px-4 rounded-[9px] bg-[#062c55] hover:bg-[#041D38] text-white font-bold text-sm shadow-xs transition-all cursor-pointer text-center min-h-[46px] flex items-center justify-center"
-                          >
-                            Get my report
-                          </button>
-                        </div>
-
-                        {/* Card 2: Get Help */}
-                        <div className="relative border-2 border-[#0eb28d] rounded-[12px] p-5 sm:p-6 bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] flex flex-col justify-between shadow-[0_18px_34px_-22px_rgba(12,143,114,0.45)] hover:shadow-lg transition-all">
-                          <button
-                            type="button"
-                            onClick={() => setInfoModal("lawyer")}
-                            className="absolute top-3.5 right-3.5 w-[27px] h-[27px] rounded-full bg-[#062c55] text-white flex items-center justify-center hover:bg-[#0c8f72] transition-colors cursor-pointer shadow-[0_2px_6px_-1px_rgba(6,44,85,0.4)] z-10"
-                            aria-label="Info about talking to a lawyer"
-                          >
-                            <svg
-                              viewBox="0 0 24 24"
-                              fill="currentColor"
-                              className="w-[15px] h-[15px] block"
-                              aria-hidden="true"
-                            >
-                              <circle cx="12" cy="6.6" r="1.7" />
-                              <rect x="10.5" y="10" width="3" height="8.4" rx="1.5" />
-                            </svg>
-                          </button>
-                          <div>
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0c7a60]">
-                              Get help
-                            </span>
-                            <h4 className="font-serif font-bold text-lg sm:text-[19px] text-[#062c55] mt-1 mb-2">
-                              Talk to a lawyer
-                            </h4>
-                            <div className="font-serif text-3xl font-bold text-[#062c55] leading-none mb-1">
-                              Free
-                            </div>
-                            <div className="text-[11px] font-bold text-[#0c7a60] mb-3">
-                              first call · free to connect
-                            </div>
-                            <p className="text-xs text-[#5a6b78] leading-relaxed mb-5">
-                              Your best shot at the full number — and it&apos;s
-                              free for us to connect you.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => setAskLawyerOpen(true)}
-                            className="w-full py-3 px-4 rounded-[9px] bg-gradient-to-r from-[#0eb28d] to-[#0c8f72] hover:brightness-105 text-white font-bold text-sm shadow-[0_12px_22px_-14px_rgba(12,143,114,0.7)] transition-all cursor-pointer text-center min-h-[46px] flex items-center justify-center"
-                          >
-                            Ask a lawyer to contact me — free
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Third Option Link */}
-                      <div className="mt-5 text-center text-xs sm:text-[13px] text-[#5a6b78]">
-                        Happy with the offer as it is?{" "}
+                    {/* 2 Options Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left max-w-[640px] mx-auto">
+                      {/* Card 1: Do It Yourself */}
+                      <div className="relative border-[1.5px] border-[#e7e4dd] rounded-[15px] p-5 sm:p-6 bg-white flex flex-col justify-between shadow-xs hover:border-[#062c55] transition-all">
                         <button
                           type="button"
-                          onClick={() => setChecklistModalOpen(true)}
-                          className="text-[#0c8f72] font-bold hover:underline cursor-pointer inline-flex items-center gap-0.5"
+                          onClick={() => setInfoModal("report")}
+                          className="absolute top-3.5 right-3.5 w-[27px] h-[27px] rounded-full bg-[#062c55] text-white flex items-center justify-center hover:bg-[#0c8f72] transition-colors cursor-pointer shadow-[0_2px_6px_-1px_rgba(6,44,85,0.4)] z-10"
+                          aria-label="Info about Severance Report"
                         >
-                          Get your free 3-point checklist →
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            className="w-[15px] h-[15px] block"
+                            aria-hidden="true"
+                          >
+                            <circle cx="12" cy="6.6" r="1.7" />
+                            <rect x="10.5" y="10" width="3" height="8.4" rx="1.5" />
+                          </svg>
+                        </button>
+                        <div>
+                          <span className="font-sans font-[800] uppercase tracking-[0.8px] text-[11px] leading-[16px] text-[#5a6b78]">
+                            Do it yourself
+                          </span>
+                          <h3 className="font-serif font-[600] text-[19px] leading-[24px] text-[#062c55] mt-1 mb-2">
+                            Get your Severance Report
+                          </h3>
+                          <div className="font-serif font-[600] text-[30px] leading-none text-[#062c55] mb-2 flex items-baseline gap-2 flex-wrap">
+                            $59{" "}
+                            <span className="font-sans font-[700] text-[11px] leading-none text-[#5a6b78]">
+                              one-time · no subscription
+                            </span>
+                          </div>
+                          <p className="font-sans font-normal text-[13px] leading-[19.5px] text-[#5a6b78] mb-5">
+                            Your offer organized, your dates, your questions —
+                            a 13-page report to take into any conversation.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setInfoModal("report")}
+                          className="w-full py-3 px-4 rounded-[9px] bg-[#062c55] hover:bg-[#041D38] text-white font-sans font-[800] text-[14px] leading-[20px] shadow-xs transition-all cursor-pointer text-center min-h-[50px] flex items-center justify-center"
+                        >
+                          Get my report
                         </button>
                       </div>
 
-                      {/* Why talk to a lawyer? Box */}
-                      <div className="mt-5 max-w-[620px] mx-auto p-4 sm:p-4.5 rounded-[12px] border border-[#c7e6d6] bg-[#eef8f3] text-xs sm:text-[13px] text-[#12523f] leading-relaxed text-center">
-                        <b className="text-[#062c55] font-bold">
-                          Why talk to a lawyer?
-                        </b>{" "}
-                        Most people don&apos;t realize the first offer is
-                        usually just a{" "}
-                        <b className="text-[#062c55] font-bold">
-                          starting point
-                        </b>{" "}
-                        — an employment lawyer can spot money and terms people
-                        miss, and often recovers{" "}
-                        <b className="text-[#062c55] font-bold">
-                          more than they cost
-                        </b>
-                        . The first call is{" "}
-                        <b className="text-[#062c55] font-bold">free</b>,
-                        there&apos;s no obligation, and you choose who to talk
-                        to.
-                      </div>
-
-                      {/* Educational disclaimer */}
-                      <div className="mt-6 pt-5 border-t border-[#e7e4dd] text-[11px] sm:text-xs text-[#5a6b78] leading-relaxed text-center max-w-[600px] mx-auto">
-                        Educational and organizational information — not legal
-                        advice. FairExit does not assess whether an offer is
-                        fair, calculate what you&apos;re owed, or tell you what
-                        to do. Only a licensed employment lawyer can advise on
-                        your situation. Deadlines to act can be short — confirm
-                        them with a lawyer promptly. We&apos;re paid a fixed
-                        advertising fee by lawyers; never a cut of your
-                        outcome, and you always choose who to talk to.{" "}
-                        <a
-                          href="#legal"
-                          className="text-[#0c8f72] font-bold underline"
+                      {/* Card 2: Get Help */}
+                      <div className="relative border-2 border-[#0eb28d] rounded-[15px] p-5 sm:p-6 bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] flex flex-col justify-between shadow-[0_18px_34px_-22px_rgba(12,143,114,0.45)] hover:shadow-lg transition-all">
+                        <button
+                          type="button"
+                          onClick={() => setInfoModal("lawyer")}
+                          className="absolute top-3.5 right-3.5 w-[27px] h-[27px] rounded-full bg-[#062c55] text-white flex items-center justify-center hover:bg-[#0c8f72] transition-colors cursor-pointer shadow-[0_2px_6px_-1px_rgba(6,44,85,0.4)] z-10"
+                          aria-label="Info about talking to a lawyer"
                         >
-                          Terms &amp; Disclaimer →
-                        </a>
+                          <svg
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            className="w-[15px] h-[15px] block"
+                            aria-hidden="true"
+                          >
+                            <circle cx="12" cy="6.6" r="1.7" />
+                            <rect x="10.5" y="10" width="3" height="8.4" rx="1.5" />
+                          </svg>
+                        </button>
+                        <div>
+                          <span className="font-sans font-[800] uppercase tracking-[0.8px] text-[11px] leading-[16px] text-[#0c7a60]">
+                            Get help
+                          </span>
+                          <h3 className="font-serif font-[600] text-[19px] leading-[24px] text-[#062c55] mt-1 mb-2">
+                            Talk to a lawyer
+                          </h3>
+                          <div className="font-serif font-[600] text-[30px] leading-none text-[#062c55] mb-2 flex items-baseline gap-2 flex-wrap">
+                            Free{" "}
+                            <span className="font-sans font-[700] text-[11px] leading-none text-[#0c7a60]">
+                              first call · free to connect
+                            </span>
+                          </div>
+                          <p className="font-sans font-normal text-[13px] leading-[19.5px] text-[#5a6b78] mb-5">
+                            Your best shot at the full number — and it&apos;s
+                            free for us to connect you.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setAskLawyerOpen(true)}
+                          className="w-full py-3 px-4 rounded-[9px] bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] hover:brightness-105 text-white font-sans font-[800] text-[14px] leading-[20px] shadow-[0_12px_22px_-14px_rgba(12,143,114,0.7)] transition-all cursor-pointer text-center min-h-[50px] flex items-center justify-center"
+                        >
+                          Ask a lawyer to contact me — free
+                        </button>
                       </div>
                     </div>
 
-                    <div className="mt-8 text-center">
+                    {/* Third Option Link */}
+                    <div className="text-center my-4 font-sans font-normal text-[13.5px] leading-[20px] text-[#5a6b78]">
+                      Happy with the offer as it is?{" "}
                       <button
                         type="button"
-                        onClick={goToQ1}
-                        className="text-xs font-bold text-[#5a6b78] hover:text-[#062c55] cursor-pointer"
+                        onClick={() => setChecklistModalOpen(true)}
+                        className="font-sans font-[700] text-[#0c8f72] underline hover:no-underline cursor-pointer"
                       >
-                        ← Start over
+                        Get your free 3-point checklist →
                       </button>
+                    </div>
+
+                    {/* Why talk to a lawyer? Box */}
+                    <div className="rounded-[12px] p-[14px_18px] bg-[#f0f9f5] border border-[#c7e6d6] font-sans font-normal text-[13.5px] leading-[21px] text-[#12523f] my-4 text-center max-w-[640px] mx-auto">
+                      <b className="font-bold text-[#062c55]">
+                        Why talk to a lawyer?
+                      </b>{" "}
+                      Most people don&apos;t realize the first offer is
+                      usually just a{" "}
+                      <b>starting point</b>{" "}
+                      — an employment lawyer can spot money and terms people
+                      miss, and often recovers{" "}
+                      <b>more than they cost</b>
+                      . The first call is <b>free</b>,
+                      there&apos;s no obligation, and you choose who to talk
+                      to.
+                    </div>
+
+                    {/* Educational disclaimer */}
+                    <div className="mt-6 pt-5 border-t border-[#e7e4dd] font-sans font-normal text-[11.5px] leading-[17px] text-[#5a6b78] text-left max-w-[640px] mx-auto">
+                      Educational and organizational information — not legal
+                      advice. FairExit does not assess whether an offer is
+                      fair, calculate what you&apos;re owed, or tell you what
+                      to do. Only a licensed employment lawyer can advise on
+                      your situation. Deadlines to act can be short — confirm
+                      them with a lawyer promptly. We&apos;re paid a fixed
+                      advertising fee by lawyers; never a cut of your
+                      outcome, and you always choose who to talk to.{" "}
+                      <a
+                        href="#legal"
+                        className="text-[#0c8f72] font-bold underline"
+                      >
+                        Terms &amp; Disclaimer →
+                      </a>
                     </div>
                   </div>
                 );
@@ -3891,8 +3909,13 @@ function QuestionsContent() {
       <div className="fixed bottom-6 right-6 z-30 hidden md:flex flex-col items-center gap-2.5">
         <button
           type="button"
-          className="w-10 h-10 rounded-full bg-white border border-[#d5dde4] shadow-[0_4px_14px_rgba(6,44,85,0.12)] flex items-center justify-center text-[#062c55] hover:scale-105 transition-transform cursor-pointer"
-          aria-label="Call or chat"
+          onClick={(e) => {
+            e.preventDefault();
+            triggerGetApp();
+          }}
+          className="w-10 h-10 rounded-full bg-white dark:bg-[#133863] border border-[#d5dde4] dark:border-[#2A5A8C] shadow-[0_4px_14px_rgba(6,44,85,0.12)] flex items-center justify-center text-[#062c55] dark:text-white hover:scale-105 transition-transform cursor-pointer"
+          aria-label="Get the app"
+          title="Get the app"
         >
           <svg
             viewBox="0 0 24 24"
@@ -3909,8 +3932,13 @@ function QuestionsContent() {
         </button>
         <button
           type="button"
-          className="w-10 h-10 rounded-full bg-[#062c55] text-white shadow-[0_4px_14px_rgba(6,44,85,0.25)] flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleDialog();
+          }}
+          className="w-10 h-10 rounded-full bg-[#062c55] dark:bg-[#0EB28D] text-white dark:text-[#062C55] shadow-[0_4px_14px_rgba(6,44,85,0.25)] flex items-center justify-center hover:scale-105 transition-transform cursor-pointer"
           aria-label="Accessibility options"
+          title="Accessibility options"
         >
           <svg viewBox="0 0 24 24" fill="currentColor" className="w-5 h-5">
             <path d="M12 2c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm9 7h-6v13h-2v-6h-2v6H9V9H3V7h18v2z" />
@@ -3926,11 +3954,11 @@ function QuestionsContent() {
           onClick={() => setInfoModal(null)}
         >
           <div
-            className="relative bg-white rounded-[16px] p-6 max-w-[420px] w-full shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-in zoom-in-95 duration-150"
+            className="relative bg-white rounded-[16px] p-6 max-w-[420px] w-full shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="font-sans font-[800] text-[11px] uppercase tracking-[0.6px] text-[#0c8f72] mb-1.5">
-              Details
+              DETAILS
             </div>
 
             {infoModal === "report" ? (
@@ -3976,29 +4004,172 @@ function QuestionsContent() {
                 <h3 className="font-sans font-[700] text-[16px] text-[#062c55] leading-snug mb-2">
                   How the free call works
                 </h3>
-                <p className="font-sans font-normal text-[13px] leading-[19.5px] text-[#5a6b78] mb-3.5">
+                <p className="font-sans font-normal text-[13px] leading-[19.5px] text-[#5a6b78] mb-4">
                   Leave your name, email and phone. We pass them, with your organized summary, to an employment lawyer in your province who contacts you. They decide whether to offer a consultation. You keep a plain-English summary; the lawyer gets a clean intake.
                 </p>
-                <ul className="space-y-2 mb-5">
-                  <li className="flex items-start gap-2.5 font-sans font-normal text-[13px] leading-[19px] text-[#17242f]">
-                    <span className="text-[#0c8f72] font-[800] text-[13px] leading-[19px] flex-shrink-0">
-                      ✓
-                    </span>
-                    <span>First call is free to discuss your situation</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 font-sans font-normal text-[13px] leading-[19px] text-[#17242f]">
-                    <span className="text-[#0c8f72] font-[800] text-[13px] leading-[19px] flex-shrink-0">
-                      ✓
-                    </span>
-                    <span>Licensed employment lawyer in {state.province || "Ontario"}</span>
-                  </li>
-                  <li className="flex items-start gap-2.5 font-sans font-normal text-[13px] leading-[19px] text-[#17242f]">
-                    <span className="text-[#0c8f72] font-[800] text-[13px] leading-[19px] flex-shrink-0">
-                      ✓
-                    </span>
-                    <span>Zero upfront commitment — you remain in full control</span>
-                  </li>
-                </ul>
+
+                {(() => {
+                  const payLabelMap: Record<string, string> = {
+                    bonus: "Bonus",
+                    stock: "Stock",
+                    benefits: "Benefits",
+                    commission: "Commission",
+                    pto: "PTO",
+                  };
+                  const checkedPay = Object.entries(state.pay || {})
+                    .filter(([_, v]) => Boolean(v))
+                    .map(([k]) => payLabelMap[k] || k);
+                  const otherPayVal =
+                    checkedPay.length > 0
+                      ? checkedPay.join(", ")
+                      : userAnswers["otherPay"] || "Benefits";
+
+                  const getRoleLabel = () => {
+                    const occ = OCCUPATIONS.find(
+                      (o) => Math.abs(o.value - state.roleFactor) < 0.01,
+                    );
+                    if (occ) {
+                      return occ.label.split(" (")[0];
+                    }
+                    return "Professional";
+                  };
+
+                  const contractMap: Record<string, string> = {
+                    current: "Signed - same role",
+                    old: "Signed - role changed",
+                    none: "No written contract",
+                    unsure: "Unsure",
+                  };
+
+                  const reasonMap: Record<string, string> = {
+                    layoff: "Laid off (no cause)",
+                    cause: "For cause",
+                    constructive: "Forced out",
+                    templayoff: "Temporary layoff",
+                    mass: "Part of a big layoff (50+)",
+                    restructure: "Restructure / Downsized",
+                  };
+
+                  const flagMap: Record<string, string> = {
+                    none: "None noted",
+                    mistreat: "Mistreatment / discrimination",
+                    unpaid: "Unpaid bonus / wages",
+                    harassment: "Harassment / Reprisal",
+                    medical: "Medical / Disability",
+                    pregnant: "Pregnancy / Parental",
+                    other: "Other",
+                  };
+
+                  const rows = [
+                    {
+                      label: "Jurisdiction",
+                      value:
+                        PROVINCE_NAMES[state.province] ||
+                        state.province ||
+                        "Ontario",
+                    },
+                    {
+                      label: "Union member",
+                      value:
+                        state.union === "yes"
+                          ? "Yes"
+                          : state.union === "unsure"
+                            ? "Unsure"
+                            : "No",
+                    },
+                    {
+                      label: "Employment type",
+                      value:
+                        EMP_TYPE_LABELS[state.emptype] || "Regular employee",
+                    },
+                    {
+                      label: "Age",
+                      value: state.age || "23",
+                    },
+                    {
+                      label: "Length of service",
+                      value: state.years ? `${state.years} yrs` : "3 yrs",
+                    },
+                    {
+                      label: "Role / seniority",
+                      value: getRoleLabel(),
+                    },
+                    {
+                      label: "Base salary",
+                      value: state.salary
+                        ? `${money(parseFloat(state.salary))}/yr`
+                        : "$100,000/yr",
+                    },
+                    {
+                      label: "Other pay",
+                      value: otherPayVal,
+                    },
+                    {
+                      label: "Termination clause",
+                      value:
+                        state.clause === "yes"
+                          ? "Clause present — needs review"
+                          : state.clause === "no"
+                            ? "No clause"
+                            : "Unclear — needs review",
+                    },
+                    {
+                      label: "Employment contract",
+                      value: contractMap[state.contract] || "Unsure",
+                    },
+                    {
+                      label: "Payroll ≥ $2.5M",
+                      value:
+                        state.payroll === "yes"
+                          ? "Yes"
+                          : state.payroll === "no"
+                            ? "No"
+                            : "Unsure",
+                    },
+                    {
+                      label: "How it ended",
+                      value:
+                        reasonMap[state.reason] || "Laid off (no cause)",
+                    },
+                    {
+                      label: "Flags",
+                      value: flagMap[state.redflag] || "None noted",
+                    },
+                    {
+                      label: "Re-employed?",
+                      value:
+                        state.reemployed === "yes"
+                          ? "Yes"
+                          : state.reemployed === "soon"
+                            ? "Interviews"
+                            : state.reemployed === "offer"
+                              ? "Offer received"
+                              : "Not yet",
+                    },
+                  ];
+
+                  return (
+                    <div className="space-y-0 mb-5">
+                      {rows.map((row, idx) => (
+                        <div
+                          key={row.label}
+                          className={`flex justify-between items-center py-2 ${
+                            idx < rows.length - 1
+                              ? "border-b border-dotted border-[#d5dde4]"
+                              : ""
+                          } gap-4 text-[13px] leading-tight`}
+                        >
+                          <span className="text-[#5a6b78] shrink-0 font-normal">
+                            {row.label}
+                          </span>
+                          <span className="text-[#062c55] font-[700] text-right">
+                            {row.value}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </>
             )}
 

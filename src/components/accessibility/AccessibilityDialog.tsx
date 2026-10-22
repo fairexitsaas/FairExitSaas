@@ -37,7 +37,8 @@ export default function AccessibilityDialog() {
     <>
       {/* Invisible backdrop to dismiss popup when clicking outside (keeps page bright & visible) */}
       <div
-        className="fixed inset-0 z-40 bg-transparent"
+        className="fixed inset-0 z-40 a11y-backdrop"
+        style={{ backgroundColor: "transparent", background: "transparent" }}
         onClick={closeDialog}
         aria-hidden="true"
       />
@@ -144,14 +145,14 @@ function Toggle({
         role="switch"
         aria-checked={checked}
         onClick={onChange}
-        className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green focus:ring-offset-1 ${
+        className={`a11y-toggle-btn relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full p-0.5 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-green focus:ring-offset-1 ${
           checked
             ? "bg-navy dark:bg-green"
             : "bg-[#D8D2C5] dark:bg-[#1E3A56]"
         }`}
       >
         <span
-          className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+          className={`a11y-toggle-knob pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
             checked ? "translate-x-5" : "translate-x-0"
           }`}
         />

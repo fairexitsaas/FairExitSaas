@@ -10,8 +10,13 @@ function QuestionsRouter() {
   const countryParam = searchParams?.get("country")?.toUpperCase();
   const stParam = searchParams?.get("st") || searchParams?.get("state");
   const isCanada = countryParam ? countryParam === "CA" : stParam ? false : true;
+  const flowKey = `${isCanada ? "CA" : "US"}_${searchParams?.toString() || ""}`;
 
-  return isCanada ? <CanadaFlow /> : <USFlow />;
+  return isCanada ? (
+    <CanadaFlow key={flowKey} />
+  ) : (
+    <USFlow key={flowKey} />
+  );
 }
 
 export default function QuestionsPage() {
