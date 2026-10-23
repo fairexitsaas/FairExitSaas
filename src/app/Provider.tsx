@@ -23,23 +23,60 @@ export default function Provider({ children }: ProviderProp) {
     queueMicrotask(() => {
       setMounted(true);
       try {
-        const stored = localStorage.getItem("fairexit_country") as CountryCode | null;
-        if (stored === "CA" || stored === "US") {
-          setCountryState(stored);
+        // 1. Check URL parameters for explicit country or state
+        const params = new URLSearchParams(window.location.search);
+        const countryParam = params.get("country")?.toUpperCase();
+        const stParam = params.get("st") || params.get("state");
+
+        let knownCountry: CountryCode | null = null;
+        if (countryParam === "CA" || countryParam === "US") {
+          knownCountry = countryParam;
+        } else if (stParam) {
+          knownCountry = "US";
+        }
+
+        // 2. Check localStorage for saved choice
+        if (!knownCountry) {
+          const stored = (
+            localStorage.getItem("fairexit_country") ||
+            localStorage.getItem("fx_country")
+          )?.toUpperCase() as CountryCode | null;
+          if (stored === "CA" || stored === "US") {
+            knownCountry = stored;
+          }
+        }
+
+        if (knownCountry) {
+          setCountryState(knownCountry);
+          try {
+            localStorage.setItem("fairexit_country", knownCountry);
+            localStorage.setItem("fx_country", knownCountry.toLowerCase());
+          } catch {
+            // ignore
+          }
+          setIsCountryModalOpen(false);
         } else {
-          // Show dialog — page already shows US content as background
-          setIsCountryModalOpen(true);
+          // If country is not known from URL or storage:
+          // Never show the pop-up on /questions or /admin; only show on landing page
+          const isQuestions = window.location.pathname.startsWith("/questions");
+          const isAdmin = window.location.pathname.startsWith("/admin");
+          if (!isQuestions && !isAdmin) {
+            setIsCountryModalOpen(true);
+          } else {
+            setIsCountryModalOpen(false);
+          }
         }
       } catch {
-        setIsCountryModalOpen(true);
+        setIsCountryModalOpen(false);
       }
     });
-  }, []);
+  }, [pathname]);
 
   const setCountry = (newCountry: CountryCode) => {
     setCountryState(newCountry);
     try {
       localStorage.setItem("fairexit_country", newCountry);
+      localStorage.setItem("fx_country", newCountry.toLowerCase());
     } catch {
       // Ignore storage errors
     }
@@ -52,13 +89,14 @@ export default function Provider({ children }: ProviderProp) {
   };
 
   const isAdminRoute = pathname?.startsWith("/admin");
+  const isQuestionsRoute = pathname?.startsWith("/questions");
 
   return (
     <AccessibilityProvider>
       <GetAppProvider>
         <CountryContext.Provider value={{ Country, setCountry }}>
           {children}
-          {mounted && !isAdminRoute && (
+          {mounted && !isAdminRoute && !isQuestionsRoute && (
             <CountrySelectionDialog
               isOpen={isCountryModalOpen}
               onSelect={handleSelectCountry}

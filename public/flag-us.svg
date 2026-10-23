@@ -1,51 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 336" width="34" height="22">
-  <rect width="640" height="336" fill="#B22234"/>
-  <path d="M0 26h640v26H0zm0 52h640v26H0zm0 52h640v26H0zm0 52h640v26H0zm0 52h640v26H0zm0 52h640v26H0z" fill="#FFFFFF"/>
-  <rect width="256" height="182" fill="#3C3B6E"/>
-  <g fill="#FFFFFF">
-    <circle cx="28" cy="20" r="6"/>
-    <circle cx="68" cy="20" r="6"/>
-    <circle cx="108" cy="20" r="6"/>
-    <circle cx="148" cy="20" r="6"/>
-    <circle cx="188" cy="20" r="6"/>
-    <circle cx="228" cy="20" r="6"/>
-    <circle cx="48" cy="40" r="6"/>
-    <circle cx="88" cy="40" r="6"/>
-    <circle cx="128" cy="40" r="6"/>
-    <circle cx="168" cy="40" r="6"/>
-    <circle cx="208" cy="40" r="6"/>
-    <circle cx="28" cy="60" r="6"/>
-    <circle cx="68" cy="60" r="6"/>
-    <circle cx="108" cy="60" r="6"/>
-    <circle cx="148" cy="60" r="6"/>
-    <circle cx="188" cy="60" r="6"/>
-    <circle cx="228" cy="60" r="6"/>
-    <circle cx="48" cy="80" r="6"/>
-    <circle cx="88" cy="80" r="6"/>
-    <circle cx="128" cy="80" r="6"/>
-    <circle cx="168" cy="80" r="6"/>
-    <circle cx="208" cy="80" r="6"/>
-    <circle cx="28" cy="100" r="6"/>
-    <circle cx="68" cy="100" r="6"/>
-    <circle cx="108" cy="100" r="6"/>
-    <circle cx="148" cy="100" r="6"/>
-    <circle cx="188" cy="100" r="6"/>
-    <circle cx="228" cy="100" r="6"/>
-    <circle cx="48" cy="120" r="6"/>
-    <circle cx="88" cy="120" r="6"/>
-    <circle cx="128" cy="120" r="6"/>
-    <circle cx="168" cy="120" r="6"/>
-    <circle cx="208" cy="120" r="6"/>
-    <circle cx="28" cy="140" r="6"/>
-    <circle cx="68" cy="140" r="6"/>
-    <circle cx="108" cy="140" r="6"/>
-    <circle cx="148" cy="140" r="6"/>
-    <circle cx="188" cy="140" r="6"/>
-    <circle cx="228" cy="140" r="6"/>
-    <circle cx="48" cy="160" r="6"/>
-    <circle cx="88" cy="160" r="6"/>
-    <circle cx="128" cy="160" r="6"/>
-    <circle cx="168" cy="160" r="6"/>
-    <circle cx="208" cy="160" r="6"/>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 14" width="31" height="22">
+  <rect width="20" height="14" fill="#b22234"/>
+  <rect y="2" width="20" height="2" fill="#fff"/>
+  <rect y="6" width="20" height="2" fill="#fff"/>
+  <rect y="10" width="20" height="2" fill="#fff"/>
+  <rect width="9" height="8" fill="#3c3b6e"/>
 </svg>

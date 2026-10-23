@@ -3,20 +3,21 @@ import React from "react";
 export function CanadaFlagIcon({ className = "w-5 h-3.5" }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 640 320"
+      viewBox="0 0 20 14"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
       aria-label="Canada Flag"
       role="img"
     >
-      <rect width="160" height="320" fill="#D80027" />
-      <rect x="160" width="320" height="320" fill="#FFFFFF" />
-      <rect x="480" width="160" height="320" fill="#D80027" />
-      <path
-        d="M320 60l14 42 36-12-16 36 34 16-28 24 16 32-38-10-8 32-10-32-38 10 16-32-28-24 34-16-16-36 36 12z"
-        fill="#D80027"
-      />
-      <path d="M316 230h8v42h-8z" fill="#D80027" />
+      <rect width="20" height="14" fill="#fff" />
+      <rect width="5.5" height="14" fill="#d52b1e" />
+      <rect x="14.5" width="5.5" height="14" fill="#d52b1e" />
+      <g transform="translate(10 7) scale(0.11) translate(-50 -48)">
+        <path
+          d="M50 6L55 25L60 20L58 40L75 35L68 48L90 50L68 58L72 70L55 65L57 90L50 82L43 90L45 65L28 70L32 58L10 50L32 48L25 35L42 40L40 20L45 25Z"
+          fill="#d52b1e"
+        />
+      </g>
     </svg>
   );
 }
@@ -24,64 +25,17 @@ export function CanadaFlagIcon({ className = "w-5 h-3.5" }: { className?: string
 export function USFlagIcon({ className = "w-5 h-3.5" }: { className?: string }) {
   return (
     <svg
-      viewBox="0 0 640 336"
+      viewBox="0 0 20 14"
       className={className}
       xmlns="http://www.w3.org/2000/svg"
       aria-label="United States Flag"
       role="img"
     >
-      <rect width="640" height="336" fill="#B22234" />
-      <path
-        d="M0 26h640v26H0zm0 52h640v26H0zm0 52h640v26H0zm0 52h640v26H0zm0 52h640v26H0zm0 52h640v26H0z"
-        fill="#FFFFFF"
-      />
-      <rect width="256" height="182" fill="#3C3B6E" />
-      <g fill="#FFFFFF">
-        <circle cx="28" cy="20" r="5" />
-        <circle cx="68" cy="20" r="5" />
-        <circle cx="108" cy="20" r="5" />
-        <circle cx="148" cy="20" r="5" />
-        <circle cx="188" cy="20" r="5" />
-        <circle cx="228" cy="20" r="5" />
-        <circle cx="48" cy="40" r="5" />
-        <circle cx="88" cy="40" r="5" />
-        <circle cx="128" cy="40" r="5" />
-        <circle cx="168" cy="40" r="5" />
-        <circle cx="208" cy="40" r="5" />
-        <circle cx="28" cy="60" r="5" />
-        <circle cx="68" cy="60" r="5" />
-        <circle cx="108" cy="60" r="5" />
-        <circle cx="148" cy="60" r="5" />
-        <circle cx="188" cy="60" r="5" />
-        <circle cx="228" cy="60" r="5" />
-        <circle cx="48" cy="80" r="5" />
-        <circle cx="88" cy="80" r="5" />
-        <circle cx="128" cy="80" r="5" />
-        <circle cx="168" cy="80" r="5" />
-        <circle cx="208" cy="80" r="5" />
-        <circle cx="28" cy="100" r="5" />
-        <circle cx="68" cy="100" r="5" />
-        <circle cx="108" cy="100" r="5" />
-        <circle cx="148" cy="100" r="5" />
-        <circle cx="188" cy="100" r="5" />
-        <circle cx="228" cy="100" r="5" />
-        <circle cx="48" cy="120" r="5" />
-        <circle cx="88" cy="120" r="5" />
-        <circle cx="128" cy="120" r="5" />
-        <circle cx="168" cy="120" r="5" />
-        <circle cx="208" cy="120" r="5" />
-        <circle cx="28" cy="140" r="5" />
-        <circle cx="68" cy="140" r="5" />
-        <circle cx="108" cy="140" r="5" />
-        <circle cx="148" cy="140" r="5" />
-        <circle cx="188" cy="140" r="5" />
-        <circle cx="228" cy="140" r="5" />
-        <circle cx="48" cy="160" r="5" />
-        <circle cx="88" cy="160" r="5" />
-        <circle cx="128" cy="160" r="5" />
-        <circle cx="168" cy="160" r="5" />
-        <circle cx="208" cy="160" r="5" />
-      </g>
+      <rect width="20" height="14" fill="#b22234" />
+      <rect y="2" width="20" height="2" fill="#fff" />
+      <rect y="6" width="20" height="2" fill="#fff" />
+      <rect y="10" width="20" height="2" fill="#fff" />
+      <rect width="9" height="8" fill="#3c3b6e" />
     </svg>
   );
 }
