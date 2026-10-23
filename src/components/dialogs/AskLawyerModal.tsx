@@ -63,11 +63,11 @@ export default function AskLawyerModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-scrimin"
       onClick={handleClose}
     >
       <div
-        className="relative bg-white rounded-[16px] p-5 sm:p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-in zoom-in-95 duration-150"
+        className="relative bg-white rounded-[16px] p-5 sm:p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-dlgup"
         onClick={(e) => e.stopPropagation()}
       >
         {submitted ? (
@@ -76,7 +76,7 @@ export default function AskLawyerModal({
               Sent
             </div>
 
-            <h3 className="font-serif font-[600] text-[22px] sm:text-[24px] text-[#062c55] leading-tight mb-2">
+            <h3 className="font-serif font-[600] text-[22px] sm:text-[24px] text-[#062c55] leading-[1.1] mb-2">
               Thanks, {name.trim().split(" ")[0] || "there"}.
             </h3>
 
@@ -105,7 +105,7 @@ export default function AskLawyerModal({
               Talk to {isUS ? "an attorney" : "a lawyer"} · free
             </div>
 
-            <h3 className="font-serif font-[600] text-[22px] sm:text-[24px] text-[#062c55] leading-tight mb-2">
+            <h3 className="font-serif font-[600] text-[22px] sm:text-[24px] text-[#062c55] leading-[1.1] mb-2">
               Want {isUS ? "an attorney" : "a lawyer"} to contact you?
             </h3>
 

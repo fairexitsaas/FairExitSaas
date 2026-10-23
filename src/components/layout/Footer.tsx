@@ -45,7 +45,7 @@ export default function Footer({
 
   return (
     <footer className="border-t border-line pt-[54px] pb-11 transition-colors">
-      <div className="max-w-[1200px] mx-auto px-6 w-full box-border grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-9 lg:gap-12">
+      <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-9 lg:gap-12">
         <div>
           <Image
             className="h-7 w-auto object-contain dark:hidden"
@@ -65,14 +65,14 @@ export default function Footer({
             Challenge your severance offer
           </div>
           {isCanada ? (
-            <p className="text-xs text-slate leading-[1.6]">
+            <p className="text-xs text-slate leading-[1.55]">
               <b className="font-bold text-navy dark:text-white">Educational &amp; organizational information — not legal advice.</b> FairExit helps you organize your offer and understand general information; it does not assess whether an offer is fair, calculate what you&apos;re owed, or tell you what to do. Any read or general information can be wrong, and the law changes. Please do your own research. <b className="font-bold text-navy dark:text-white">Only a licensed employment lawyer can advise on your situation.</b> We&apos;re paid a fixed advertising fee by lawyers, never a cut of your outcome, and you always choose who to talk to. <b className="font-bold text-navy dark:text-white">Deadlines to act can be short — confirm them with a lawyer promptly.</b>{" "}
               <a href="#legal" className="text-greend hover:underline font-medium">
                 Read our full Terms &amp; Disclaimer →
               </a>
             </p>
           ) : (
-            <p className="text-xs text-slate leading-[1.6]">
+            <p className="text-xs text-slate leading-[1.55]">
               <b className="font-bold text-navy dark:text-white">Educational &amp; organizational information — not legal advice.</b> FairExit US helps you organize your offer and understand general federal rules that may apply — it does <b className="font-bold text-navy dark:text-white">not</b> assess whether your layoff was lawful, evaluate compliance, tell you what you&apos;re owed, or create an attorney-client relationship. It is <b className="font-bold text-navy dark:text-white">not a substitute for an attorney</b>. US severance isn&apos;t set by law, so we never claim a legal minimum and we don&apos;t calculate WARN amounts. General rules referenced are US federal law (ADEA/OWBPA, WARN Act); your state may add more. <b className="font-bold text-navy dark:text-white">Deadlines to act can be short — confirm them with an attorney promptly.</b> We&apos;re paid a flat advertising fee by attorneys, never a cut of your outcome, and you always choose who to talk to.{" "}
               <a href="#legal" className="text-greend hover:underline font-medium">
                 Read the full disclaimer, terms &amp; privacy →

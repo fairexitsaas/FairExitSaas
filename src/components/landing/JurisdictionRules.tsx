@@ -13,11 +13,11 @@ export default function JurisdictionRules({ country }: JurisdictionRulesProps) {
   if (isCanada) {
     return (
       <section className="py-16 mx-auto" id="provinces">
-        <div className="max-w-[1200px] mx-auto px-6 w-full box-border">
-          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.5px] text-greend">
+        <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
+          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
             Severance rules by province
           </span>
-          <h2 className="font-serif text-2xl sm:text-[32px] text-navy dark:text-white font-semibold my-1.5 mb-2.5">
+          <h2 className="font-serif text-[24px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] my-1.5 mb-2.5">
             The law is provincial. So is our read.
           </h2>
           <p className="max-w-[640px] text-sm sm:text-[15px] text-slate leading-[1.55]">
@@ -75,11 +75,11 @@ export default function JurisdictionRules({ country }: JurisdictionRulesProps) {
 
   return (
     <section className="py-16 mx-auto" id="states">
-      <div className="max-w-[1200px] mx-auto px-6 w-full box-border">
-        <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.5px] text-greend">
+      <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
+        <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
           Layoff rules by state
         </span>
-        <h2 className="font-serif text-2xl sm:text-[32px] text-navy dark:text-white font-semibold my-1.5 mb-2.5">
+        <h2 className="font-serif text-[24px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] my-1.5 mb-2.5">
           Federal law is the floor. Some states add more.
         </h2>
         <p className="max-w-[640px] text-sm sm:text-[15px] text-slate leading-[1.55]">

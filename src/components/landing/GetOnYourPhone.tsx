@@ -25,7 +25,7 @@ export default function GetOnYourPhone({ country = "US", onOpenAppModal }: GetOn
 
   return (
     <section className="py-16 pt-0 mx-auto">
-      <div className="max-w-[1200px] mx-auto px-6 w-full box-border">
+      <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
         <div
           className="bg-brand-navy dark:bg-[#0B1E32] rounded-[20px] p-8 sm:p-[32px_40px] flex items-center justify-between gap-6 flex-wrap shadow-[0_12px_36px_rgba(6,44,85,0.16)] border border-white/8 dark:border-[#183654] transition-colors"
           id="app"

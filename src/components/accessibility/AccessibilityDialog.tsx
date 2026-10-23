@@ -37,8 +37,7 @@ export default function AccessibilityDialog() {
     <>
       {/* Invisible backdrop to dismiss popup when clicking outside (keeps page bright & visible) */}
       <div
-        className="fixed inset-0 z-40 a11y-backdrop"
-        style={{ backgroundColor: "transparent", background: "transparent" }}
+        className="fixed inset-0 z-40 a11y-backdrop bg-transparent"
         onClick={closeDialog}
         aria-hidden="true"
       />

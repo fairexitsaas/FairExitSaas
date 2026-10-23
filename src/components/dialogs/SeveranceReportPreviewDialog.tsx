@@ -73,7 +73,7 @@ export default function SeveranceReportPreviewDialog({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-[#062C55]/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-[#062C55]/60 backdrop-blur-xs animate-scrimin"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -85,7 +85,7 @@ export default function SeveranceReportPreviewDialog({
         aria-modal="true"
         aria-labelledby="report-preview-title"
         tabIndex={-1}
-        className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border shadow-2xl p-6 sm:p-8 z-10 focus:outline-none bg-card border-card-border"
+        className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border shadow-2xl p-6 sm:p-8 z-10 focus:outline-none bg-card border-card-border animate-dlgup"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b mb-6 border-divider">
@@ -95,7 +95,7 @@ export default function SeveranceReportPreviewDialog({
             </span>
             <h2
               id="report-preview-title"
-              className="font-serif text-2xl font-bold mt-1 text-primary"
+              className="font-serif text-2xl font-semibold mt-1 text-primary"
             >
               10-Page Severance Report
             </h2>
@@ -125,7 +125,7 @@ export default function SeveranceReportPreviewDialog({
                   {item.page}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm leading-relaxed text-secondary">
+              <p className="text-xs sm:text-sm leading-[1.55] text-secondary">
                 {item.desc}
               </p>
             </div>

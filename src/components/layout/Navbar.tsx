@@ -133,7 +133,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
 
   return (
     <header className="sticky top-0 z-50 w-full bg-[#f6f4ef]/90 border-b border-[#e7e4dd] backdrop-blur-md transition-colors">
-      <div className="max-w-[1040px] mx-auto px-6 w-full flex items-center justify-between py-3.5 box-border">
+      <div className="wrap max-w-[1040px] mx-auto px-6 w-full flex items-center justify-between py-3.5 box-border">
         {/* Brand Lock */}
         <div className="flex flex-col items-start no-underline shrink-0 mr-8 xl:mr-10">
           <Link
@@ -257,7 +257,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
               <>
                 {CaFlagSvg}
                 <span>
-                  CA <span className="font-semibold text-[#5a6b78] text-[12px]">· switch to</span>
+                  CA <span className="font-semibold text-[#5a6b78] text-[12.5px]">· switch to</span>
                 </span>
                 {UsFlagSvg}
               </>
@@ -265,7 +265,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
               <>
                 {UsFlagSvg}
                 <span>
-                  US <span className="font-semibold text-[#5a6b78] text-[12px]">· switch to</span>
+                  US <span className="font-semibold text-[#5a6b78] text-[12.5px]">· switch to</span>
                 </span>
                 {CaFlagSvg}
               </>
@@ -274,8 +274,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
 
           {/* Primary CTA */}
           <a
-            className="inline-flex items-center justify-center gap-1.5 text-white px-[22px] py-[11px] rounded-[9px] font-bold text-[15px] no-underline border-none cursor-pointer shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] hover:shadow-[0_14px_24px_-10px_rgba(12,143,114,0.65)] hover:-translate-y-px active:scale-[0.98] transition-all whitespace-nowrap"
-            style={{ background: "linear-gradient(180deg,#0eb28d,#0c8f72)" }}
+            className="inline-flex items-center justify-center gap-1.5 text-white px-[22px] py-[12px] rounded-[9px] font-bold text-[15px] no-underline border-none cursor-pointer bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] hover:shadow-[0_14px_24px_-10px_rgba(12,143,114,0.65)] hover:-translate-y-px active:scale-[0.98] transition-all whitespace-nowrap"
             href={isCanada ? "/questions" : "#check"}
             onClick={handleCtaClick}
           >
@@ -369,8 +368,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
           Accessibility options
         </a>
         <a
-          className="inline-flex items-center justify-center gap-1.5 text-white px-5 py-3 rounded-[9px] font-bold text-[15px] no-underline border-none cursor-pointer shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] active:scale-[0.98] transition-all whitespace-nowrap mt-2 w-full"
-          style={{ background: "linear-gradient(180deg,#0eb28d,#0c8f72)" }}
+          className="inline-flex items-center justify-center gap-1.5 text-white px-5 py-3 rounded-[9px] font-bold text-[15px] no-underline border-none cursor-pointer bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] active:scale-[0.98] transition-all whitespace-nowrap mt-2 w-full"
           href={isCanada ? "/questions" : "#check"}
           onClick={handleCtaClick}
         >

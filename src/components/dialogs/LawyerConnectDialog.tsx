@@ -68,7 +68,7 @@ export default function LawyerConnectDialog({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-[#062C55]/60 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-[#062C55]/60 backdrop-blur-xs animate-scrimin"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -80,7 +80,7 @@ export default function LawyerConnectDialog({
         aria-modal="true"
         aria-labelledby="lawyer-connect-title"
         tabIndex={-1}
-        className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border shadow-2xl p-6 sm:p-8 z-10 focus:outline-none bg-card border-card-border"
+        className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border shadow-2xl p-6 sm:p-8 z-10 focus:outline-none bg-card border-card-border animate-dlgup"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b mb-6 border-divider">
@@ -90,7 +90,7 @@ export default function LawyerConnectDialog({
             </span>
             <h2
               id="lawyer-connect-title"
-              className="font-serif text-2xl font-bold mt-1 text-primary"
+              className="font-serif text-2xl font-semibold mt-1 text-primary"
             >
               {isCanada ? "Hand it to a lawyer" : "Hand it to an attorney"}
             </h2>
@@ -119,7 +119,7 @@ export default function LawyerConnectDialog({
                 <h3 className="font-semibold text-sm sm:text-base mb-1 text-primary">
                   {p.title}
                 </h3>
-                <p className="text-xs sm:text-sm leading-relaxed text-secondary">
+                <p className="text-xs sm:text-sm leading-[1.55] text-secondary">
                   {p.desc}
                 </p>
               </div>

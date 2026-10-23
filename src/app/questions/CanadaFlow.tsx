@@ -739,16 +739,16 @@ function QuestionsContent() {
       {mobileSummOpen && (
         <>
           <div
-            className="md:hidden fixed inset-0 z-40 bg-[#062c55]/40 backdrop-blur-xs transition-opacity"
+            className="md:hidden fixed inset-0 z-40 bg-[#062c55]/40 backdrop-blur-xs animate-scrimin"
             onClick={() => setMobileSummOpen(false)}
           />
-          <div className="md:hidden fixed inset-x-0 bottom-0 z-50 bg-[#EEF1F4] border-t border-[#e7e4dd] rounded-t-2xl p-5 pb-8 shadow-2xl max-h-[80vh] overflow-y-auto animate-in slide-in-from-bottom duration-300">
+          <div className="md:hidden fixed inset-x-0 bottom-0 z-50 bg-[#EEF1F4] border-t border-[#e7e4dd] rounded-t-2xl p-5 pb-8 shadow-2xl max-h-[80vh] overflow-y-auto animate-dlgup">
             <div className="flex items-center justify-between pb-3 border-b border-[#e7e4dd] mb-4">
               <div>
                 <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#5a6b78]">
                   Your details so far
                 </span>
-                <h3 className="font-serif text-lg font-bold text-[#062c55]">
+                <h3 className="font-serif text-lg font-semibold text-[#062c55]">
                   FairExit summary
                 </h3>
               </div>
@@ -772,10 +772,10 @@ function QuestionsContent() {
                   (f) => (
                     <div
                       key={f.key}
-                      className="flex justify-between items-start py-1.5 border-b border-dashed border-[#e7e4dd] gap-2"
+                      className="flex justify-between items-start py-1.5 border-b border-dashed border-[#e7e4dd] gap-2 animate-rowin"
                     >
                       <span className="text-[#5a6b78] shrink-0">{f.label}</span>
-                      <b className="text-[#062c55] font-semibold text-right leading-tight">
+                      <b className="text-[#062c55] font-semibold text-right leading-tight animate-flash">
                         {userAnswers[f.key]}
                       </b>
                     </div>
@@ -958,7 +958,7 @@ function QuestionsContent() {
                 SCREEN 1 (QUESTION 1 OF 4): WERE YOU IN A UNION?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "q1" && (
-              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 4 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1111,7 +1111,7 @@ function QuestionsContent() {
                 SCREEN 2 (QUESTION 2 OF 4): WHAT KIND OF ROLE WAS IT?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "q2" && (
-              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 4 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1259,7 +1259,7 @@ function QuestionsContent() {
                 SCREEN 3 (QUESTION 3 OF 4): HAVE YOU SIGNED ANYTHING YET?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "q3" && (
-              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 4 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1396,7 +1396,7 @@ function QuestionsContent() {
                 SCREEN 4 (QUESTION 4 OF 4): WAS EMPLOYER FEDERALLY REGULATED?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "q4" && (
-              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 4 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1589,7 +1589,7 @@ function QuestionsContent() {
                 US SITUATION CARD (WHEN IN US MODE)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "us-situation" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 <div className="flex items-center gap-3 p-3 px-4 rounded-xl bg-gradient-to-r from-[#e6f8f1] to-[#f3faf6] border border-[#b9e6d4] shadow-[0_8px_24px_-16px_rgba(14,178,141,0.6)] mb-5">
                   <span className="w-7 h-7 rounded-full bg-[#0eb28d] text-white font-extrabold flex items-center justify-center shrink-0 shadow-[0_0_0_4px_rgba(14,178,141,0.18)] text-xs">
                     ✓
@@ -1793,7 +1793,7 @@ function QuestionsContent() {
                 UNION SCREEN-OUT BRANCH (CANADA - MATCHING SCREENSHOT)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "union" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center animate-fade">
                 {/* Handshake Emoji Icon */}
                 <div
                   className="text-3xl sm:text-4xl mb-3 select-none"
@@ -1802,7 +1802,7 @@ function QuestionsContent() {
                   🤝
                 </div>
 
-                <h1 className="font-serif font-bold text-2xl sm:text-[28px] text-[#062c55] leading-tight mb-3">
+                <h1 className="font-serif font-semibold text-2xl sm:text-[28px] text-[#062c55] leading-tight mb-3">
                   Your union handles this one.
                 </h1>
 
@@ -1874,7 +1874,7 @@ function QuestionsContent() {
                 PROVINCE STOP / REGION NOT COVERED (CANADA - MATCHING SCREENSHOT)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "province-stop" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center animate-fade">
                 {/* Map Emoji Icon */}
                 <div
                   className="text-3xl sm:text-4xl mb-3 select-none"
@@ -1883,7 +1883,7 @@ function QuestionsContent() {
                   🗺️
                 </div>
 
-                <h1 className="font-serif font-bold text-2xl sm:text-[28px] text-[#062c55] leading-tight mb-3">
+                <h1 className="font-serif font-semibold text-2xl sm:text-[28px] text-[#062c55] leading-tight mb-3">
                   We don&apos;t cover your province yet.
                 </h1>
 
@@ -1956,7 +1956,7 @@ function QuestionsContent() {
                 CANADA STEP 2 (QUESTION 1 OF 2): PAYROLL OVER $2.5M
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "basics-q1" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill Tag on left, 2 Dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2007,7 +2007,7 @@ function QuestionsContent() {
 
                   {/* Inline fields revealed when clicking Change something */}
                   {editingBasics && (
-                    <div className="mt-4 pt-3.5 border-t border-[#cfe8dd] grid grid-cols-1 sm:grid-cols-2 gap-3 text-left animate-in fade-in duration-200">
+                    <div className="mt-4 pt-3.5 border-t border-[#cfe8dd] grid grid-cols-1 sm:grid-cols-2 gap-3 text-left animate-fade">
                       <div className="sm:col-span-2">
                         <label className="block text-xs font-bold text-[#5a6b78] mb-1">
                           Where were you employed?
@@ -2198,7 +2198,7 @@ function QuestionsContent() {
                 CANADA STEP 2 (QUESTION 2 OF 2): ROLE / OCCUPATION
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "basics-q2" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill Tag on left, 2 Dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2249,7 +2249,7 @@ function QuestionsContent() {
 
                   {/* Inline fields revealed when clicking Change something */}
                   {editingBasics && (
-                    <div className="mt-4 pt-3.5 border-t border-[#cfe8dd] grid grid-cols-1 sm:grid-cols-2 gap-3 text-left animate-in fade-in duration-200">
+                    <div className="mt-4 pt-3.5 border-t border-[#cfe8dd] grid grid-cols-1 sm:grid-cols-2 gap-3 text-left animate-fade">
                       <div className="sm:col-span-2">
                         <label className="block text-xs font-bold text-[#5a6b78] mb-1">
                           Where were you employed?
@@ -2403,7 +2403,7 @@ function QuestionsContent() {
                 US STEP 2: THE LAYOFF (WHEN IN US MODE)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "step-basics" && !isCanada && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 <span className="inline-block text-xs font-bold text-[#062c55] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full mb-3">
                   The layoff
                 </span>
@@ -2540,7 +2540,7 @@ function QuestionsContent() {
                 STEP 3 (QUESTION 1 OF 3): WHAT ELSE WERE YOU PAID?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "money-q1" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2662,7 +2662,7 @@ function QuestionsContent() {
                 STEP 3 (QUESTION 2 OF 3): WHAT ARE THEY OFFERING YOU?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "money-q2" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2757,7 +2757,7 @@ function QuestionsContent() {
                 STEP 3 (QUESTION 3 OF 3): HAVE YOU ALREADY FOUND A NEW JOB?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "money-q3" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2866,7 +2866,7 @@ function QuestionsContent() {
                 STEP 4 (QUESTION 1 OF 2): DOES YOUR OFFER LIMIT YOU TO THE MINIMUM?
             ════════════════════════════════════════════════════════════════ */}
             {(currentStep === "clause-q1" || currentStep === "step-clause") && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 2 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2961,7 +2961,7 @@ function QuestionsContent() {
                 STEP 4 (QUESTION 2 OF 2): DID YOU SIGN AN EMPLOYMENT CONTRACT?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "clause-q2" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 2 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -3078,7 +3078,7 @@ function QuestionsContent() {
             ════════════════════════════════════════════════════════════════ */}
             {(currentStep === "details-q1" ||
               currentStep === "step-details") && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -3190,7 +3190,7 @@ function QuestionsContent() {
                 STEP 5 (QUESTION 2 OF 3): HOW HARD WOULD IT BE TO FIND A SIMILAR JOB?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "details-q2" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -3291,7 +3291,7 @@ function QuestionsContent() {
                 STEP 5 (QUESTION 3 OF 3): ANYTHING ELSE YOU'D FLAG?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "details-q3" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -3398,7 +3398,7 @@ function QuestionsContent() {
                 STEP 5: ANALYZING STATE (MATCHING SCREENSHOT)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "step-analyzing" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[22px] py-14 sm:py-20 px-6 sm:px-12 text-center shadow-[0_20px_50px_-25px_rgba(6,44,85,0.12)] max-w-[620px] mx-auto animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[22px] py-14 sm:py-20 px-6 sm:px-12 text-center shadow-[0_20px_50px_-25px_rgba(6,44,85,0.12)] max-w-[620px] mx-auto animate-fade">
                 {/* Document outline icon with green top banner matching screenshot */}
                 <div className="relative mx-auto w-14 h-[68px] mb-6 flex items-center justify-center">
                   <div className="absolute inset-0 bg-[#0eb28d]/15 rounded-lg blur-md animate-pulse" />
@@ -3413,7 +3413,7 @@ function QuestionsContent() {
                   </div>
                 </div>
 
-                <h1 className="font-serif font-bold text-2xl sm:text-[30px] text-[#062c55] leading-tight tracking-tight mb-2">
+                <h1 className="font-serif font-semibold text-2xl sm:text-[30px] text-[#062c55] leading-tight tracking-tight mb-2">
                   Reading your situation…
                 </h1>
                 <p className="text-sm sm:text-base text-[#5a6b78] font-normal leading-relaxed max-w-[420px] mx-auto">
@@ -3476,13 +3476,13 @@ function QuestionsContent() {
                 const offerPct = pct(offerAmt);
 
                 return (
-                  <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-5 sm:p-8 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+                  <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-5 sm:p-8 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                     {/* ── VERDICT CARD (encompasses tag, title, reasons, estbox, and srcbadge) ── */}
                     <div className="text-center p-5 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
                       <span className="text-[11.5px] font-extrabold uppercase tracking-[0.8px] text-[#0c8f72] block mb-1.5">
                         Often worth a closer look
                       </span>
-                      <h2 className="font-serif font-bold text-2xl sm:text-[28px] text-[#062c55] my-2 leading-[1.14] tracking-tight">
+                      <h2 className="font-serif font-semibold text-2xl sm:text-[28px] text-[#062c55] my-2 leading-[1.14] tracking-tight">
                         This is the kind of offer people often review with a
                         lawyer.
                       </h2>
@@ -3691,7 +3691,7 @@ function QuestionsContent() {
                       <div className="font-sans font-[800] uppercase tracking-[0.9px] text-[11px] leading-[16px] text-[#0c8f72] mb-1">
                         Next step · optional
                       </div>
-                      <h2 className="font-serif font-[600] text-[26px] sm:text-[32px] text-[#062c55] leading-[32px] sm:leading-[36px] tracking-normal mb-2">
+                      <h2 className="font-serif font-[600] text-[26px] sm:text-[32px] text-[#062c55] leading-[32px] sm:leading-[36px] mb-2">
                         Want to take it a step further?
                       </h2>
                       <p className="font-sans font-normal text-[14px] sm:text-[15px] leading-[20px] text-[#5a6b78] max-w-[540px] mx-auto">
@@ -3861,7 +3861,7 @@ function QuestionsContent() {
               <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#5a6b78]">
                 Your details so far
               </span>
-              <h3 className="font-serif text-[17px] font-bold text-[#062c55] mb-3">
+              <h3 className="font-serif text-[17px] font-semibold text-[#062c55] mb-3">
                 FairExit summary
               </h3>
 
@@ -3876,12 +3876,12 @@ function QuestionsContent() {
                     (f) => (
                       <div
                         key={f.key}
-                        className="flex justify-between items-start py-1 border-b border-dashed border-[#e7e4dd] gap-2"
+                        className="flex justify-between items-start py-1 border-b border-dashed border-[#e7e4dd] gap-2 animate-rowin"
                       >
                         <span className="text-[#5a6b78] shrink-0">
                           {f.label}
                         </span>
-                        <b className="text-[#062c55] font-semibold text-right leading-tight">
+                        <b className="text-[#062c55] font-semibold text-right leading-tight animate-flash">
                           {userAnswers[f.key]}
                         </b>
                       </div>
@@ -3950,11 +3950,11 @@ function QuestionsContent() {
       {/* 1. Option Info Pop-up (ⓘ) */}
       {infoModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-scrimin"
           onClick={() => setInfoModal(null)}
         >
           <div
-            className="relative bg-white rounded-[16px] p-6 max-w-[420px] w-full shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto"
+            className="relative bg-white rounded-[16px] p-6 max-w-[420px] w-full shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-dlgup max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="font-sans font-[800] text-[11px] uppercase tracking-[0.6px] text-[#0c8f72] mb-1.5">
@@ -4188,14 +4188,14 @@ function QuestionsContent() {
       {emailModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-[#062c55]/45 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-[#062c55]/45 backdrop-blur-xs animate-scrimin"
             onClick={() => setEmailModalOpen(false)}
           />
-          <div className="relative bg-white rounded-2xl border border-[#e7e4dd] p-6 sm:p-7 max-w-[420px] w-full shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-200 text-center">
+          <div className="relative bg-white rounded-2xl border border-[#e7e4dd] p-6 sm:p-7 max-w-[420px] w-full shadow-2xl z-10 animate-dlgup text-center">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0c8f72] block mb-1">
               Free · No card needed
             </span>
-            <h3 className="font-serif font-bold text-2xl text-[#062c55] mb-2 leading-tight">
+            <h3 className="font-serif font-semibold text-2xl text-[#062c55] mb-2 leading-tight">
               Email me my free results
             </h3>
             <p className="text-xs sm:text-[13px] text-[#5a6b78] leading-relaxed mb-4">

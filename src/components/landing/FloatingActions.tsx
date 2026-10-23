@@ -9,10 +9,10 @@ export default function FloatingActions() {
 
   return (
     <>
-      {/* ── Floating App Button ── */}
+      {/* ── Floating App Button (white with navy icon) ── */}
       <a
         id="appFab"
-        className="fixed bottom-[84px] right-6 w-12 h-12 rounded-full bg-[#062c55] dark:bg-[#0D2238] border-[1.5px] border-transparent dark:border-[#1E3B5C] text-white dark:text-[#F0F6FC] hover:dark:border-[#0EB28D] hover:dark:text-[#0EB28D] flex items-center justify-center shadow-[0_8px_24px_rgba(6,44,85,0.3)] dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)] z-[100] no-underline hover:scale-108 transition-all group"
+        className="fixed bottom-[84px] right-6 w-12 h-12 rounded-full bg-white text-[#062c55] border-none flex items-center justify-center shadow-[0_12px_26px_-8px_rgba(6,44,85,0.45)] z-[100] no-underline hover:scale-105 hover:bg-[#0eb28d] hover:text-white transition-all group"
         href="#app"
         aria-label="Get the app"
         onClick={(e) => {
@@ -33,15 +33,16 @@ export default function FloatingActions() {
           <rect x="6" y="2.5" width="12" height="19" rx="2.5"></rect>
           <path d="M10.5 18.5h3"></path>
         </svg>
-        <span className="absolute right-14 bg-[#062c55] dark:bg-[#0D2238] border border-transparent dark:border-[#1E3B5C] text-white dark:text-[#F0F6FC] py-1 px-2.5 rounded-md text-xs whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity">
+        <span className="absolute right-14 bg-[#062c55] text-white py-1 px-2.5 rounded-md text-xs font-bold whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity">
           Get the app
         </span>
       </a>
 
-      {/* ── Floating Accessibility Button ── */}
+      {/* ── Floating Accessibility Button (navy with white icon) ── */}
       <button
         id="a11yFab"
-        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-card border-[1.5px] border-line text-navy dark:text-white flex items-center justify-center shadow-[0_8px_24px_rgba(6,44,85,0.15)] z-[100] cursor-pointer hover:scale-108 hover:border-green transition-all"
+        type="button"
+        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-[#062c55] text-white border-none flex items-center justify-center shadow-[0_12px_26px_-8px_rgba(6,44,85,0.55)] z-[100] cursor-pointer hover:scale-105 transition-all"
         aria-label="Accessibility options"
         aria-expanded={isDialogOpen}
         onClick={(e) => {

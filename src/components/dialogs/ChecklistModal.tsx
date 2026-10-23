@@ -41,18 +41,18 @@ export default function ChecklistModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-scrimin"
       onClick={onClose}
     >
       <div
-        className="relative bg-white rounded-[16px] p-5 sm:p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-in zoom-in-95 duration-150"
+        className="relative bg-white rounded-[16px] p-5 sm:p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-dlgup"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="font-sans font-[800] text-[11px] uppercase tracking-[0.6px] text-[#0c8f72] mb-1.5">
           Your free 3-point checklist
         </div>
 
-        <h3 className="font-serif font-[600] text-[22px] sm:text-[24px] text-[#062c55] leading-tight mb-2">
+        <h3 className="font-serif font-[600] text-[22px] sm:text-[24px] text-[#062c55] leading-[1.1] mb-2">
           Taking the offer? 3 things to check first.
         </h3>
 

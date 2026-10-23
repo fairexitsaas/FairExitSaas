@@ -56,6 +56,30 @@
   --shadow-panel: 0 20px 50px rgba(6,44,85,.2);
   --shadow-button: 0 4px 14px rgba(14, 178, 141, 0.35);
   --shadow-button-hover: 0 6px 18px rgba(12, 143, 114, 0.4);
+
+  --animate-fade: fade 0.35s ease both;
+  --animate-rowin: rowin 0.3s ease both;
+  --animate-flash: flash 1.4s ease both;
+  --animate-scrimin: scrimin 0.28s ease both;
+  --animate-dlgin: dlgin 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-dlgup: dlgup 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-dlgout: dlgout 0.22s ease both;
+  --animate-scrimout: scrimout 0.22s ease both;
+  --animate-dlgdown: dlgdown 0.22s ease both;
+  --animate-tsin: tsin 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  --animate-tbar: tbar 7.5s linear forwards;
+  --animate-ckspin: ckspin 0.8s linear infinite;
+  --animate-ckpop: ckpop 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-ckdraw: ckdraw 0.25s ease-out 0.06s forwards;
+  --animate-ckpulse: ckpulse 1.3s ease;
+  --animate-ckglow: ckglow 1.4s cubic-bezier(0.2, 0.7, 0.2, 1);
+  --animate-unl: unl 0.6s ease both;
+  --animate-ffin: ffin 0.6s ease both;
+  --animate-flow: flow 2s linear infinite;
+  --animate-ppflash: ppflash 1.4s ease both;
+  --animate-ckpulse2: ckpulse2 0.9s ease-out both;
+  --animate-ccpop: ccpop 0.28s ease both;
+  --animate-fxsh: fxsh 0.35s ease both;
 }
 
 /* ==========================================================================
@@ -111,6 +135,265 @@
   --slate:            #5A6B78;
   --ink:              #17242F;
   --serif:            var(--font-newsreader), 'Newsreader', Georgia, serif;
+}
+
+/* ==========================================================================
+   CONTAINER & LAYOUT — Prototype .wrap specification (max-width: 1040px)
+   Yields ~990px content column (1040px - 48px padding = 992px)
+   ========================================================================== */
+@utility wrap {
+  max-width: 1040px;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 24px;
+  padding-right: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ==========================================================================
+   TYPOGRAPHY — Line-height 1.6, weight 600 & Newsreader letter-spacing: -0.5px
+   ========================================================================== */
+body {
+  line-height: 1.6;
+}
+
+p {
+  line-height: 1.6;
+}
+
+label {
+  line-height: 1.6;
+}
+
+header a, nav a, .nav a {
+  line-height: 1.6;
+}
+
+h1, h2, h3, h4 {
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+h1.font-bold, h2.font-bold, h3.font-bold, h4.font-bold {
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+/* Per-element prototype CSS values */
+.hero h1 {
+  line-height: 1.12;
+}
+
+.freelead h3 {
+  line-height: 1.12;
+}
+
+.freelead p {
+  line-height: 1.55;
+}
+
+.dcard .dsum {
+  line-height: 1.55;
+}
+
+.chk p {
+  line-height: 1.55;
+}
+
+.chk h3 {
+  line-height: 1.15;
+}
+
+.faq .a {
+  line-height: 1.65;
+}
+
+.disc {
+  line-height: 1.55;
+}
+
+.mcard p, .tiermore p {
+  line-height: 1.5;
+}
+
+@utility kick {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--greend);
+}
+
+@utility aboutlead {
+  font-family: var(--font-newsreader), 'Newsreader', Georgia, serif;
+  font-size: 22px;
+  color: var(--navy);
+  line-height: 1.4;
+  letter-spacing: -0.5px;
+}
+
+/* Every Newsreader / serif heading */
+.font-serif,
+h1.font-serif,
+h2.font-serif,
+h3.font-serif,
+h4.font-serif,
+.font-serif:is(h1, h2, h3, h4, [role="heading"]),
+.font-serif :is(h1, h2, h3, h4, [role="heading"]),
+[class*="font-serif"]:is(h1, h2, h3, h4) {
+  letter-spacing: -0.5px;
+}
+
+/* ==========================================================================
+   ANIMATIONS & KEYFRAMES — Prototype Source of Truth (20+ Animations)
+   ========================================================================== */
+@keyframes fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes rowin {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes flash {
+  0% { background: rgba(14, 178, 141, 0.22); border-radius: 4px; }
+  100% { background: transparent; }
+}
+
+@keyframes scrimin {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes dlgin {
+  from { opacity: 0; transform: translate(-50%, -50%) translateY(14px) scale(0.975); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+@keyframes dlgup {
+  from { opacity: 0; transform: translateY(16px) scale(0.975); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes dlgout {
+  to { opacity: 0; transform: translate(-50%, -50%) translateY(10px) scale(0.98); }
+}
+
+@keyframes scrimout {
+  to { opacity: 0; }
+}
+
+@keyframes dlgdown {
+  to { opacity: 0; transform: translateY(12px) scale(0.98); }
+}
+
+@keyframes tsin {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes tbar {
+  to { width: 100%; }
+}
+
+@keyframes ckspin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes ckpop {
+  from { transform: scale(0.4); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@keyframes ckdraw {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes ckpulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(176, 122, 0, 0); }
+  30% { box-shadow: 0 0 0 4px rgba(176, 122, 0, 0.45); }
+}
+
+@keyframes ckglow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(14, 178, 141, 0); }
+  35% { box-shadow: 0 0 0 6px rgba(14, 178, 141, 0.28); }
+}
+
+@keyframes unl {
+  from { box-shadow: 0 0 0 4px rgba(14, 178, 141, 0.35); }
+  to { box-shadow: 0 0 0 0 rgba(14, 178, 141, 0); }
+}
+
+@keyframes ffin {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes flow {
+  from { background-position: 0 0; }
+  to { background-position: 200% 0; }
+}
+
+@keyframes ppflash {
+  0% { box-shadow: 0 0 0 0 rgba(14, 178, 141, 0.5); }
+  100% { box-shadow: 0 0 0 14px rgba(14, 178, 141, 0); }
+}
+
+@keyframes ckpulse2 {
+  0% { box-shadow: 0 0 0 0 rgba(14, 178, 141, 0.45); }
+  100% { box-shadow: 0 0 0 12px rgba(14, 178, 141, 0); }
+}
+
+@keyframes ccpop {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+@keyframes fxsh {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-7px); }
+  75% { transform: translateX(7px); }
+}
+
+/* Prototype animation utility classes */
+.animate-fade, .fade { animation: fade 0.35s ease both; }
+.animate-rowin, .rowin { animation: rowin 0.3s ease both; }
+.animate-flash, .flash { animation: flash 1.4s ease both; }
+.animate-scrimin, .scrimin { animation: scrimin 0.28s ease both; }
+.animate-dlgin, .dlgin { animation: dlgin 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.animate-dlgup, .dlgup { animation: dlgup 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.animate-dlgout, .dlgout { animation: dlgout 0.22s ease both; }
+.animate-scrimout, .scrimout { animation: scrimout 0.22s ease both; }
+.animate-dlgdown, .dlgdown { animation: dlgdown 0.22s ease both; }
+.animate-tsin, .tsin { animation: tsin 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.animate-tbar, .tbar { animation: tbar 7.5s linear forwards; }
+.animate-ckspin, .ckspin { animation: ckspin 0.8s linear infinite; }
+.animate-ckpop, .ckpop { animation: ckpop 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.animate-ckdraw, .ckdraw { animation: ckdraw 0.25s ease-out 0.06s forwards; }
+.animate-ckpulse, .ckpulse { animation: ckpulse 1.3s ease; }
+.animate-ckglow, .ckglow { animation: ckglow 1.4s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.animate-unl, .unl { animation: unl 0.6s ease both; }
+.animate-ffin, .ffin { animation: ffin 0.6s ease both; }
+.animate-flow, .flow { animation: flow 2s linear infinite; }
+.animate-ppflash, .ppflash { animation: ppflash 1.4s ease both; }
+.animate-ckpulse2, .ckpulse2 { animation: ckpulse2 0.9s ease-out both; }
+.animate-ccpop, .ccpop { animation: ccpop 0.28s ease both; }
+.animate-fxsh, .fxsh { animation: fxsh 0.35s ease both; }
+
+/* Interactive transitions on buttons, cards, toggles (hover lift, colour fade) */
+button, .btn, [role="button"] {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, background-color 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+}
+
+button:hover:not(:disabled), .btn:hover:not(:disabled), [role="button"]:hover {
+  transform: translateY(-1px);
+}
+
+.card, [class*="rounded-[18px]"], [class*="rounded-2xl"], [class*="rounded-[20px]"], [class*="rounded-[16px]"] {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
 }
 
 /* ==========================================================================
@@ -397,23 +680,22 @@ html.dark button[class*="bg-[#062c55]"]:not(#a11yFab):not(:disabled):hover {
   background-color: #1A4A78 !important;
 }
 
-/* Floating Action buttons in dark mode */
-html.dark #a11yFab {
-  background-color: #0EB28D !important;
+/* Floating Action buttons */
+html.dark #appFab {
+  background-color: #FFFFFF !important;
   color: #062C55 !important;
   border-color: transparent !important;
 }
 
-html.dark #appFab {
-  background-color: #0D2238 !important;
-  color: #F0F6FC !important;
-  border: 1.5px solid #1E3B5C !important;
+html.dark #appFab:hover {
+  background-color: #0EB28D !important;
+  color: #FFFFFF !important;
 }
 
-html.dark #appFab:hover {
-  background-color: #133A63 !important;
-  border-color: #0EB28D !important;
-  color: #0EB28D !important;
+html.dark #a11yFab {
+  background-color: #062C55 !important;
+  color: #FFFFFF !important;
+  border-color: transparent !important;
 }
 
 /* Hamburger menu icon bars */

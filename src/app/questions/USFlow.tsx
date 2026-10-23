@@ -857,16 +857,16 @@ export default function USFlow() {
       {mobileSummOpen && (
         <>
           <div
-            className="fixed inset-0 bg-[#062c55]/40 backdrop-blur-sm z-50 transition-opacity"
+            className="fixed inset-0 bg-[#062c55]/40 backdrop-blur-sm z-50 animate-scrimin"
             onClick={() => setMobileSummOpen(false)}
           />
-          <div className="fixed inset-x-0 bottom-0 max-h-[85vh] bg-[#EEF1F4] rounded-t-3xl z-50 p-6 shadow-2xl overflow-y-auto animate-in slide-in-from-bottom duration-300">
+          <div className="fixed inset-x-0 bottom-0 max-h-[85vh] bg-[#EEF1F4] rounded-t-3xl z-50 p-6 shadow-2xl overflow-y-auto animate-dlgup">
             <div className="flex items-center justify-between pb-3 border-b border-[#e7e4dd] mb-4">
               <div>
                 <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#5a6b78]">
                   Your details so far
                 </span>
-                <h3 className="font-serif text-lg font-bold text-[#062c55]">
+                <h3 className="font-serif text-lg font-semibold text-[#062c55]">
                   FairExit summary
                 </h3>
               </div>
@@ -891,10 +891,10 @@ export default function USFlow() {
                   (f) => (
                     <div
                       key={f.key}
-                      className="flex justify-between items-start py-1.5 border-b border-dashed border-[#e7e4dd] gap-2"
+                      className="flex justify-between items-start py-1.5 border-b border-dashed border-[#e7e4dd] gap-2 animate-rowin"
                     >
                       <span className="text-[#5a6b78] shrink-0">{f.label}</span>
-                      <b className="text-[#062c55] font-semibold text-right leading-tight">
+                      <b className="text-[#062c55] font-semibold text-right leading-[1.2] animate-flash">
                         {getSummaryValue(f.key)}
                       </b>
                     </div>
@@ -1034,7 +1034,7 @@ export default function USFlow() {
                 STEP 1: US SITUATION (5 SEQUENTIAL SINGLE-QUESTION SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isSituationStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 5 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1073,7 +1073,7 @@ export default function USFlow() {
                 <h1 className="font-serif font-normal text-[23px] sm:text-[27px] text-[#062c55] leading-[1.2] tracking-tight">
                   Make sense of your separation offer.
                 </h1>
-                <p className="text-[13.5px] sm:text-sm text-[#5a6b78] mt-2 mb-4 leading-relaxed">
+                <p className="text-[13.5px] sm:text-sm text-[#5a6b78] mt-2 mb-4 leading-[1.55]">
                   US law doesn&apos;t set a severance amount — so there&apos;s
                   no &quot;number you&apos;re owed&quot;. What the law{" "}
                   <b>does</b> control is <b>how</b> they can ask you to sign:
@@ -1450,7 +1450,7 @@ export default function USFlow() {
                 STATE STOP CARD (WHEN SELECTING "Other state" - MATCHING SCREENSHOT)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "us-state-stop" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center animate-fade">
                 {/* Map Emoji Icon */}
                 <div
                   className="text-3xl sm:text-4xl mb-3 select-none"
@@ -1459,11 +1459,11 @@ export default function USFlow() {
                   🗺️
                 </div>
 
-                <h1 className="font-serif font-bold text-2xl sm:text-[28px] text-[#062c55] leading-tight mb-3">
+                <h1 className="font-serif font-semibold text-2xl sm:text-[28px] text-[#062c55] leading-[1.12] mb-3">
                   We don&apos;t cover your state yet.
                 </h1>
 
-                <p className="text-sm text-[#5a6b78] max-w-[520px] mx-auto leading-relaxed mb-6">
+                <p className="text-sm text-[#5a6b78] max-w-[520px] mx-auto leading-[1.55] mb-6">
                   Layoff rules differ by state — several add their own WARN,
                   severance or non-compete rules on top of federal law. Rather
                   than give you a federal-only read that could be wrong for you,
@@ -1488,7 +1488,7 @@ export default function USFlow() {
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-1 sm:gap-4 pt-3 border-t border-[#e2e8e4]">
                     <span className="text-[#5a6b78] shrink-0">Meanwhile</span>
-                    <span className="text-[#062c55] font-semibold text-left sm:text-right leading-snug">
+                    <span className="text-[#062c55] font-semibold text-left sm:text-right leading-[1.3]">
                       Your state labor department · the EEOC · a licensed
                       employment attorney (many offer a free first call)
                     </span>
@@ -1528,7 +1528,7 @@ export default function USFlow() {
                 STEP 2: THE LAYOFF (5 SEQUENTIAL SINGLE-QUESTION SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isLayoffStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Tag & 5-Dot Indicator */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -1557,7 +1557,7 @@ export default function USFlow() {
                 <h1 className="font-serif font-normal text-[23px] sm:text-[27px] text-[#062c55] leading-[1.2] tracking-tight">
                   How did it happen?
                 </h1>
-                <p className="text-[13.5px] sm:text-sm text-[#5a6b78] mt-2 mb-6 leading-relaxed">
+                <p className="text-[13.5px] sm:text-sm text-[#5a6b78] mt-2 mb-6 leading-[1.55]">
                   This tells us whether the advance-notice rules (the federal
                   WARN Act) applied to your layoff.
                 </p>
@@ -1895,7 +1895,7 @@ export default function USFlow() {
                 STEP 3: THE PAPERS (3 SEQUENTIAL SINGLE-QUESTION SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isPapersStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Tag & 3-Dot Indicator */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2141,7 +2141,7 @@ export default function USFlow() {
                 STEP 4: THE MOST IMPORTANT QUESTION (4 SEQUENTIAL SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isClauseStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Upper Badge & 4 Progress Dots */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2181,8 +2181,8 @@ export default function USFlow() {
                 {/* ── QUESTION 1 OF 4: How long did they give you to decide? ── */}
                 {(currentStep === "clause-q1" ||
                   currentStep === "step-clause") && (
-                  <div className="animate-in fade-in duration-200">
-                    <h2 className="text-sm sm:text-base font-bold text-[#062c55] mb-3">
+                  <div className="animate-fade">
+                    <h2 className="text-sm sm:text-base font-semibold text-[#062c55] mb-3">
                       How long did they give you to decide?
                     </h2>
 
@@ -2250,8 +2250,8 @@ export default function USFlow() {
 
                 {/* ── QUESTION 2 OF 4: Does it tell you in writing to talk to an attorney? ── */}
                 {currentStep === "clause-q2" && (
-                  <div className="animate-in fade-in duration-200">
-                    <h2 className="text-sm sm:text-base font-bold text-[#062c55] mb-3">
+                  <div className="animate-fade">
+                    <h2 className="text-sm sm:text-base font-semibold text-[#062c55] mb-3">
                       Does the agreement tell you, in writing, to talk to an
                       attorney before signing?
                     </h2>
@@ -2314,8 +2314,8 @@ export default function USFlow() {
 
                 {/* ── QUESTION 3 OF 4: Did they give you the list of ages and job titles? ── */}
                 {currentStep === "clause-q3" && (
-                  <div className="animate-in fade-in duration-200">
-                    <h2 className="text-sm sm:text-base font-bold text-[#062c55] mb-3">
+                  <div className="animate-fade">
+                    <h2 className="text-sm sm:text-base font-semibold text-[#062c55] mb-3">
                       Did they give you a list of the ages and job titles of who
                       was let go and who was kept?
                     </h2>
@@ -2379,8 +2379,8 @@ export default function USFlow() {
 
                 {/* ── QUESTION 4 OF 4: Does it give you 7 days after signing to change your mind? ── */}
                 {currentStep === "clause-q4" && (
-                  <div className="animate-in fade-in duration-200">
-                    <h2 className="text-sm sm:text-base font-bold text-[#062c55] mb-3">
+                  <div className="animate-fade">
+                    <h2 className="text-sm sm:text-base font-semibold text-[#062c55] mb-3">
                       Does it give you 7 days after signing to change your mind?
                     </h2>
 
@@ -2457,7 +2457,7 @@ export default function USFlow() {
                 STEP 5: DETAILS (2 SEQUENTIAL SINGLE-QUESTION SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isDetailsStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Upper Badge & 2 Progress Dots */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2490,8 +2490,8 @@ export default function USFlow() {
                 {/* ── QUESTION 1 OF 2: Anything else you'd flag? ── */}
                 {(currentStep === "details-q1" ||
                   currentStep === "step-details") && (
-                  <div className="animate-in fade-in duration-200">
-                    <h2 className="text-sm sm:text-base font-bold text-[#062c55] mb-3">
+                  <div className="animate-fade">
+                    <h2 className="text-sm sm:text-base font-semibold text-[#062c55] mb-3">
                       Anything else you&apos;d flag?
                     </h2>
 
@@ -2556,8 +2556,8 @@ export default function USFlow() {
 
                 {/* ── QUESTION 2 OF 2: Is there a non-compete in your agreement? ── */}
                 {currentStep === "details-q2" && (
-                  <div className="animate-in fade-in duration-200">
-                    <h2 className="text-sm sm:text-base font-bold text-[#062c55] mb-3">
+                  <div className="animate-fade">
+                    <h2 className="text-sm sm:text-base font-semibold text-[#062c55] mb-3">
                       Is there a non-compete in your agreement?
                     </h2>
 
@@ -2638,7 +2638,7 @@ export default function USFlow() {
                 STEP: ANALYZING (MATCHING SCREENSHOT)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "step-analyzing" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[22px] py-14 sm:py-20 px-6 sm:px-12 text-center shadow-[0_20px_50px_-25px_rgba(6,44,85,0.12)] max-w-[620px] mx-auto animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[22px] py-14 sm:py-20 px-6 sm:px-12 text-center shadow-[0_20px_50px_-25px_rgba(6,44,85,0.12)] max-w-[620px] mx-auto animate-fade">
                 {/* Document outline icon with green top banner matching screenshot */}
                 <div className="relative mx-auto w-14 h-[68px] mb-6 flex items-center justify-center">
                   <div className="absolute inset-0 bg-[#0eb28d]/15 rounded-lg blur-md animate-pulse" />
@@ -2678,7 +2678,7 @@ export default function USFlow() {
                 STEP 6: RESULTS & VERDICT
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "step-results" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-5 sm:p-8 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-in fade-in duration-300">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-5 sm:p-8 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* ── VERDICT CARD (encompasses tag, title, reasons, and srcbadge) ── */}
                 <div className="text-center p-5 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
                   {/* Upper Badges */}
@@ -2692,7 +2692,7 @@ export default function USFlow() {
                   </div>
 
                   {/* Main Title */}
-                  <h2 className="font-serif font-[600] text-[26px] sm:text-[30px] md:text-[32px] text-[#062c55] leading-[31.5px] sm:leading-[36px] tracking-normal max-w-[580px] mx-auto mb-3">
+                  <h2 className="font-serif font-[600] text-[26px] sm:text-[30px] md:text-[32px] text-[#062c55] leading-[31.5px] sm:leading-[36px] max-w-[580px] mx-auto mb-3">
                     A few things here are worth an attorney&apos;s look.
                   </h2>
 
@@ -2830,7 +2830,7 @@ export default function USFlow() {
                   <div className="font-sans font-[800] uppercase tracking-[0.9px] text-[11px] leading-[16px] text-[#0c8f72] mb-1">
                     Next step · optional
                   </div>
-                  <h2 className="font-serif font-[600] text-[26px] sm:text-[32px] text-[#062c55] leading-[32px] sm:leading-[36px] tracking-normal mb-2">
+                  <h2 className="font-serif font-[600] text-[26px] sm:text-[32px] text-[#062c55] leading-[32px] sm:leading-[36px] mb-2">
                     Want to take it a step further?
                   </h2>
                   <p className="font-sans font-normal text-[14px] sm:text-[15px] leading-[20px] text-[#5a6b78] max-w-[540px] mx-auto">
@@ -3005,12 +3005,12 @@ export default function USFlow() {
                     (f) => (
                       <div
                         key={f.key}
-                        className="flex justify-between items-start py-1 border-b border-dashed border-[#e7e4dd] gap-2"
+                        className="flex justify-between items-start py-1 border-b border-dashed border-[#e7e4dd] gap-2 animate-rowin"
                       >
                         <span className="font-sans font-normal text-[13px] leading-[18px] text-[#5a6b78] shrink-0">
                           {f.label}
                         </span>
-                        <b className="font-sans font-[700] text-[13px] leading-[18px] text-[#062c55] text-right">
+                        <b className="font-sans font-[700] text-[13px] leading-[18px] text-[#062c55] text-right animate-flash">
                           {getSummaryValue(f.key)}
                         </b>
                       </div>
@@ -3113,11 +3113,11 @@ export default function USFlow() {
       {/* ── OPTION INFO POP-UP (ⓘ) ── */}
       {infoModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-scrimin"
           onClick={() => setInfoModal(null)}
         >
           <div
-            className="relative bg-white rounded-[16px] p-5 sm:p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-in zoom-in-95 duration-150"
+            className="relative bg-white rounded-[16px] p-5 sm:p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-left animate-dlgup"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="font-sans font-[800] text-[11px] uppercase tracking-[0.6px] text-[#0c8f72] mb-1.5">
@@ -3328,14 +3328,14 @@ export default function USFlow() {
       {emailModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
-            className="fixed inset-0 bg-[#062c55]/45 backdrop-blur-xs transition-opacity"
+            className="fixed inset-0 bg-[#062c55]/45 backdrop-blur-xs animate-scrimin"
             onClick={() => setEmailModalOpen(false)}
           />
-          <div className="relative bg-white rounded-2xl border border-[#e7e4dd] p-6 sm:p-7 max-w-[420px] w-full shadow-2xl z-10 animate-in fade-in zoom-in-95 duration-200 text-center">
+          <div className="relative bg-white rounded-2xl border border-[#e7e4dd] p-6 sm:p-7 max-w-[420px] w-full shadow-2xl z-10 animate-dlgup text-center">
             <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0c8f72] block mb-1">
               Free · No card needed
             </span>
-            <h3 className="font-serif font-bold text-2xl text-[#062c55] mb-2 leading-tight">
+            <h3 className="font-serif font-semibold text-2xl text-[#062c55] mb-2 leading-tight">
               Email me my free results
             </h3>
             <p className="text-xs sm:text-[13px] text-[#5a6b78] leading-relaxed mb-4">

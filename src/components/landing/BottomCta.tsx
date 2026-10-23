@@ -30,11 +30,11 @@ export default function BottomCta({ country }: BottomCtaProps) {
   if (isCanada) {
     return (
       <section className="py-[68px] pb-[60px] mx-auto">
-        <div className="max-w-[1200px] mx-auto px-6 w-full box-border text-center">
-          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.5px] text-greend">
+        <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border text-center">
+          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
             You don&apos;t have to sign today
           </span>
-          <h2 className="font-serif text-[26px] sm:text-[clamp(24px,3vw,34px)] text-navy dark:text-white font-bold leading-[1.2] mt-2">
+          <h2 className="font-serif text-2xl sm:text-[32px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] mt-2">
             Make sense of your offer — free, in 60 seconds.
           </h2>
           <div className="mt-6">
@@ -52,12 +52,12 @@ export default function BottomCta({ country }: BottomCtaProps) {
   }
 
   return (
-    <section className="max-w-[1200px] mx-auto px-6 w-full box-border">
+    <section className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
       <div className="bg-brand-navy rounded-3xl p-8 sm:p-[50px_32px] text-center text-white my-10 mx-auto shadow-[0_16px_40px_rgba(6,44,85,0.2)]">
-        <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.5px] text-[#7ff0cf]">
+        <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-[#7ff0cf]">
           You don&apos;t have to sign today
         </span>
-        <h2 className="font-serif text-[26px] sm:text-[34px] text-white font-semibold leading-[1.2] mt-2">
+        <h2 className="font-serif text-2xl sm:text-[32px] text-white font-semibold leading-[1.1] tracking-[-0.5px] mt-2">
           Make sense of your separation offer — free, in 60 seconds.
         </h2>
         <div className="mt-5">

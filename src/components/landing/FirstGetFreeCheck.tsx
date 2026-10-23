@@ -85,28 +85,28 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
   return (
     <>
       <section className={`py-16 ${isCanada ? "" : "bg-card dark:bg-[#071524] border-t border-b border-line"} transition-colors`} id="paths">
-        <div className="max-w-[1200px] mx-auto px-6 w-full box-border">
+        <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
           <div className="text-center">
-            <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.5px] text-greend">
+            <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
               Step 1 — start here
             </span>
-            <h2 className="font-serif text-[26px] sm:text-[clamp(24px,3vw,28px)] text-navy dark:text-white font-bold leading-[1.15] mt-1.5">
+            <h2 className="font-serif text-2xl sm:text-[32px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] mt-1.5">
               First, get your free check.
             </h2>
           </div>
 
           {/* STEP 1: the free check, front and centre */}
-          <div className="bg-[#062C55] rounded-[20px] p-[28px_22px] sm:p-9 lg:p-[36px_44px] text-white flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-10 mt-8 shadow-[0_16px_48px_rgba(6,44,85,0.22)] max-w-[1000px] mx-auto text-center lg:text-left">
+          <div className="bg-[#062C55] rounded-[20px] p-[28px_22px] sm:p-9 lg:p-[36px_44px] text-white flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-10 mt-8 shadow-[0_16px_48px_rgba(6,44,85,0.22)] w-full mx-auto text-center lg:text-left">
             <div>
               <div className="text-[11px] font-extrabold uppercase tracking-[1.2px] text-[#7ff0cf] mb-2.5">
                 Free · <b className="text-[#12d29e]">60 seconds</b> · no obligation
               </div>
-              <h3 className="font-serif text-2xl sm:text-[26px] text-white m-0 mb-2.5 font-bold leading-[1.25] max-w-[520px]">
+              <h3 className="font-serif text-2xl sm:text-[31px] text-white m-0 mb-2.5 font-semibold leading-[1.12] tracking-[-0.5px] max-w-[520px]">
                 {isCanada
                   ? "See what kind of offer you got — free, in 60 seconds."
                   : "See which rules may apply — free, in 60 seconds."}
               </h3>
-              <p className="text-[14.5px] text-[#b8d4e8] leading-[1.58] m-0 max-w-[520px]">
+              <p className="text-[14.5px] text-[#b8d4e8] leading-[1.55] m-0 max-w-[520px]">
                 {isCanada
                   ? "Answer a few quick questions and get a plain-English read on your severance. No credit card, no signup, nothing to lose."
                   : "Answer a few quick questions and get a plain-English read on the federal rules that may apply to your layoff. No credit card, no signup, nothing to lose."}
@@ -114,7 +114,7 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
             </div>
             <div className="text-center shrink-0">
               <a
-                className="inline-flex items-center justify-center bg-green hover:bg-greend text-white py-3.5 px-[26px] rounded-xl font-bold text-[15px] no-underline whitespace-nowrap shadow-[0_4px_16px_rgba(14,178,141,0.4)] hover:shadow-[0_6px_20px_rgba(12,143,114,0.45)] hover:-translate-y-px active:scale-[0.98] transition-all"
+                className="inline-flex items-center justify-center bg-green hover:bg-greend text-white py-[18px] px-[30px] rounded-[14px] font-extrabold text-[18px] no-underline whitespace-nowrap shadow-[0_16px_30px_-14px_rgba(12,143,114,0.7)] hover:shadow-[0_20px_34px_-12px_rgba(12,143,114,0.8)] hover:-translate-y-px active:scale-[0.98] transition-all"
                 href="#hero"
                 onClick={handleStartRead}
               >
@@ -141,7 +141,7 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
 
           {/* STEP 2: after the read, the decision */}
           <div className="text-center max-w-[600px] mx-auto mb-8">
-            <div className="font-serif text-2xl sm:text-[28px] text-navy dark:text-white font-bold mb-2.5 leading-[1.2]">
+            <div className="font-serif text-2xl sm:text-[28px] text-navy dark:text-white font-semibold mb-2.5 leading-[1.2]">
               You got your 60-second read. Now it&apos;s your call.
             </div>
             <div className="text-[14.5px] text-slate leading-[1.6]">
@@ -166,10 +166,10 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
               <div className="text-[32px] font-extrabold text-navy dark:text-white mb-1 flex items-baseline gap-1.5 font-serif">
                 $59<span className="text-[13px] font-semibold normal-case text-slate tracking-normal font-sans">one-time</span>
               </div>
-              <h4 className="font-serif text-xl text-navy dark:text-white m-0 mb-3 font-bold">
+              <h4 className="font-serif text-xl text-navy dark:text-white m-0 mb-3 font-semibold">
                 Get your Severance Report
               </h4>
-              <div className="text-sm text-slate leading-[1.6] flex-1 mb-5">
+              <div className="text-sm text-slate leading-[1.55] flex-1 mb-5">
                 {isCanada
                   ? "Your offer organized into a 13-page report — key terms, dates, questions to prepare — so you can push back on your own, or walk into a free lawyer call already prepared."
                   : "Add your paperwork and get it organized into a clear summary — key terms, dates, and the federal rules that may apply."}
@@ -194,10 +194,10 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
               <div className="text-[32px] font-extrabold text-greend mb-1 flex items-baseline gap-1.5 font-serif">
                 Free<span className="text-[13px] font-semibold normal-case text-slate tracking-normal font-sans">to connect</span>
               </div>
-              <h4 className="font-serif text-xl text-navy dark:text-white m-0 mb-3 font-bold">
+              <h4 className="font-serif text-xl text-navy dark:text-white m-0 mb-3 font-semibold">
                 Hand it to {isCanada ? "a lawyer" : "an attorney"}
               </h4>
-              <div className="text-sm text-slate leading-[1.6] flex-1 mb-5">
+              <div className="text-sm text-slate leading-[1.55] flex-1 mb-5">
                 Where we&apos;re live, an employment {isCanada ? "lawyer" : "attorney"} takes it from here — free to connect.{" "}
                 {isCanada ? "Lawyers" : "Attorneys"} pay us a flat advertising fee, never a cut of your outcome.
               </div>
@@ -212,12 +212,12 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
       {/* Path Info Popup Modal */}
       {activePath && (
         <div
-          className="fixed inset-0 bg-[#062C55]/55 z-[300] backdrop-blur-xs flex items-center justify-center p-5"
+          className="fixed inset-0 bg-[#062C55]/55 z-[300] backdrop-blur-xs flex items-center justify-center p-5 animate-scrimin"
           id="pmscrim"
           onClick={() => setActivePath(null)}
         >
           <div
-            className="bg-card rounded-[20px] p-8 pb-[26px] max-w-[500px] w-full z-[310] shadow-[0_40px_90px_-30px_rgba(6,44,85,0.6)] border border-line box-border"
+            className="bg-card rounded-[20px] p-8 pb-[26px] max-w-[500px] w-full z-[310] shadow-[0_40px_90px_-30px_rgba(6,44,85,0.6)] border border-line box-border animate-dlgup"
             id="pmodal"
             role="dialog"
             aria-modal="true"
@@ -229,7 +229,7 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
                 <div className="text-[11px] font-extrabold tracking-[0.6px] uppercase text-greend mb-1.5">
                   {modalContent.k}
                 </div>
-                <h3 className="font-serif text-2xl text-navy dark:text-white my-1.5 mb-3.5 font-bold">
+                <h3 className="font-serif text-2xl text-navy dark:text-white my-1.5 mb-3.5 font-semibold">
                   {modalContent.h}
                 </h3>
                 <div className="bg-navy rounded-xl p-6 text-center text-white mb-4 flex flex-col items-center gap-2">

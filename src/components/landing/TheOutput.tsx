@@ -13,12 +13,12 @@ export default function TheOutput({ country }: TheOutputProps) {
   if (isCanada) {
     return (
       <section className="py-16 pt-0 mx-auto mt-3">
-        <div className="max-w-[1200px] mx-auto px-6 w-full box-border">
+        <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
           <div className="bg-brand-navy rounded-3xl p-8 sm:p-12 text-white text-center w-full mx-auto shadow-[0_20px_50px_rgba(6,44,85,0.25)] box-border">
-            <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.5px] text-[#7ff0cf]">
+            <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-[#7ff0cf]">
               The output
             </span>
-            <h2 className="font-serif text-[clamp(25px,2.7vw,31px)] text-white font-semibold my-2.5 mb-3.5 leading-[1.25]">
+            <h2 className="font-serif text-[28px] text-white font-semibold my-2.5 mb-3.5 leading-[1.1] tracking-[-0.5px]">
               We don&apos;t guess your number. We help you make sense of the offer.
             </h2>
             <p className="text-[15.5px] text-[#cfe0f0] leading-[1.6] max-w-[740px] mx-auto mb-5">
@@ -39,12 +39,12 @@ export default function TheOutput({ country }: TheOutputProps) {
 
   return (
     <section className="py-16 mx-auto">
-      <div className="max-w-[1200px] mx-auto px-6 w-full box-border">
+      <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
         <div className="bg-brand-navy rounded-3xl p-8 sm:p-12 text-white text-center w-full mx-auto shadow-[0_20px_50px_rgba(6,44,85,0.25)] box-border">
-          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.5px] text-[#7ff0cf]">
+          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-[#7ff0cf]">
             The output
           </span>
-          <h2 className="font-serif text-[clamp(25px,2.7vw,31px)] text-white font-semibold my-2.5 mb-3.5 leading-[1.25]">
+          <h2 className="font-serif text-[28px] text-white font-semibold my-2.5 mb-3.5 leading-[1.1] tracking-[-0.5px]">
             A plain-English read — not a score, not a dollar figure.
           </h2>
           <p className="text-[15.5px] text-[#cfe0f0] leading-[1.6] max-w-[740px] mx-auto mb-5">

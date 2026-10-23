@@ -51,7 +51,7 @@ export default function CountrySelectionDialog({
     >
       {/* Frosted backdrop — lighter so the page content is still visible per screenshot */}
       <div
-        className="fixed inset-0 backdrop-blur-[3px] bg-[#062C55]/45 transition-opacity"
+        className="fixed inset-0 backdrop-blur-[3px] bg-[#062C55]/45 animate-scrimin"
         aria-hidden="true"
       />
 
@@ -62,23 +62,23 @@ export default function CountrySelectionDialog({
         aria-modal="true"
         aria-labelledby="country-dialog-heading"
         tabIndex={-1}
-        className="relative w-full max-w-sm rounded-3xl shadow-2xl p-8 z-10 focus:outline-none text-center bg-card text-primary border border-line"
+        className="relative w-full max-w-sm rounded-3xl shadow-2xl p-8 z-10 focus:outline-none text-center bg-card text-primary border border-line animate-dlgup"
       >
         {/* Eyebrow */}
-        <p className="text-[11px] font-bold tracking-[1.5px] uppercase mb-3 text-brand-green-text">
+        <p className="text-[11px] font-bold tracking-[1.4px] uppercase mb-3 text-brand-green-text">
           WELCOME TO FAIREXIT
         </p>
 
         {/* Heading */}
         <h2
           id="country-dialog-heading"
-          className="font-serif text-2xl sm:text-3xl font-bold leading-tight mb-3 text-navy dark:text-white"
+          className="font-serif text-[24px] font-semibold leading-[1.1] tracking-[-0.5px] mb-3 text-navy dark:text-white"
         >
           Where were you laid off?
         </h2>
 
         {/* Sub-copy */}
-        <p className="text-sm leading-relaxed mb-7 max-w-[260px] mx-auto text-slate">
+        <p className="text-sm leading-[1.6] mb-7 max-w-[260px] mx-auto text-slate">
           The laws are different in each country, so we run two separate services.
           Pick yours and we&apos;ll take you to the right one.
         </p>

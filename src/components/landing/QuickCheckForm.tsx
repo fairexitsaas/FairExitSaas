@@ -136,8 +136,7 @@ export default function QuickCheckForm({ country }: QuickCheckFormProps) {
 
           <button
             type="submit"
-            className="w-full mt-4 font-bold text-[16.5px] px-[30px] py-4 rounded-[9px] text-white border-none cursor-pointer active:scale-[0.98] transition-all shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] hover:shadow-[0_14px_24px_-10px_rgba(12,143,114,0.65)] hover:-translate-y-px"
-            style={{ background: "linear-gradient(180deg,#0eb28d,#0c8f72)" }}
+            className="w-full mt-4 font-bold text-[16.5px] px-[30px] py-4 rounded-[9px] text-white border-none cursor-pointer bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] active:scale-[0.98] transition-all shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] hover:shadow-[0_14px_24px_-10px_rgba(12,143,114,0.65)] hover:-translate-y-px"
           >
             See what kind of offer it is →
           </button>
@@ -286,8 +285,7 @@ export default function QuickCheckForm({ country }: QuickCheckFormProps) {
 
           <button
             type="submit"
-            className="w-full mt-4 font-bold text-[16.5px] px-[30px] py-4 rounded-[9px] text-white border-none cursor-pointer active:scale-[0.98] transition-all shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] hover:shadow-[0_14px_24px_-10px_rgba(12,143,114,0.65)] hover:-translate-y-px"
-            style={{ background: "linear-gradient(180deg,#0eb28d,#0c8f72)" }}
+            className="w-full mt-4 font-bold text-[16.5px] px-[30px] py-4 rounded-[9px] text-white border-none cursor-pointer bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] active:scale-[0.98] transition-all shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] hover:shadow-[0_14px_24px_-10px_rgba(12,143,114,0.65)] hover:-translate-y-px"
           >
             Check my layoff — free →
           </button>

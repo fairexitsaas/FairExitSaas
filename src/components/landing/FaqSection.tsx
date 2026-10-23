@@ -25,12 +25,12 @@ export default function FaqSection({ country }: FaqSectionProps) {
   if (isCanada) {
     return (
       <section className="py-16 bg-card dark:bg-[#071524] border-t border-b border-line transition-colors" id="faq">
-        <div className="max-w-[1200px] mx-auto px-6 w-full box-border">
+        <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
           <div className="text-center">
-            <span className="inline-flex items-start text-xs font-extrabold uppercase tracking-[1.5px] text-greend">
+            <span className="inline-flex items-start text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
               Severance questions, answered
             </span>
-            <h2 className="font-serif text-[26px] sm:text-[clamp(24px,3vw,28px)] text-navy dark:text-white font-bold leading-[1.15] mt-1.5">
+            <h2 className="font-serif text-2xl sm:text-[32px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] mt-1.5">
               The questions people ask right after a layoff.
             </h2>
             <p className="text-base leading-[1.6] text-slate max-w-[640px] mt-2.5 mx-auto">
@@ -45,7 +45,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
                 <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
                 <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
               </summary>
-              <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+              <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
                 Severance is money — and sometimes benefits — an employer gives you when your job ends through no fault of your own. It can be a lump sum, continued salary for a period, benefits, or a mix. <b>The first amount you&apos;re offered often isn&apos;t all you can get.</b>
               </div>
             </details>
@@ -56,7 +56,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
                 <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
                 <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
               </summary>
-              <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+              <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
                 Usually, yes. A severance offer is normally a <b>starting point, not a final number</b>. Plenty of people ask for more — calmly, in writing — and improve the deal. You&apos;re allowed to say &quot;let me review this&quot; before you agree to anything.
               </div>
             </details>
@@ -67,7 +67,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
                 <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
                 <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
               </summary>
-              <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+              <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
                 There&apos;s usually no need to rush. Signing often means <b>giving up your right to ask for more later</b>, and it&apos;s hard to undo. It&apos;s completely normal to ask for time to read it carefully — so take it.
               </div>
             </details>
@@ -78,7 +78,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
                 <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
                 <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
               </summary>
-              <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+              <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
                 It depends on things like <b>how long you worked there, your age, your role, your pay, and the wording of your contract</b>. There&apos;s no single formula that fits everyone or every place — which is exactly why it&apos;s worth understanding the offer and your options before you accept.
               </div>
             </details>
@@ -89,7 +89,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
                 <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
                 <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
               </summary>
-              <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+              <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
                 Not always. For smaller, straightforward cases you may be fine handling it yourself. But for bigger ones — long tenure, a senior role, a lot of money, or anything that felt unfair — a lawyer is often the <b>biggest return</b>, and the first call is usually free. It&apos;s worth finding out which camp you&apos;re in before you decide.
               </div>
             </details>
@@ -100,7 +100,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
                 <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
                 <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
               </summary>
-              <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+              <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
                 No. FairExit isn&apos;t a law firm and doesn&apos;t give legal advice. <b>We don&apos;t hold your hand or make the decision for you.</b> We give you the resources to understand your options — sign, negotiate yourself with some help, or talk to a lawyer — and what each could mean, then you choose the path that&apos;s right for you. Only a licensed employment lawyer can confirm what applies to you.
               </div>
             </details>
@@ -129,12 +129,12 @@ export default function FaqSection({ country }: FaqSectionProps) {
 
   return (
     <section className="py-16 mx-auto" id="faq">
-      <div className="max-w-[1200px] mx-auto px-6 w-full box-border">
+      <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
         <div className="text-center">
-          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.5px] text-greend">
+          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
             US severance questions, answered
           </span>
-          <h2 className="font-serif text-[26px] sm:text-[clamp(24px,3vw,28px)] text-navy dark:text-white font-bold leading-[1.15] mt-1.5">
+          <h2 className="font-serif text-2xl sm:text-[32px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] mt-1.5">
             The questions people ask after a US layoff.
           </h2>
           <p className="text-base leading-[1.6] text-slate max-w-[640px] mt-2.5 mx-auto">
@@ -149,7 +149,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
               <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
               <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
             </summary>
-            <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+            <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
               Usually <b>not by law</b> — no federal law requires employers to pay severance. You may still be owed it if your <b>contract, offer letter, or company policy</b> promises it, or if it&apos;s offered in exchange for signing a release. That&apos;s why we check what you were promised, and whether the layoff followed the rules that <b>do</b> apply.
             </div>
           </details>
@@ -160,7 +160,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
               <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
               <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
             </summary>
-            <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+            <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
               If you&apos;re <b>40 or older</b> and asked to sign a release of age-discrimination claims as part of an <b>age-40+ group termination program</b>, the law sets a <b>45-day</b> minimum to consider it (21 days for an individual), plus a <b>7-day</b> window to revoke after signing — you can still choose to sign earlier. The employer also generally has to disclose the job titles and ages of who was and wasn&apos;t selected. Whether these apply to you, and what they mean, is a question for an attorney.
             </div>
           </details>
@@ -171,7 +171,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
               <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
               <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
             </summary>
-            <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+            <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
               The federal <b>WARN Act</b> generally requires a <b>100+-employee</b> employer to give <b>60 days&apos; written notice</b> of a covered mass layoff or closing at a single site. (Federal WARN doesn&apos;t recognize &quot;pay in lieu of notice&quot; — paying instead can still be a violation that only offsets damages.) Some states have their own stricter &quot;mini-WARN&quot; laws. It&apos;s about <b>notice</b>, not a severance amount.
             </div>
           </details>
@@ -182,7 +182,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
               <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
               <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
             </summary>
-            <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+            <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
               Often, yes. If they&apos;ve offered you a severance package in exchange for a release, that number is usually a <b>starting point</b>. Understanding the offer and the rules that may apply can help you decide what to ask — and an attorney can tell you where you actually stand. Don&apos;t sign under pressure.
             </div>
           </details>
@@ -193,7 +193,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
               <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
               <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
             </summary>
-            <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+            <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
               Not always — but if the rules above weren&apos;t followed, or you were let go in a way that felt discriminatory or retaliatory, an <b>employment attorney</b> is often the biggest help, and the first call is usually free. We can connect you.
             </div>
           </details>
@@ -204,7 +204,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
               <span className="text-xl text-greend font-normal leading-none group-open:hidden" aria-hidden="true">+</span>
               <span className="text-xl text-greend font-normal leading-none hidden group-open:inline" aria-hidden="true">−</span>
             </summary>
-            <div className="text-[14.5px] text-slate leading-[1.6] mt-3 pt-3 border-t border-line">
+            <div className="text-[14.5px] text-slate leading-[1.65] mt-3 pt-3 border-t border-line">
               No. FairExit isn&apos;t a law firm and doesn&apos;t give legal advice. We give you a plain-English read of the federal rules that may apply, and help you organize your questions — then you decide. Only a licensed attorney can advise you on your specific situation.
             </div>
           </details>

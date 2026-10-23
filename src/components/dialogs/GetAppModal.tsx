@@ -22,11 +22,11 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-in fade-in duration-150"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-scrimin"
       onClick={onClose}
     >
       <div
-        className="relative bg-white rounded-[18px] p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-center animate-in zoom-in-95 duration-150"
+        className="relative bg-white rounded-[18px] p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-center animate-dlgup"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button ✕ */}
@@ -43,7 +43,7 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
           FairExit on your phone
         </div>
 
-        <h3 className="font-serif font-[600] text-[22px] sm:text-[24px] text-[#062c55] leading-tight mb-1.5">
+        <h3 className="font-serif font-[600] text-[22px] sm:text-[24px] text-[#062c55] leading-[1.1] mb-1.5">
           Scan to get the app
         </h3>
 

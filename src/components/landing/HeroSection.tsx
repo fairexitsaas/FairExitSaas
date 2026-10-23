@@ -28,14 +28,13 @@ export default function HeroSection({ country, onOpenAppModal }: HeroSectionProp
     <>
       {/* ── HERO ──────────────────────────────────────────────────────── */}
       <section className="relative transition-colors" id="hero">
-        <div className="max-w-[1040px] mx-auto px-6 w-full box-border">
+        <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
           <div className="grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-5 lg:gap-10 items-center py-7 lg:py-[46px] lg:pb-[30px]">
             {/* Left Column: Heading, Subtitle & Reference */}
             <div>
               <span className="inline-flex items-center text-[12px] font-extrabold uppercase tracking-[1.4px] text-[#0c8f72]">
                 <Image
-                  className="h-[22px] w-auto mr-[9px] rounded-[2px]"
-                  style={{ verticalAlign: "-7px" }}
+                  className="h-[22px] w-auto mr-[9px] rounded-[2px] [vertical-align:-7px]"
                   src={isCanada ? "/flag-ca.svg" : "/flag-us.svg"}
                   alt={isCanada ? "Canada" : "United States"}
                   width={34}
@@ -122,7 +121,7 @@ export default function HeroSection({ country, onOpenAppModal }: HeroSectionProp
 
       {/* ── EXPLAINER VIDEO (placeholder) ─────────────────────────────── */}
       <section className="py-14 mx-auto" id="video">
-        <div className="max-w-[1040px] mx-auto px-6 w-full box-border">
+        <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
           <div className="text-center">
             <span className="inline-flex items-center text-[12px] font-extrabold uppercase tracking-[1.4px] text-[#0c8f72]">In 90 seconds</span>
             <h2 className="font-serif text-[26px] md:text-[32px] text-[#062c55] font-semibold leading-[1.1] tracking-[-0.5px] mt-[6px]">

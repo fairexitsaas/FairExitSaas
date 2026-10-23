@@ -14,12 +14,12 @@ export default function CantIAskChatGPT() {
 
   return (
     <section className="py-16 lg:pt-[72px] lg:pb-16 bg-card dark:bg-[#071524] border-t border-b border-line transition-colors" id="why" data-ab="chatgpt">
-      <div className="max-w-[1200px] mx-auto px-6 w-full box-border">
+      <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
         <div className="text-center">
-          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.5px] text-greend">
+          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
             The honest question
           </span>
-          <h2 className="font-serif text-[26px] sm:text-[clamp(24px,3vw,28px)] text-navy dark:text-white font-bold leading-[1.15] mt-1.5">
+          <h2 className="font-serif text-2xl sm:text-[32px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] mt-1.5">
             &ldquo;Can&apos;t I just ask ChatGPT?&rdquo;
           </h2>
           <p className="text-base leading-[1.6] text-slate max-w-[640px] mt-2 mx-auto">
@@ -29,7 +29,7 @@ export default function CantIAskChatGPT() {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-[22px] my-9 mb-6">
           <div className="rounded-2xl p-[30px_32px] box-border bg-[#FBFBFA] dark:bg-[#0d2238] border border-[#E6E7E9] dark:border-[#183654] transition-colors">
-            <h3 className="font-serif text-[19px] text-navy dark:text-white mb-4 font-bold">
+            <h3 className="font-serif text-[19px] text-navy dark:text-white mb-4 font-semibold">
               A general chatbot
             </h3>
             <ul className="m-0 p-0 list-none text-[14.5px] text-[#334155] dark:text-[#E1E7ED] leading-[1.6] flex flex-col gap-3.5">
@@ -53,7 +53,7 @@ export default function CantIAskChatGPT() {
           </div>
 
           <div className="rounded-2xl p-[30px_32px] box-border bg-card dark:bg-[#0B1E32] border border-[#9DE0CE] dark:border-[#12D29E] transition-colors shadow-xs">
-            <h3 className="font-serif text-[19px] text-navy dark:text-white mb-4 font-bold">
+            <h3 className="font-serif text-[19px] text-navy dark:text-white mb-4 font-semibold">
               FairExit&apos;s severance engine
             </h3>
             <ul className="m-0 p-0 list-none text-[14.5px] text-[#334155] dark:text-[#E1E7ED] leading-[1.6] flex flex-col gap-3.5">
@@ -86,7 +86,7 @@ export default function CantIAskChatGPT() {
                 <circle cx="12" cy="12" r="4" />
               </svg>
             </div>
-            <h4 className="text-[14.5px] font-bold text-navy dark:text-[#F0F6FC] mb-2 font-sans leading-[1.35]">
+            <h4 className="text-[14.5px] font-semibold text-navy dark:text-[#F0F6FC] mb-2 font-sans leading-[1.35]">
               Purpose-built, not general
             </h4>
             <p className="text-[12.5px] text-slate leading-[1.5] m-0">
@@ -104,7 +104,7 @@ export default function CantIAskChatGPT() {
                 <path d="M18 7l-3 7h6l-3-7z" />
               </svg>
             </div>
-            <h4 className="text-[14.5px] font-bold text-navy dark:text-[#F0F6FC] mb-2 font-sans leading-[1.35]">
+            <h4 className="text-[14.5px] font-semibold text-navy dark:text-[#F0F6FC] mb-2 font-sans leading-[1.35]">
               Jurisdiction-specific framework
             </h4>
             <p className="text-[12.5px] text-slate leading-[1.5] m-0">
@@ -119,7 +119,7 @@ export default function CantIAskChatGPT() {
                 <path d="M21 3v5h-5" />
               </svg>
             </div>
-            <h4 className="text-[14.5px] font-bold text-navy dark:text-[#F0F6FC] mb-2 font-sans leading-[1.35]">
+            <h4 className="text-[14.5px] font-semibold text-navy dark:text-[#F0F6FC] mb-2 font-sans leading-[1.35]">
               Structured &amp; consistent
             </h4>
             <p className="text-[12.5px] text-slate leading-[1.5] m-0">
@@ -131,7 +131,7 @@ export default function CantIAskChatGPT() {
             <div className="text-xl text-green mb-3 leading-none flex items-center">
               <span className="text-[21px] font-bold leading-none">§</span>
             </div>
-            <h4 className="text-[14.5px] font-bold text-navy dark:text-[#F0F6FC] mb-2 font-sans leading-[1.35]">
+            <h4 className="text-[14.5px] font-semibold text-navy dark:text-[#F0F6FC] mb-2 font-sans leading-[1.35]">
               A human finishes it
             </h4>
             <p className="text-[12.5px] text-slate leading-[1.5] m-0">

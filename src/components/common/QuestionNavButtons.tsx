@@ -53,8 +53,7 @@ export function QuestionNextButton({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      style={{ background: "linear-gradient(135deg, #0eb28d, #0c8f72)" }}
-      className={`inline-flex items-center justify-center gap-2 py-[11px] px-[18px] sm:py-[13px] sm:pl-[22px] sm:pr-[20px] rounded-[9px] border-none text-white text-[14px] font-extrabold shadow-[0_10px_24px_-12px_rgba(12,143,114,0.7)] hover:-translate-y-px hover:shadow-[0_14px_28px_-12px_rgba(12,143,114,0.8)] active:translate-y-0 transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed leading-normal select-none ${className}`}
+      className={`inline-flex items-center justify-center gap-2 py-[11px] px-[18px] sm:py-[13px] sm:pl-[22px] sm:pr-[20px] rounded-[9px] border-none text-white text-[14px] font-extrabold bg-gradient-to-br from-[#0eb28d] to-[#0c8f72] shadow-[0_10px_24px_-12px_rgba(12,143,114,0.7)] hover:-translate-y-px hover:shadow-[0_14px_28px_-12px_rgba(12,143,114,0.8)] active:translate-y-0 transition-all duration-150 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed leading-normal select-none ${className}`}
     >
       {children || (
         <>

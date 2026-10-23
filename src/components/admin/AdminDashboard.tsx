@@ -405,7 +405,7 @@ function AdminDashboardInner({
             <div className="mb-8">
               <div className="flex items-center justify-between">
                 <Link href="/" className="inline-block group">
-                  <h1 className="text-xl font-bold tracking-tight text-white group-hover:text-emerald-300 transition-colors">
+                  <h1 className="text-xl font-semibold tracking-tight text-white group-hover:text-emerald-300 transition-colors">
                     FairExit
                   </h1>
                 </Link>
@@ -667,7 +667,7 @@ function AdminDashboardInner({
                 {/* Left: Report status this month */}
                 <div className="lg:col-span-7 bg-white rounded-xl border border-[#E7E4DD] p-5 shadow-xs flex flex-col justify-between">
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900">
+                    <h3 className="text-xs font-semibold text-slate-900">
                       Report status <span className="text-slate-400 font-normal ml-1">this month</span>
                     </h3>
 
@@ -679,7 +679,7 @@ function AdminDashboardInner({
                           <span className="font-bold text-slate-900">33</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-[#EAE6DF] overflow-hidden">
-                          <div className="h-full rounded-full bg-[#0EB28D]" style={{ width: '89%' }}></div>
+                          <div className="h-full rounded-full bg-[#0EB28D] w-[89%]"></div>
                         </div>
                       </div>
 
@@ -690,7 +690,7 @@ function AdminDashboardInner({
                           <span className="font-bold text-slate-900">2</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-[#EAE6DF] overflow-hidden">
-                          <div className="h-full rounded-full bg-[#E1C497]" style={{ width: '8%' }}></div>
+                          <div className="h-full rounded-full bg-[#E1C497] w-[8%]"></div>
                         </div>
                       </div>
 
@@ -701,7 +701,7 @@ function AdminDashboardInner({
                           <span className="font-bold text-slate-900">1</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-[#EAE6DF] overflow-hidden">
-                          <div className="h-full rounded-full bg-[#E1C497]" style={{ width: '4%' }}></div>
+                          <div className="h-full rounded-full bg-[#E1C497] w-[4%]"></div>
                         </div>
                       </div>
 
@@ -712,7 +712,7 @@ function AdminDashboardInner({
                           <span className="font-bold text-slate-900">1</span>
                         </div>
                         <div className="h-2 w-full rounded-full bg-[#EAE6DF] overflow-hidden">
-                          <div className="h-full rounded-full bg-[#E1C497]" style={{ width: '4%' }}></div>
+                          <div className="h-full rounded-full bg-[#E1C497] w-[4%]"></div>
                         </div>
                       </div>
                     </div>
@@ -721,7 +721,7 @@ function AdminDashboardInner({
 
                 {/* Right: Needs attention */}
                 <div className="lg:col-span-5 bg-white rounded-xl border border-[#E7E4DD] p-5 shadow-xs">
-                  <h3 className="text-xs font-bold text-slate-900">Needs attention</h3>
+                  <h3 className="text-xs font-semibold text-slate-900">Needs attention</h3>
 
                   <div className="mt-4 space-y-3.5">
                     {/* Item 1: REQ-0029 */}
@@ -785,7 +785,7 @@ function AdminDashboardInner({
 
               {/* Bottom Card: Recent users */}
               <div className="mt-5 bg-white rounded-xl border border-[#E7E4DD] p-5 shadow-xs">
-                <h3 className="text-xs font-bold text-slate-900 mb-3.5">Recent users</h3>
+                <h3 className="text-xs font-semibold text-slate-900 mb-3.5">Recent users</h3>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs">
@@ -1070,7 +1070,7 @@ function AdminDashboardInner({
 
               {/* Callout Box: What "Summary" means */}
               <div className="mt-5 bg-white rounded-xl border border-[#E7E4DD] p-5 shadow-xs">
-                <h4 className="text-xs font-bold text-slate-900">
+                <h4 className="text-xs font-semibold text-slate-900">
                   What &quot;Summary&quot; means · the only things we share with a lawyer
                 </h4>
                 <p className="mt-1.5 text-xs text-[#5A6B78] leading-relaxed">
@@ -1367,7 +1367,7 @@ function AdminDashboardInner({
           <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold text-[#062C55]">
+                <h3 className="text-base font-semibold text-[#062C55]">
                   Summary Sent to Lawyer · {summaryModalReq.id}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -1442,7 +1442,7 @@ function AdminDashboardInner({
           <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <h3 className="text-base font-bold text-[#062C55]">Add a lawyer to roster</h3>
+                <h3 className="text-base font-semibold text-[#062C55]">Add a lawyer to roster</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
                   Phase 1: Hand-curated list. Enter signed agreement details.
                 </p>
