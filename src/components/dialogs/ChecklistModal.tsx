@@ -94,7 +94,7 @@ export default function ChecklistModal({
         </div>
 
         {sent ? (
-          <div className="py-3 px-4 bg-[#e6f5ef] border border-[#b9e6d4] rounded-[10px] text-center font-sans font-[700] text-[13.5px] text-[#0c7a60] mb-3">
+          <div className="py-3 px-4 bg-[#e6f5ef] border border-[#b9e6d4] rounded-[10px] text-center font-sans font-[700] text-[13.5px] text-[#0c7a60] mb-3 animate-fade">
             ✓ Sent — checklist on its way to {email || "your email"}!
           </div>
         ) : (
@@ -104,12 +104,12 @@ export default function ChecklistModal({
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@email.com (optional)"
-              className="w-full border border-[#cdd3d8] rounded-[10px] px-3.5 py-2.5 text-[13.5px] text-[#17242f] placeholder-[#8a98a4] focus:outline-none focus:border-[#0c8f72]"
+              className="w-full border border-[#cdd3d8] rounded-[10px] px-3.5 py-2.5 text-[13.5px] text-[#17242f] placeholder-[#8a98a4] focus:outline-none focus:border-[#0c8f72] transition-colors"
             />
             <button
               type="button"
               onClick={handleSend}
-              className="w-full py-3 rounded-[9px] bg-[#0c8f72] hover:bg-[#0aa07e] text-white font-sans font-[700] text-[14px] leading-[20px] transition-colors cursor-pointer text-center shadow-xs"
+              className="w-full py-3 rounded-[9px] bg-[#0c8f72] hover:bg-[#0aa07e] active:scale-[0.98] text-white font-sans font-[700] text-[14px] leading-[20px] transition-all cursor-pointer text-center shadow-xs"
             >
               Email me this checklist
             </button>

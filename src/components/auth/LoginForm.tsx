@@ -69,7 +69,7 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-800 dark:bg-slate-900">
+    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 sm:p-8 shadow-xl dark:border-slate-800 dark:bg-slate-900">
       <div className="mb-6 text-center">
         <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
           Welcome back

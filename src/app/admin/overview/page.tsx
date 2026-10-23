@@ -62,7 +62,7 @@ export default function OverviewPage() {
       </div>
 
       {/* 5 KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-[18px]">
+      <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 mb-[18px]">
         {/* KPI 1: Free checks */}
         <div className="bg-white border border-[#e7e4dd] rounded-[12px] p-[14px_16px]">
           <div className="text-[10.5px] font-extrabold tracking-[0.8px] uppercase text-[#5a6b78]">
@@ -116,7 +116,7 @@ export default function OverviewPage() {
         </div>
 
         {/* KPI 5: Sent to a lawyer */}
-        <div className="bg-white border border-[#e7e4dd] rounded-[12px] p-[14px_16px] col-span-2 sm:col-span-1">
+        <div className="bg-white border border-[#e7e4dd] rounded-[12px] p-[14px_16px] col-span-1 xs:col-span-2 sm:col-span-1">
           <div className="text-[10.5px] font-extrabold tracking-[0.8px] uppercase text-[#5a6b78]">
             Sent to a lawyer
           </div>

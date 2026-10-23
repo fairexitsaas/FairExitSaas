@@ -170,14 +170,13 @@ header a, nav a, .nav a {
   line-height: 1.6;
 }
 
-h1, h2, h3, h4 {
-  font-weight: 600;
+h1, h2, h3, h4,
+h1[class*="font-"], h2[class*="font-"], h3[class*="font-"], h4[class*="font-"],
+.font-serif:is(h1, h2, h3, h4),
+[class*="font-serif"]:is(h1, h2, h3, h4) {
+  font-weight: 600 !important;
   line-height: 1.1;
-}
-
-h1.font-bold, h2.font-bold, h3.font-bold, h4.font-bold {
-  font-weight: 600;
-  line-height: 1.1;
+  letter-spacing: -0.5px;
 }
 
 /* Per-element prototype CSS values */
@@ -209,6 +208,25 @@ h1.font-bold, h2.font-bold, h3.font-bold, h4.font-bold {
   line-height: 1.65;
 }
 
+.faq .a b,
+.faq .a strong,
+.faqnote b,
+.faqnote strong {
+  color: var(--navy, #062c55);
+  font-weight: 700;
+}
+
+html[data-theme="dark"] .faq .a b,
+html[data-theme="dark"] .faq .a strong,
+html[data-theme="dark"] .faqnote b,
+html[data-theme="dark"] .faqnote strong,
+.dark .faq .a b,
+.dark .faq .a strong,
+.dark .faqnote b,
+.dark .faqnote strong {
+  color: #ffffff;
+}
+
 .disc {
   line-height: 1.55;
 }
@@ -235,6 +253,7 @@ h1.font-bold, h2.font-bold, h3.font-bold, h4.font-bold {
 
 /* Every Newsreader / serif heading */
 .font-serif,
+h1, h2, h3, h4,
 h1.font-serif,
 h2.font-serif,
 h3.font-serif,
@@ -368,20 +387,186 @@ h4.font-serif,
 .animate-dlgout, .dlgout { animation: dlgout 0.22s ease both; }
 .animate-scrimout, .scrimout { animation: scrimout 0.22s ease both; }
 .animate-dlgdown, .dlgdown { animation: dlgdown 0.22s ease both; }
-.animate-tsin, .tsin { animation: tsin 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
-.animate-tbar, .tbar { animation: tbar 7.5s linear forwards; }
-.animate-ckspin, .ckspin { animation: ckspin 0.8s linear infinite; }
-.animate-ckpop, .ckpop { animation: ckpop 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.animate-ckdraw, .ckdraw { animation: ckdraw 0.25s ease-out 0.06s forwards; }
+.animate-tsin, .tsin, .tv.in .ts, .ts.in { animation: tsin 0.6s ease both; }
+.animate-tbar, .tbar, .tprog i.on b { animation: tbar 7.5s linear forwards; }
+.animate-ckspin, .ckspin {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  vertical-align: -2px;
+  border: 2px solid #cdd3d8;
+  border-top-color: var(--greend);
+  border-radius: 50%;
+  animation: ckspin 0.8s linear infinite;
+}
+.animate-ckpop, .ckpop, .just .cktick { animation: ckpop 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.animate-ckdraw, .ckdraw, .just .cktick path {
+  stroke-dasharray: 14;
+  stroke-dashoffset: 14;
+  animation: ckdraw 0.25s ease-out 0.06s forwards;
+}
 .animate-ckpulse, .ckpulse { animation: ckpulse 1.3s ease; }
 .animate-ckglow, .ckglow { animation: ckglow 1.4s cubic-bezier(0.2, 0.7, 0.2, 1); }
-.animate-unl, .unl { animation: unl 0.6s ease both; }
+.animate-unl, .unl, .bsec.unl { animation: unl 0.6s ease both; }
 .animate-ffin, .ffin { animation: ffin 0.6s ease both; }
 .animate-flow, .flow { animation: flow 2s linear infinite; }
 .animate-ppflash, .ppflash { animation: ppflash 1.4s ease both; }
 .animate-ckpulse2, .ckpulse2 { animation: ckpulse2 0.9s ease-out both; }
 .animate-ccpop, .ccpop { animation: ccpop 0.28s ease both; }
 .animate-fxsh, .fxsh { animation: fxsh 0.35s ease both; }
+
+/* Story tour elements */
+.tour {
+  position: relative;
+  aspect-ratio: 16/9;
+  background: linear-gradient(135deg, #062c55, #0b3f73);
+  border-radius: 14px;
+  overflow: hidden;
+  color: #fff;
+}
+.tv {
+  position: absolute;
+  inset: 0 0 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+}
+.ts {
+  background: #fff;
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 14px 16px;
+  width: min(340px, 90%);
+  box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.5);
+}
+.ts-k {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--greend);
+}
+.ts-big {
+  font-family: var(--serif);
+  font-size: 34px;
+  color: var(--navy);
+  line-height: 1.1;
+  margin: 2px 0 8px;
+}
+.ts-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 5px 0;
+  border-top: 1px dashed #dde3e9;
+}
+.ts-row b { color: var(--navy); }
+.ts-bars { display: grid; gap: 6px; margin-top: 8px; }
+.ts-bars i {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--green);
+  border-radius: 5px;
+  padding: 4px 8px;
+}
+.ts-doc { display: grid; gap: 6px; margin-top: 8px; }
+.ts-doc i {
+  display: block;
+  height: 7px;
+  background: #e6ebef;
+  border-radius: 4px;
+}
+.ts-doc i.s { width: 60%; }
+.ts-doc mark {
+  background: #fff1c2;
+  border-radius: 4px;
+  padding: 3px 6px;
+  font-size: 12px;
+  color: #5a4400;
+}
+.ts-tl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+.ts-tl span {
+  font-size: 11.5px;
+  color: var(--slate);
+  background: #f6f8fa;
+  border-radius: 8px;
+  padding: 6px;
+}
+.ts-tl b {
+  display: block;
+  color: var(--navy);
+  font-size: 12px;
+}
+.ts-q { margin: 8px 0 0 18px; font-size: 13px; }
+.ts-q li { margin: 3px 0; }
+.ts-end { text-align: center; }
+.tcap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13.5px;
+  font-weight: 700;
+  background: rgba(0, 0, 0, 0.28);
+  padding: 0 14px;
+  text-align: center;
+}
+.tprog {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 10px;
+  display: flex;
+  gap: 4px;
+}
+.tprog i {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.tprog i b {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #fff;
+}
+.tprog i.done b { width: 100%; }
+
+/* Check tick */
+.cktick {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--greend);
+  flex: 0 0 auto;
+}
+.cktick svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: #fff;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 
 /* Interactive transitions on buttons, cards, toggles (hover lift, colour fade) */
 button, .btn, [role="button"] {
@@ -1108,6 +1293,36 @@ html.reduce-motion *::after {
   scroll-behavior:          auto    !important;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration:       0.001ms !important;
+    animation-iteration-count: 1      !important;
+    transition-duration:      0.001ms !important;
+    scroll-behavior:          auto    !important;
+  }
+  .animate-fade, .fade,
+  .animate-rowin, .rowin,
+  .animate-flash, .flash,
+  .animate-scrimin, .scrimin,
+  .animate-dlgin, .dlgin,
+  .animate-dlgup, .dlgup,
+  .animate-dlgout, .dlgout,
+  .animate-scrimout, .scrimout,
+  .animate-dlgdown, .dlgdown,
+  .animate-tsin, .tsin,
+  .animate-tbar, .tbar,
+  .animate-ckspin, .ckspin,
+  .animate-ckpop, .ckpop,
+  .animate-ckdraw, .ckdraw,
+  .animate-ckpulse, .ckpulse,
+  .animate-ckglow, .ckglow,
+  .animate-unl, .unl {
+    animation: none !important;
+  }
+}
+
 /* ==========================================================================
    TEXT SIZE SCALING
    All 4 levels control html font-size; Tailwind rem values scale automatically.
@@ -1132,3 +1347,103 @@ html[data-text-size="large"] {
 html[data-text-size="extraLarge"] {
   font-size: 20px;
 }
+
+/* ==========================================================================
+   FORM CONTROLS — Amber "needs input" state & validation (US & Canada)
+   ========================================================================== */
+input::placeholder,
+textarea::placeholder {
+  color: #9aa3ab;
+}
+
+.needs-input,
+.ca-needs-input,
+.us-needs-input {
+  border: 1.5px solid #e7c074 !important;
+  background-color: #fffdf5 !important;
+  box-shadow: inset 3px 0 0 #e7b74d !important;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.needs-input:not(:placeholder-shown),
+.ca-needs-input:not(:placeholder-shown),
+.us-needs-input:not(:placeholder-shown) {
+  border-color: #cdd3d8 !important;
+  background-color: #ffffff !important;
+  box-shadow: none !important;
+}
+
+.needs-input:focus,
+.ca-needs-input:focus,
+.us-needs-input:focus {
+  outline: none !important;
+  border-color: #0eb28d !important;
+  background-color: #ffffff !important;
+  box-shadow: inset 3px 0 0 #0eb28d !important;
+}
+
+.ca-input-error,
+.us-input-error,
+.needs-input.ca-input-error,
+.needs-input.us-input-error,
+.needs-input.ca-input-error:focus,
+.needs-input.us-input-error:focus,
+.needs-input.ca-input-error:not(:placeholder-shown),
+.needs-input.us-input-error:not(:placeholder-shown),
+.ca-needs-input.ca-input-error,
+.ca-needs-input.us-input-error,
+.us-needs-input.ca-input-error,
+.us-needs-input.us-input-error,
+.ca-needs-input.ca-input-error:focus,
+.ca-needs-input.us-input-error:focus,
+.us-needs-input.ca-input-error:focus,
+.us-needs-input.us-input-error:focus,
+.ca-needs-input.ca-input-error:not(:placeholder-shown),
+.ca-needs-input.us-input-error:not(:placeholder-shown),
+.us-needs-input.ca-input-error:not(:placeholder-shown),
+.us-needs-input.us-input-error:not(:placeholder-shown) {
+  border: 1.5px solid #e53e3e !important;
+  background-color: #fff5f5 !important;
+  box-shadow: inset 3px 0 0 #e53e3e, 0 0 0 2px rgba(229, 62, 62, 0.15) !important;
+  color: #c53030 !important;
+}
+
+/* Dark mode amber needs-input styles */
+html.dark .needs-input,
+html.dark .ca-needs-input,
+html.dark .us-needs-input {
+  border-color: #e7c074 !important;
+  background-color: #262112 !important;
+  box-shadow: inset 3px 0 0 #e7b74d !important;
+  color: #f0f6fc !important;
+}
+
+html.dark .needs-input:not(:placeholder-shown),
+html.dark .ca-needs-input:not(:placeholder-shown),
+html.dark .us-needs-input:not(:placeholder-shown) {
+  border-color: #1E3B5C !important;
+  background-color: #071422 !important;
+  box-shadow: none !important;
+}
+
+html.dark .needs-input:focus,
+html.dark .ca-needs-input:focus,
+html.dark .us-needs-input:focus {
+  outline: none !important;
+  border-color: #0eb28d !important;
+  background-color: #071422 !important;
+  box-shadow: inset 3px 0 0 #0eb28d !important;
+}
+
+html.dark .ca-input-error,
+html.dark .us-input-error,
+html.dark .needs-input.ca-input-error,
+html.dark .needs-input.us-input-error,
+html.dark .ca-needs-input.ca-input-error,
+html.dark .us-needs-input.us-input-error {
+  border-color: #e53e3e !important;
+  background-color: #2d1215 !important;
+  box-shadow: inset 3px 0 0 #e53e3e, 0 0 0 2px rgba(229, 62, 62, 0.25) !important;
+  color: #fca5a5 !important;
+}
+

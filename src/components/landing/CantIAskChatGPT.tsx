@@ -13,8 +13,8 @@ export default function CantIAskChatGPT() {
   };
 
   return (
-    <section className="py-16 lg:pt-[72px] lg:pb-16 bg-card dark:bg-[#071524] border-t border-b border-line transition-colors" id="why" data-ab="chatgpt">
-      <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
+    <section className="py-12 sm:py-16 lg:pt-[72px] lg:pb-16 bg-card dark:bg-[#071524] border-t border-b border-line transition-colors" id="why" data-ab="chatgpt">
+      <div className="wrap max-w-[1040px] mx-auto px-4 sm:px-6 w-full box-border">
         <div className="text-center">
           <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
             The honest question
@@ -22,17 +22,17 @@ export default function CantIAskChatGPT() {
           <h2 className="font-serif text-2xl sm:text-[32px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] mt-1.5">
             &ldquo;Can&apos;t I just ask ChatGPT?&rdquo;
           </h2>
-          <p className="text-base leading-[1.6] text-slate max-w-[640px] mt-2 mx-auto">
+          <p className="text-[15px] sm:text-base leading-[1.6] text-slate max-w-[640px] mt-2 mx-auto">
             You can — and it&apos;s a fine place to start reading. But a general chatbot gives a slightly different answer every time and isn&apos;t built to <b>organize a severance offer</b> the way a purpose-made tool is. We built something for exactly this job.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-[22px] my-9 mb-6">
-          <div className="rounded-2xl p-[30px_32px] box-border bg-[#FBFBFA] dark:bg-[#0d2238] border border-[#E6E7E9] dark:border-[#183654] transition-colors">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-[22px] my-7 sm:my-9 mb-6">
+          <div className="rounded-2xl p-5 sm:p-[30px_32px] box-border bg-[#FBFBFA] dark:bg-[#0d2238] border border-[#E6E7E9] dark:border-[#183654] transition-colors">
             <h3 className="font-serif text-[19px] text-navy dark:text-white mb-4 font-semibold">
               A general chatbot
             </h3>
-            <ul className="m-0 p-0 list-none text-[14.5px] text-[#334155] dark:text-[#E1E7ED] leading-[1.6] flex flex-col gap-3.5">
+            <ul className="m-0 p-0 list-none text-[14px] sm:text-[14.5px] text-[#334155] dark:text-[#E1E7ED] leading-[1.6] flex flex-col gap-3 sm:gap-3.5">
               <li className="relative pl-6 leading-[1.55] block">
                 <span className="absolute left-0 top-[1px] text-[#D9776A] text-xs font-bold leading-[1.4]" aria-hidden="true">✕</span>
                 Gives a different answer every time you ask
@@ -52,7 +52,7 @@ export default function CantIAskChatGPT() {
             </ul>
           </div>
 
-          <div className="rounded-2xl p-[30px_32px] box-border bg-card dark:bg-[#0B1E32] border border-[#9DE0CE] dark:border-[#12D29E] transition-colors shadow-xs">
+          <div className="rounded-2xl p-5 sm:p-[30px_32px] box-border bg-card dark:bg-[#0B1E32] border border-[#9DE0CE] dark:border-[#12D29E] transition-colors shadow-xs">
             <h3 className="font-serif text-[19px] text-navy dark:text-white mb-4 font-semibold">
               FairExit&apos;s severance engine
             </h3>
@@ -79,7 +79,7 @@ export default function CantIAskChatGPT() {
 
         {/* how we do it */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-[22px]">
-          <div className="bg-card dark:bg-[#0D2238] border border-[#EAECEF] dark:border-[#183654] rounded-[14px] p-[22px_20px] flex flex-col shadow-xs transition-colors">
+          <div className="bg-card dark:bg-[#0D2238] border border-[#EAECEF] dark:border-[#183654] rounded-[14px] p-[22px_20px] flex flex-col shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
             <div className="text-xl text-green mb-3 leading-none flex items-center">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" />
@@ -94,7 +94,7 @@ export default function CantIAskChatGPT() {
             </p>
           </div>
 
-          <div className="bg-card dark:bg-[#0D2238] border border-[#EAECEF] dark:border-[#183654] rounded-[14px] p-[22px_20px] flex flex-col shadow-xs transition-colors">
+          <div className="bg-card dark:bg-[#0D2238] border border-[#EAECEF] dark:border-[#183654] rounded-[14px] p-[22px_20px] flex flex-col shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
             <div className="text-xl text-green mb-3 leading-none flex items-center">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 3v17" />
@@ -112,7 +112,7 @@ export default function CantIAskChatGPT() {
             </p>
           </div>
 
-          <div className="bg-card dark:bg-[#0D2238] border border-[#EAECEF] dark:border-[#183654] rounded-[14px] p-[22px_20px] flex flex-col shadow-xs transition-colors">
+          <div className="bg-card dark:bg-[#0D2238] border border-[#EAECEF] dark:border-[#183654] rounded-[14px] p-[22px_20px] flex flex-col shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
             <div className="text-xl text-green mb-3 leading-none flex items-center">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
@@ -127,7 +127,7 @@ export default function CantIAskChatGPT() {
             </p>
           </div>
 
-          <div className="bg-card dark:bg-[#0D2238] border border-[#EAECEF] dark:border-[#183654] rounded-[14px] p-[22px_20px] flex flex-col shadow-xs transition-colors">
+          <div className="bg-card dark:bg-[#0D2238] border border-[#EAECEF] dark:border-[#183654] rounded-[14px] p-[22px_20px] flex flex-col shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
             <div className="text-xl text-green mb-3 leading-none flex items-center">
               <span className="text-[21px] font-bold leading-none">§</span>
             </div>
@@ -146,11 +146,12 @@ export default function CantIAskChatGPT() {
 
         <div className="text-center mt-[22px]">
           <a
-            className="inline-flex items-center justify-center gap-1.5 bg-green hover:bg-greend text-white px-7 py-3 rounded-[10px] font-bold text-[14.5px] no-underline border-none cursor-pointer shadow-[0_4px_14px_rgba(14,178,141,0.28)] hover:shadow-button-hover active:scale-[0.98] transition-all"
+            className="group inline-flex items-center justify-center gap-1.5 bg-green hover:bg-greend text-white px-7 py-3 rounded-[10px] font-bold text-[14.5px] no-underline border-none cursor-pointer shadow-[0_4px_14px_rgba(14,178,141,0.28)] hover:shadow-button-hover hover:-translate-y-0.5 active:scale-[0.98] transition-all"
             href="#hero"
             onClick={handleStartCheck}
           >
-            Start with a free check →
+            <span>Start with a free check</span>
+            <span className="inline-block transition-transform duration-200 group-hover:translate-x-1">→</span>
           </a>
         </div>
       </div>

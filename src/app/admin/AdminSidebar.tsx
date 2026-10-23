@@ -4,7 +4,13 @@ import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
-export default function AdminSidebar() {
+export default function AdminSidebar({
+  onClose,
+  isMobileDrawer = false,
+}: {
+  onClose?: () => void
+  isMobileDrawer?: boolean
+} = {}) {
   const pathname = usePathname()
 
   const navLinks = [
@@ -45,19 +51,44 @@ export default function AdminSidebar() {
     },
   ]
 
+  const handleLinkClick = () => {
+    if (onClose) onClose()
+  }
+
+  const containerClasses = isMobileDrawer
+    ? 'w-full h-full bg-[#062c55] text-[#cfdcea] p-[22px_16px] flex flex-col gap-1 select-none overflow-y-auto'
+    : 'hidden md:flex w-[232px] shrink-0 bg-[#062c55] text-[#cfdcea] p-[22px_14px] sticky top-0 h-screen flex-col gap-1 select-none overflow-hidden z-30'
+
   return (
-    <aside
-      className="w-[232px] shrink-0 bg-[#062c55] text-[#cfdcea] p-[22px_14px] sticky top-0 h-screen flex flex-col gap-1 select-none overflow-hidden z-30"
-      aria-label="Operations"
-    >
-      {/* Brand & Subtitle */}
-      <Link href="/admin/overview" className="block px-2.5 pt-0 pb-0 text-white hover:opacity-90 transition-opacity">
-        <div className="text-[18px] font-extrabold tracking-[-0.2px] leading-tight">
-          FairExit
+    <aside className={containerClasses} aria-label="Operations">
+      {/* Brand & Subtitle & optional close button for mobile */}
+      <div className="flex items-start justify-between">
+        <div>
+          <Link
+            href="/admin/overview"
+            onClick={handleLinkClick}
+            className="block px-2.5 pt-0 pb-0 text-white hover:opacity-90 transition-opacity"
+          >
+            <div className="text-[18px] font-extrabold tracking-[-0.2px] leading-tight">
+              FairExit
+            </div>
+          </Link>
+          <div className="text-[10.5px] font-bold tracking-[0.9px] uppercase text-[#8fb0cf] px-2.5 pb-4">
+            Operator · phase 1
+          </div>
         </div>
-      </Link>
-      <div className="text-[10.5px] font-bold tracking-[0.9px] uppercase text-[#8fb0cf] px-2.5 pb-4">
-        Operator · phase 1
+        {isMobileDrawer && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 -mr-1 text-[#8fb0cf] hover:text-white rounded-md transition-colors cursor-pointer"
+            aria-label="Close navigation"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Navigation items */}
@@ -66,6 +97,7 @@ export default function AdminSidebar() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={handleLinkClick}
             className={`flex items-center gap-2.5 py-2 px-2.5 rounded-lg text-[13.5px] font-semibold transition-colors duration-150 ${
               item.isActive
                 ? 'bg-white/[0.12] text-white'

@@ -75,7 +75,7 @@ export default function AdminModals() {
       {toastMessage && (
         <div
           role="status"
-          className="fixed left-1/2 bottom-[22px] -translate-x-1/2 bg-[#062c55] text-white py-2.5 px-4 rounded-[10px] text-[13px] font-semibold z-50 shadow-lg animate-in fade-in duration-200"
+          className="fixed left-1/2 bottom-[22px] -translate-x-1/2 w-[calc(100vw-32px)] max-w-max text-center bg-[#062c55] text-white py-2.5 px-4 rounded-[10px] text-[13px] font-semibold z-50 shadow-lg animate-in fade-in duration-200"
         >
           {toastMessage}
         </div>
@@ -84,14 +84,14 @@ export default function AdminModals() {
       {/* Summary Sent to Lawyer Modal */}
       {summaryModalReq && (
         <div
-          className="fixed inset-0 bg-[#062c55]/45 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 bg-[#062c55]/45 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
           onClick={() => setSummaryModalReq(null)}
         >
           <div
-            className="bg-white rounded-[14px] w-full max-w-[480px] p-[22px_22px_18px] shadow-[0_30px_60px_-20px_rgba(6,44,85,0.5)] border border-[#e7e4dd]"
+            className="bg-white rounded-[14px] w-full max-w-[480px] p-4 sm:p-[22px_22px_18px] shadow-[0_30px_60px_-20px_rgba(6,44,85,0.5)] border border-[#e7e4dd]"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-serif text-[22px] text-[#062c55] font-semibold mb-2">
+            <h3 className="font-serif text-[20px] sm:text-[22px] text-[#062c55] font-semibold mb-2">
               Summary sent to lawyer · {summaryModalReq.id}
             </h3>
             <p className="text-[13.5px] text-[#5a6b78] mb-3">
@@ -111,7 +111,7 @@ export default function AdminModals() {
               <button
                 type="button"
                 onClick={() => setSummaryModalReq(null)}
-                className="border border-[#e7e4dd] bg-[#062c55] text-white rounded-[9px] py-2 px-3.5 font-bold text-[13px] hover:bg-[#041d38] transition-colors cursor-pointer"
+                className="w-full sm:w-auto border border-[#e7e4dd] bg-[#062c55] text-white rounded-[9px] py-2 px-3.5 font-bold text-[13px] hover:bg-[#041d38] transition-colors cursor-pointer text-center"
               >
                 Close
               </button>
@@ -123,14 +123,14 @@ export default function AdminModals() {
       {/* Add a Lawyer Modal */}
       {addLawyerModalOpen && (
         <div
-          className="fixed inset-0 bg-[#062c55]/45 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 bg-[#062c55]/45 z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
           onClick={() => setAddLawyerModalOpen(false)}
         >
           <div
-            className="bg-white rounded-[14px] w-full max-w-[500px] p-[22px_22px_18px] shadow-[0_30px_60px_-20px_rgba(6,44,85,0.5)] border border-[#e7e4dd] max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-[14px] w-full max-w-[500px] p-4 sm:p-[22px_22px_18px] shadow-[0_30px_60px_-20px_rgba(6,44,85,0.5)] border border-[#e7e4dd] max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="font-serif text-[22px] text-[#062c55] font-semibold mb-1">
+            <h3 className="font-serif text-[20px] sm:text-[22px] text-[#062c55] font-semibold mb-1">
               Add a lawyer
             </h3>
             <p className="text-[13px] text-[#5a6b78] mb-4">
@@ -165,7 +165,7 @@ export default function AdminModals() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-extrabold uppercase tracking-[0.6px] text-[#5a6b78] mb-1">
                     Street Address
@@ -192,7 +192,7 @@ export default function AdminModals() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-extrabold uppercase tracking-[0.6px] text-[#5a6b78] mb-1">
                     City, Province/State, Postal
@@ -219,7 +219,7 @@ export default function AdminModals() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-extrabold uppercase tracking-[0.6px] text-[#5a6b78] mb-1">
                     Email
@@ -246,7 +246,7 @@ export default function AdminModals() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-[11px] font-extrabold uppercase tracking-[0.6px] text-[#5a6b78] mb-1">
                     Status

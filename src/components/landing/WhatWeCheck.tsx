@@ -4,8 +4,8 @@ import React from "react";
 
 export default function WhatWeCheck() {
   return (
-    <section className="py-16 lg:py-20 bg-white dark:bg-[#071524] border-t border-b border-line transition-colors" id="check">
-      <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
+    <section className="py-12 sm:py-16 lg:py-20 bg-white dark:bg-[#071524] border-t border-b border-line transition-colors" id="check">
+      <div className="wrap max-w-[1040px] mx-auto px-4 sm:px-6 w-full box-border">
         {/* Eyebrow */}
         <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
           What we check
@@ -17,14 +17,14 @@ export default function WhatWeCheck() {
         </h2>
 
         {/* Lede description */}
-        <p className="text-[15.5px] sm:text-base leading-[1.6] text-slate max-w-[720px] mb-9">
+        <p className="text-[15px] sm:text-base leading-[1.6] text-slate max-w-[720px] mb-7 sm:mb-9">
           There&apos;s no federal law forcing a severance <em className="italic">amount</em> in the US — so instead of a dollar figure, we help you understand the federal rules that <b className="font-bold text-navy dark:text-white">may</b> apply and organize your questions. Whether any of them apply to you is an attorney&apos;s call.
         </p>
 
         {/* 2-Column Cards Grid matching Image 1 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 lg:gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 lg:gap-6">
           {/* Card 1: The review window */}
-          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-6 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
+          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-5 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
             <div className="text-[26px] mb-1">📅</div>
             <h3 className="font-serif text-[18px] text-navy dark:text-white font-semibold m-0 leading-[1.15] tracking-[-0.5px]">
               The review window
@@ -38,7 +38,7 @@ export default function WhatWeCheck() {
           </div>
 
           {/* Card 2: The 7-day take-back */}
-          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-6 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
+          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-5 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
             <div className="text-[26px] mb-1">↩️</div>
             <h3 className="font-serif text-[18px] text-navy dark:text-white font-semibold m-0 leading-[1.15] tracking-[-0.5px]">
               The 7-day take-back
@@ -52,7 +52,7 @@ export default function WhatWeCheck() {
           </div>
 
           {/* Card 3: Plain, clear language */}
-          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-6 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
+          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-5 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
             <div className="text-[26px] mb-1">📝</div>
             <h3 className="font-serif text-[18px] text-navy dark:text-white font-semibold m-0 leading-[1.15] tracking-[-0.5px]">
               Plain, clear language
@@ -66,7 +66,7 @@ export default function WhatWeCheck() {
           </div>
 
           {/* Card 4: Group-program disclosures */}
-          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-6 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
+          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-5 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
             <div className="text-[26px] mb-1">👥</div>
             <h3 className="font-serif text-[18px] text-navy dark:text-white font-semibold m-0 leading-[1.15] tracking-[-0.5px]">
               Group-program disclosures
@@ -80,7 +80,7 @@ export default function WhatWeCheck() {
           </div>
 
           {/* Card 5: Advance notice (WARN) */}
-          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-6 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
+          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-5 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
             <div className="text-[26px] mb-1">⏰</div>
             <h3 className="font-serif text-[18px] text-navy dark:text-white font-semibold m-0 leading-[1.15] tracking-[-0.5px]">
               Advance notice (WARN)
@@ -94,7 +94,7 @@ export default function WhatWeCheck() {
           </div>
 
           {/* Card 6: Your contract & policy */}
-          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-6 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
+          <div className="bg-white dark:bg-card border border-line rounded-[18px] p-5 sm:p-7 flex flex-col gap-2 transition-colors shadow-xs">
             <div className="text-[26px] mb-1">📄</div>
             <h3 className="font-serif text-[18px] text-navy dark:text-white font-semibold m-0 leading-[1.15] tracking-[-0.5px]">
               Your contract &amp; policy

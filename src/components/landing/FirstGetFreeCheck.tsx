@@ -26,7 +26,9 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setActivePath(null);
+      if (e.key === "Escape") {
+        setActivePath(null);
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -84,8 +86,8 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
 
   return (
     <>
-      <section className={`py-16 ${isCanada ? "" : "bg-card dark:bg-[#071524] border-t border-b border-line"} transition-colors`} id="paths">
-        <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
+      <section className={`py-12 sm:py-16 ${isCanada ? "" : "bg-card dark:bg-[#071524] border-t border-b border-line"} transition-colors`} id="paths">
+        <div className="wrap max-w-[1040px] mx-auto px-4 sm:px-6 w-full box-border">
           <div className="text-center">
             <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
               Step 1 — start here
@@ -96,25 +98,25 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
           </div>
 
           {/* STEP 1: the free check, front and centre */}
-          <div className="bg-[#062C55] rounded-[20px] p-[28px_22px] sm:p-9 lg:p-[36px_44px] text-white flex flex-col lg:flex-row items-center justify-between gap-8 lg:gap-10 mt-8 shadow-[0_16px_48px_rgba(6,44,85,0.22)] w-full mx-auto text-center lg:text-left">
+          <div className="bg-[#062C55] rounded-[20px] p-5 sm:p-9 lg:p-[36px_44px] text-white flex flex-col md:flex-row items-center justify-between gap-6 sm:gap-8 lg:gap-10 mt-8 shadow-[0_16px_48px_rgba(6,44,85,0.22)] w-full mx-auto text-center md:text-left">
             <div>
               <div className="text-[11px] font-extrabold uppercase tracking-[1.2px] text-[#7ff0cf] mb-2.5">
                 Free · <b className="text-[#12d29e]">60 seconds</b> · no obligation
               </div>
-              <h3 className="font-serif text-2xl sm:text-[31px] text-white m-0 mb-2.5 font-semibold leading-[1.12] tracking-[-0.5px] max-w-[520px]">
+              <h3 className="font-serif text-2xl sm:text-[31px] text-white m-0 mb-2.5 font-semibold leading-[1.14] tracking-[-0.5px] max-w-[520px]">
                 {isCanada
                   ? "See what kind of offer you got — free, in 60 seconds."
                   : "See which rules may apply — free, in 60 seconds."}
               </h3>
-              <p className="text-[14.5px] text-[#b8d4e8] leading-[1.55] m-0 max-w-[520px]">
+              <p className="text-[14px] sm:text-[14.5px] text-[#b8d4e8] leading-[1.55] m-0 max-w-[520px]">
                 {isCanada
                   ? "Answer a few quick questions and get a plain-English read on your severance. No credit card, no signup, nothing to lose."
                   : "Answer a few quick questions and get a plain-English read on the federal rules that may apply to your layoff. No credit card, no signup, nothing to lose."}
               </p>
             </div>
-            <div className="text-center shrink-0">
+            <div className="text-center shrink-0 w-full md:w-auto">
               <a
-                className="inline-flex items-center justify-center bg-green hover:bg-greend text-white py-[18px] px-[30px] rounded-[14px] font-extrabold text-[18px] no-underline whitespace-nowrap shadow-[0_16px_30px_-14px_rgba(12,143,114,0.7)] hover:shadow-[0_20px_34px_-12px_rgba(12,143,114,0.8)] hover:-translate-y-px active:scale-[0.98] transition-all"
+                className="inline-flex items-center justify-center bg-green hover:bg-greend text-white py-3.5 sm:py-[18px] px-5 sm:px-[30px] rounded-[14px] font-extrabold text-[15px] sm:text-[18px] no-underline whitespace-normal md:max-w-[220px] lg:max-w-none text-center w-full sm:w-auto shadow-[0_16px_30px_-14px_rgba(12,143,114,0.7)] hover:shadow-[0_20px_34px_-12px_rgba(12,143,114,0.8)] hover:-translate-y-px active:scale-[0.98] transition-all"
                 href="#hero"
                 onClick={handleStartRead}
               >
@@ -141,7 +143,7 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
 
           {/* STEP 2: after the read, the decision */}
           <div className="text-center max-w-[600px] mx-auto mb-8">
-            <div className="font-serif text-2xl sm:text-[28px] text-navy dark:text-white font-semibold mb-2.5 leading-[1.2]">
+            <div className="font-serif text-[25px] text-navy dark:text-white font-semibold mb-2.5 leading-[1.2]">
               You got your 60-second read. Now it&apos;s your call.
             </div>
             <div className="text-[14.5px] text-slate leading-[1.6]">
@@ -150,9 +152,9 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
             <div
-              className="bg-card border-[1.5px] border-line rounded-2xl p-7 pb-6 cursor-pointer hover:-translate-y-0.5 hover:border-navy dark:hover:border-white/40 hover:shadow-[0_10px_28px_rgba(6,44,85,0.09)] transition-all flex flex-col text-left group"
+              className="bg-card border-[1.5px] border-line rounded-2xl p-5 sm:p-7 pb-5 sm:pb-6 cursor-pointer hover:-translate-y-0.5 hover:border-navy dark:hover:border-white/40 hover:shadow-[0_10px_28px_rgba(6,44,85,0.09)] transition-all flex flex-col text-left group"
               role="button"
               tabIndex={0}
               onClick={() => setActivePath("report")}
@@ -174,13 +176,13 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
                   ? "Your offer organized into a 13-page report — key terms, dates, questions to prepare — so you can push back on your own, or walk into a free lawyer call already prepared."
                   : "Add your paperwork and get it organized into a clear summary — key terms, dates, and the federal rules that may apply."}
               </div>
-              <div className="text-[13px] font-bold text-greend inline-flex items-center gap-1.5 border-t border-line pt-3.5 w-full">
-                <span className="w-[18px] h-[18px] rounded-full bg-navy text-white text-[8px] inline-flex items-center justify-center shrink-0">▶</span> See what&apos;s inside
+              <div className="text-[13.5px] font-bold text-greend inline-flex items-center gap-2 border-t border-line pt-3.5 w-full">
+                <span className="w-[26px] h-[26px] rounded-full bg-[#eef8f3] dark:bg-[#07241d] border border-[#c7e6d6] dark:border-[#0e4838] text-greend text-[10px] inline-flex items-center justify-center shrink-0">▶</span> See what&apos;s inside
               </div>
             </div>
 
             <div
-              className="bg-[#f0fdf8] dark:bg-[#071d2b] border-[1.5px] border-green rounded-2xl p-7 pb-6 cursor-pointer hover:-translate-y-0.5 hover:border-greend hover:shadow-[0_10px_28px_rgba(14,178,141,0.12)] transition-all flex flex-col text-left group"
+              className="bg-[#f0fdf8] dark:bg-[#071d2b] border-[1.5px] border-green rounded-2xl p-5 sm:p-7 pb-5 sm:pb-6 cursor-pointer hover:-translate-y-0.5 hover:border-greend hover:shadow-[0_10px_28px_rgba(14,178,141,0.12)] transition-all flex flex-col text-left group"
               role="button"
               tabIndex={0}
               onClick={() => setActivePath("lawyer")}
@@ -201,8 +203,8 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
                 Where we&apos;re live, an employment {isCanada ? "lawyer" : "attorney"} takes it from here — free to connect.{" "}
                 {isCanada ? "Lawyers" : "Attorneys"} pay us a flat advertising fee, never a cut of your outcome.
               </div>
-              <div className="text-[13px] font-bold text-greend inline-flex items-center gap-1.5 border-t border-line pt-3.5 w-full">
-                <span className="w-[18px] h-[18px] rounded-full bg-greend text-white text-[8px] inline-flex items-center justify-center shrink-0">▶</span> See how it works
+              <div className="text-[13.5px] font-bold text-greend inline-flex items-center gap-2 border-t border-line pt-3.5 w-full">
+                <span className="w-[26px] h-[26px] rounded-full bg-navy text-white text-[10px] inline-flex items-center justify-center shrink-0">▶</span> See how it works
               </div>
             </div>
           </div>
@@ -212,12 +214,12 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
       {/* Path Info Popup Modal */}
       {activePath && (
         <div
-          className="fixed inset-0 bg-[#062C55]/55 z-[300] backdrop-blur-xs flex items-center justify-center p-5 animate-scrimin"
+          className="fixed inset-0 bg-[#062c55]/50 z-[70] flex items-center justify-center p-3 sm:p-4 animate-scrimin"
           id="pmscrim"
           onClick={() => setActivePath(null)}
         >
           <div
-            className="bg-card rounded-[20px] p-8 pb-[26px] max-w-[500px] w-full z-[310] shadow-[0_40px_90px_-30px_rgba(6,44,85,0.6)] border border-line box-border animate-dlgup"
+            className="relative bg-white dark:bg-[#071829] rounded-[20px] p-6 sm:p-7 max-w-[500px] w-full z-[71] shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border-0 dark:border dark:border-[#1e3b5c] box-border animate-dlgup max-h-[92vh] overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
             id="pmodal"
             role="dialog"
             aria-modal="true"
@@ -226,28 +228,45 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
           >
             {modalContent && (
               <>
-                <div className="text-[11px] font-extrabold tracking-[0.6px] uppercase text-greend mb-1.5">
+                <div className="text-[11px] font-extrabold tracking-[0.6px] uppercase text-greend mb-1 text-left">
                   {modalContent.k}
                 </div>
-                <h3 className="font-serif text-2xl text-navy dark:text-white my-1.5 mb-3.5 font-semibold">
+                <h3 className="font-serif text-[24px] font-semibold text-navy dark:text-white mt-1 mb-3 text-left">
                   {modalContent.h}
                 </h3>
-                <div className="bg-navy rounded-xl p-6 text-center text-white mb-4 flex flex-col items-center gap-2">
-                  <div className="w-11 h-11 rounded-full bg-white/20 flex items-center justify-center text-lg">
+
+                <div className="bg-[#0e3560] rounded-[14px] h-[150px] flex flex-col items-center justify-center text-white gap-2 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-white/[0.18] flex items-center justify-center text-lg text-white pl-0.5">
                     ▶
                   </div>
-                  <small className="text-xs text-white/80">{modalContent.vid} — video coming soon</small>
+                  <small className="text-xs text-[#9fc0da] font-medium">
+                    {modalContent.vid} — video coming soon
+                  </small>
                 </div>
-                <ul className="m-0 mb-4 pl-5 text-[13.5px] text-ink dark:text-white leading-[1.6] list-disc space-y-1">
+
+                <ul className="list-none m-0 mb-4 p-0 space-y-1.5 text-left">
                   {modalContent.items.map((item, idx) => (
-                    <li key={idx}>{item}</li>
+                    <li
+                      key={idx}
+                      className="relative pl-6 text-[14px] text-ink dark:text-[#c7ddee] leading-[1.5]"
+                    >
+                      <span
+                        className="absolute left-0 top-0 font-extrabold text-greend"
+                        aria-hidden="true"
+                      >
+                        ✓
+                      </span>
+                      {item}
+                    </li>
                   ))}
                 </ul>
-                <p className="text-[13px] text-slate leading-[1.5] m-0 mb-3.5">
+
+                <p className="text-[13px] text-slate dark:text-[#8ea5b8] leading-[1.5] m-0 mb-3.5 text-left">
                   {modalContent.note}
                 </p>
+
                 <a
-                  className="inline-flex items-center justify-center gap-1.5 bg-green hover:bg-greend text-white px-5 py-[9px] rounded-xl font-bold text-sm no-underline border-none cursor-pointer shadow-button hover:shadow-button-hover active:scale-[0.98] transition-all whitespace-nowrap w-full h-11"
+                  className="inline-flex items-center justify-center bg-green hover:bg-greend text-white py-3.5 px-6 rounded-xl font-extrabold text-base no-underline text-center w-full shadow-[0_12px_24px_-10px_rgba(12,143,114,0.6)] hover:-translate-y-px active:scale-[0.98] transition-all cursor-pointer"
                   href="#hero"
                   onClick={handleStartRead}
                 >
@@ -255,7 +274,7 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
                 </a>
                 <button
                   type="button"
-                  className="block w-full mt-2.5 bg-transparent border-none text-slate text-[13px] font-semibold cursor-pointer p-1.5 hover:text-navy dark:hover:text-white transition-colors"
+                  className="block w-full mt-2.5 bg-transparent border-none text-slate hover:text-navy dark:text-[#8ea5b8] dark:hover:text-white text-[13px] font-semibold cursor-pointer p-1.5 transition-colors"
                   onClick={() => setActivePath(null)}
                 >
                   Maybe later

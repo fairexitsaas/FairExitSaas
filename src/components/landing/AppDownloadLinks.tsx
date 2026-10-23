@@ -1,14 +1,15 @@
 "use client";
 
 import React from "react";
+import { triggerGetApp } from "@/context/GetAppContext";
 
 export default function AppDownloadLinks() {
   const handleAppStoreClick = () => {
-    console.log("[FairExit] App Store badge clicked");
+    triggerGetApp();
   };
 
   const handleGooglePlayClick = () => {
-    console.log("[FairExit] Google Play badge clicked");
+    triggerGetApp();
   };
 
   return (

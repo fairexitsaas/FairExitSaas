@@ -7,12 +7,16 @@ interface SeveranceReportPreviewDialogProps {
   isOpen: boolean;
   onClose: () => void;
   country: CountryCode;
+  isResultsPage?: boolean;
+  onDownload?: () => void;
 }
 
 export default function SeveranceReportPreviewDialog({
   isOpen,
   onClose,
   country,
+  isResultsPage = false,
+  onDownload,
 }: SeveranceReportPreviewDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const isCanada = country === "CA";
@@ -85,7 +89,7 @@ export default function SeveranceReportPreviewDialog({
         aria-modal="true"
         aria-labelledby="report-preview-title"
         tabIndex={-1}
-        className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border shadow-2xl p-6 sm:p-8 z-10 focus:outline-none bg-card border-card-border animate-dlgup"
+        className="relative w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl border shadow-2xl p-5 sm:p-8 z-10 focus:outline-none bg-card border-card-border animate-dlgup"
       >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b mb-6 border-divider">
@@ -137,17 +141,33 @@ export default function SeveranceReportPreviewDialog({
           <div className="text-xs text-muted">
             One-time purchase · Instant PDF download
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              const el = document.getElementById("ca-work-location") || document.getElementById("us-state");
-              if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-            }}
-            className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-xl text-white font-semibold text-sm shadow-md transition-all active:scale-95 bg-brand-green hover:bg-brand-green-hover"
-          >
-            Start free check first →
-          </button>
+          {isResultsPage ? (
+            <button
+              type="button"
+              onClick={() => {
+                if (onDownload) {
+                  onDownload();
+                } else {
+                  onClose();
+                }
+              }}
+              className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-xl text-white font-semibold text-sm shadow-md transition-all active:scale-95 bg-brand-green hover:bg-brand-green-hover cursor-pointer"
+            >
+              Get Severance Report — $59 →
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                const el = document.getElementById("ca-work-location") || document.getElementById("us-state");
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+              }}
+              className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-xl text-white font-semibold text-sm shadow-md transition-all active:scale-95 bg-brand-green hover:bg-brand-green-hover cursor-pointer"
+            >
+              Start free check first →
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -13,7 +13,7 @@ export default function JurisdictionRules({ country }: JurisdictionRulesProps) {
   if (isCanada) {
     return (
       <section className="py-16 mx-auto" id="provinces">
-        <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
+        <div className="wrap max-w-[1040px] mx-auto px-4 sm:px-6 w-full box-border">
           <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
             Severance rules by province
           </span>
@@ -75,7 +75,7 @@ export default function JurisdictionRules({ country }: JurisdictionRulesProps) {
 
   return (
     <section className="py-16 mx-auto" id="states">
-      <div className="wrap max-w-[1040px] mx-auto px-6 w-full box-border">
+      <div className="wrap max-w-[1040px] mx-auto px-4 sm:px-6 w-full box-border">
         <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
           Layoff rules by state
         </span>

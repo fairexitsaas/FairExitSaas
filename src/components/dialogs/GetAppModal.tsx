@@ -10,7 +10,7 @@ interface GetAppModalProps {
 
 export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
   const [copied, setCopied] = useState(false);
-  const appUrl = "https://sevapp-opal.vercel.app/resource-hub-v2/index-v3.html#app";
+  const appUrl = "https://fairexit.com/#app";
 
   if (!isOpen) return null;
 
@@ -22,11 +22,11 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-scrimin"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#062c55]/45 backdrop-blur-[2px] animate-scrimin"
       onClick={onClose}
     >
       <div
-        className="relative bg-white rounded-[18px] p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-center animate-dlgup"
+        className="relative bg-white rounded-[18px] p-4 sm:p-6 max-w-[420px] w-full max-h-[92vh] overflow-y-auto shadow-[0_40px_80px_-30px_rgba(6,44,85,0.55)] border border-[#e7e4dd] text-center animate-dlgup"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close Button ✕ */}
@@ -59,7 +59,7 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
             alt="Scan QR code to download the FairExit app"
             width={160}
             height={160}
-            className="w-[150px] sm:w-[165px] h-[150px] sm:h-[165px] object-contain rounded-[8px]"
+            className="w-[140px] sm:w-[165px] h-[140px] sm:h-[165px] object-contain rounded-[8px]"
             priority
           />
         </div>
@@ -86,7 +86,7 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
         </div>
 
         {/* App Store & Google Play Badges */}
-        <div className="flex items-center justify-center gap-3 mb-3">
+        <div className="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 mb-3">
           <a
             href={appUrl}
             target="_blank"
@@ -99,7 +99,7 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
               alt="Download on the App Store"
               width={128}
               height={38}
-              className="h-[38px] w-auto"
+              className="h-8 sm:h-[38px] w-auto"
             />
           </a>
           <a
@@ -114,7 +114,7 @@ export default function GetAppModal({ isOpen, onClose }: GetAppModalProps) {
               alt="Get it on Google Play"
               width={128}
               height={38}
-              className="h-[38px] w-auto"
+              className="h-8 sm:h-[38px] w-auto"
             />
           </a>
         </div>

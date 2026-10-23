@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { QuestionBackButton, QuestionNextButton } from "@/components/common/QuestionNavButtons";
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
+import SeveranceReportPreviewDialog from "@/components/dialogs/SeveranceReportPreviewDialog";
 import { triggerGetApp } from "@/context/GetAppContext";
 import { useAccessibility } from "@/context/AccessibilityContext";
 
@@ -59,58 +60,108 @@ export default function USFlow() {
   // Step 4: "step-clause" (Key question)
   // Step 5: "step-details" (Details)
   // Step 6: "step-analyzing" -> "step-results" (Your results)
-  // Stop: "us-state-stop"
   const [currentStep, setCurrentStep] = useState<string>("us-situation-q1");
   const [explainOn, setExplainOn] = useState<boolean>(true);
+
+  // Default "Explain each question" switch to off under 768px (phone), on for desktop
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("fx_plain");
+      if (stored !== null) {
+        setExplainOn(stored === "1");
+        return;
+      }
+    } catch (e) {}
+    if (typeof window !== "undefined") {
+      setExplainOn(window.innerWidth >= 768);
+    }
+  }, []);
+
+  const handleToggleExplain = (checked: boolean) => {
+    setExplainOn(checked);
+    try {
+      localStorage.setItem("fx_plain", checked ? "1" : "0");
+    } catch (e) {}
+  };
+
   const [mobileSummOpen, setMobileSummOpen] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [notifiedState, setNotifiedState] = useState<boolean>(false);
   const [infoModal, setInfoModal] = useState<null | "report" | "lawyer">(null);
+  const [checkoutState, setCheckoutState] = useState<"idle" | "verifying" | "success">("idle");
+  const [isReportUnlocked, setIsReportUnlocked] = useState<boolean>(false);
   const [checklistOpen, setChecklistOpen] = useState<boolean>(false);
   const [askLawyerOpen, setAskLawyerOpen] = useState<boolean>(false);
   const [emailModalOpen, setEmailModalOpen] = useState<boolean>(false);
   const [emailInput, setEmailInput] = useState<string>("");
   const [emailSent, setEmailSent] = useState<boolean>(false);
+  const [reportPreviewOpen, setReportPreviewOpen] = useState<boolean>(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const { toggleDialog } = useAccessibility();
+
+  const handleUnlockReport = () => {
+    setCheckoutState("verifying");
+    setTimeout(() => {
+      setCheckoutState("success");
+      setTimeout(() => {
+        setIsReportUnlocked(true);
+        setCheckoutState("idle");
+        setInfoModal(null);
+      }, 900);
+    }, 1100);
+  };
 
   // US Form State matching demo-v3.html
   const [state, setState] = useState({
-    usState: "California",
-    age: "52",
-    years: "9",
-    salary: "128000",
+    usState: "",
+    age: "",
+    years: "",
+    salary: "",
     comp: {
       bonus: false,
       equity: false,
       pto: false,
       benefits: false,
     } as Record<string, boolean>,
-    signed: "no",
+    signed: "",
     agreed: false,
 
     // Step 2-5 fields
-    union: "no",
-    ended: "layoff",
-    empsize: "big",
-    others: "50",
-    notice: "none",
-    release: "yes",
-    promise: "unsure",
-    groupLayoff: "yes",
+    union: "",
+    ended: "",
+    empsize: "",
+    others: "",
+    notice: "",
+    release: "",
+    promise: "",
+    groupLayoff: "",
     roleFactor: 1.15,
-    offer: 22154,
-    reemployed: "no",
-    clause: "unsure",
-    deadline: "short",
-    advise: "unsure",
-    list: "unsure",
-    revoke: "no",
-    contract: "unsure",
-    reason: "layoff",
-    market: "mid",
-    redflag: "none",
-    nc: "no",
+    offer: 0,
+    reemployed: "",
+    clause: "",
+    deadline: "",
+    advise: "",
+    list: "",
+    revoke: "",
+    contract: "",
+    reason: "",
+    market: "",
+    redflag: "",
+    nc: "",
   });
+
+  const getMobileSummarySnippet = () => {
+    const parts: string[] = [];
+    if (state.usState) parts.push(state.usState);
+    if (state.years) parts.push(`${state.years} yrs`);
+    else if (state.age) parts.push(`Age ${state.age}`);
+
+    if (parts.length > 0) {
+      return `— ${parts.join(" · ")}`;
+    }
+    return "— just getting started";
+  };
 
   const unionMap: Record<string, string> = {
     yes: "Yes",
@@ -233,18 +284,16 @@ export default function USFlow() {
     nc: 19,
   };
 
-  const [maxStepIndex, setMaxStepIndex] = useState<number>(1);
-  const [answeredFields, setAnsweredFields] = useState<Record<string, boolean>>({
-    usState: true,
-  });
+  const [maxStepIndex, setMaxStepIndex] = useState<number>(0);
+  const [answeredFields, setAnsweredFields] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const curIdx = STEP_ORDER_INDEX[currentStep] || 1;
     setMaxStepIndex((prev) => Math.max(prev, curIdx));
   }, [currentStep]);
 
-  const handleAnswer = (key: string, value: any) => {
-    setState((prev) => ({ ...prev, [key]: value }));
+  const handleAnswer = (key: string, value: any, extra?: Record<string, any>) => {
+    setState((prev) => ({ ...prev, [key]: value, ...(extra || {}) }));
     setAnsweredFields((prev) => ({ ...prev, [key]: true }));
   };
 
@@ -252,22 +301,21 @@ export default function USFlow() {
     if (currentStep === "step-results" || currentStep === "step-analyzing") {
       return true;
     }
-    const triggerIdx = FIELD_TRIGGER_INDEX[key] ?? 999;
-    return maxStepIndex >= triggerIdx || Boolean(answeredFields[key]);
+    return Boolean(answeredFields[key]);
   };
 
   const getSummaryValue = (key: string): string => {
     switch (key) {
       case "usState":
-        return state.usState || "California";
+        return state.usState || "";
       case "age":
-        return state.age || "52";
+        return state.age || "";
       case "years":
-        return state.years ? `${state.years} yrs` : "9 yrs";
+        return state.years ? `${state.years} yrs` : "";
       case "salary":
         return state.salary
-          ? `$${Math.round(parseFloat(state.salary) / 1000)}k/yr`
-          : "$128k/yr";
+          ? `$${Math.round(parseFloat(state.salary.replace(/[^0-9.]/g, "")) / 1000)}k/yr`
+          : "";
       case "comp":
         return compText || "None";
       case "union":
@@ -275,7 +323,9 @@ export default function USFlow() {
           ? "Yes"
           : state.union === "no"
             ? "No"
-            : "Not sure";
+            : state.union === "unsure"
+              ? "Not sure"
+              : "";
       case "ended":
         return state.ended === "layoff"
           ? "Laid off"
@@ -285,13 +335,13 @@ export default function USFlow() {
               ? "Big group"
               : state.ended === "cause"
                 ? "For cause"
-                : (endedMap[state.ended] || "Laid off");
+                : (endedMap[state.ended] || "");
       case "empsize":
         return state.empsize === "big"
           ? "100+"
           : state.empsize === "small"
             ? "Under 100"
-            : (empsizeMap[state.empsize] || "100+");
+            : (empsizeMap[state.empsize] || "");
       case "others":
         return state.others === "50"
           ? "50+"
@@ -299,7 +349,7 @@ export default function USFlow() {
             ? "A handful"
             : state.others === "me"
               ? "Just me"
-              : (othersMap[state.others] || "50+");
+              : (othersMap[state.others] || "");
       case "notice":
         return state.notice === "none"
           ? "None"
@@ -309,25 +359,29 @@ export default function USFlow() {
               ? "3–8 wks"
               : state.notice === "full"
                 ? "60+ days"
-                : (noticeMap[state.notice] || "None");
+                : (noticeMap[state.notice] || "");
       case "release":
         return state.release === "yes"
           ? "Yes"
           : state.release === "no"
             ? "No"
-            : "Not sure";
+            : state.release === "unsure"
+              ? "Not sure"
+              : "";
       case "offer":
         return state.offer
           ? state.offer >= 1000
             ? `$${Math.round(state.offer / 1000)}k`
             : `$${state.offer}`
-          : "$22k";
+          : "$0";
       case "promise":
         return state.promise === "yes"
           ? "Yes"
           : state.promise === "no"
             ? "No"
-            : "Not sure";
+            : state.promise === "unsure"
+              ? "Not sure"
+              : "";
       case "deadline":
         return state.deadline === "short"
           ? "Under 21"
@@ -335,41 +389,153 @@ export default function USFlow() {
             ? "21–44 days"
             : state.deadline === "full"
               ? "45+ days"
-              : "Not sure";
+              : state.deadline === "unsure"
+                ? "Not sure"
+                : "";
       case "advise":
         return state.advise === "yes"
           ? "Yes"
           : state.advise === "no"
             ? "No"
-            : "Not sure";
+            : state.advise === "unsure"
+              ? "Not sure"
+              : "";
       case "list":
         return state.list === "yes"
           ? "Yes"
           : state.list === "no"
             ? "No"
-            : "Not sure";
+            : state.list === "unsure"
+              ? "Not sure"
+              : "";
       case "revoke":
         return state.revoke === "yes"
           ? "Yes"
           : state.revoke === "no"
             ? "Not mentioned"
-            : "Not sure";
+            : state.revoke === "unsure"
+              ? "Not sure"
+              : "";
       case "redflag":
         return state.redflag === "discrim"
           ? "Mistreatment"
           : state.redflag === "unpaid"
             ? "Unpaid wages"
-            : "Nothing unusual";
+            : state.redflag === "none"
+              ? "Nothing unusual"
+              : "";
       case "nc":
         return state.nc === "yes"
           ? "Yes"
           : state.nc === "no"
             ? "No"
-            : "Not sure";
+            : state.nc === "unsure"
+              ? "Not sure"
+              : "";
       default:
         return "";
     }
   };
+
+  const thingsToCheck = useMemo(() => {
+    const list: string[] = [];
+
+    // 1. Deadline check
+    if (
+      isFieldVisible("deadline") &&
+      (state.deadline === "short" || state.deadline === "mid" || state.deadline === "unsure")
+    ) {
+      list.push("Time to consider looks short");
+    }
+
+    // 2. Age 40+ revocation / OWBPA check
+    if (isFieldVisible("age") && Number(state.age) >= 40) {
+      list.push(
+        "A 7-day period to change your mind is a common requirement for age-40+ releases",
+      );
+    }
+
+    // 3. Age 40+ group program disclosure
+    if (
+      Number(state.age) >= 40 &&
+      (isFieldVisible("list") || isFieldVisible("others") || isFieldVisible("ended")) &&
+      (state.others === "50" ||
+        state.others === "few" ||
+        state.ended === "mass" ||
+        state.ended === "closure" ||
+        state.groupLayoff === "yes" ||
+        state.list === "no" ||
+        state.list === "unsure")
+    ) {
+      list.push(
+        "For an age-40+ group program, the law requires a disclosure of the ages & job titles selected",
+      );
+    }
+
+    // 4. WARN advance notice (site size 50+, employer 100+)
+    if (
+      isFieldVisible("others") &&
+      (state.others === "50" || state.ended === "mass" || state.ended === "closure") &&
+      state.empsize === "big"
+    ) {
+      list.push(
+        "50+ people lost their job at your site and the employer has 100+ staff — that's the fact pattern where WARN's advance-notice rules can apply",
+      );
+    }
+
+    // 5. State-specific rules
+    if (isFieldVisible("usState") && state.usState) {
+      if (state.usState === "California") {
+        list.push(
+          "California has its own Cal-WARN Act (often broader than federal) and generally voids non-competes",
+        );
+      } else if (state.usState === "New York") {
+        list.push(
+          "New York WARN Act requires 90 days notice (broader than federal 60 days)",
+        );
+      } else if (state.usState === "Illinois") {
+        list.push("Illinois WARN Act and separation notice rules apply");
+      } else if (state.usState === "New Jersey") {
+        list.push(
+          "New Jersey requires mandatory severance pay under state WARN law",
+        );
+      } else {
+        list.push(
+          `${state.usState} state separation rules apply in addition to federal law`,
+        );
+      }
+    }
+
+    // 6. Advance notice
+    if (
+      isFieldVisible("notice") &&
+      (state.notice === "none" || state.notice === "wk")
+    ) {
+      list.push("Advance notice was short or not given");
+    }
+
+    // 7. Non-compete
+    if (isFieldVisible("nc") && state.nc === "yes") {
+      list.push("Non-compete clause flagged for attorney review");
+    }
+
+    // 8. Unwritten severance
+    if (
+      isFieldVisible("promise") &&
+      (state.promise === "unsure" || state.promise === "no")
+    ) {
+      list.push("Severance promised in writing should be confirmed");
+    }
+
+    // 9. Signed release
+    if (isFieldVisible("release") && state.release === "yes") {
+      list.push(
+        "A signed release is usually final — confirm terms before signing",
+      );
+    }
+
+    return list;
+  }, [state, currentStep, maxStepIndex, answeredFields]);
 
   const populateAllAnswers = (s: typeof state) => {
     setAnsweredFields({
@@ -408,15 +574,26 @@ export default function USFlow() {
     const stepParam = searchParams.get("step");
     const loadingParam = searchParams.get("loading");
 
-    setState((prev) => ({
-      ...prev,
-      usState: st || prev.usState,
-      years: y ? y.replace(/\D/g, "") : prev.years,
-      salary: s ? s.replace(/\D/g, "") : prev.salary,
-      age: a ? a.replace(/\D/g, "") : age40 === "yes" ? "52" : prev.age,
-      offer: off ? parseInt(off.replace(/\D/g, ""), 10) : prev.offer,
-      groupLayoff: grp || prev.groupLayoff,
-    }));
+    if (st || y || s || a || off || grp) {
+      setState((prev) => ({
+        ...prev,
+        ...(st ? { usState: st } : {}),
+        ...(y ? { years: y.replace(/\D/g, "") } : {}),
+        ...(s ? { salary: s.replace(/\D/g, "") } : {}),
+        ...(a ? { age: a.replace(/\D/g, "") } : {}),
+        ...(off ? { offer: parseInt(off.replace(/\D/g, ""), 10) } : {}),
+        ...(grp ? { groupLayoff: grp } : {}),
+      }));
+
+      setAnsweredFields((prev) => ({
+        ...prev,
+        ...(st ? { usState: true } : {}),
+        ...(y ? { years: true } : {}),
+        ...(s ? { salary: true } : {}),
+        ...(a ? { age: true } : {}),
+        ...(off ? { offer: true } : {}),
+      }));
+    }
 
     if (stepParam === "loading" || loadingParam === "true") {
       setCurrentStep("step-analyzing");
@@ -724,7 +901,7 @@ export default function USFlow() {
 
           <div className="flex items-center gap-5 sm:gap-6 ml-auto">
             {/* Desktop Nav */}
-            <nav className="hidden md:flex items-center gap-5 sm:gap-6 text-[13.5px] font-semibold text-[#5a6b78]">
+            <nav className="hidden lg:flex items-center gap-5 sm:gap-6 text-[13.5px] font-semibold text-[#5a6b78]">
               <a
                 href="/#how"
                 className="hover:text-[#062c55] transition-colors"
@@ -757,14 +934,14 @@ export default function USFlow() {
             <button
               type="button"
               onClick={() => triggerGetApp()}
-              className="hidden sm:inline-flex items-center text-[13px] font-bold text-[#0c8f72] hover:underline transition-colors whitespace-nowrap cursor-pointer"
+              className="hidden lg:inline-flex items-center text-[13px] font-bold text-[#0c8f72] hover:underline transition-colors whitespace-nowrap cursor-pointer"
             >
               Get the app
             </button>
             <button
               type="button"
               onClick={handleExit}
-              className="hidden sm:inline-flex items-center text-[13px] font-semibold text-[#5a6b78] hover:text-[#062c55] transition-colors whitespace-nowrap cursor-pointer bg-transparent border-none p-0"
+              className="hidden lg:inline-flex items-center text-[13px] font-semibold text-[#5a6b78] hover:text-[#062c55] transition-colors whitespace-nowrap cursor-pointer bg-transparent border-none p-0"
             >
               Exit ✕
             </button>
@@ -772,8 +949,8 @@ export default function USFlow() {
             {/* Mobile Your Details Trigger Button */}
             <button
               type="button"
-              onClick={() => setMobileSummOpen(true)}
-              className="md:hidden inline-flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-[#cfe8dd] bg-[#eef8f3] text-[13px] font-bold text-[#062c55] shadow-xs cursor-pointer"
+              onClick={() => setMobileSummOpen((prev) => !prev)}
+              className="lg:hidden inline-flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-[#cfe8dd] bg-[#eef8f3] text-[13px] font-bold text-[#062c55] shadow-xs cursor-pointer"
               aria-expanded={mobileSummOpen}
             >
               Your details
@@ -782,10 +959,10 @@ export default function USFlow() {
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2.5"
-                className="w-3.5 h-3.5 text-[#062c55]"
+                className={`w-3.5 h-3.5 text-[#062c55] transition-transform duration-200 ${mobileSummOpen ? "rotate-180" : ""}`}
               >
                 <path
-                  d="M6 9l6 6 6-6"
+                  d="M6 15l6-6 6 6"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -796,7 +973,7 @@ export default function USFlow() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden w-9 h-9 rounded-[10px] border border-[#d5dde4] bg-white text-[#062c55] flex items-center justify-center shadow-xs focus:outline-none cursor-pointer"
+              className="lg:hidden w-9 h-9 rounded-[10px] border border-[#d5dde4] bg-white text-[#062c55] flex items-center justify-center shadow-xs focus:outline-none cursor-pointer"
               aria-label="Toggle navigation menu"
             >
               <svg
@@ -814,23 +991,23 @@ export default function USFlow() {
 
         {/* Mobile Dropdown Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[#e7e4dd] bg-white px-5 py-4 space-y-3 text-sm font-bold text-[#062c55] animate-in fade-in">
-            <a href="/#how" className="block py-1">
+          <div className="lg:hidden border-t border-[#e7e4dd] bg-[#f6f4ef] px-5 py-2 text-sm font-bold text-[#062c55] animate-in fade-in">
+            <a href="/#how" className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors">
               How it works
             </a>
-            <a href="/#paths" className="block py-1">
+            <a href="/#paths" className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors">
               Pricing
             </a>
-            <a href="/faq" className="block py-1">
+            <a href="/faq" className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors">
               FAQ
             </a>
-            <a href="/blog" className="block py-1">
+            <a href="/blog" className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors">
               Blog
             </a>
-            <a href="/about" className="block py-1">
+            <a href="/about" className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors">
               About
             </a>
-            <div className="pt-2 border-t border-[#e7e4dd] flex justify-between text-xs text-[#5a6b78]">
+            <div className="pt-3 pb-2 flex justify-between text-xs text-[#5a6b78]">
               <button
                 type="button"
                 onClick={() => {
@@ -853,14 +1030,14 @@ export default function USFlow() {
         )}
       </header>
 
-      {/* ── MOBILE SUMMARY BOTTOM SHEET / MODAL ── */}
+      {/* ── MOBILE / TABLET SUMMARY BOTTOM SHEET / MODAL ── */}
       {mobileSummOpen && (
         <>
           <div
-            className="fixed inset-0 bg-[#062c55]/40 backdrop-blur-sm z-50 animate-scrimin"
+            className="lg:hidden fixed inset-0 bg-[#062c55]/40 backdrop-blur-sm z-[60] animate-scrimin"
             onClick={() => setMobileSummOpen(false)}
           />
-          <div className="fixed inset-x-0 bottom-0 max-h-[85vh] bg-[#EEF1F4] rounded-t-3xl z-50 p-6 shadow-2xl overflow-y-auto animate-dlgup">
+          <div className="lg:hidden fixed inset-x-0 bottom-0 max-h-[85vh] bg-[#EEF1F4] rounded-t-3xl z-[70] p-6 shadow-2xl overflow-y-auto animate-dlgup sm:max-w-xl sm:mx-auto">
             <div className="flex items-center justify-between pb-3 border-b border-[#e7e4dd] mb-4">
               <div>
                 <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#5a6b78]">
@@ -903,22 +1080,50 @@ export default function USFlow() {
               )}
             </div>
 
-            {/* Enough to show results banner (as in original) */}
-            {Boolean(
-              (isFieldVisible("years") && isFieldVisible("salary")) ||
-                (state.years && state.salary) ||
-                currentStep === "step-results",
-            ) && (
-              <div className="mt-3 text-[12px] font-bold text-[#0c8f72] bg-[#e5f5ee] border border-[#b9e6d4] rounded-[9px] px-[11px] py-2">
-                ✓ Enough to show your results
+            {/* LIVE READ Panel inside Mobile Summary */}
+            {thingsToCheck.length > 0 ? (
+              <div className="mt-4 pt-4 border-t border-[#cfe8dd] bg-[#f3faf6] -mx-6 -mb-6 p-5 rounded-b-3xl">
+                <span className="font-sans font-[800] uppercase text-[10.5px] leading-[16px] tracking-[0.8px] text-[#5a6b78] block">
+                  LIVE READ · NOT AN ASSESSMENT
+                </span>
+                <h4 className="font-serif font-[600] text-[18px] leading-[22px] text-[#0c8f72] mt-0.5 mb-2.5">
+                  {thingsToCheck.length} things to check
+                </h4>
+                <ul className="space-y-2 font-sans font-normal text-[13px] leading-[19px] text-[#5a6b78] mb-3.5">
+                  {thingsToCheck.map((item, idx) => (
+                    <li key={idx} className="flex items-start gap-1.5 leading-relaxed">
+                      <span className="text-[#0c8f72] font-bold">•</span>
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                {Boolean(
+                  answeredFields["usState"] ||
+                    (state.years && state.salary) ||
+                    currentStep === "step-results",
+                ) && (
+                  <div className="text-[12px] font-sans font-[700] leading-[16px] text-[#0c8f72] bg-[#e5f5ee] border border-[#b9e6d4] rounded-[6px] px-3 py-2 text-center">
+                    ✓ Enough to show your results
+                  </div>
+                )}
               </div>
+            ) : (
+              Boolean(
+                answeredFields["usState"] ||
+                  (state.years && state.salary) ||
+                  currentStep === "step-results",
+              ) && (
+                <div className="mt-3 text-[12px] font-bold text-[#0c8f72] bg-[#e5f5ee] border border-[#b9e6d4] rounded-[9px] px-[11px] py-2">
+                  ✓ Enough to show your results
+                </div>
+              )
             )}
           </div>
         </>
       )}
 
       {/* ── TWO COLUMN SHELL: MAIN (PROGRESS + CARD) + DESKTOP SIDEBAR ── */}
-      <div className="max-w-[1080px] mx-auto px-4 sm:px-5 pt-4">
+      <div className="max-w-[1080px] mx-auto px-4 sm:px-5 pt-4 pb-20 lg:pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,720px)_320px] gap-8 justify-center items-start">
           {/* LEFT: MAIN WORKFLOW (PROGRESS + CARD) */}
           <div className="w-full">
@@ -967,11 +1172,16 @@ export default function USFlow() {
               </ol>
 
               {/* Progress bar track */}
-              <div className="h-1.5 bg-[#e9e5dc] rounded-full overflow-hidden relative mx-2">
+              <div className="h-1.5 bg-[#e9e5dc] rounded-full relative mx-2">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-[#0c8f72] to-[#0eb28d] transition-all duration-500 relative"
                   style={{ width: `${progressPercent}%` }}
-                />
+                >
+                  <span
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 rounded-full bg-[#0eb28d] border-2 border-white shadow-[0_1px_4px_rgba(6,44,85,0.25)] transition-all duration-500 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                </div>
               </div>
 
               {/* Subheading row: Step label + Explain toggle */}
@@ -1010,7 +1220,7 @@ export default function USFlow() {
                     type="checkbox"
                     className="sr-only"
                     checked={explainOn}
-                    onChange={(e) => setExplainOn(e.target.checked)}
+                    onChange={(e) => handleToggleExplain(e.target.checked)}
                   />
                   <span
                     className={`w-9 h-5 rounded-full transition-colors relative ${
@@ -1034,7 +1244,7 @@ export default function USFlow() {
                 STEP 1: US SITUATION (5 SEQUENTIAL SINGLE-QUESTION SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isSituationStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 5 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1107,13 +1317,24 @@ export default function USFlow() {
                       value={state.usState}
                       onChange={(e) => {
                         const val = e.target.value;
-                        setState({ ...state, usState: val });
+                        setState((prev) => ({ ...prev, usState: val }));
+                        if (val) {
+                          setAnsweredFields((prev) => ({ ...prev, usState: true }));
+                          setErrorMessage("");
+                        } else {
+                          setAnsweredFields((prev) => {
+                            const next = { ...prev };
+                            delete next.usState;
+                            return next;
+                          });
+                        }
                         if (val === "Other state") {
                           setCurrentStep("us-state-stop");
                         }
                       }}
                       className="w-full border border-[#cdd3d8] rounded-xl px-4 py-3 text-sm font-medium bg-white focus:outline-none focus:border-[#0eb28d] shadow-sm cursor-pointer"
                     >
+                      <option value="">Select your state</option>
                       {US_STATES.map((st) => (
                         <option key={st} value={st}>
                           {st}
@@ -1121,10 +1342,24 @@ export default function USFlow() {
                       ))}
                     </select>
 
+                    {errorMessage && (
+                      <div className="mt-3 text-xs sm:text-[13px] font-bold text-[#e53e3e] flex items-center gap-1.5 animate-in fade-in">
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0 text-[#e53e3e]">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span>{errorMessage}</span>
+                      </div>
+                    )}
+
                     {/* Navigation */}
                     <div className="mt-8 flex justify-end">
                       <QuestionNextButton
                         onClick={() => {
+                          if (!state.usState) {
+                            setErrorMessage("Please select your state.");
+                            return;
+                          }
+                          setErrorMessage("");
                           if (state.usState === "Other state") {
                             setCurrentStep("us-state-stop");
                           } else {
@@ -1167,10 +1402,18 @@ export default function USFlow() {
                           inputMode="numeric"
                           value={state.age}
                           placeholder="52"
-                          onChange={(e) =>
-                            setState({ ...state, age: e.target.value })
-                          }
-                          className="w-full border border-[#cdd3d8] rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:border-[#0eb28d]"
+                          onChange={(e) => {
+                            setState({ ...state, age: e.target.value });
+                            if (fieldErrors.age) {
+                              setFieldErrors((prev) => ({ ...prev, age: false }));
+                              setErrorMessage("");
+                            }
+                          }}
+                          className={`us-needs-input w-full rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none transition-colors placeholder:text-[#9aa3ab] ${
+                            fieldErrors.age
+                              ? "us-input-error text-[#c53030]"
+                              : "text-[#17242f]"
+                          }`}
                         />
                       </div>
                       <div>
@@ -1182,24 +1425,75 @@ export default function USFlow() {
                           inputMode="numeric"
                           value={state.years}
                           placeholder="9"
-                          onChange={(e) =>
-                            setState({ ...state, years: e.target.value })
-                          }
-                          className="w-full border border-[#cdd3d8] rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:border-[#0eb28d]"
+                          onChange={(e) => {
+                            setState({ ...state, years: e.target.value });
+                            if (fieldErrors.years) {
+                              setFieldErrors((prev) => ({ ...prev, years: false }));
+                              setErrorMessage("");
+                            }
+                          }}
+                          className={`us-needs-input w-full rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none transition-colors placeholder:text-[#9aa3ab] ${
+                            fieldErrors.years
+                              ? "us-input-error text-[#c53030]"
+                              : "text-[#17242f]"
+                          }`}
                         />
                       </div>
                     </div>
+
+                    {errorMessage && (
+                      <div className="mt-3 text-xs sm:text-[13px] font-bold text-[#e53e3e] flex items-center gap-1.5 animate-in fade-in">
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0 text-[#e53e3e]">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span>{errorMessage}</span>
+                      </div>
+                    )}
 
                     {/* Navigation */}
                     <div className="mt-8 flex items-center justify-between">
                       <QuestionBackButton
                         onClick={() => {
+                          setFieldErrors({});
+                          setErrorMessage("");
                           setCurrentStep("us-situation-q1");
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
                       />
                       <QuestionNextButton
                         onClick={() => {
+                          const ageNum = parseInt(state.age, 10);
+                          const yearsNum = parseFloat(state.years);
+                          const isAgeInvalid = isNaN(ageNum) || ageNum < 16 || ageNum > 99;
+                          const isYearsInvalid =
+                            isNaN(yearsNum) ||
+                            yearsNum < 0 ||
+                            yearsNum > 70 ||
+                            (!isNaN(ageNum) && (yearsNum >= ageNum || yearsNum > ageNum - 14));
+
+                          let msg = "";
+                          if (isAgeInvalid && isYearsInvalid) {
+                            msg = "Please enter a valid age (16–99) and years of service (0–70).";
+                          } else if (isAgeInvalid) {
+                            msg = isNaN(ageNum) ? "Please enter your age." : "Age must be between 16 and 99.";
+                          } else if (isYearsInvalid) {
+                            msg =
+                              !isNaN(ageNum) && (yearsNum >= ageNum || yearsNum > ageNum - 14)
+                                ? "Years of service cannot exceed your age (started after age 14)."
+                                : isNaN(yearsNum) || yearsNum < 0
+                                  ? "Please enter your years of service."
+                                  : "Years of service must be between 0 and 70.";
+                          }
+
+                          if (isAgeInvalid || isYearsInvalid) {
+                            setFieldErrors({ age: isAgeInvalid, years: isYearsInvalid });
+                            setErrorMessage(msg);
+                            return;
+                          }
+
+                          setFieldErrors({});
+                          setErrorMessage("");
+                          setAnsweredFields((prev) => ({ ...prev, age: true, years: true }));
                           setCurrentStep("us-situation-q3");
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
@@ -1233,22 +1527,61 @@ export default function USFlow() {
                       inputMode="numeric"
                       value={state.salary}
                       placeholder="128000"
-                      onChange={(e) =>
-                        setState({ ...state, salary: e.target.value })
-                      }
-                      className="w-full border border-[#cdd3d8] rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:border-[#0eb28d]"
+                      onChange={(e) => {
+                        setState({ ...state, salary: e.target.value });
+                        if (fieldErrors.salary) {
+                          setFieldErrors((prev) => ({ ...prev, salary: false }));
+                          setErrorMessage("");
+                        }
+                      }}
+                      className={`us-needs-input w-full rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none transition-colors placeholder:text-[#9aa3ab] ${
+                        fieldErrors.salary
+                          ? "us-input-error text-[#c53030]"
+                          : "text-[#17242f]"
+                      }`}
                     />
+
+                    {errorMessage && (
+                      <div className="mt-3 text-xs sm:text-[13px] font-bold text-[#e53e3e] flex items-center gap-1.5 animate-in fade-in">
+                        <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0 text-[#e53e3e]">
+                          <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                        </svg>
+                        <span>{errorMessage}</span>
+                      </div>
+                    )}
 
                     {/* Navigation */}
                     <div className="mt-8 flex items-center justify-between">
                       <QuestionBackButton
                         onClick={() => {
+                          setFieldErrors({});
+                          setErrorMessage("");
                           setCurrentStep("us-situation-q2");
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
                       />
                       <QuestionNextButton
                         onClick={() => {
+                          const salClean = String(state.salary).replace(/[^0-9.]/g, "");
+                          const salNum = parseFloat(salClean);
+                          const isSalInvalid =
+                            isNaN(salNum) || salNum <= 0 || salNum < 500 || salNum > 1000000000;
+
+                          if (isSalInvalid) {
+                            setFieldErrors({ salary: true });
+                            setErrorMessage(
+                              isNaN(salNum) || salNum <= 0
+                                ? "Please enter your annual pay."
+                                : salNum < 500
+                                  ? "Annual pay must be at least $500."
+                                  : "Please enter a realistic annual pay."
+                            );
+                            return;
+                          }
+
+                          setFieldErrors({});
+                          setErrorMessage("");
+                          setAnsweredFields((prev) => ({ ...prev, salary: true }));
                           setCurrentStep("us-situation-q4");
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
@@ -1320,6 +1653,7 @@ export default function USFlow() {
                       />
                       <QuestionNextButton
                         onClick={() => {
+                          setAnsweredFields((prev) => ({ ...prev, comp: true }));
                           setCurrentStep("us-situation-q5");
                           window.scrollTo({ top: 0, behavior: "smooth" });
                         }}
@@ -1358,7 +1692,7 @@ export default function USFlow() {
                             key={item.k}
                             type="button"
                             onClick={() =>
-                              setState({ ...state, signed: item.k })
+                              handleAnswer("signed", item.k)
                             }
                             className={`px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-bold transition-all cursor-pointer ${
                               isSelected
@@ -1450,7 +1784,7 @@ export default function USFlow() {
                 STATE STOP CARD (WHEN SELECTING "Other state" - MATCHING SCREENSHOT)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "us-state-stop" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center animate-fade">
                 {/* Map Emoji Icon */}
                 <div
                   className="text-3xl sm:text-4xl mb-3 select-none"
@@ -1528,7 +1862,7 @@ export default function USFlow() {
                 STEP 2: THE LAYOFF (5 SEQUENTIAL SINGLE-QUESTION SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isLayoffStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Tag & 5-Dot Indicator */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -1595,7 +1929,7 @@ export default function USFlow() {
                           <button
                             key={p.k}
                             type="button"
-                            onClick={() => setState({ ...state, union: p.k })}
+                            onClick={() => handleAnswer("union", p.k)}
                             className={`px-5 py-2.5 rounded-lg text-[13.5px] sm:text-sm font-semibold transition-all cursor-pointer ${
                               isSelected
                                 ? "bg-[#062c55] text-white border border-[#062c55] shadow-xs"
@@ -1659,7 +1993,7 @@ export default function USFlow() {
                             key={p.k}
                             type="button"
                             onClick={() =>
-                              setState({ ...state, ended: p.k, reason: p.k })
+                              handleAnswer("ended", p.k, { reason: p.k })
                             }
                             className={`px-5 py-2.5 rounded-lg text-[13.5px] sm:text-sm font-semibold transition-all cursor-pointer ${
                               isSelected
@@ -1722,7 +2056,7 @@ export default function USFlow() {
                           <button
                             key={p.k}
                             type="button"
-                            onClick={() => setState({ ...state, empsize: p.k })}
+                            onClick={() => handleAnswer("empsize", p.k)}
                             className={`px-5 py-2.5 rounded-lg text-[13.5px] sm:text-sm font-semibold transition-all cursor-pointer ${
                               isSelected
                                 ? "bg-[#062c55] text-white border border-[#062c55] shadow-xs"
@@ -1785,7 +2119,7 @@ export default function USFlow() {
                           <button
                             key={p.k}
                             type="button"
-                            onClick={() => setState({ ...state, others: p.k })}
+                            onClick={() => handleAnswer("others", p.k)}
                             className={`px-5 py-2.5 rounded-lg text-[13.5px] sm:text-sm font-semibold transition-all cursor-pointer ${
                               isSelected
                                 ? "bg-[#062c55] text-white border border-[#062c55] shadow-xs"
@@ -1848,7 +2182,7 @@ export default function USFlow() {
                           <button
                             key={p.k}
                             type="button"
-                            onClick={() => setState({ ...state, notice: p.k })}
+                            onClick={() => handleAnswer("notice", p.k)}
                             className={`px-5 py-2.5 rounded-lg text-[13.5px] sm:text-sm font-semibold transition-all cursor-pointer ${
                               isSelected
                                 ? "bg-[#062c55] text-white border border-[#062c55] shadow-xs"
@@ -1895,7 +2229,7 @@ export default function USFlow() {
                 STEP 3: THE PAPERS (3 SEQUENTIAL SINGLE-QUESTION SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isPapersStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Tag & 3-Dot Indicator */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -1965,7 +2299,7 @@ export default function USFlow() {
                           <button
                             key={p.k}
                             type="button"
-                            onClick={() => setState({ ...state, release: p.k })}
+                            onClick={() => handleAnswer("release", p.k)}
                             className={`px-5 py-2.5 rounded-lg text-[13.5px] sm:text-sm font-semibold transition-all cursor-pointer ${
                               isSelected
                                 ? "bg-[#062c55] text-white border border-[#062c55] shadow-xs"
@@ -2026,8 +2360,9 @@ export default function USFlow() {
                           parseFloat(e.target.value.replace(/[^0-9.]/g, "")) ||
                           0;
                         setState({ ...state, offer: val });
+                        setAnsweredFields((prev) => ({ ...prev, offer: true }));
                       }}
-                      className="w-full border border-[#0eb28d] rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:border-[#0eb28d] bg-white text-[#17242f] shadow-xs"
+                      className="us-needs-input w-full rounded-xl px-4 py-3 text-sm font-medium outline-none transition-colors placeholder:text-[#9aa3ab] text-[#17242f]"
                     />
 
                     {/* Navigation */}
@@ -2072,7 +2407,7 @@ export default function USFlow() {
                     <div className="flex flex-wrap gap-2.5">
                       <button
                         type="button"
-                        onClick={() => setState({ ...state, promise: "yes" })}
+                        onClick={() => handleAnswer("promise", "yes")}
                         className={`w-full sm:w-auto px-5 py-2.5 rounded-lg text-[13.5px] sm:text-sm font-semibold transition-all cursor-pointer ${
                           state.promise === "yes"
                             ? "bg-[#062c55] text-white border border-[#062c55] shadow-xs"
@@ -2083,7 +2418,7 @@ export default function USFlow() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setState({ ...state, promise: "no" })}
+                        onClick={() => handleAnswer("promise", "no")}
                         className={`flex-1 sm:flex-none px-5 py-2.5 rounded-lg text-[13.5px] sm:text-sm font-semibold transition-all cursor-pointer ${
                           state.promise === "no"
                             ? "bg-[#062c55] text-white border border-[#062c55] shadow-xs"
@@ -2095,7 +2430,7 @@ export default function USFlow() {
                       <button
                         type="button"
                         onClick={() =>
-                          setState({ ...state, promise: "unsure" })
+                          handleAnswer("promise", "unsure")
                         }
                         className={`flex-1 sm:flex-none px-5 py-2.5 rounded-lg text-[13.5px] sm:text-sm font-semibold transition-all cursor-pointer ${
                           state.promise === "unsure"
@@ -2141,7 +2476,7 @@ export default function USFlow() {
                 STEP 4: THE MOST IMPORTANT QUESTION (4 SEQUENTIAL SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isClauseStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Upper Badge & 4 Progress Dots */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2213,11 +2548,7 @@ export default function USFlow() {
                           key={item.k}
                           type="button"
                           onClick={() =>
-                            setState((prev) => ({
-                              ...prev,
-                              deadline: item.k,
-                              clause: item.k,
-                            }))
+                            handleAnswer("deadline", item.k, { clause: item.k })
                           }
                           className={`px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold sm:font-bold transition-all cursor-pointer ${
                             state.deadline === item.k
@@ -2281,7 +2612,7 @@ export default function USFlow() {
                           key={item.k}
                           type="button"
                           onClick={() =>
-                            setState((prev) => ({ ...prev, advise: item.k }))
+                            handleAnswer("advise", item.k)
                           }
                           className={`px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold sm:font-bold transition-all cursor-pointer ${
                             state.advise === item.k
@@ -2346,7 +2677,7 @@ export default function USFlow() {
                           key={item.k}
                           type="button"
                           onClick={() =>
-                            setState((prev) => ({ ...prev, list: item.k }))
+                            handleAnswer("list", item.k)
                           }
                           className={`px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold sm:font-bold transition-all cursor-pointer ${
                             state.list === item.k
@@ -2410,7 +2741,7 @@ export default function USFlow() {
                           key={item.k}
                           type="button"
                           onClick={() =>
-                            setState((prev) => ({ ...prev, revoke: item.k }))
+                            handleAnswer("revoke", item.k)
                           }
                           className={`px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold sm:font-bold transition-all cursor-pointer ${
                             state.revoke === item.k
@@ -2457,7 +2788,7 @@ export default function USFlow() {
                 STEP 5: DETAILS (2 SEQUENTIAL SINGLE-QUESTION SCREENS)
             ════════════════════════════════════════════════════════════════ */}
             {isDetailsStep && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Upper Badge & 2 Progress Dots */}
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2523,7 +2854,7 @@ export default function USFlow() {
                           key={item.k}
                           type="button"
                           onClick={() =>
-                            setState((prev) => ({ ...prev, redflag: item.k }))
+                            handleAnswer("redflag", item.k)
                           }
                           className={`px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold sm:font-bold transition-all cursor-pointer ${
                             state.redflag === item.k
@@ -2586,7 +2917,7 @@ export default function USFlow() {
                           key={item.k}
                           type="button"
                           onClick={() =>
-                            setState((prev) => ({ ...prev, nc: item.k }))
+                            handleAnswer("nc", item.k)
                           }
                           className={`px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold sm:font-bold transition-all cursor-pointer ${
                             state.nc === item.k
@@ -2678,9 +3009,9 @@ export default function USFlow() {
                 STEP 6: RESULTS & VERDICT
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "step-results" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-5 sm:p-8 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-7 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* ── VERDICT CARD (encompasses tag, title, reasons, and srcbadge) ── */}
-                <div className="text-center p-5 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
+                <div className="text-center p-4 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
                   {/* Upper Badges */}
                   <div className="mb-2">
                     <span className="inline-block font-sans font-[800] uppercase text-[#8a6400] bg-[#fbf3df] border border-[#eeddb0] text-[10.5px] leading-[16.5px] tracking-[0.5px] px-[10px] py-[3px] rounded-[6px] mb-2">
@@ -2841,7 +3172,7 @@ export default function USFlow() {
                 {/* 2 Cards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left max-w-[640px] mx-auto">
                   {/* Card 1: Do It Yourself */}
-                  <div className="relative border-[1.5px] border-[#e7e4dd] rounded-[15px] p-5 sm:p-6 bg-white flex flex-col justify-between shadow-xs hover:border-[#062c55] transition-all">
+                  <div className={`relative border-[1.5px] ${isReportUnlocked ? "border-[#0eb28d] animate-unl" : "border-[#e7e4dd]"} rounded-[15px] p-5 sm:p-6 bg-white flex flex-col justify-between shadow-xs hover:border-[#062c55] transition-all`}>
                     <button
                       type="button"
                       onClick={() => setInfoModal("report")}
@@ -2866,9 +3197,9 @@ export default function USFlow() {
                         Get your Severance Report
                       </h3>
                       <div className="font-serif font-[600] text-[30px] leading-none text-[#062c55] mb-2 flex items-baseline gap-2 flex-wrap">
-                        $59{" "}
+                        {isReportUnlocked ? "Unlocked" : "$59"}{" "}
                         <span className="font-sans font-[700] text-[11px] leading-none text-[#5a6b78]">
-                          one-time · no subscription
+                          {isReportUnlocked ? "PDF download ready" : "one-time · no subscription"}
                         </span>
                       </div>
                       <p className="font-sans font-normal text-[13px] leading-[19.5px] text-[#5a6b78] mb-5">
@@ -2879,10 +3210,14 @@ export default function USFlow() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setInfoModal("report")}
-                      className="w-full py-3 px-4 rounded-[9px] bg-[#062c55] hover:bg-[#041D38] text-white font-sans font-[800] text-[14px] leading-[20px] shadow-xs transition-all cursor-pointer text-center min-h-[50px] flex items-center justify-center"
+                      onClick={() => setReportPreviewOpen(true)}
+                      className={`w-full py-3 px-4 rounded-[9px] ${
+                        isReportUnlocked
+                          ? "bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] text-white animate-ckglow"
+                          : "bg-[#062c55] hover:bg-[#041D38] text-white"
+                      } font-sans font-[800] text-[14px] leading-[20px] shadow-xs transition-all cursor-pointer text-center min-h-[50px] flex items-center justify-center`}
                     >
-                      Get my report
+                      {isReportUnlocked ? "Download my report (PDF) ✓" : "Get my report"}
                     </button>
                   </div>
 
@@ -2985,7 +3320,7 @@ export default function USFlow() {
             )}
 
             {/* FairExit Summary Card */}
-            <div className="bg-[#EEF1F4] border border-[#e7e4dd] rounded-[14px] p-4 sm:p-5 shadow-[0_4px_20px_0_rgba(6,44,85,0.06)]">
+            <div className="bg-[#EEF1F4] border border-[#e7e4dd] rounded-[14px] p-4 sm:p-5 shadow-[0_4px_20px_0_rgba(6,44,85,0.06)] overflow-hidden">
               <span className="font-sans font-[800] uppercase text-[10.5px] leading-[16px] tracking-[0.8px] text-[#5a6b78]">
                 Your details so far
               </span>
@@ -3019,52 +3354,51 @@ export default function USFlow() {
                 )}
               </div>
 
-              {/* Enough to show results banner */}
-              {currentStep !== "step-results" &&
+              {/* LIVE READ Panel inside Summary Card */}
+              {thingsToCheck.length > 0 ? (
+                <div className="mt-4 pt-4 border-t border-[#cfe8dd] bg-[#f3faf6] -mx-4 sm:-mx-5 -mb-4 sm:-mb-5 p-4 sm:p-5 rounded-b-[14px] animate-in fade-in">
+                  <span className="font-sans font-[800] uppercase text-[10.5px] leading-[16px] tracking-[0.8px] text-[#5a6b78] block">
+                    LIVE READ · NOT AN ASSESSMENT
+                  </span>
+                  <h4 className="font-serif font-[600] text-[18px] leading-[22px] text-[#0c8f72] mt-0.5 mb-2.5">
+                    {thingsToCheck.length} things to check
+                  </h4>
+                  <ul className="space-y-2 font-sans font-normal text-[13px] leading-[19px] text-[#5a6b78] mb-3.5">
+                    {thingsToCheck.map((item, idx) => (
+                      <li
+                        key={idx}
+                        className="flex items-start gap-1.5 leading-relaxed animate-in fade-in"
+                      >
+                        <span className="text-[#0c8f72] font-bold shrink-0">•</span>
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  {/* Enough to show results banner inside Live Read */}
+                  {Boolean(
+                    answeredFields["usState"] ||
+                      (state.years && state.salary) ||
+                      currentStep === "step-results",
+                  ) && (
+                    <div className="text-[12px] font-sans font-[700] leading-[16px] text-[#0c8f72] bg-[#e5f5ee] border border-[#b9e6d4] rounded-[6px] px-3 py-2 text-center">
+                      ✓ Enough to show your results
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* When no items yet, show enough to show results if conditions met */
                 Boolean(
-                  (isFieldVisible("years") && isFieldVisible("salary")) ||
-                    (state.years && state.salary),
+                  answeredFields["usState"] ||
+                    (state.years && state.salary) ||
+                    currentStep === "step-results",
                 ) && (
                   <div className="mt-3 text-[12px] font-sans font-[700] leading-[16px] text-[#0c8f72] bg-[#e5f5ee] border border-[#b9e6d4] rounded-[6px] px-3 py-2 text-center">
                     ✓ Enough to show your results
                   </div>
-                )}
+                )
+              )}
             </div>
-
-            {/* Live Read Card in results step matching screenshot */}
-            {currentStep === "step-results" && (
-              <div className="mt-4 bg-[#f3faf6] border border-[#cfe8dd] rounded-[14px] p-4 sm:p-5 shadow-[0_4px_20px_0_rgba(6,44,85,0.06)] animate-in fade-in">
-                <span className="font-sans font-[800] uppercase text-[10.5px] leading-[16px] tracking-[0.8px] text-[#5a6b78]">
-                  LIVE READ · NOT AN ASSESSMENT
-                </span>
-                <h4 className="font-serif font-[600] text-[18px] leading-[22px] text-[#0c8f72] mt-0.5 mb-2.5">
-                  5 things to check
-                </h4>
-                <ul className="space-y-2 font-sans font-normal text-[13px] leading-[19px] text-[#5a6b78] mb-4">
-                  <li className="flex items-start gap-1.5 leading-relaxed">
-                    <span>•</span>
-                    <span>Time to consider looks short</span>
-                  </li>
-                  <li className="flex items-start gap-1.5 leading-relaxed">
-                    <span>•</span>
-                    <span>
-                      A 7-day period to change your mind is a common requirement
-                      for age-40+ releases
-                    </span>
-                  </li>
-                  <li className="flex items-start gap-1.5 leading-relaxed">
-                    <span>•</span>
-                    <span>
-                      For an age-40+ group program, the law requires a disclosure
-                      of the ages &amp; job titles selected
-                    </span>
-                  </li>
-                </ul>
-                <div className="text-[12px] font-sans font-[700] leading-[16px] text-[#0c8f72] bg-[#e5f5ee] border border-[#b9e6d4] rounded-[6px] px-3 py-2 text-center">
-                  ✓ Enough to show your results
-                </div>
-              </div>
-            )}
           </aside>
         </div>
       </div>
@@ -3255,12 +3589,44 @@ export default function USFlow() {
               </>
             )}
 
+            {infoModal === "report" && (
+              <div className="mt-2 mb-3">
+                {checkoutState === "verifying" && (
+                  <div className="py-3 px-4 my-2 text-center text-sm font-semibold text-[#062c55] bg-[#eef8f3] rounded-xl border border-[#c7e6d6] flex items-center justify-center gap-2">
+                    <span className="ckspin animate-ckspin" aria-hidden="true" />
+                    <span>Verifying details &amp; processing…</span>
+                  </div>
+                )}
+
+                {checkoutState === "success" && (
+                  <div className="just py-3 px-4 my-2 text-center text-sm font-bold text-[#0c8f72] bg-[#eef8f3] rounded-xl border border-[#c7e6d6] flex items-center justify-center gap-2 animate-ckglow">
+                    <span className="cktick animate-ckpop">
+                      <svg viewBox="0 0 14 14">
+                        <path className="animate-ckdraw" d="M2.5 7.5L5.5 10.5L11.5 3.5" />
+                      </svg>
+                    </span>
+                    <span className="animate-ckpulse">Report Unlocked!</span>
+                  </div>
+                )}
+
+                {checkoutState === "idle" && !isReportUnlocked && (
+                  <button
+                    type="button"
+                    onClick={handleUnlockReport}
+                    className="w-full py-3 rounded-[9px] bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] hover:brightness-105 text-white font-sans font-[800] text-[14px] leading-[20px] transition-all cursor-pointer text-center shadow-button animate-ckpulse mb-2"
+                  >
+                    Unlock 15-page report — $59 →
+                  </button>
+                )}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => setInfoModal(null)}
               className="w-full py-2.5 sm:py-3 rounded-[9px] bg-[#0c8f72] hover:bg-[#0aa07e] text-white font-sans font-[700] text-[14px] leading-[20px] transition-colors cursor-pointer text-center shadow-xs"
             >
-              Got it
+              {isReportUnlocked ? "Done" : "Got it"}
             </button>
           </div>
         </div>
@@ -3306,6 +3672,15 @@ export default function USFlow() {
           </svg>
         </button>
       </div>
+
+      {/* ── SEVERANCE REPORT PREVIEW MODAL ── */}
+      <SeveranceReportPreviewDialog
+        isOpen={reportPreviewOpen}
+        onClose={() => setReportPreviewOpen(false)}
+        country="US"
+        isResultsPage={true}
+        onDownload={handleUnlockReport}
+      />
 
       {/* ── 3-POINT CHECKLIST MODAL (PHOTO 1 & PHOTO 4) ── */}
       <ChecklistModal
@@ -3383,6 +3758,43 @@ export default function USFlow() {
           </div>
         </div>
       )}
+
+      {/* ── STICKY BOTTOM BAR ("Your details — Illinois · 9 yrs [View]") ── */}
+      {currentStep !== "step-results" &&
+        currentStep !== "step-analyzing" &&
+        currentStep !== "us-state-stop" && (
+          <div className="fixed left-3 right-3 bottom-3 z-40 block md:hidden animate-fade">
+            <button
+              type="button"
+              onClick={() => setMobileSummOpen((prev) => !prev)}
+              className="w-full bg-white border border-[#d5dde4] rounded-xl px-3.5 py-2.5 shadow-[0_10px_28px_-12px_rgba(6,44,85,0.35)] flex items-center gap-1.5 cursor-pointer text-left transition-all hover:border-[#0eb28d] active:scale-[0.99]"
+              aria-expanded={mobileSummOpen}
+              aria-controls="mobileSummary"
+            >
+              <span className="font-bold text-[13px] text-[#062c55] shrink-0">
+                Your details
+              </span>
+              <span className="text-[12.5px] text-[#5a6b78] font-medium truncate flex-1 min-w-0">
+                {getMobileSummarySnippet()}
+              </span>
+              <span className="shrink-0 inline-flex items-center gap-1 bg-[#0c8f72] text-white text-xs font-extrabold px-3 py-1.5 rounded-lg shadow-xs">
+                <span>{mobileSummOpen ? "Hide" : "View"}</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${mobileSummOpen ? "rotate-180" : ""}`}
+                  aria-hidden="true"
+                >
+                  <path d="M6 15l6-6 6 6" />
+                </svg>
+              </span>
+            </button>
+          </div>
+        )}
     </div>
   );
 }

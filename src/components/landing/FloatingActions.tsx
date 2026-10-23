@@ -1,18 +1,53 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useAccessibility } from "@/context/AccessibilityContext";
 import { triggerGetApp } from "@/context/GetAppContext";
 
 export default function FloatingActions() {
   const { isDialogOpen, toggleDialog } = useAccessibility();
+  const [hideOnPhone, setHideOnPhone] = useState(false);
+
+  useEffect(() => {
+    const getTarget = () =>
+      document.getElementById("heroForm") || document.getElementById("hero");
+
+    const checkVisibility = () => {
+      if (window.innerWidth >= 1024) {
+        setHideOnPhone(false);
+        return;
+      }
+      const el = getTarget();
+      if (!el) {
+        setHideOnPhone(false);
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      // If hero form is on screen on phone
+      const isHeroOnScreen = rect.top < window.innerHeight && rect.bottom > 0;
+      setHideOnPhone(isHeroOnScreen);
+    };
+
+    checkVisibility();
+    window.addEventListener("scroll", checkVisibility, { passive: true });
+    window.addEventListener("resize", checkVisibility, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", checkVisibility);
+      window.removeEventListener("resize", checkVisibility);
+    };
+  }, []);
 
   return (
     <>
       {/* ── Floating App Button (white with navy icon) ── */}
       <a
         id="appFab"
-        className="fixed bottom-[84px] right-6 w-12 h-12 rounded-full bg-white text-[#062c55] border-none flex items-center justify-center shadow-[0_12px_26px_-8px_rgba(6,44,85,0.45)] z-[100] no-underline hover:scale-105 hover:bg-[#0eb28d] hover:text-white transition-all group"
+        className={`fixed bottom-[74px] sm:bottom-[84px] right-3 sm:right-6 w-12 h-12 rounded-full bg-white text-[#062c55] border-none flex items-center justify-center shadow-[0_12px_26px_-8px_rgba(6,44,85,0.45)] z-[100] no-underline hover:scale-105 hover:bg-[#0eb28d] hover:text-white transition-all duration-300 group ${
+          hideOnPhone
+            ? "max-lg:opacity-0 max-lg:pointer-events-none max-lg:translate-y-4 max-lg:scale-95"
+            : "max-lg:opacity-100 max-lg:pointer-events-auto max-lg:translate-y-0 max-lg:scale-100"
+        }`}
         href="#app"
         aria-label="Get the app"
         onClick={(e) => {
@@ -42,7 +77,11 @@ export default function FloatingActions() {
       <button
         id="a11yFab"
         type="button"
-        className="fixed bottom-6 right-6 w-12 h-12 rounded-full bg-[#062c55] text-white border-none flex items-center justify-center shadow-[0_12px_26px_-8px_rgba(6,44,85,0.55)] z-[100] cursor-pointer hover:scale-105 transition-all"
+        className={`fixed bottom-3 sm:bottom-6 right-3 sm:right-6 w-12 h-12 rounded-full bg-[#062c55] text-white border-none flex items-center justify-center shadow-[0_12px_26px_-8px_rgba(6,44,85,0.55)] z-[100] cursor-pointer hover:scale-105 transition-all duration-300 ${
+          hideOnPhone
+            ? "max-lg:opacity-0 max-lg:pointer-events-none max-lg:translate-y-4 max-lg:scale-95"
+            : "max-lg:opacity-100 max-lg:pointer-events-auto max-lg:translate-y-0 max-lg:scale-100"
+        }`}
         aria-label="Accessibility options"
         aria-expanded={isDialogOpen}
         onClick={(e) => {

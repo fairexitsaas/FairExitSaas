@@ -65,7 +65,7 @@ export default function CountrySelectionDialog({
         aria-modal="true"
         aria-labelledby="country-dialog-heading"
         tabIndex={-1}
-        className="relative w-full max-w-[440px] rounded-[18px] shadow-[0_40px_90px_-30px_rgba(6,44,85,0.6)] p-[30px_28px_24px] z-10 focus:outline-none text-center bg-white dark:bg-[#0e2238] text-[#17242f] dark:text-white border border-[#e7e4dd] dark:border-[#1a385c] animate-dlgup"
+        className="relative w-full max-w-[440px] rounded-[18px] shadow-[0_40px_90px_-30px_rgba(6,44,85,0.6)] p-5 sm:p-[30px_28px_24px] z-10 focus:outline-none text-center bg-white dark:bg-[#0e2238] text-[#17242f] dark:text-white border border-[#e7e4dd] dark:border-[#1a385c] animate-dlgup"
       >
         {/* Eyebrow */}
         <p className="text-[11px] font-extrabold tracking-[0.6px] uppercase mb-1.5 text-[#0c8f72]">

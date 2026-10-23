@@ -49,7 +49,7 @@ export default function AccessibilityDialog() {
         aria-modal="true"
         aria-labelledby="accessibility-heading"
         tabIndex={-1}
-        className="fixed bottom-20 right-6 z-50 w-76 sm:w-80 rounded-2xl border border-card-border bg-card text-primary p-6 focus:outline-none shadow-[0_16px_48px_-8px_rgba(0,0,0,0.16)] dark:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)] transition-colors duration-200"
+        className="fixed bottom-16 sm:bottom-20 right-3 sm:right-6 z-50 w-[calc(100vw-24px)] max-w-[320px] sm:w-80 rounded-2xl border border-card-border bg-card text-primary p-4 sm:p-6 focus:outline-none shadow-[0_16px_48px_-8px_rgba(0,0,0,0.16)] dark:shadow-[0_20px_50px_-10px_rgba(0,0,0,0.6)] transition-colors duration-200"
       >
         {/* Header */}
         <div className="pb-3.5">

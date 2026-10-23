@@ -7,6 +7,7 @@ import { estimate, EstimateResult } from "@/lib/severance-rules";
 import { QuestionBackButton, QuestionNextButton } from "@/components/common/QuestionNavButtons";
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
+import SeveranceReportPreviewDialog from "@/components/dialogs/SeveranceReportPreviewDialog";
 import { triggerGetApp } from "@/context/GetAppContext";
 import { useAccessibility } from "@/context/AccessibilityContext";
 
@@ -105,20 +106,147 @@ function QuestionsContent() {
     isCanada ? "q1" : "us-situation",
   );
   const [explainOn, setExplainOn] = useState<boolean>(true);
+
+  // Default "Explain each question" switch to off under 768px (phone), on for desktop
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("fx_plain");
+      if (stored !== null) {
+        setExplainOn(stored === "1");
+        return;
+      }
+    } catch (e) {}
+    if (typeof window !== "undefined") {
+      setExplainOn(window.innerWidth >= 768);
+    }
+  }, []);
+
+  const handleToggleExplain = (checked: boolean) => {
+    setExplainOn(checked);
+    try {
+      localStorage.setItem("fx_plain", checked ? "1" : "0");
+    } catch (e) {}
+  };
+
   const [editingBasics, setEditingBasics] = useState<boolean>(false);
   const [mobileSummOpen, setMobileSummOpen] = useState<boolean>(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [notifiedProvince, setNotifiedProvince] = useState<boolean>(false);
   const [infoModal, setInfoModal] = useState<"report" | "lawyer" | null>(null);
+  const [checkoutState, setCheckoutState] = useState<"idle" | "verifying" | "success">("idle");
+  const [isReportUnlocked, setIsReportUnlocked] = useState<boolean>(false);
   const [emailModalOpen, setEmailModalOpen] = useState<boolean>(false);
   const [emailInput, setEmailInput] = useState<string>("");
   const [emailSent, setEmailSent] = useState<boolean>(false);
   const [checklistModalOpen, setChecklistModalOpen] = useState<boolean>(false);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
+  const [errorMessage, setErrorMessage] = useState<string>("");
   const [askLawyerOpen, setAskLawyerOpen] = useState<boolean>(false);
+  const [reportPreviewOpen, setReportPreviewOpen] = useState<boolean>(false);
   const { toggleDialog } = useAccessibility();
+
+  const validateBasicsFields = (): { isValid: boolean; errors: Record<string, boolean>; message: string } => {
+    const errors: Record<string, boolean> = {};
+    let msg = "";
+
+    // 1. Age validation
+    const ageClean = String(state.age || "").trim();
+    const ageNum = parseInt(ageClean, 10);
+    const isAgeEmpty = !ageClean;
+    const isAgeOutOfRange = !isAgeEmpty && (isNaN(ageNum) || ageNum < 16 || ageNum > 99);
+    if (isAgeEmpty) {
+      errors.age = true;
+      if (!msg) msg = "Please enter your age.";
+    } else if (isAgeOutOfRange) {
+      errors.age = true;
+      if (!msg) msg = "Age must be between 16 and 99.";
+    }
+
+    // 2. Years of service validation
+    const yearsClean = String(state.years || "").trim();
+    const yearsNum = parseFloat(yearsClean);
+    const isYearsEmpty = !yearsClean;
+    const isYearsOutOfRange = !isYearsEmpty && (isNaN(yearsNum) || yearsNum < 0 || yearsNum > 70);
+    const isYearsExceedAge =
+      !isYearsEmpty && !isNaN(yearsNum) && !isNaN(ageNum) && (yearsNum >= ageNum || yearsNum > ageNum - 14);
+
+    if (isYearsEmpty) {
+      errors.years = true;
+      if (!msg) msg = "Please enter your years of service.";
+    } else if (isYearsExceedAge) {
+      errors.years = true;
+      if (!msg) msg = "Years of service cannot exceed your age (started after age 14).";
+    } else if (isYearsOutOfRange) {
+      errors.years = true;
+      if (!msg) msg = "Years of service must be between 0 and 70.";
+    }
+
+    // 3. Salary validation
+    const salClean = String(state.salary || "").replace(/[^0-9.]/g, "");
+    const salNum = parseFloat(salClean);
+    const isSalEmpty = !salClean;
+    const isSalOutOfRange = !isSalEmpty && (isNaN(salNum) || salNum < 500 || salNum > 1000000000);
+
+    if (isSalEmpty) {
+      errors.salary = true;
+      if (!msg) msg = "Please enter your annual pay.";
+    } else if (isSalOutOfRange) {
+      errors.salary = true;
+      if (!msg) msg = "Annual pay must be at least $500.";
+    }
+
+    if (errors.age && errors.years) {
+      if (isAgeOutOfRange && (isYearsOutOfRange || isYearsExceedAge)) {
+        msg = "Please enter a valid age (16–99) and years of service (0–70).";
+      }
+    }
+
+    return {
+      isValid: Object.keys(errors).length === 0,
+      errors,
+      message: msg,
+    };
+  };
+
+  const handleUnlockReport = () => {
+    setCheckoutState("verifying");
+    setTimeout(() => {
+      setCheckoutState("success");
+      setTimeout(() => {
+        setIsReportUnlocked(true);
+        setCheckoutState("idle");
+        setInfoModal(null);
+      }, 900);
+    }, 1100);
+  };
 
   // User answers tracking via useState for FairExit summary box
   const [userAnswers, setUserAnswers] = useState<Record<string, string>>({});
+
+  const getMobileSummarySnippet = () => {
+    const parts: string[] = [];
+    const provRaw = userAnswers.province || state.province;
+    const provName = {
+      ON: "Ontario",
+      BC: "British Columbia",
+      AB: "Alberta",
+      NS: "Nova Scotia",
+      OTHER: "Other",
+    }[provRaw] || provRaw;
+
+    if (provName) parts.push(provName);
+    const yrs = userAnswers.years || state.years;
+    if (yrs) parts.push(`${String(yrs).replace(/[^0-9.]/g, "")} yrs`);
+    else {
+      const a = userAnswers.age || state.age;
+      if (a) parts.push(`Age ${a}`);
+    }
+
+    if (parts.length > 0) {
+      return `— ${parts.join(" · ")}`;
+    }
+    return "— just getting started";
+  };
 
   const saveAnswer = (key: string, val: string) => {
     setUserAnswers((prev) => ({ ...prev, [key]: val }));
@@ -208,17 +336,17 @@ function QuestionsContent() {
 
   // Form State
   const [state, setState] = useState({
-    union: "no",
-    emptype: "regular",
-    signed: "no",
-    federal: "no",
+    union: "",
+    emptype: "",
+    signed: "",
+    federal: "",
     agreed: false,
-    province: "ON",
-    usState: "California",
-    age: "52",
-    years: "14",
-    salary: isCanada ? "110000" : "128000",
-    payroll: "unsure",
+    province: "",
+    usState: "",
+    age: "",
+    years: "",
+    salary: "",
+    payroll: "",
     roleFactor: 1.15,
     pay: {
       bonus: false,
@@ -227,14 +355,14 @@ function QuestionsContent() {
       commission: false,
       pto: false,
     } as Record<string, boolean>,
-    offer: 24000,
-    reemployed: "no",
-    clause: "unsure",
-    contract: "unsure",
-    reason: "layoff",
-    market: "mid",
-    redflag: "none",
-    groupLayoff: "yes",
+    offer: 0,
+    reemployed: "",
+    clause: "",
+    contract: "",
+    reason: "",
+    market: "",
+    redflag: "",
+    groupLayoff: "",
   });
 
   // Prefill from URL query params
@@ -250,17 +378,19 @@ function QuestionsContent() {
     const r = searchParams.get("role");
     const off = searchParams.get("offer");
 
-    setState((prev) => ({
-      ...prev,
-      province: p || prev.province,
-      usState: st || prev.usState,
-      years: y ? y.replace(/\D/g, "") : prev.years,
-      salary: s ? s.replace(/\D/g, "") : prev.salary,
-      age: a ? a.replace(/\D/g, "") : age40 === "yes" ? "52" : prev.age,
-      roleFactor: r ? parseFloat(r) : prev.roleFactor,
-      offer: off ? parseInt(off.replace(/\D/g, ""), 10) : prev.offer,
-      groupLayoff: grp || prev.groupLayoff,
-    }));
+    if (p || st || y || s || a || age40 || grp || r || off) {
+      setState((prev) => ({
+        ...prev,
+        ...(p ? { province: p } : {}),
+        ...(st ? { usState: st } : {}),
+        ...(y ? { years: y.replace(/\D/g, "") } : {}),
+        ...(s ? { salary: s.replace(/\D/g, "") } : {}),
+        ...(a ? { age: a.replace(/\D/g, "") } : age40 === "yes" ? { age: "52" } : {}),
+        ...(r ? { roleFactor: parseFloat(r) } : {}),
+        ...(off ? { offer: parseInt(off.replace(/\D/g, ""), 10) } : {}),
+        ...(grp ? { groupLayoff: grp } : {}),
+      }));
+    }
 
     const stepParam = searchParams.get("step");
     const loadingParam = searchParams.get("loading");
@@ -282,26 +412,20 @@ function QuestionsContent() {
       });
     } else if (stepParam === "union") {
       setCurrentStep("union");
-      saveAnswer("age", a || "52");
-      saveAnswer("years", y ? `${y} yrs` : "14 yrs");
-      saveAnswer(
-        "salary",
-        s ? `$${Math.round(parseFloat(s) / 1000)}k/yr` : "$110k/yr",
-      );
-      saveAnswer("offer", off ? `$${off}` : "$24k");
+      if (a) saveAnswer("age", a);
+      if (y) saveAnswer("years", `${y} yrs`);
+      if (s) saveAnswer("salary", `${Math.round(parseFloat(s) / 1000)}k/yr`);
+      if (off) saveAnswer("offer", `$${off}`);
     } else if (
       stepParam === "province-stop" ||
       stepParam === "stop" ||
       p === "OTHER"
     ) {
       setCurrentStep("province-stop");
-      saveAnswer("age", a || "52");
-      saveAnswer("years", y ? `${y} yrs` : "14 yrs");
-      saveAnswer(
-        "salary",
-        s ? `$${Math.round(parseFloat(s) / 1000)}k/yr` : "$110k/yr",
-      );
-      saveAnswer("offer", off ? `$${off}` : "$24k");
+      if (a) saveAnswer("age", a);
+      if (y) saveAnswer("years", `${y} yrs`);
+      if (s) saveAnswer("salary", `${Math.round(parseFloat(s) / 1000)}k/yr`);
+      if (off) saveAnswer("offer", `$${off}`);
     } else if (stepParam === "step-results" || stepParam === "results") {
       setCurrentStep("step-results");
       populateAllAnswers({
@@ -523,7 +647,10 @@ function QuestionsContent() {
   };
 
   const handleContinueFromQ4 = () => {
-    if (!state.agreed) return;
+    if (!state.agreed || !state.federal) return;
+    if (!userAnswers.federal) {
+      saveAnswer("federal", state.federal === "yes" ? "Yes" : "No");
+    }
     if (state.union === "yes") {
       setCurrentStep("union");
     } else {
@@ -581,7 +708,7 @@ function QuestionsContent() {
 
           <div className="flex items-center gap-5 sm:gap-6 ml-auto">
             <nav
-              className="hidden md:flex items-center gap-5 sm:gap-6 text-[13.5px] font-semibold text-[#5a6b78]"
+              className="hidden lg:flex items-center gap-5 sm:gap-6 text-[13.5px] font-semibold text-[#5a6b78]"
               aria-label="Site"
             >
               <NextLink
@@ -619,14 +746,14 @@ function QuestionsContent() {
             <button
               type="button"
               onClick={() => triggerGetApp()}
-              className="hidden md:inline-block text-[13px] font-bold text-[#0c8f72] hover:underline whitespace-nowrap cursor-pointer"
+              className="hidden lg:inline-block text-[13px] font-bold text-[#0c8f72] hover:underline whitespace-nowrap cursor-pointer"
             >
               Get the app
             </button>
             <button
               type="button"
               onClick={handleExit}
-              className="hidden md:inline-block text-[13px] font-semibold text-[#5a6b78] hover:text-[#062c55] transition-colors whitespace-nowrap cursor-pointer bg-transparent border-none p-0"
+              className="hidden lg:inline-block text-[13px] font-semibold text-[#5a6b78] hover:text-[#062c55] transition-colors whitespace-nowrap cursor-pointer bg-transparent border-none p-0"
             >
               Exit ✕
             </button>
@@ -634,8 +761,8 @@ function QuestionsContent() {
             {/* Mobile Your Details Trigger Button */}
             <button
               type="button"
-              onClick={() => setMobileSummOpen(true)}
-              className="md:hidden inline-flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-[#cfe8dd] bg-[#eef8f3] text-[13px] font-bold text-[#062c55] shadow-xs cursor-pointer"
+              onClick={() => setMobileSummOpen((prev) => !prev)}
+              className="lg:hidden inline-flex items-center gap-1.5 h-9 px-3 rounded-[10px] border border-[#cfe8dd] bg-[#eef8f3] text-[13px] font-bold text-[#062c55] shadow-xs cursor-pointer"
               aria-expanded={mobileSummOpen}
             >
               Your details
@@ -644,10 +771,10 @@ function QuestionsContent() {
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="2.5"
-                className="w-3.5 h-3.5 text-[#062c55]"
+                className={`w-3.5 h-3.5 text-[#062c55] transition-transform duration-200 ${mobileSummOpen ? "rotate-180" : ""}`}
               >
                 <path
-                  d="M6 9l6 6 6-6"
+                  d="M6 15l6-6 6 6"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
@@ -657,7 +784,7 @@ function QuestionsContent() {
             {/* Hamburger for mobile */}
             <button
               type="button"
-              className="md:hidden w-9 h-9 rounded-[10px] border border-[#d5dde4] bg-white text-[#062c55] flex items-center justify-center shadow-xs focus:outline-none cursor-pointer"
+              className="lg:hidden w-9 h-9 rounded-[10px] border border-[#d5dde4] bg-white text-[#062c55] flex items-center justify-center shadow-xs focus:outline-none cursor-pointer"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               aria-label="Toggle mobile menu"
             >
@@ -676,43 +803,43 @@ function QuestionsContent() {
 
         {/* Mobile Nav Dropdown */}
         {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-b border-[#e7e4dd] px-5 py-3 space-y-2 text-sm font-semibold text-[#5a6b78]">
+          <div className="lg:hidden bg-[#f6f4ef] border-b border-[#e7e4dd] px-5 py-2 text-sm font-bold text-[#062c55] animate-in fade-in">
             <NextLink
               href="/#how"
-              className="block py-1 hover:text-[#062c55]"
+              className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               How it works
             </NextLink>
             <NextLink
               href="/#paths"
-              className="block py-1 hover:text-[#062c55]"
+              className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               Pricing
             </NextLink>
             <NextLink
               href="/#faq"
-              className="block py-1 hover:text-[#062c55]"
+              className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               FAQ
             </NextLink>
             <NextLink
               href="/#why"
-              className="block py-1 hover:text-[#062c55]"
+              className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               Blog
             </NextLink>
             <NextLink
               href="/#about"
-              className="block py-1 hover:text-[#062c55]"
+              className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               About
             </NextLink>
-            <div className="pt-2 border-t border-[#e7e4dd] flex justify-between text-xs text-[#5a6b78]">
+            <div className="pt-3 pb-2 flex justify-between text-xs text-[#5a6b78]">
               <button
                 type="button"
                 onClick={() => {
@@ -735,14 +862,14 @@ function QuestionsContent() {
         )}
       </header>
 
-      {/* ── MOBILE SUMMARY BOTTOM SHEET ── */}
+      {/* ── MOBILE / TABLET SUMMARY BOTTOM SHEET ── */}
       {mobileSummOpen && (
         <>
           <div
-            className="md:hidden fixed inset-0 z-40 bg-[#062c55]/40 backdrop-blur-xs animate-scrimin"
+            className="lg:hidden fixed inset-0 z-[60] bg-[#062c55]/40 backdrop-blur-xs animate-scrimin"
             onClick={() => setMobileSummOpen(false)}
           />
-          <div className="md:hidden fixed inset-x-0 bottom-0 z-50 bg-[#EEF1F4] border-t border-[#e7e4dd] rounded-t-2xl p-5 pb-8 shadow-2xl max-h-[80vh] overflow-y-auto animate-dlgup">
+          <div className="lg:hidden fixed inset-x-0 bottom-0 z-[70] bg-[#EEF1F4] border-t border-[#e7e4dd] rounded-t-2xl sm:max-w-xl sm:mx-auto p-5 pb-8 shadow-2xl max-h-[80vh] overflow-y-auto animate-dlgup">
             <div className="flex items-center justify-between pb-3 border-b border-[#e7e4dd] mb-4">
               <div>
                 <span className="text-[10.5px] font-extrabold uppercase tracking-wider text-[#5a6b78]">
@@ -786,7 +913,7 @@ function QuestionsContent() {
 
             {/* Enough to show results banner (as in original) */}
             {Boolean(
-              (userAnswers["Years of service"] && userAnswers["Pay"]) ||
+              (userAnswers.years && userAnswers.salary) ||
               (state.years && state.salary) ||
               currentStep === "step-results",
             ) && (
@@ -799,7 +926,7 @@ function QuestionsContent() {
       )}
 
       {/* ── TWO COLUMN SHELL: MAIN (PROGRESS + CARD) + DESKTOP SIDEBAR ── */}
-      <div className="max-w-[1080px] mx-auto px-4 sm:px-5 pt-4">
+      <div className="max-w-[1080px] mx-auto px-4 sm:px-5 pt-4 pb-20 lg:pb-8">
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,720px)_320px] gap-8 justify-center items-start">
           {/* LEFT: MAIN WORKFLOW (PROGRESS + CARD) */}
           <div className="w-full">
@@ -848,11 +975,16 @@ function QuestionsContent() {
               </ol>
 
               {/* Progress bar track */}
-              <div className="h-1.5 bg-[#e9e5dc] rounded-full overflow-hidden relative mx-2">
+              <div className="h-1.5 bg-[#e9e5dc] rounded-full relative mx-2">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-[#0c8f72] to-[#0eb28d] transition-all duration-500 relative"
                   style={{ width: `${progressPercent}%` }}
-                />
+                >
+                  <span
+                    className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 rounded-full bg-[#0eb28d] border-2 border-white shadow-[0_1px_4px_rgba(6,44,85,0.25)] transition-all duration-500 pointer-events-none"
+                    aria-hidden="true"
+                  />
+                </div>
               </div>
 
               {/* Subheading row: Step label + Explain toggle */}
@@ -934,7 +1066,7 @@ function QuestionsContent() {
                     type="checkbox"
                     className="sr-only"
                     checked={explainOn}
-                    onChange={(e) => setExplainOn(e.target.checked)}
+                    onChange={(e) => handleToggleExplain(e.target.checked)}
                   />
                   <span
                     className={`w-9 h-5 rounded-full transition-colors relative ${
@@ -958,7 +1090,7 @@ function QuestionsContent() {
                 SCREEN 1 (QUESTION 1 OF 4): WERE YOU IN A UNION?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "q1" && (
-              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 4 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1094,6 +1226,7 @@ function QuestionsContent() {
                 <div className="mt-8 flex items-center justify-end">
                   <QuestionNextButton
                     onClick={() => {
+                      if (!state.union) return;
                       if (!userAnswers.union) {
                         saveAnswer(
                           "union",
@@ -1111,7 +1244,7 @@ function QuestionsContent() {
                 SCREEN 2 (QUESTION 2 OF 4): WHAT KIND OF ROLE WAS IT?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "q2" && (
-              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 4 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1242,6 +1375,7 @@ function QuestionsContent() {
                   <QuestionBackButton onClick={goToQ1} />
                   <QuestionNextButton
                     onClick={() => {
+                      if (!state.emptype) return;
                       if (!userAnswers.emptype) {
                         saveAnswer(
                           "emptype",
@@ -1259,7 +1393,7 @@ function QuestionsContent() {
                 SCREEN 3 (QUESTION 3 OF 4): HAVE YOU SIGNED ANYTHING YET?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "q3" && (
-              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 4 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1387,7 +1521,15 @@ function QuestionsContent() {
                 {/* Bottom Action Row: Back and Next buttons */}
                 <div className="mt-8 flex items-center justify-between">
                   <QuestionBackButton onClick={goToQ2} />
-                  <QuestionNextButton onClick={goToQ4} />
+                  <QuestionNextButton
+                    onClick={() => {
+                      if (!state.signed) return;
+                      if (!userAnswers.signed) {
+                        saveAnswer("signed", state.signed === "yes" ? "Yes" : "No");
+                      }
+                      goToQ4();
+                    }}
+                  />
                 </div>
               </div>
             )}
@@ -1396,7 +1538,7 @@ function QuestionsContent() {
                 SCREEN 4 (QUESTION 4 OF 4): WAS EMPLOYER FEDERALLY REGULATED?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "q4" && (
-              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="relative bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* 4 Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
@@ -1589,7 +1731,7 @@ function QuestionsContent() {
                 US SITUATION CARD (WHEN IN US MODE)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "us-situation" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 <div className="flex items-center gap-3 p-3 px-4 rounded-xl bg-gradient-to-r from-[#e6f8f1] to-[#f3faf6] border border-[#b9e6d4] shadow-[0_8px_24px_-16px_rgba(14,178,141,0.6)] mb-5">
                   <span className="w-7 h-7 rounded-full bg-[#0eb28d] text-white font-extrabold flex items-center justify-center shrink-0 shadow-[0_0_0_4px_rgba(14,178,141,0.18)] text-xs">
                     ✓
@@ -1646,7 +1788,7 @@ function QuestionsContent() {
                         onChange={(e) =>
                           setState({ ...state, age: e.target.value })
                         }
-                        className="w-full border border-[#cdd3d8] rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:border-[#0eb28d]"
+                        className="us-needs-input w-full rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none transition-colors placeholder:text-[#9aa3ab] text-[#17242f]"
                       />
                     </div>
                     <div>
@@ -1661,7 +1803,7 @@ function QuestionsContent() {
                         onChange={(e) =>
                           setState({ ...state, years: e.target.value })
                         }
-                        className="w-full border border-[#cdd3d8] rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:border-[#0eb28d]"
+                        className="us-needs-input w-full rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none transition-colors placeholder:text-[#9aa3ab] text-[#17242f]"
                       />
                     </div>
                   </div>
@@ -1678,7 +1820,7 @@ function QuestionsContent() {
                       onChange={(e) =>
                         setState({ ...state, salary: e.target.value })
                       }
-                      className="w-full border border-[#cdd3d8] rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:border-[#0eb28d]"
+                      className="us-needs-input w-full rounded-xl px-3.5 py-2.5 text-sm font-medium outline-none transition-colors placeholder:text-[#9aa3ab] text-[#17242f]"
                     />
                   </div>
 
@@ -1956,7 +2098,7 @@ function QuestionsContent() {
                 CANADA STEP 2 (QUESTION 1 OF 2): PAYROLL OVER $2.5M
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "basics-q1" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill Tag on left, 2 Dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2033,6 +2175,7 @@ function QuestionsContent() {
                           }}
                           className="w-full border border-[#cdd3d8] rounded-xl px-3 py-2 text-xs font-medium bg-white focus:outline-none focus:border-[#0eb28d]"
                         >
+                          <option value="">Select your province</option>
                           <option value="ON">Ontario</option>
                           <option value="BC">British Columbia</option>
                           <option value="AB">Alberta</option>
@@ -2051,10 +2194,18 @@ function QuestionsContent() {
                           inputMode="numeric"
                           value={state.age}
                           placeholder="52"
-                          onChange={(e) =>
-                            setState({ ...state, age: e.target.value })
-                          }
-                          className="w-full border border-[#cdd3d8] rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-[#0eb28d]"
+                          onChange={(e) => {
+                            setState({ ...state, age: e.target.value });
+                            if (fieldErrors.age) {
+                              setFieldErrors((prev) => ({ ...prev, age: false }));
+                              setErrorMessage("");
+                            }
+                          }}
+                          className={`ca-needs-input w-full rounded-xl px-3 py-2 text-xs font-medium outline-none transition-colors placeholder:text-[#9aa3ab] ${
+                            fieldErrors.age
+                              ? "ca-input-error text-[#c53030]"
+                              : "text-[#17242f]"
+                          }`}
                         />
                       </div>
                       <div>
@@ -2066,10 +2217,18 @@ function QuestionsContent() {
                           inputMode="numeric"
                           value={state.years}
                           placeholder="14"
-                          onChange={(e) =>
-                            setState({ ...state, years: e.target.value })
-                          }
-                          className="w-full border border-[#cdd3d8] rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-[#0eb28d]"
+                          onChange={(e) => {
+                            setState({ ...state, years: e.target.value });
+                            if (fieldErrors.years) {
+                              setFieldErrors((prev) => ({ ...prev, years: false }));
+                              setErrorMessage("");
+                            }
+                          }}
+                          className={`ca-needs-input w-full rounded-xl px-3 py-2 text-xs font-medium outline-none transition-colors placeholder:text-[#9aa3ab] ${
+                            fieldErrors.years
+                              ? "ca-input-error text-[#c53030]"
+                              : "text-[#17242f]"
+                          }`}
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -2081,12 +2240,29 @@ function QuestionsContent() {
                           inputMode="numeric"
                           value={state.salary}
                           placeholder="110000"
-                          onChange={(e) =>
-                            setState({ ...state, salary: e.target.value })
-                          }
-                          className="w-full border border-[#cdd3d8] rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-[#0eb28d]"
+                          onChange={(e) => {
+                            setState({ ...state, salary: e.target.value });
+                            if (fieldErrors.salary) {
+                              setFieldErrors((prev) => ({ ...prev, salary: false }));
+                              setErrorMessage("");
+                            }
+                          }}
+                          className={`ca-needs-input w-full rounded-xl px-3 py-2 text-xs font-medium outline-none transition-colors placeholder:text-[#9aa3ab] ${
+                            fieldErrors.salary
+                              ? "ca-input-error text-[#c53030]"
+                              : "text-[#17242f]"
+                          }`}
                         />
                       </div>
+
+                      {errorMessage && (
+                        <div className="sm:col-span-2 mt-1 text-xs font-bold text-[#e53e3e] flex items-center gap-1.5 animate-in fade-in">
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0 text-[#e53e3e]">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          <span>{errorMessage}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2161,11 +2337,37 @@ function QuestionsContent() {
                   </div>
                 </div>
 
+                {errorMessage && (
+                  <div className="mt-4 text-xs sm:text-[13px] font-bold text-[#e53e3e] flex items-center gap-1.5 animate-in fade-in">
+                    <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0 text-[#e53e3e]">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                    </svg>
+                    <span>{errorMessage}</span>
+                  </div>
+                )}
+
                 {/* Navigation Row */}
                 <div className="mt-8 flex items-center justify-between">
-                  <QuestionBackButton onClick={goToQ4} />
+                  <QuestionBackButton
+                    onClick={() => {
+                      setFieldErrors({});
+                      setErrorMessage("");
+                      goToQ4();
+                    }}
+                  />
                   <QuestionNextButton
                     onClick={() => {
+                      const validation = validateBasicsFields();
+                      if (!validation.isValid) {
+                        setEditingBasics(true);
+                        setFieldErrors(validation.errors);
+                        setErrorMessage(validation.message);
+                        return;
+                      }
+
+                      setFieldErrors({});
+                      setErrorMessage("");
+
                       if (state.province === "OTHER") {
                         saveAnswer("province", "Another province / U.S. state");
                         setCurrentStep("province-stop");
@@ -2198,7 +2400,7 @@ function QuestionsContent() {
                 CANADA STEP 2 (QUESTION 2 OF 2): ROLE / OCCUPATION
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "basics-q2" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill Tag on left, 2 Dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2275,6 +2477,7 @@ function QuestionsContent() {
                           }}
                           className="w-full border border-[#cdd3d8] rounded-xl px-3 py-2 text-xs font-medium bg-white focus:outline-none focus:border-[#0eb28d]"
                         >
+                          <option value="">Select your province</option>
                           <option value="ON">Ontario</option>
                           <option value="BC">British Columbia</option>
                           <option value="AB">Alberta</option>
@@ -2293,10 +2496,18 @@ function QuestionsContent() {
                           inputMode="numeric"
                           value={state.age}
                           placeholder="52"
-                          onChange={(e) =>
-                            setState({ ...state, age: e.target.value })
-                          }
-                          className="w-full border border-[#cdd3d8] rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-[#0eb28d]"
+                          onChange={(e) => {
+                            setState({ ...state, age: e.target.value });
+                            if (fieldErrors.age) {
+                              setFieldErrors((prev) => ({ ...prev, age: false }));
+                              setErrorMessage("");
+                            }
+                          }}
+                          className={`ca-needs-input w-full rounded-xl px-3 py-2 text-xs font-medium outline-none transition-colors placeholder:text-[#9aa3ab] ${
+                            fieldErrors.age
+                              ? "ca-input-error text-[#c53030]"
+                              : "text-[#17242f]"
+                          }`}
                         />
                       </div>
                       <div>
@@ -2308,10 +2519,18 @@ function QuestionsContent() {
                           inputMode="numeric"
                           value={state.years}
                           placeholder="14"
-                          onChange={(e) =>
-                            setState({ ...state, years: e.target.value })
-                          }
-                          className="w-full border border-[#cdd3d8] rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-[#0eb28d]"
+                          onChange={(e) => {
+                            setState({ ...state, years: e.target.value });
+                            if (fieldErrors.years) {
+                              setFieldErrors((prev) => ({ ...prev, years: false }));
+                              setErrorMessage("");
+                            }
+                          }}
+                          className={`ca-needs-input w-full rounded-xl px-3 py-2 text-xs font-medium outline-none transition-colors placeholder:text-[#9aa3ab] ${
+                            fieldErrors.years
+                              ? "ca-input-error text-[#c53030]"
+                              : "text-[#17242f]"
+                          }`}
                         />
                       </div>
                       <div className="sm:col-span-2">
@@ -2323,12 +2542,29 @@ function QuestionsContent() {
                           inputMode="numeric"
                           value={state.salary}
                           placeholder="110000"
-                          onChange={(e) =>
-                            setState({ ...state, salary: e.target.value })
-                          }
-                          className="w-full border border-[#cdd3d8] rounded-xl px-3 py-2 text-xs font-medium focus:outline-none focus:border-[#0eb28d]"
+                          onChange={(e) => {
+                            setState({ ...state, salary: e.target.value });
+                            if (fieldErrors.salary) {
+                              setFieldErrors((prev) => ({ ...prev, salary: false }));
+                              setErrorMessage("");
+                            }
+                          }}
+                          className={`ca-needs-input w-full rounded-xl px-3 py-2 text-xs font-medium outline-none transition-colors placeholder:text-[#9aa3ab] ${
+                            fieldErrors.salary
+                              ? "ca-input-error text-[#c53030]"
+                              : "text-[#17242f]"
+                          }`}
                         />
                       </div>
+
+                      {errorMessage && (
+                        <div className="sm:col-span-2 mt-1 text-xs font-bold text-[#e53e3e] flex items-center gap-1.5 animate-in fade-in">
+                          <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0 text-[#e53e3e]">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                          </svg>
+                          <span>{errorMessage}</span>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2362,9 +2598,20 @@ function QuestionsContent() {
 
                 {/* Navigation and Confirmation Row */}
                 <div className="mt-8">
+                  {errorMessage && (
+                    <div className="mb-3.5 text-xs sm:text-[13px] font-bold text-[#e53e3e] flex items-center gap-1.5 animate-in fade-in">
+                      <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0 text-[#e53e3e]">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between mb-3.5">
                     <QuestionBackButton
                       onClick={() => {
+                        setFieldErrors({});
+                        setErrorMessage("");
                         setCurrentStep("basics-q1");
                         window.scrollTo({ top: 0, behavior: "smooth" });
                       }}
@@ -2377,6 +2624,17 @@ function QuestionsContent() {
                   <button
                     type="button"
                     onClick={() => {
+                      const validation = validateBasicsFields();
+                      if (!validation.isValid) {
+                        setEditingBasics(true);
+                        setFieldErrors(validation.errors);
+                        setErrorMessage(validation.message);
+                        return;
+                      }
+
+                      setFieldErrors({});
+                      setErrorMessage("");
+
                       const occ =
                         OCCUPATIONS.find(
                           (o) => Math.abs(o.value - state.roleFactor) < 0.01,
@@ -2403,7 +2661,7 @@ function QuestionsContent() {
                 US STEP 2: THE LAYOFF (WHEN IN US MODE)
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "step-basics" && !isCanada && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 <span className="inline-block text-xs font-bold text-[#062c55] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full mb-3">
                   The layoff
                 </span>
@@ -2540,7 +2798,7 @@ function QuestionsContent() {
                 STEP 3 (QUESTION 1 OF 3): WHAT ELSE WERE YOU PAID?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "money-q1" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2662,7 +2920,7 @@ function QuestionsContent() {
                 STEP 3 (QUESTION 2 OF 3): WHAT ARE THEY OFFERING YOU?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "money-q2" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2716,6 +2974,10 @@ function QuestionsContent() {
                       const val = e.target.value.replace(/[^0-9]/g, "");
                       const num = val ? parseFloat(val) : 0;
                       setState({ ...state, offer: num });
+                      if (fieldErrors.offer) {
+                        setFieldErrors((prev) => ({ ...prev, offer: false }));
+                        setErrorMessage("");
+                      }
                       if (num > 0) {
                         saveAnswer(
                           "offer",
@@ -2725,20 +2987,42 @@ function QuestionsContent() {
                         saveAnswer("offer", "");
                       }
                     }}
-                    className="w-full border-[1.5px] border-[#0eb28d] rounded-xl px-4 py-3 text-sm font-medium text-[#17242f] bg-white focus:outline-none shadow-xs"
+                    className={`w-full border-[1.5px] rounded-xl px-4 py-3 text-sm font-medium bg-white focus:outline-none shadow-xs transition-colors ${
+                      fieldErrors.offer
+                        ? "ca-input-error border-[#e53e3e] bg-[#fff5f5] ring-2 ring-[#e53e3e]/20 text-[#c53030]"
+                        : "border-[#0eb28d] text-[#17242f]"
+                    }`}
                   />
+
+                  {errorMessage && (
+                    <div className="mt-3 text-xs sm:text-[13px] font-bold text-[#e53e3e] flex items-center gap-1.5 animate-in fade-in">
+                      <svg viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 shrink-0 text-[#e53e3e]">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      <span>{errorMessage}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Navigation Row */}
                 <div className="mt-8 flex items-center justify-between">
                   <QuestionBackButton
                     onClick={() => {
+                      setFieldErrors({});
+                      setErrorMessage("");
                       setCurrentStep("money-q1");
                       window.scrollTo({ top: 0, behavior: "smooth" });
                     }}
                   />
                   <QuestionNextButton
                     onClick={() => {
+                      if (state.offer !== undefined && state.offer !== null && state.offer < 0) {
+                        setFieldErrors({ offer: true });
+                        setErrorMessage("Severance offer cannot be negative.");
+                        return;
+                      }
+                      setFieldErrors({});
+                      setErrorMessage("");
                       if (state.offer) {
                         saveAnswer(
                           "offer",
@@ -2757,7 +3041,7 @@ function QuestionsContent() {
                 STEP 3 (QUESTION 3 OF 3): HAVE YOU ALREADY FOUND A NEW JOB?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "money-q3" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2866,7 +3150,7 @@ function QuestionsContent() {
                 STEP 4 (QUESTION 1 OF 2): DOES YOUR OFFER LIMIT YOU TO THE MINIMUM?
             ════════════════════════════════════════════════════════════════ */}
             {(currentStep === "clause-q1" || currentStep === "step-clause") && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 2 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -2961,7 +3245,7 @@ function QuestionsContent() {
                 STEP 4 (QUESTION 2 OF 2): DID YOU SIGN AN EMPLOYMENT CONTRACT?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "clause-q2" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 2 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -3078,7 +3362,7 @@ function QuestionsContent() {
             ════════════════════════════════════════════════════════════════ */}
             {(currentStep === "details-q1" ||
               currentStep === "step-details") && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -3190,7 +3474,7 @@ function QuestionsContent() {
                 STEP 5 (QUESTION 2 OF 3): HOW HARD WOULD IT BE TO FIND A SIMILAR JOB?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "details-q2" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -3291,7 +3575,7 @@ function QuestionsContent() {
                 STEP 5 (QUESTION 3 OF 3): ANYTHING ELSE YOU'D FLAG?
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "details-q3" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                 {/* Top Row: Pill tag on left, 3 dots on right */}
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <span className="inline-block text-xs font-semibold text-[#5a6b78] bg-white border border-[#e7e4dd] px-3 py-1 rounded-full">
@@ -3476,9 +3760,9 @@ function QuestionsContent() {
                 const offerPct = pct(offerAmt);
 
                 return (
-                  <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-5 sm:p-8 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+                  <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-7 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                     {/* ── VERDICT CARD (encompasses tag, title, reasons, estbox, and srcbadge) ── */}
-                    <div className="text-center p-5 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
+                    <div className="text-center p-4 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
                       <span className="text-[11.5px] font-extrabold uppercase tracking-[0.8px] text-[#0c8f72] block mb-1.5">
                         Often worth a closer look
                       </span>
@@ -3586,7 +3870,7 @@ function QuestionsContent() {
 
                         {/* Visual Range Bar Gauge (.rbar) */}
                         <div className="mt-4 max-w-[540px] mx-auto text-left bg-white border border-[#e7e4dd] rounded-[12px] p-4 pt-9">
-                          <div className="relative pb-1">
+                          <div className="relative pb-1 mx-2 sm:mx-3">
                             {/* Track */}
                             <div className="relative h-3 bg-[#eef1f4] rounded-full overflow-visible">
                               {/* Min Bar (Gray) */}
@@ -3739,7 +4023,7 @@ function QuestionsContent() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setInfoModal("report")}
+                          onClick={() => setReportPreviewOpen(true)}
                           className="w-full py-3 px-4 rounded-[9px] bg-[#062c55] hover:bg-[#041D38] text-white font-sans font-[800] text-[14px] leading-[20px] shadow-xs transition-all cursor-pointer text-center min-h-[50px] flex items-center justify-center"
                         >
                           Get my report
@@ -3892,7 +4176,7 @@ function QuestionsContent() {
 
               {/* Enough to show results banner (as in original) */}
               {Boolean(
-                (userAnswers["Years of service"] && userAnswers["Pay"]) ||
+                (userAnswers.years && userAnswers.salary) ||
                 (state.years && state.salary) ||
                 currentStep === "step-results",
               ) && (
@@ -4244,6 +4528,15 @@ function QuestionsContent() {
         </div>
       )}
 
+      {/* ── SEVERANCE REPORT PREVIEW MODAL ── */}
+      <SeveranceReportPreviewDialog
+        isOpen={reportPreviewOpen}
+        onClose={() => setReportPreviewOpen(false)}
+        country="CA"
+        isResultsPage={true}
+        onDownload={handleUnlockReport}
+      />
+
       {/* ── 3-POINT CHECKLIST MODAL (PHOTO 1 & PHOTO 4) ── */}
       <ChecklistModal
         isOpen={checklistModalOpen}
@@ -4260,6 +4553,43 @@ function QuestionsContent() {
         country="CA"
         regionName={state.province || "Ontario"}
       />
+
+      {/* ── STICKY BOTTOM BAR ("Your details — Ontario · 14 yrs [View]") ── */}
+      {currentStep !== "step-results" &&
+        currentStep !== "step-analyzing" &&
+        currentStep !== "union" && (
+          <div className="fixed left-3 right-3 bottom-3 z-40 block md:hidden animate-fade">
+            <button
+              type="button"
+              onClick={() => setMobileSummOpen((prev) => !prev)}
+              className="w-full bg-white border border-[#d5dde4] rounded-xl px-3.5 py-2.5 shadow-[0_10px_28px_-12px_rgba(6,44,85,0.35)] flex items-center gap-1.5 cursor-pointer text-left transition-all hover:border-[#0eb28d] active:scale-[0.99]"
+              aria-expanded={mobileSummOpen}
+              aria-controls="mobileSummary"
+            >
+              <span className="font-bold text-[13px] text-[#062c55] shrink-0">
+                Your details
+              </span>
+              <span className="text-[12.5px] text-[#5a6b78] font-medium truncate flex-1 min-w-0">
+                {getMobileSummarySnippet()}
+              </span>
+              <span className="shrink-0 inline-flex items-center gap-1 bg-[#0c8f72] text-white text-xs font-extrabold px-3 py-1.5 rounded-lg shadow-xs">
+                <span>{mobileSummOpen ? "Hide" : "View"}</span>
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${mobileSummOpen ? "rotate-180" : ""}`}
+                  aria-hidden="true"
+                >
+                  <path d="M6 15l6-6 6 6" />
+                </svg>
+              </span>
+            </button>
+          </div>
+        )}
     </div>
   );
 }
