@@ -98,7 +98,13 @@ export default function QuickCheckForm({ country }: QuickCheckFormProps) {
             <option value="ON">Ontario</option>
             <option value="BC">British Columbia</option>
             <option value="AB">Alberta</option>
-            <option value="OTHER">Another province / U.S. state</option>
+            <option value="SK">Saskatchewan</option>
+            <option value="MB">Manitoba</option>
+            <option value="NS">Nova Scotia</option>
+            <option value="NB">New Brunswick</option>
+            <option value="PE">Prince Edward Island</option>
+            <option value="NL">Newfoundland and Labrador</option>
+            <option value="OTHER">Quebec, a territory, or a U.S. state</option>
           </select>
 
           <div className="grid grid-cols-2 gap-2.5">
@@ -412,3 +418,4 @@ export default function QuickCheckForm({ country }: QuickCheckFormProps) {
     </div>
   );
 }
+

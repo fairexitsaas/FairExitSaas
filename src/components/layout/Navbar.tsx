@@ -24,52 +24,47 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
     e.preventDefault();
     setMobileMenuOpen(false);
 
-    if (href === "#how" || href === "#check") {
+    if (href === "#how" || href === "#check" || href === "/#how" || href === "/#check") {
       const targetId = isCanada ? "how" : "check";
       const el =
         document.getElementById(targetId) ||
         document.getElementById("how") ||
         document.getElementById("check");
-      el?.scrollIntoView({ behavior: "smooth" });
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      } else {
+        router.push(isCanada ? "/#how" : "/#check");
+      }
       return;
     }
 
-    if (href === "#paths") {
-      document.getElementById("paths")?.scrollIntoView({ behavior: "smooth" });
+    if (href === "#paths" || href === "/#paths") {
+      const el = document.getElementById("paths");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+      } else {
+        router.push("/#paths");
+      }
       return;
     }
 
-    if (href === "faq.html" || href === "#faq") {
-      document.getElementById("faq")?.scrollIntoView({ behavior: "smooth" });
+    if (href === "/faq" || href === "faq.html" || href === "#faq") {
+      router.push("/faq");
       return;
     }
 
-    if (href === "blog/index.html" || href.includes("blog")) {
-      const el = isCanada
-        ? document.getElementById("why")
-        : document.getElementById("states");
-      (
-        el ||
-        document.getElementById("why") ||
-        document.getElementById("states")
-      )?.scrollIntoView({ behavior: "smooth" });
+    if (href === "/blog" || href === "blog/index.html" || href.includes("blog")) {
+      router.push("/blog");
+      return;
+    }
+
+    if (href === "/about" || href === "about.html" || href === "#about") {
+      router.push("/about");
       return;
     }
 
     if (href === "#app") {
       triggerGetApp();
-      return;
-    }
-
-    if (href === "about.html" || href === "#about") {
-      const el = isCanada
-        ? document.getElementById("how")
-        : document.getElementById("about");
-      (
-        el ||
-        document.getElementById("how") ||
-        document.getElementById("about")
-      )?.scrollIntoView({ behavior: "smooth" });
       return;
     }
 
@@ -78,21 +73,18 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
       return;
     }
 
-    if (href === "#app") {
-      e.preventDefault();
-      setMobileMenuOpen(false);
-      triggerGetApp();
-      return;
-    }
-
     if (href.startsWith("#")) {
       const targetId = href.slice(1);
       const targetEl = document.getElementById(targetId);
       if (targetEl) {
         targetEl.scrollIntoView({ behavior: "smooth" });
+      } else {
+        router.push("/" + href);
       }
       return;
     }
+
+    router.push(href);
   };
 
   const handleToggleCountry = (e: React.MouseEvent) => {
@@ -182,32 +174,32 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
         <div className="hidden lg:flex items-center gap-3.5 xl:gap-5">
           <a
             className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
-            href={isCanada ? "#how" : "#check"}
+            href={isCanada ? "/#how" : "/#check"}
             onClick={(e) => handleNavLinkClick(isCanada ? "#how" : "#check", e)}
           >
             How it works
           </a>
           <a
             className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
-            href="#paths"
+            href="/#paths"
             onClick={(e) => handleNavLinkClick("#paths", e)}
           >
             Pricing
           </a>
-          <a
+          <Link
             className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
-            href="faq.html"
-            onClick={(e) => handleNavLinkClick("faq.html", e)}
+            href="/faq"
+            onClick={(e) => handleNavLinkClick("/faq", e)}
           >
             FAQ
-          </a>
-          <a
+          </Link>
+          <Link
             className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
-            href="blog/index.html"
-            onClick={(e) => handleNavLinkClick("blog/index.html", e)}
+            href="/blog"
+            onClick={(e) => handleNavLinkClick("/blog", e)}
           >
             Blog
-          </a>
+          </Link>
           <a
             className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
             href="#app"
@@ -215,13 +207,13 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
           >
             Get the app
           </a>
-          <a
+          <Link
             className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
-            href="about.html"
-            onClick={(e) => handleNavLinkClick("about.html", e)}
+            href="/about"
+            onClick={(e) => handleNavLinkClick("/about", e)}
           >
             About
-          </a>
+          </Link>
         </div>
 
         {/* Nav Right */}
@@ -246,13 +238,9 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
           </button>
 
           {/* Country Pill Switcher */}
-          <a
+          <button
+            type="button"
             className="inline-flex items-center gap-1.5 text-[12.5px] font-bold text-[#062c55] dark:text-[#f0f6fc] bg-[#eef4fa] dark:bg-[#0e2742] border border-[#d9e6f2] dark:border-[#1a4269] rounded-[6px] px-[11px] py-[5px] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#b0ccdf] dark:hover:border-[#0eb28d] transition-all no-underline"
-            href={
-              isCanada
-                ? "../resource-hub-us/index-v3.html"
-                : "../resource-hub-v2/index-v3.html"
-            }
             onClick={handleToggleCountry}
             title={
               isCanada
@@ -277,16 +265,16 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
                 {CaFlagSvg}
               </>
             )}
-          </a>
+          </button>
 
           {/* Primary CTA */}
-          <a
+          <Link
             className="inline-flex items-center justify-center gap-1.5 text-white px-3.5 sm:px-[22px] py-2 sm:py-[12px] rounded-[9px] font-bold text-[13.5px] sm:text-[15px] no-underline border-none cursor-pointer bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] hover:shadow-[0_14px_24px_-10px_rgba(12,143,114,0.65)] hover:-translate-y-px active:scale-[0.98] transition-all whitespace-nowrap"
-            href={isCanada ? "/questions" : "#check"}
+            href={isCanada ? "/questions" : "/#check"}
             onClick={handleCtaClick}
           >
             {isCanada ? "Check my offer →" : "Check my layoff →"}
-          </a>
+          </Link>
         </div>
 
         {/* Hamburger Trigger */}
@@ -309,32 +297,32 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
       >
         <a
           className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
-          href={isCanada ? "#how" : "#check"}
+          href={isCanada ? "/#how" : "/#check"}
           onClick={(e) => handleNavLinkClick(isCanada ? "#how" : "#check", e)}
         >
           How it works
         </a>
         <a
           className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
-          href="#paths"
+          href="/#paths"
           onClick={(e) => handleNavLinkClick("#paths", e)}
         >
           Pricing
         </a>
-        <a
+        <Link
           className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
-          href="faq.html"
-          onClick={(e) => handleNavLinkClick("faq.html", e)}
+          href="/faq"
+          onClick={(e) => handleNavLinkClick("/faq", e)}
         >
           FAQ
-        </a>
-        <a
+        </Link>
+        <Link
           className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
-          href="blog/index.html"
-          onClick={(e) => handleNavLinkClick("blog/index.html", e)}
+          href="/blog"
+          onClick={(e) => handleNavLinkClick("/blog", e)}
         >
           Blog
-        </a>
+        </Link>
         <a
           className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
           href="#app"
@@ -342,26 +330,22 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
         >
           Get the app
         </a>
-        <a
+        <Link
           className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
-          href="about.html"
-          onClick={(e) => handleNavLinkClick("about.html", e)}
+          href="/about"
+          onClick={(e) => handleNavLinkClick("/about", e)}
         >
           About
-        </a>
-        <a
-          className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
-          href={
-            isCanada
-              ? "../resource-hub-us/index-v3.html"
-              : "../resource-hub-v2/index-v3.html"
-          }
+        </Link>
+        <button
+          type="button"
+          className="text-left text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block bg-transparent border-none cursor-pointer p-0"
           onClick={handleToggleCountry}
         >
           {isCanada
             ? "Switch to the US site →"
             : "Switch to the Canadian site →"}
-        </a>
+        </button>
         <a
           className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
           href="#"
@@ -375,13 +359,13 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
           Accessibility options
         </a>
         <div className="pt-4 flex justify-start">
-          <a
+          <Link
             className="inline-flex items-center justify-center gap-1.5 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-[9px] font-bold text-[14.5px] sm:text-[15px] no-underline border-none cursor-pointer bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] active:scale-[0.98] transition-all whitespace-nowrap self-start"
-            href={isCanada ? "/questions" : "#check"}
+            href={isCanada ? "/questions" : "/#check"}
             onClick={handleCtaClick}
           >
             {isCanada ? "Check my offer →" : "Check my layoff →"}
-          </a>
+          </Link>
         </div>
       </div>
     </header>

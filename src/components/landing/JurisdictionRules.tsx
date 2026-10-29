@@ -1,117 +1,188 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { CountryCode } from "@/context/CountryContext";
 
 interface JurisdictionRulesProps {
   country: CountryCode;
 }
 
+const CANADA_PROVINCES = [
+  {
+    name: "Ontario",
+    desc: "Termination pay + severance pay · $2.5M payroll test · mass termination",
+    href: "/canada/ontario",
+    action: "Read the rules →",
+  },
+  {
+    name: "British Columbia",
+    desc: "8-week cap · 13-week temporary layoff · group notice",
+    href: "/canada/british-columbia",
+    action: "Read the rules →",
+  },
+  {
+    name: "Alberta",
+    desc: "Steps at 2/4/6/8/10 yrs · 90-day temporary layoff",
+    href: "/canada/alberta",
+    action: "Read the rules →",
+  },
+  {
+    name: "Federally regulated",
+    desc: "Banks, telecom, air, rail · notice + severance · unjust dismissal",
+    href: "/canada/federal",
+    action: "Read the rules →",
+  },
+  {
+    name: "Saskatchewan",
+    desc: "Notice after 13 weeks · 8-week cap · group rule starts at 25",
+    href: "/canada/severance-pay-saskatchewan",
+    action: "Read the rules →",
+  },
+  {
+    name: "Manitoba",
+    desc: "Notice from 30 days · 8-week cap · group notice up to 18 weeks",
+    href: "/canada/severance-pay-manitoba",
+    action: "Read the rules →",
+  },
+  {
+    name: "Nova Scotia",
+    desc: "8-week cap · just cause needed after 10 years",
+    href: "/canada/severance-pay-nova-scotia",
+    action: "Read the rules →",
+  },
+  {
+    name: "New Brunswick",
+    desc: "Two steps: 2 or 4 weeks · reasons in writing",
+    href: "/canada/severance-pay-new-brunswick",
+    action: "Read the rules →",
+  },
+  {
+    name: "Prince Edward Island",
+    desc: "New Act since June 30, 2026 · notice from 90 days",
+    href: "/canada/severance-pay-prince-edward-island",
+    action: "Read the rules →",
+  },
+  {
+    name: "Newfoundland & Labrador",
+    desc: "6-week cap, the lowest in Canada",
+    href: "/canada/severance-pay-newfoundland-and-labrador",
+    action: "Read the rules →",
+  },
+];
+
+const US_STATES = [
+  {
+    name: "California",
+    desc: "Cal-WARN at 75+ employees · non-competes void · final pay on your last day",
+    href: "/us/california",
+    action: "Read the rules →",
+  },
+  {
+    name: "New York",
+    desc: "90 days' notice · 50+ employees · 25+ laid off (a third of the site) triggers it",
+    href: "/us/new-york",
+    action: "Read the rules →",
+  },
+  {
+    name: "New Jersey",
+    desc: "Mandatory severance: a week per year · 90 days' notice",
+    href: "/us/new-jersey",
+    action: "Read the rules →",
+  },
+  {
+    name: "Illinois",
+    desc: "Illinois WARN at 75+ · non-competes void under $75k ($80k from Jan 2027)",
+    href: "/us/illinois",
+    action: "Read the rules →",
+  },
+  {
+    name: "Every state",
+    desc: "Final pay, unused vacation, unemployment and layoff-notice rules, one row per state",
+    href: "/questions",
+    action: "See all 50 →",
+  },
+];
+
 export default function JurisdictionRules({ country }: JurisdictionRulesProps) {
   const isCanada = country === "CA";
 
-  if (isCanada) {
-    return (
-      <section className="py-16 mx-auto" id="provinces">
-        <div className="wrap max-w-[1040px] mx-auto px-4 sm:px-6 w-full box-border">
-          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
-            Severance rules by province
-          </span>
-          <h2 className="font-serif text-[24px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] my-1.5 mb-2.5">
-            The law is provincial. So is our read.
-          </h2>
-          <p className="max-w-[640px] text-sm sm:text-[15px] text-slate leading-[1.55]">
-            Each page shows the legal minimum table, the one thing that province does differently, and three worked examples, all generated from the same rules engine as the free check.
-          </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-            <a className="flex flex-col gap-1.5 bg-card border border-line rounded-[14px] p-5 py-[18px] no-underline text-ink dark:text-white hover:border-green hover:-translate-y-0.5 transition-all shadow-xs group" href="#hero">
-              <b className="text-navy dark:text-white text-[15.5px] font-bold">Ontario</b>
-              <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Termination pay + severance pay · $2.5M payroll test · mass termination</span>
-              <i className="not-italic text-[12.5px] font-bold text-greend mt-2.5">Read the rules →</i>
-            </a>
-            <a className="flex flex-col gap-1.5 bg-card border border-line rounded-[14px] p-5 py-[18px] no-underline text-ink dark:text-white hover:border-green hover:-translate-y-0.5 transition-all shadow-xs group" href="#hero">
-              <b className="text-navy dark:text-white text-[15.5px] font-bold">British Columbia</b>
-              <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">8-week cap · 13-week temporary layoff · group notice</span>
-              <i className="not-italic text-[12.5px] font-bold text-greend mt-2.5">Read the rules →</i>
-            </a>
-            <a className="flex flex-col gap-1.5 bg-card border border-line rounded-[14px] p-5 py-[18px] no-underline text-ink dark:text-white hover:border-green hover:-translate-y-0.5 transition-all shadow-xs group" href="#hero">
-              <b className="text-navy dark:text-white text-[15.5px] font-bold">Alberta</b>
-              <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Steps at 2/4/6/8/10 yrs · 90-day temporary layoff</span>
-              <i className="not-italic text-[12.5px] font-bold text-greend mt-2.5">Read the rules →</i>
-            </a>
-            <a className="flex flex-col gap-1.5 bg-card border border-line rounded-[14px] p-5 py-[18px] no-underline text-ink dark:text-white hover:border-green hover:-translate-y-0.5 transition-all shadow-xs group" href="#hero">
-              <b className="text-navy dark:text-white text-[15.5px] font-bold">Federally regulated</b>
-              <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Banks, telecom, air, rail · notice + severance · unjust dismissal</span>
-              <i className="not-italic text-[12.5px] font-bold text-greend mt-2.5">Read the rules →</i>
-            </a>
-            <div className="flex flex-col gap-1.5 bg-transparent border border-dashed border-[#CBD5E1] dark:border-slate-700 rounded-[14px] p-5 py-[18px] text-ink dark:text-white shadow-xs">
-              <b className="text-navy dark:text-white text-[15.5px] font-bold">Quebec</b>
-              <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Civil-law regime · separate build</span>
-              <i className="not-italic text-[12.5px] font-semibold text-slate mt-2.5">In review</i>
-            </div>
-            <div className="flex flex-col gap-1.5 bg-transparent border border-dashed border-[#CBD5E1] dark:border-slate-700 rounded-[14px] p-5 py-[18px] text-ink dark:text-white shadow-xs">
-              <b className="text-navy dark:text-white text-[15.5px] font-bold">Manitoba · Saskatchewan</b>
-              <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Legal minimum tables being verified</span>
-              <i className="not-italic text-[12.5px] font-semibold text-slate mt-2.5">In review</i>
-            </div>
-            <div className="flex flex-col gap-1.5 bg-transparent border border-dashed border-[#CBD5E1] dark:border-slate-700 rounded-[14px] p-5 py-[18px] text-ink dark:text-white shadow-xs">
-              <b className="text-navy dark:text-white text-[15.5px] font-bold">Nova Scotia · New Brunswick</b>
-              <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Legal minimum tables being verified</span>
-              <i className="not-italic text-[12.5px] font-semibold text-slate mt-2.5">In review</i>
-            </div>
-            <div className="flex flex-col gap-1.5 bg-transparent border border-dashed border-[#CBD5E1] dark:border-slate-700 rounded-[14px] p-5 py-[18px] text-ink dark:text-white shadow-xs">
-              <b className="text-navy dark:text-white text-[15.5px] font-bold">PEI · Newfoundland &amp; Labrador</b>
-              <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Legal minimum tables being verified</span>
-              <i className="not-italic text-[12.5px] font-semibold text-slate mt-2.5">In review</i>
-            </div>
-          </div>
-          <p className="text-[13px] text-slate mt-3.5 leading-[1.5]">
-            We only publish a province once its table is verified against the official source. &quot;In review&quot; provinces can still use the free check; the read leans on court-awarded factors until the table is live.
-          </p>
-        </div>
-      </section>
-    );
-  }
-
   return (
-    <section className="py-16 mx-auto" id="states">
-      <div className="wrap max-w-[1040px] mx-auto px-4 sm:px-6 w-full box-border">
-        <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend">
-          Layoff rules by state
-        </span>
-        <h2 className="font-serif text-[24px] text-navy dark:text-white font-semibold leading-[1.1] tracking-[-0.5px] my-1.5 mb-2.5">
-          Federal law is the floor. Some states add more.
-        </h2>
-        <p className="max-w-[640px] text-sm sm:text-[15px] text-slate leading-[1.55]">
-          Most states rely on the federal rules alone. These four add their own notice, severance or non-compete rules, so each gets its own page: what the state requires, what&apos;s different, and the questions people ask.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
-          <a className="flex flex-col gap-1.5 bg-card border border-line rounded-[14px] p-5 py-[18px] no-underline text-ink dark:text-white hover:border-green hover:-translate-y-0.5 transition-all shadow-xs group" href="#hero">
-            <b className="text-navy dark:text-white text-[15.5px] font-bold">California</b>
-            <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Cal-WARN at 75+ employees · non-competes void · final pay on your last day</span>
-            <i className="not-italic text-[12.5px] font-bold text-greend mt-2.5">Read the rules →</i>
-          </a>
-          <a className="flex flex-col gap-1.5 bg-card border border-line rounded-[14px] p-5 py-[18px] no-underline text-ink dark:text-white hover:border-green hover:-translate-y-0.5 transition-all shadow-xs group" href="#hero">
-            <b className="text-navy dark:text-white text-[15.5px] font-bold">New York</b>
-            <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">90 days&apos; notice · 50+ employees · 25 laid off triggers it</span>
-            <i className="not-italic text-[12.5px] font-bold text-greend mt-2.5">Read the rules →</i>
-          </a>
-          <a className="flex flex-col gap-1.5 bg-card border border-line rounded-[14px] p-5 py-[18px] no-underline text-ink dark:text-white hover:border-green hover:-translate-y-0.5 transition-all shadow-xs group" href="#hero">
-            <b className="text-navy dark:text-white text-[15.5px] font-bold">New Jersey</b>
-            <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Mandatory severance: a week per year · 90 days&apos; notice</span>
-            <i className="not-italic text-[12.5px] font-bold text-greend mt-2.5">Read the rules →</i>
-          </a>
-          <a className="flex flex-col gap-1.5 bg-card border border-line rounded-[14px] p-5 py-[18px] no-underline text-ink dark:text-white hover:border-green hover:-translate-y-0.5 transition-all shadow-xs group" href="#hero">
-            <b className="text-navy dark:text-white text-[15.5px] font-bold">Illinois</b>
-            <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Illinois WARN at 75+ · non-competes void under $75k</span>
-            <i className="not-italic text-[12.5px] font-bold text-greend mt-2.5">Read the rules →</i>
-          </a>
-          <a className="flex flex-col gap-1.5 bg-card border border-line rounded-[14px] p-5 py-[18px] no-underline text-ink dark:text-white hover:border-green hover:-translate-y-0.5 transition-all shadow-xs group" href="#hero">
-            <b className="text-navy dark:text-white text-[15.5px] font-bold">Every state</b>
-            <span className="text-[12.5px] text-slate flex-1 leading-[1.45]">Final pay, unused vacation, unemployment and layoff-notice rules, one row per state</span>
-            <i className="not-italic text-[12.5px] font-bold text-greend mt-2.5">See all 50 →</i>
-          </a>
+    <section className="py-20 bg-[#F6F4EF] dark:bg-[#062C55] transition-colors" id="states">
+      <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Section Header */}
+        <div className="mb-6 sm:mb-8 text-left max-w-3xl">
+          <span className="inline-flex items-center text-xs font-extrabold uppercase tracking-[1.4px] text-greend dark:text-[#0EB28D]">
+            {isCanada ? "SEVERANCE RULES BY PROVINCE" : "LAYOFF RULES BY STATE"}
+          </span>
+          <h2 className="font-serif text-[26px] sm:text-[32px] text-navy dark:text-white font-semibold leading-[1.15] tracking-[-0.5px] mt-2 mb-2">
+            {isCanada
+              ? "The law is provincial. So is our read."
+              : "Federal law is the floor. Some states add more."}
+          </h2>
+          <p className="text-[15px] sm:text-base leading-[1.6] text-slate dark:text-[#9AB1C6]">
+            {isCanada
+              ? "Each page shows the legal minimum table, the one thing that province does differently, and three worked examples, all generated from the same rules engine as the free check."
+              : "Most states rely on the federal rules alone. These four add their own notice, severance or non-compete rules, so each gets its own page: what the state requires, what's different, and the questions people ask."}
+          </p>
         </div>
+
+        {/* Cards Grid */}
+        {isCanada ? (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              {CANADA_PROVINCES.map((p, idx) => (
+                <Link
+                  key={idx}
+                  href={p.href}
+                  className="group bg-white dark:bg-[#0D2238] rounded-xl p-5 border border-[#DFE3E8] dark:border-[#1E3B5C] hover:border-[#0EB28D] transition-all flex flex-col justify-between shadow-2xs hover:shadow-sm"
+                >
+                  <div>
+                    <h3 className="font-bold text-[16px] text-[#062C55] dark:text-white group-hover:text-[#0EB28D] transition-colors mb-2">
+                      {p.name}
+                    </h3>
+                    <p className="text-[13px] text-[#5A6B7D] dark:text-[#9AB1C6] leading-relaxed mb-6">
+                      {p.desc}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center text-[13px] font-bold text-[#0C8F72] dark:text-[#0EB28D] group-hover:text-[#0a755d] transition-colors pt-2">
+                    <span>{p.action}</span>
+                  </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Footnote for Canada */}
+            <p className="text-[12px] text-[#5A6B7D] dark:text-[#8EA5B8] leading-relaxed">
+              Every province page is checked against the official source. FairExit does not cover Quebec or the territories.
+            </p>
+          </>
+        ) : (
+          /* US Grid: 3 columns matching Figma */
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {US_STATES.map((s, idx) => (
+              <Link
+                key={idx}
+                href={s.href}
+                className="group bg-white dark:bg-[#0D2238] rounded-xl p-6 border border-[#DFE3E8] dark:border-[#1E3B5C] hover:border-[#0EB28D] transition-all flex flex-col justify-between shadow-2xs hover:shadow-sm"
+              >
+                <div>
+                  <h3 className="font-bold text-[17px] text-[#062C55] dark:text-white group-hover:text-[#0EB28D] transition-colors mb-2">
+                    {s.name}
+                  </h3>
+                  <p className="text-[13.5px] text-[#5A6B7D] dark:text-[#9AB1C6] leading-relaxed mb-6">
+                    {s.desc}
+                  </p>
+                </div>
+
+                <div className="flex items-center text-[13px] font-bold text-[#0C8F72] dark:text-[#0EB28D] group-hover:text-[#0a755d] transition-colors pt-2">
+                  <span>{s.action}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </section>
   );
