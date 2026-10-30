@@ -1,13 +1,21 @@
 "use client";
 
-import React, { useContext } from "react";
+import React, { useContext, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import FloatingActions from "@/components/landing/FloatingActions";
 import { CountryContext, CountryCode } from "@/context/CountryContext";
 
-export default function LegalPage() {
+function LegalContent() {
   const context = useContext(CountryContext);
-  const currentCountry: CountryCode = context?.Country || "CA";
+  const searchParams = useSearchParams();
+  const urlCountry = searchParams?.get("country")?.toUpperCase();
+
+  const currentCountry: CountryCode =
+    urlCountry === "US" || urlCountry === "CA"
+      ? (urlCountry as CountryCode)
+      : context?.Country || "CA";
+
   const isCanada = currentCountry === "CA";
 
   const handleCountrySwitch = (nextCountry: CountryCode) => {
@@ -304,7 +312,7 @@ export default function LegalPage() {
                 and questions you might choose to ask.
               </p>
               <p className="mb-2">FairExit does <b>not</b>:</p>
-              <ul className="list-disc pl-5 space-y-1 my-3">
+              <ul className="list-disc pl-5 space-y-1.5 my-3">
                 <li>tell you whether your offer is fair, or what you are legally owed;</li>
                 <li>determine whether your employer complied with any law;</li>
                 <li>decide whether any term or release is valid or enforceable;</li>
@@ -336,10 +344,10 @@ export default function LegalPage() {
                 3. Jurisdiction and scope
               </h2>
               <p>
-                FairExit covers the US federal rules (such as the ADEA/OWBPA and the WARN Act) in every
-                state, and publishes state-specific information pages for selected states. Where FairExit
-                has no state page, the check uses the federal rules only and says so; your state and
-                local laws may add requirements, and rules differ by situation.
+                Any general information refers to <b>US federal rules only</b>; your state and local
+                laws may add requirements FairExit does not cover, and rules differ by situation.
+                FairExit does not currently provide reviewed, state-specific public resources — where
+                those aren&apos;t available, you&apos;ll be told so.
               </p>
             </section>
 
@@ -349,26 +357,26 @@ export default function LegalPage() {
                 4. How we make money
               </h2>
               <p>
-                The free check is free. The Severance Report is a one-time paid purchase. When you
-                choose to be connected with an employment attorney, participating attorneys may pay
-                FairExit a <b>flat advertising / lead-generation fee</b> — never a percentage of any
-                recovery and never a cut of your outcome. FairExit is not a lawyer referral service in
-                the sense of recommending a specific attorney based on the merits of your matter; you
-                always choose whether and with whom to speak. Attorneys are responsible for their own
-                compliance with their state bar&apos;s advertising rules.
+                FairExit is free for people reviewing an offer. When you choose to be connected with
+                an employment attorney, participating attorneys may pay FairExit a{" "}
+                <b>flat advertising / lead-generation fee</b> — never a percentage of any recovery and
+                never a cut of your outcome. FairExit is not a lawyer referral service in the sense of
+                recommending a specific attorney based on the merits of your matter; you always choose
+                whether and with whom to speak. Attorneys are responsible for their own compliance with
+                their state bar&apos;s advertising rules.
               </p>
             </section>
 
-            {/* 5. Connecting with an attorney */}
+            {/* 5. No attorney network yet */}
             <section>
               <h2 className="font-serif font-semibold text-[21px] text-[#062C55] dark:text-white mb-2">
-                5. Connecting with an attorney
+                5. No attorney network yet
               </h2>
               <p>
-                If you ask to talk to an attorney, our team looks for an employment attorney licensed
-                in your state and we usually get back to you within 2 business days. Your documents and
-                your report are never sent to the attorney. The attorney decides whether to offer a
-                consultation, and you decide whether to go further.
+                FairExit is a pre-launch concept. We are still building our attorney network, and
+                features such as document upload, automated extraction, payments, and connecting you
+                with an attorney are <b>not yet live</b>. Where a feature isn&apos;t active, the product
+                will say so.
               </p>
             </section>
 
@@ -378,11 +386,17 @@ export default function LegalPage() {
                 6. Privacy &amp; your information
               </h2>
               <p className="mb-3">
-                We collect only what&apos;s needed; we ask for your explicit consent before sharing
-                anything with a third party (such as an attorney); we tell you below what is kept and
-                for how long; and we honor applicable privacy rights, including for California residents
-                under the CCPA/CPRA (access, deletion, correction, and opt-out). Employment documents
-                can be sensitive — only share what you&apos;re authorized to share.
+                In this preview, <b>no documents are uploaded or processed</b> — the flow uses sample
+                data to demonstrate the experience.
+              </p>
+              <p className="mb-4">
+                When features go live, we intend to: collect only what&apos;s needed; obtain your
+                explicit consent before sharing anything with a third party (such as an attorney); tell
+                you what is retained and for how long; and honor applicable privacy rights, including
+                for California residents under the CCPA/CPRA (access, deletion, and opt-out). We will
+                publish the specific data-processing, retention, and third-party details before those
+                features are enabled. Employment documents can be sensitive — only share what
+                you&apos;re authorized to share.
               </p>
 
               <div className="bg-white dark:bg-[#0D2238] border border-[#E2DDD2] dark:border-[#1E3B5C] border-l-4 border-l-[#10B48F] rounded-[12px] p-4 sm:p-5 my-4">
@@ -394,28 +408,26 @@ export default function LegalPage() {
                 </p>
                 <ol className="list-decimal pl-5 space-y-2 text-[14px] text-[#12202E] dark:text-[#D3E2EF] leading-[1.55]">
                   <li>
-                    <b>We don&apos;t keep your documents.</b> Your separation agreement and offer
-                    letter or employment contract are used only to build your report. They are deleted
-                    automatically <b>30 days after your report is ready</b>. You can delete them sooner
-                    at any time.
+                    <b>We don&apos;t keep your documents.</b> Your severance letter and employment
+                    contract are used only to build your report. They are deleted automatically{" "}
+                    <b>30 days after your report is ready</b>. You can delete them sooner at any time.
                   </li>
                   <li>
                     <b>We don&apos;t sell your information,</b> and we don&apos;t use your documents to
                     train AI models.
                   </li>
                   <li>
-                    <b>What we collect:</b> your answers, the documents you upload, your email, and a
-                    record that you paid. We never see your card number; the payment processor handles
-                    cards. Only if you ask for an attorney and agree, we also collect your name, email,
-                    phone and a short summary of your answers.
+                    <b>What we keep:</b> your answers to the free check (no name needed), the email
+                    you give us for your receipt and report, and a record that you paid. Card or
+                    app-store payment details stay with the payment provider; we never see them.
                   </li>
                   <li>
                     <b>No account needed.</b> If you save your offer to an account in the app, you can
                     delete it and everything in it from Settings.
                   </li>
                   <li>
-                    <b>Attorney requests are opt-in.</b> Nothing goes to an attorney unless you ask us
-                    to connect you and tick the consent box.
+                    <b>Lawyer requests are opt-in.</b> Nothing goes to an attorney unless you ask us to
+                    connect you and tick the consent box.
                   </li>
                   <li>
                     <b>What an attorney receives if you ask:</b> your name, email and phone; your
@@ -428,7 +440,7 @@ export default function LegalPage() {
                     them to see either, you share it yourself.
                   </li>
                   <li>
-                    <b>Attorney request details are deleted 12 months after the request closes.</b>
+                    <b>Lawyer request details are deleted 12 months after the request closes.</b>
                   </li>
                   <li>
                     <b>How we&apos;re paid:</b> Attorneys pay FairExit a flat advertising fee. It never
@@ -464,8 +476,11 @@ export default function LegalPage() {
                 8. Governing law
               </h2>
               <p>
-                These terms are governed by the laws of the State of Delaware and the federal laws of
-                the United States applicable therein, without regard to conflict-of-laws rules.
+                These terms are governed by the laws of the Province of Ontario, Canada, where
+                FairExit&apos;s founders operate, without regard to conflict-of-laws rules.{" "}
+                <span className="text-[#5A6B7D] dark:text-[#8EA5B8]">
+                  [To be confirmed with counsel for US operation.]
+                </span>
               </p>
             </section>
 
@@ -486,7 +501,7 @@ export default function LegalPage() {
         <footer className="border-t border-[#DFE3E8] dark:border-[#1E3B5C] pt-4 mt-10 text-[12px] text-[#5A6B7D] dark:text-[#8EA5B8] leading-relaxed flex flex-wrap items-center gap-x-2 gap-y-1">
           <span>
             FairExit {isCanada ? "Canada" : "US"} · Educational and organizational information only,
-            not legal advice. Not a law firm; no lawyer-client relationship. ·
+            not legal advice. Not a law firm; {isCanada ? "no lawyer-client relationship." : "no attorney-client relationship."} ·
           </span>
           <Link
             href="/"
@@ -517,5 +532,19 @@ export default function LegalPage() {
 
       <FloatingActions />
     </div>
+  );
+}
+
+export default function LegalPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#F6F4EF] dark:bg-[#062C55] flex items-center justify-center">
+          <div className="w-8 h-8 border-4 border-[#0C8F72] border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <LegalContent />
+    </Suspense>
   );
 }

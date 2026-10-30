@@ -1,15 +1,23 @@
 "use client";
 
-import React, { useContext } from "react";
+import React, { useContext, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import FloatingActions from "@/components/landing/FloatingActions";
 import { CountryContext, CountryCode } from "@/context/CountryContext";
 
-export default function AboutPage() {
+function AboutContent() {
   const context = useContext(CountryContext);
-  const currentCountry: CountryCode = context?.Country || "CA";
+  const searchParams = useSearchParams();
+  const urlCountry = searchParams?.get("country")?.toUpperCase();
+
+  const currentCountry: CountryCode =
+    urlCountry === "US" || urlCountry === "CA"
+      ? (urlCountry as CountryCode)
+      : context?.Country || "CA";
+
   const isCanada = currentCountry === "CA";
 
   const handleCountrySwitch = (nextCountry: CountryCode) => {
@@ -47,16 +55,28 @@ export default function AboutPage() {
               <b className="font-bold text-[#062c55] dark:text-white">Sign here.</b>{" "}
               Then: pack up your things and go.
             </p>
-            <p className="text-base sm:text-[17px] text-[#17242f] dark:text-[#d3e2ef] leading-[1.75] mb-5">
-              What nobody prepares you for is everything that hits at once — the anger, the
-              guilt, the fear, the sadness, all in the same breath, and usually all at
-              the same time. The relationships you spent years building turn awkward
-              overnight. People you used to talk to every day don&apos;t know what to say,
-              so they say nothing. You feel isolated in a way that&apos;s hard to put into
-              words, and it doesn&apos;t leave when you clear your desk. It lingers. For a
-              long time. It becomes a quiet kind of trauma you don&apos;t know how to talk
-              about, so you don&apos;t.
-            </p>
+            {isCanada ? (
+              <p className="text-base sm:text-[17px] text-[#17242f] dark:text-[#d3e2ef] leading-[1.75] mb-5">
+                What nobody prepares you for is everything that hits at once — the anger, the
+                guilt, the fear, the sadness, all in the same breath, and usually all at
+                the same time. The relationships you spent years building turn awkward
+                overnight. People you used to talk to every day don&apos;t know what to say,
+                so they say nothing. You feel isolated in a way that&apos;s hard to put into
+                words, and it doesn&apos;t leave when you clear your desk. It lingers. For a
+                long time. It becomes a quiet kind of trauma you don&apos;t know how to talk
+                about, so you don&apos;t.
+              </p>
+            ) : (
+              <p className="text-base sm:text-[17px] text-[#17242f] dark:text-[#d3e2ef] leading-[1.75] mb-5">
+                What nobody prepares you for is everything that hits at once — the anger, the
+                guilt, the fear, the sadness, all in the same breath. The relationships you spent
+                years building turn awkward overnight. People you used to talk to every day
+                don&apos;t know what to say, so they say nothing. You feel isolated in a way
+                that&apos;s hard to put into words, and it doesn&apos;t leave when you clear your
+                desk. It lingers. It becomes a quiet kind of trauma you don&apos;t know how to
+                talk about, so you don&apos;t.
+              </p>
+            )}
 
             {/* Pull Quote */}
             <div className="border-l-4 border-[#0eb28d] pl-5 sm:pl-6 py-2 my-8 font-serif text-xl sm:text-2xl text-[#062c55] dark:text-[#7ff0cf] leading-[1.35]">
@@ -64,25 +84,51 @@ export default function AboutPage() {
               sign — quickly.
             </div>
 
-            <p className="text-base sm:text-[17px] text-[#17242f] dark:text-[#d3e2ef] leading-[1.75] mb-5">
-              What no one tells you is that the number on that page is rarely the whole
-              story — and that you have{" "}
-              <em className="text-[#0c8f72] dark:text-[#0eb28d] italic font-semibold">
-                options
-              </em>
-              . I didn&apos;t know that. Most people don&apos;t. You just assume the paper
-              in front of you is the deal, and the only choice is where to sign.
-            </p>
+            {isCanada ? (
+              <p className="text-base sm:text-[17px] text-[#17242f] dark:text-[#d3e2ef] leading-[1.75] mb-5">
+                What no one tells you is that the number on that page is rarely the whole
+                story — and that you have{" "}
+                <em className="text-[#0c8f72] dark:text-[#0eb28d] italic font-semibold">
+                  options
+                </em>
+                . I didn&apos;t know that. Most people don&apos;t. You just assume the paper
+                in front of you is the deal, and the only choice is where to sign.
+              </p>
+            ) : (
+              <p className="text-base sm:text-[17px] text-[#17242f] dark:text-[#d3e2ef] leading-[1.75] mb-5">
+                Here&apos;s what no one tells you in the US: even though the law doesn&apos;t set a
+                severance amount, your employer still has{" "}
+                <em className="text-[#0c8f72] dark:text-[#0eb28d] italic font-semibold">
+                  rules
+                </em>{" "}
+                they have to follow — how much notice may be required on a big layoff, the language
+                a release needs when you&apos;re 40 or older, your right to time to decide and to
+                change your mind. Whether any of it applies to you is worth understanding — it&apos;s
+                the first thing an attorney checks. I didn&apos;t know that. Most people don&apos;t.
+                You just assume the paper in front of you is the deal, and the only choice is where to sign.
+              </p>
+            )}
+
             <p className="font-serif text-xl sm:text-[22px] text-[#062c55] dark:text-white leading-[1.4] mb-5">
               That&apos;s the moment FairExit is built for.
             </p>
-            <p className="text-base sm:text-[17px] text-[#17242f] dark:text-[#d3e2ef] leading-[1.75]">
-              Not to hold your hand, and not to give you legal advice — I&apos;m not a
-              lawyer, and this isn&apos;t legal advice. But to help you understand, in
-              plain English, what your severance might really be worth and what your choices
-              actually are. So the next person who gets handed that folder walks in
-              knowing they have room to think.
-            </p>
+
+            {isCanada ? (
+              <p className="text-base sm:text-[17px] text-[#17242f] dark:text-[#d3e2ef] leading-[1.75]">
+                Not to hold your hand, and not to give you legal advice — I&apos;m not a
+                lawyer, and this isn&apos;t legal advice. But to help you understand, in
+                plain English, what your severance might really be worth and what your choices
+                actually are. So the next person who gets handed that folder walks in
+                knowing they have room to think.
+              </p>
+            ) : (
+              <p className="text-base sm:text-[17px] text-[#17242f] dark:text-[#d3e2ef] leading-[1.75]">
+                Not to hold your hand, and not to give you legal advice — I&apos;m not a
+                lawyer, and this isn&apos;t legal advice. But to help you make sense of it,
+                in plain English — the rules that may apply and what your choices actually are.
+                So the next person who gets handed that folder walks in knowing they have room to think.
+              </p>
+            )}
           </div>
         </section>
 
@@ -92,12 +138,14 @@ export default function AboutPage() {
             What we built
           </span>
           <h2 className="font-serif font-semibold text-2xl sm:text-[32px] text-[#062c55] dark:text-white leading-tight mb-3">
-            Three honest options — and the clarity to choose.
+            {isCanada
+              ? "Three honest options — and the clarity to choose."
+              : "A clear read — and the clarity to choose."}
           </h2>
           <p className="text-base sm:text-[17px] text-[#5a6b78] dark:text-[#9ab1c6] max-w-[660px] leading-relaxed mb-8">
-            We built an intelligence system around the right questions and the real factors
-            that decide these cases, so you can see what challenging your severance could
-            look like down each path.
+            {isCanada
+              ? "We built an intelligence system around the right questions and the real factors that decide these cases, so you can see what challenging your severance could look like down each path."
+              : "We built an AI system informed by the federal rules that often matter in these situations — OWBPA and the WARN Act — so you can understand what may apply and what each path looks like from here. It doesn't decide your case; an attorney does."}
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 mb-8">
@@ -110,8 +158,9 @@ export default function AboutPage() {
                 Sign it
               </h3>
               <p className="text-sm text-[#5a6b78] dark:text-[#9ab1c6] leading-relaxed">
-                Sometimes the offer really is fair. We&apos;ll help you see if that&apos;s
-                you — so you sign with confidence, not pressure.
+                {isCanada
+                  ? "Sometimes the offer really is fair. We'll help you see if that's you — so you sign with confidence, not pressure."
+                  : "Sometimes they did everything right. We'll help you see if that's you — so you sign with confidence, not pressure."}
               </p>
             </div>
 
@@ -121,11 +170,12 @@ export default function AboutPage() {
                 Option 2
               </div>
               <h3 className="font-serif font-semibold text-lg sm:text-[19px] text-[#062c55] dark:text-white mb-2">
-                Negotiate it yourself
+                {isCanada ? "Negotiate it yourself" : "Organize it yourself"}
               </h3>
               <p className="text-sm text-[#5a6b78] dark:text-[#9ab1c6] leading-relaxed">
-                With a little help — the weak spots, a script, your likely number —
-                plenty of people ask for more on their own.
+                {isCanada
+                  ? "With a little help — the weak spots, a script, your likely number — plenty of people ask for more on their own."
+                  : "Your offer organized, with the rules that may apply explained and questions to prepare — plenty of people raise it on their own."}
               </p>
             </div>
 
@@ -135,11 +185,12 @@ export default function AboutPage() {
                 Option 3
               </div>
               <h3 className="font-serif font-semibold text-lg sm:text-[19px] text-[#062c55] dark:text-white mb-2">
-                Hand it to a {isCanada ? "lawyer" : "attorney"}
+                {isCanada ? "Hand it to a lawyer" : "Talk to an attorney"}
               </h3>
               <p className="text-sm text-[#5a6b78] dark:text-[#9ab1c6] leading-relaxed">
-                Often the biggest return. We connect you to the right employment{" "}
-                {isCanada ? "lawyer" : "attorney"}, and the first call is free.
+                {isCanada
+                  ? "Often the biggest return. We connect you to the right employment lawyer, and the first call is free."
+                  : "Often the biggest return. We connect you to the right employment attorney, and the first call is free."}
               </p>
             </div>
           </div>
@@ -221,7 +272,7 @@ export default function AboutPage() {
               </p>
             </div>
             <Link
-              href="/questions"
+              href={isCanada ? "/questions" : "/questions?country=US"}
               className="w-full sm:w-auto text-center font-extrabold text-[15px] px-6 py-3 rounded-lg bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] text-white shadow-md hover:brightness-105 active:scale-95 transition-all whitespace-nowrap"
             >
               {isCanada ? "Check my offer →" : "Check my layoff →"}
@@ -236,3 +287,10 @@ export default function AboutPage() {
   );
 }
 
+export default function AboutPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f6f4ef] dark:bg-[#062c55]" />}>
+      <AboutContent />
+    </Suspense>
+  );
+}

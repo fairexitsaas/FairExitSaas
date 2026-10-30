@@ -247,6 +247,12 @@ export default function Footer({
               >
                 For individuals →
               </Link>
+              <Link
+                href="/attorneys"
+                className="hover:text-[#062c55] dark:hover:text-white transition-colors no-underline whitespace-nowrap"
+              >
+                🇺🇸 US attorney page →
+              </Link>
             </div>
           </div>
         </div>
@@ -422,7 +428,7 @@ export default function Footer({
                       About
                     </Link>
                     <Link
-                      href="/lawyers"
+                      href="/attorneys"
                       className="text-slate hover:text-navy dark:hover:text-white transition-colors no-underline whitespace-nowrap"
                     >
                       Are you an attorney? →
