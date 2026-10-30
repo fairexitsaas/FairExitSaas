@@ -7,18 +7,24 @@ export async function updateSession(request: NextRequest) {
   })
 
   const FALLBACK_URL = 'https://kvqxcidparapfarxdbzo.supabase.co'
-  const FALLBACK_KEY = 'sb_publishable_Q3vRwcgSoY0k_5JRLbPmFw_sX-YlXMq'
+  const FALLBACK_KEY =
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt2cXhjaWRwYXJhcGZhcnhkYnpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE3OTMwMzAsImV4cCI6MjEwNzM2OTAzMH0.r7gJ0cMlEjygr1N1v2ABPSpieRjgD3ATk0PUEkQGXSc'
 
   const supabaseUrl =
     (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_URL.trim() !== '')
       ? process.env.NEXT_PUBLIC_SUPABASE_URL.trim()
-      : FALLBACK_URL
+      : (process.env.SUPABASE_URL && process.env.SUPABASE_URL.trim() !== '')
+        ? process.env.SUPABASE_URL.trim()
+        : FALLBACK_URL
+
   const supabaseAnonKey =
     (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.trim() !== '')
       ? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY.trim()
-      : (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.trim() !== '')
-        ? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.trim()
-        : FALLBACK_KEY
+      : (process.env.SUPABASE_ANON_KEY && process.env.SUPABASE_ANON_KEY.trim() !== '')
+        ? process.env.SUPABASE_ANON_KEY.trim()
+        : (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.trim() !== '')
+          ? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY.trim()
+          : FALLBACK_KEY
 
   const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -55,10 +61,10 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Redirect authenticated users away from auth pages to dashboard
+  // Redirect authenticated users away from auth pages to home
   if (user && isAuthPath) {
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = '/'
     return NextResponse.redirect(url)
   }
 

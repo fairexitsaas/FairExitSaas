@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { backendAuth } from '@/lib/api/auth'
 
 export default function LogoutButton() {
   const router = useRouter()
@@ -12,6 +13,20 @@ export default function LogoutButton() {
     setLoading(true)
     try {
       const supabase = createClient()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+
+      // Notify backend if access token is present
+      if (session?.access_token) {
+        try {
+          await backendAuth.logout(session.access_token)
+        } catch (backendErr) {
+          console.warn('Backend logout call skipped/warned:', backendErr)
+        }
+      }
+
+      // Invalidate local session & cookies
       await supabase.auth.signOut()
     } catch (err) {
       console.error('Logout error:', err)

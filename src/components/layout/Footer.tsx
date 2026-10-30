@@ -158,9 +158,16 @@ export default function Footer({
                 <button
                   type="button"
                   onClick={handleCountryToggle}
-                  className="text-left font-normal text-[#5a6b78] dark:text-[#9ab1c6] hover:text-[#062c55] dark:hover:text-white bg-transparent border-none p-0 cursor-pointer text-inherit whitespace-nowrap"
+                  className="text-left font-normal text-[#5a6b78] dark:text-[#9ab1c6] hover:text-[#062c55] dark:hover:text-white bg-transparent border-none p-0 cursor-pointer text-inherit whitespace-nowrap inline-flex items-center gap-1.5"
                 >
-                  🇨🇦 In Canada? →
+                  <Image
+                    src="/flag-ca.svg"
+                    alt="Canada"
+                    width={16}
+                    height={11}
+                    className="w-4 h-[11px] object-cover rounded-[2px] shrink-0 inline-block"
+                  />
+                  <span>In Canada? →</span>
                 </button>
               )}
             </div>
@@ -422,17 +429,25 @@ export default function Footer({
                       FAQ
                     </Link>
                     <Link
-                      href="/about"
+                      href="/legal"
                       className="hover:text-navy dark:hover:text-white transition-colors no-underline whitespace-nowrap"
                     >
-                      About
+                      Legal, terms &amp; privacy
                     </Link>
-                    <Link
-                      href="/attorneys"
-                      className="text-slate hover:text-navy dark:hover:text-white transition-colors no-underline whitespace-nowrap"
+                    <button
+                      type="button"
+                      onClick={handleCountryToggle}
+                      className="text-left font-normal text-slate hover:text-navy dark:hover:text-white bg-transparent border-none p-0 cursor-pointer text-inherit whitespace-nowrap inline-flex items-center gap-1.5"
                     >
-                      Are you an attorney? →
-                    </Link>
+                      <Image
+                        src="/flag-ca.svg"
+                        alt="Canada"
+                        width={16}
+                        height={11}
+                        className="w-4 h-[11px] object-cover rounded-[2px] shrink-0 inline-block"
+                      />
+                      <span>In Canada? →</span>
+                    </button>
                   </>
                 )}
               </div>
@@ -479,24 +494,17 @@ export default function Footer({
                       Pricing
                     </a>
                     <Link
-                      href="/blog"
+                      href="/about"
                       className="hover:text-navy dark:hover:text-white transition-colors no-underline whitespace-nowrap"
                     >
-                      Blog
+                      About
                     </Link>
                     <Link
-                      href="/legal"
-                      className="hover:text-navy dark:hover:text-white transition-colors no-underline whitespace-nowrap"
+                      href="/attorneys"
+                      className="text-slate hover:text-navy dark:hover:text-white transition-colors no-underline whitespace-nowrap"
                     >
-                      Legal, terms &amp; privacy
+                      Are you an attorney? →
                     </Link>
-                    <button
-                      type="button"
-                      onClick={handleCountryToggle}
-                      className="text-left font-normal text-slate hover:text-navy dark:hover:text-white bg-transparent border-none p-0 cursor-pointer text-inherit whitespace-nowrap"
-                    >
-                      🇨🇦 In Canada? →
-                    </button>
                   </>
                 )}
               </div>

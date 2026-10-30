@@ -20,6 +20,7 @@ export default function GoogleSignInButton({
     setLoading(true)
 
     try {
+      // Must use createClient (createBrowserClient) so @supabase/ssr writes the PKCE code-verifier cookie
       const supabase = createClient()
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -32,7 +33,7 @@ export default function GoogleSignInButton({
         onError?.(error.message)
         setLoading(false)
       }
-      // If successful, browser redirects to the Google OAuth consent screen
+      // If successful, browser automatically redirects to the Google OAuth consent screen
     } catch (err: unknown) {
       if (err instanceof Error) {
         onError?.(err.message)

@@ -5,21 +5,22 @@ import { isSupabaseConfigured } from '@/lib/supabase/client'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
-  const next = requestUrl.searchParams.get('next') ?? '/dashboard'
+  const next = requestUrl.searchParams.get('next') ?? '/'
   // Prevent open redirect attacks by ensuring the destination is a safe relative path
   const isSafeRedirect = next.startsWith('/') && !next.startsWith('//')
-  const safeRedirectTarget = isSafeRedirect ? next : '/dashboard'
+  const safeRedirectTarget = isSafeRedirect ? next : '/'
 
   const authError = requestUrl.searchParams.get('error')
   const errorDescription = requestUrl.searchParams.get('error_description')
 
   // Handle OAuth provider error responses (e.g. user cancelled prompt)
   if (errorDescription || authError) {
+    console.error('OAuth provider callback error:', { authError, errorDescription })
     const errorUrl = new URL('/login', requestUrl.origin)
     const displayMsg =
       errorDescription ||
       (authError === 'access_denied'
-        ? 'Google sign-in was cancelled.'
+        ? 'Sign-in was cancelled.'
         : authError) ||
       'Authentication failed'
     errorUrl.searchParams.set('error', displayMsg)
@@ -28,6 +29,7 @@ export async function GET(request: Request) {
 
   if (code) {
     if (!isSupabaseConfigured()) {
+      console.error('Supabase is not configured in auth callback')
       const errorUrl = new URL('/login', requestUrl.origin)
       errorUrl.searchParams.set(
         'error',
@@ -53,13 +55,15 @@ export async function GET(request: Request) {
         }
       }
 
+      console.error('exchangeCodeForSession returned error:', error.message)
       const errorUrl = new URL('/login', requestUrl.origin)
       errorUrl.searchParams.set(
         'error',
         error.message || 'Unable to exchange authentication code.'
       )
       return NextResponse.redirect(errorUrl)
-    } catch {
+    } catch (err: unknown) {
+      console.error('Exception in auth callback code exchange:', err)
       const errorUrl = new URL('/login', requestUrl.origin)
       errorUrl.searchParams.set(
         'error',
@@ -70,5 +74,6 @@ export async function GET(request: Request) {
   }
 
   // If no auth code was provided, redirect to login
+  console.warn('Auth callback invoked without code parameter:', requestUrl.search)
   return NextResponse.redirect(new URL('/login', requestUrl.origin))
 }

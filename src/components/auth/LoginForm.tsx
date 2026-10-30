@@ -4,12 +4,14 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
+import { backendAuth } from '@/lib/api/auth'
 import GoogleSignInButton from './GoogleSignInButton'
+import AppleSignInButton from './AppleSignInButton'
 
 export default function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || '/dashboard'
+  const redirectTo = searchParams.get('redirectTo') || '/'
   const initialError = searchParams.get('error')
 
   const [email, setEmail] = useState('')
@@ -32,38 +34,34 @@ export default function LoginForm() {
     setLoading(true)
 
     try {
-      const supabase = createClient()
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      })
+      const trimmedEmail = email.trim()
 
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          setErrorMessage('Invalid email or password. Please try again.')
-        } else if (error.message.includes('Email not confirmed')) {
-          setErrorMessage('Please check your email and confirm your account before logging in.')
-        } else {
-          setErrorMessage(error.message)
-        }
-        setLoading(false)
-        return
-      }
+      // 1. Process login through Backend REST API
+      const backendRes = await backendAuth.login(trimmedEmail, password)
 
-      if (data.session) {
+      // 2. Synchronize session with Supabase client (for Next.js cookies & middleware)
+      if (backendRes?.session?.accessToken && backendRes?.session?.refreshToken) {
+        const supabase = createClient()
+        await supabase.auth.setSession({
+          access_token: backendRes.session.accessToken,
+          refresh_token: backendRes.session.refreshToken,
+        })
+
         const destination =
           redirectTo.startsWith('/') && !redirectTo.startsWith('//')
             ? redirectTo
-            : '/dashboard'
+            : '/'
         router.push(destination)
         router.refresh()
+        console.log("Login success");
+        return
       }
+
+      setErrorMessage('Could not establish user session.')
+      setLoading(false)
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setErrorMessage(err.message)
-      } else {
-        setErrorMessage('An unexpected error occurred. Please try again.')
-      }
+      const msg = err instanceof Error ? err.message : 'Invalid login credentials'
+      setErrorMessage(msg)
       setLoading(false)
     }
   }
@@ -99,8 +97,12 @@ export default function LoginForm() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         <GoogleSignInButton
+          onError={(err) => setErrorMessage(err)}
+          disabled={loading}
+        />
+        <AppleSignInButton
           onError={(err) => setErrorMessage(err)}
           disabled={loading}
         />
@@ -147,6 +149,12 @@ export default function LoginForm() {
             >
               Password
             </label>
+            <Link
+              href="/login#forgot-password"
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+            >
+              Forgot password?
+            </Link>
           </div>
           <div className="relative mt-1">
             <input
@@ -164,8 +172,7 @@ export default function LoginForm() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              tabIndex={-1}
-              className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 focus:outline-none"
               aria-label={showPassword ? 'Hide password' : 'Show password'}
             >
               {showPassword ? (
