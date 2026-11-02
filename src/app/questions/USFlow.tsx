@@ -7,6 +7,7 @@ import { QuestionBackButton, QuestionNextButton } from "@/components/common/Ques
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import { saveFreeCheck } from "@/lib/api/fairexit";
+import { saveReportInputs } from "@/lib/report-storage";
 import { useRouter } from "next/navigation";
 import SeveranceReportPreviewDialog from "@/components/dialogs/SeveranceReportPreviewDialog";
 import { triggerGetApp } from "@/context/GetAppContext";
@@ -108,7 +109,13 @@ export default function USFlow() {
   const caseSaving = React.useRef<Promise<string> | null>(null);
   const ensureCase = (latest?: Record<string, unknown>) => {
     if (!caseSaving.current) {
-      caseSaving.current = saveFreeCheck("US", latest || (state as unknown as Record<string, unknown>))
+      const payload: Record<string, unknown> = {
+        ...state,
+        usState: state.usState || "California",
+        state: state.usState || "California",
+        ...(latest || {}),
+      };
+      caseSaving.current = saveFreeCheck("US", payload)
         .then((id) => { setCaseId(id); return id; })
         .catch((err) => { caseSaving.current = null; throw err; });
     }
@@ -119,12 +126,50 @@ export default function USFlow() {
   const handleUnlockReport = async () => {
     setCheckoutState("verifying");
     try {
-      const id = caseId || (await ensureCase());
-      router.push(`/report?case=${id}`);
+      saveReportInputs({
+        country: "US",
+        state: state.usState || "California",
+        provinceName: state.usState || "California",
+        age: Number(state.age) || 52,
+        years: Number(state.years) || 9,
+        salary: Number(state.salary) || 128000,
+        offer: Number(state.offer) || 22000,
+        role: "Middle management / Senior / Director",
+        union: state.union === "yes" ? "Yes" : state.union === "no" ? "No" : "Not sure",
+        employment: "Regular employee",
+        payroll: state.empsize === "big" ? "100+" : state.empsize === "small" ? "Under 100" : "Not sure",
+        otherPay: compList.length > 0 ? compList.join(", ") : "None",
+        newJob: state.reemployed === "yes" ? "Yes" : state.reemployed === "no" ? "No" : "Not yet",
+        minClause: state.clause === "yes" ? "Yes" : "No",
+        contract: state.contract || "Signed · role changed",
+        howEnded: endedMap[state.ended] || state.reason || "Laid off",
+        market: state.market || "Some",
+        flagged: state.redflag || "Nothing unusual",
+        statutoryMin: 0,
+        courtAwardLow: 45000,
+        courtAwardHigh: 85000,
+        noticeWeeks: 0,
+        courtMonths: "3–6 mo",
+        signByDays: state.deadline === "21" ? "21 days" : state.deadline === "45" ? "45 days" : "Under 21 days",
+        fullState: state,
+      });
+
+      let id = caseId;
+      try {
+        id = id || (await ensureCase());
+      } catch (e) {
+        console.warn("Could not save to remote backend, continuing with local data", e);
+      }
+      if (id) {
+        router.push(`/report?case=${id}&step=pay`);
+      } else {
+        router.push("/report?step=pay");
+      }
     } catch (err) {
-      console.error("FairExit: could not save the free check", err);
+      console.error("FairExit: could not transition to report", err);
+      router.push("/report?step=pay");
+    } finally {
       setCheckoutState("idle");
-      alert("We couldn't reach FairExit right now. Please try again in a moment.");
     }
   };
 
@@ -3228,7 +3273,7 @@ export default function USFlow() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => setReportPreviewOpen(true)}
+                      onClick={handleUnlockReport}
                       className={`w-full py-3 px-4 rounded-[9px] ${
                         isReportUnlocked
                           ? "bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] text-white animate-ckglow"

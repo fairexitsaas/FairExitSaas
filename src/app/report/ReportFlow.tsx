@@ -1,4 +1,5 @@
 "use client";
+"use client";
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -6,6 +7,12 @@ import NextLink from "next/link";
 import { useSearchParams } from "next/navigation";
 import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
+import ReportSalesPage from "@/components/report/ReportSalesPage";
+import ReportUploadPage from "@/components/report/ReportUploadPage";
+import ReadingLetterPage from "@/components/report/reading/ReadingLetterPage";
+import CanadaReviewPage from "@/components/report/ca/CanadaReviewPage";
+import USReviewPage from "@/components/report/us/USReviewPage";
+import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 
 /* ── palette (same tokens as the prototype) ── */
 const C = {
@@ -125,22 +132,120 @@ export default function ReportFlow() {
     return () => clearInterval(t);
   }, [cs, refresh]);
 
-  const step = view || cs?.nextStep;
+  const urlStep = sp?.get("step");
+  const step = view || urlStep || cs?.nextStep;
   const country = cs?.country || "CA";
   const words = cs?.jurisdiction?.words || (country === "US"
     ? { lawyer: "attorney", region: "state", letter: "separation agreement", contract: "offer letter or employment contract" }
     : { lawyer: "lawyer", region: "province", letter: "severance letter", contract: "employment contract" });
 
-  if (!caseId) {
+  const handlePaySuccess = async (newCaseId?: string) => {
+    const id = newCaseId || caseId;
+    if (id) {
+      setCaseId(id);
+      try {
+        const c = await fairexit.getCase(id);
+        setCs(c);
+      } catch (e) {
+        console.warn("Could not load case", e);
+      }
+    }
+    setView("upload");
+  };
+
+  // If jurisdiction is genuinely not covered (e.g. Quebec), show the not covered screen
+  if (cs && !cs.covered && (cs.answers?.province === "QC" || cs.answers?.province === "Quebec")) {
     return (
-      <Shell>
-        <H1>We couldn&apos;t find your report</H1>
-        <p className="text-[#5a6b78] mb-4">Start with the free check, or open the private link from your email.</p>
-        <NextLink href="/questions" className="text-[#0c8f72] font-bold underline">Start the free check →</NextLink>
-      </Shell>
+      <div className="min-h-screen bg-[#F6F4EF] flex items-center justify-center p-4">
+        <div className="bg-white border border-[#E7E4DD] rounded-2xl p-8 max-w-[500px] text-center shadow-lg">
+          <h1 className="font-serif text-[28px] text-[#062C55] font-semibold mb-3">Not covered yet</h1>
+          <p className="text-[#5A6B78] text-[15px] leading-relaxed mb-6">
+            FairExit doesn&apos;t cover {cs.freeResult?.name || "Quebec"} yet. We currently support Canadian common-law provinces and all 50 US states.
+          </p>
+          <NextLink
+            href="/"
+            className="inline-block px-6 py-3 rounded-xl bg-[#0EB28D] text-white font-bold text-[14px] hover:bg-[#0C8F72] transition"
+          >
+            Back to home
+          </NextLink>
+        </div>
+      </div>
     );
   }
-  if (!cs) return <Shell>{error ? <ErrorBox text={error} /> : <Spinner text="Loading…" />}</Shell>;
+
+  // Allow post-pay steps (upload, reading, review, ready) directly during testing
+  const isPostPayStep = step === "upload" || view === "upload" || step === "reading" || view === "reading" || step === "review" || view === "review" || step === "ready" || view === "ready";
+  if ((urlStep === "pay" || step === "pay" || !cs || !cs.paid) && !isPostPayStep) {
+    return (
+      <ReportSalesPage
+        caseId={caseId}
+        cs={cs}
+        cfg={cfg}
+        onPaySuccess={handlePaySuccess}
+      />
+    );
+  }
+
+  // If on upload step (post payment), show the Figma 1200px/390px upload screen
+  if (step === "upload" || view === "upload") {
+    return (
+      <ReportUploadPage
+        caseId={caseId}
+        cs={cs}
+        onContinue={async () => {
+          setView("reading");
+        }}
+      />
+    );
+  }
+
+  // Loading / Reading state after submission (COMMON / Reading your letter)
+  if (step === "reading" || view === "reading") {
+    return (
+      <ReadingLetterPage
+        caseId={caseId}
+        cs={cs}
+        onDone={() => {
+          setView("review");
+        }}
+      />
+    );
+  }
+
+  // Country-specific flow after reading state
+  if (step === "review" || view === "review") {
+    if (country === "US") {
+      return (
+        <USReviewPage
+          caseId={caseId}
+          cs={cs}
+          onContinue={() => {
+            setView("ready");
+            refresh();
+          }}
+        />
+      );
+    }
+    return (
+      <CanadaReviewPage
+        caseId={caseId}
+        cs={cs}
+        onContinue={() => {
+          setView("ready");
+        }}
+      />
+    );
+  }
+
+  // Report Ready state (COMMON / Paid · report ready (PDF))
+  if (step === "ready" || view === "ready") {
+    return (
+      <PaidReportReadyPage
+        caseId={caseId}
+        cs={cs}
+        />
+    );
+  }
 
   return (
     <Shell rail={step}>
@@ -159,17 +264,17 @@ export default function ReportFlow() {
         <Card><Kicker>Step 4 of 4</Kicker><H1>Building your report…</H1><Spinner text="This takes a minute or two." />
           <p className="text-[13px] text-[#5a6b78] mt-3">We&apos;ll also email it to {cs.email || "you"}.</p></Card>
       )}
-      {step === "ready" && <ReadyStep cs={cs} caseId={caseId} words={words} onLawyer={() => setLawyerOpen(true)} />}
+      {step === "ready" && <ReadyStep cs={cs} caseId={caseId || cs.id || ""} words={words} onLawyer={() => setLawyerOpen(true)} />}
       {cs.status === "failed" && (
         <Card className="mt-4" style={{ borderLeft: `4px solid ${C.red}` }}>
           <b className="text-[#062c55]">{cs.statusDetail === "build_failed" ? "We couldn't build your report." : "We couldn't read your documents."}</b>
           <p className="text-[13.5px] text-[#5a6b78] mt-1">
             {cs.statusDetail === "build_failed" ? "Your confirmed details are saved. Try again below." : "Add a clearer copy (a PDF or a flat, well-lit photo) and try again."}
           </p>
-          {cs.statusDetail === "build_failed" && <Btn className="mt-3" onClick={async () => { try { await fairexit.buildReport(caseId); await refresh(); } catch (e) { setError(errText(e)); } }}>Try again</Btn>}
+          {cs.statusDetail === "build_failed" && <Btn className="mt-3" onClick={async () => { try { if (caseId || cs.id) await fairexit.buildReport(caseId || cs.id); await refresh(); } catch (e) { setError(errText(e)); } }}>Try again</Btn>}
         </Card>
       )}
-      <AskLawyerModal isOpen={lawyerOpen} onClose={() => setLawyerOpen(false)} country={country} regionName={cs.jurisdiction?.name} caseId={caseId} />
+      <AskLawyerModal isOpen={lawyerOpen} onClose={() => setLawyerOpen(false)} country={country} regionName={cs.jurisdiction?.name} caseId={caseId || undefined} />
     </Shell>
   );
 }

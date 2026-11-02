@@ -8,6 +8,7 @@ import { QuestionBackButton, QuestionNextButton } from "@/components/common/Ques
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import { saveFreeCheck } from "@/lib/api/fairexit";
+import { saveReportInputs } from "@/lib/report-storage";
 import SeveranceReportPreviewDialog from "@/components/dialogs/SeveranceReportPreviewDialog";
 import { triggerGetApp } from "@/context/GetAppContext";
 import { useAccessibility } from "@/context/AccessibilityContext";
@@ -215,7 +216,13 @@ function QuestionsContent() {
   const caseSaving = React.useRef<Promise<string> | null>(null);
   const ensureCase = (latest?: Record<string, unknown>) => {
     if (!caseSaving.current) {
-      caseSaving.current = saveFreeCheck("CA", latest || (state as unknown as Record<string, unknown>))
+      const prov = state.province && state.province !== "OTHER" && state.province !== "Other" ? state.province : "ON";
+      const payload: Record<string, unknown> = {
+        ...state,
+        province: prov,
+        ...(latest || {}),
+      };
+      caseSaving.current = saveFreeCheck("CA", payload)
         .then((id) => { setCaseId(id); return id; })
         .catch((err) => { caseSaving.current = null; throw err; });
     }
@@ -226,12 +233,76 @@ function QuestionsContent() {
   const handleUnlockReport = async () => {
     setCheckoutState("verifying");
     try {
-      const id = caseId || (await ensureCase());
-      router.push(`/report?case=${id}`);
+      let est: any = null;
+      try {
+        const ageNum = parseInt(state.age, 10) || 52;
+        const yrsNum = parseFloat(state.years) || 14;
+        const salNum = parseFloat(state.salary) || 110000;
+        est = estimate("CA-" + (state.province || "ON"), {
+          age: ageNum,
+          years: yrsNum,
+          salary: salNum,
+          roleFactor: state.roleFactor || 1.15,
+          payrollGlobal: state.payroll === "yes" ? 3000000 : 0,
+        });
+      } catch {}
+      const provName = {
+        ON: "Ontario",
+        BC: "British Columbia",
+        AB: "Alberta",
+        NS: "Nova Scotia",
+        QC: "Quebec",
+        MB: "Manitoba",
+        SK: "Saskatchewan",
+        NB: "New Brunswick",
+        NL: "Newfoundland and Labrador",
+        PE: "Prince Edward Island",
+      }[state.province] || state.province || "Ontario";
+
+      saveReportInputs({
+        country: "CA",
+        province: state.province || "ON",
+        provinceName: provName,
+        age: Number(state.age) || 52,
+        years: Number(state.years) || 14,
+        salary: Number(state.salary) || 110000,
+        offer: Number(state.offer) || 24000,
+        role: userAnswers.role || "Middle management / Senior / Director",
+        union: state.union === "yes" ? "Yes" : "No",
+        employment: state.emptype || "Regular employee",
+        payroll: state.payroll === "yes" ? "Yes (≥ $2.5M)" : state.payroll === "no" ? "No" : "Not sure",
+        otherPay: Object.entries(state.pay || {}).filter(([, v]) => v).map(([k]) => k).join(", ") || "None",
+        newJob: state.reemployed === "yes" ? "Yes" : state.reemployed === "no" ? "No" : "Not yet",
+        minClause: state.clause === "yes" ? "Yes" : "No",
+        contract: state.contract || "Signed · role changed",
+        howEnded: state.reason || "Laid off",
+        market: state.market || "Some",
+        flagged: state.redflag || "Nothing unusual",
+        statutoryMin: est?.statutory?.amount || 17000,
+        courtAwardLow: est?.commonLaw?.lowAmount || 138000,
+        courtAwardHigh: est?.commonLaw?.highAmount || 193000,
+        noticeWeeks: est?.statutory?.weeks || 8,
+        courtMonths: est?.commonLaw ? `${est.commonLaw.lowMonths}–${est.commonLaw.highMonths} mo` : "15–21 mo",
+        userAnswers,
+        fullState: state,
+      });
+
+      let id = caseId;
+      try {
+        id = id || (await ensureCase());
+      } catch (e) {
+        console.warn("Could not save to remote backend, continuing with local data", e);
+      }
+      if (id) {
+        router.push(`/report?case=${id}&step=pay`);
+      } else {
+        router.push("/report?step=pay");
+      }
     } catch (err) {
-      console.error("FairExit: could not save the free check", err);
+      console.error("FairExit: could not transition to report", err);
+      router.push("/report?step=pay");
+    } finally {
       setCheckoutState("idle");
-      alert("We couldn't reach FairExit right now. Please try again in a moment.");
     }
   };
 
@@ -4040,7 +4111,7 @@ function QuestionsContent() {
                         </div>
                         <button
                           type="button"
-                          onClick={() => setReportPreviewOpen(true)}
+                          onClick={handleUnlockReport}
                           className="w-full py-3 px-4 rounded-[9px] bg-[#062c55] hover:bg-[#041D38] text-white font-sans font-[800] text-[14px] leading-[20px] shadow-xs transition-all cursor-pointer text-center min-h-[50px] flex items-center justify-center"
                         >
                           Get my report
