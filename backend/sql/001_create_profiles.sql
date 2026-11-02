@@ -22,52 +22,56 @@ CREATE INDEX IF NOT EXISTS idx_profiles_email ON public.profiles(email);
 -- 3. Enable Row Level Security (RLS)
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
--- 4. RLS Policies
--- Drop existing policies if re-running
+-- 4. Role helpers (SECURITY DEFINER so policies never query profiles under RLS -> no recursion)
+CREATE OR REPLACE FUNCTION public.is_admin(uid UUID DEFAULT auth.uid())
+RETURNS BOOLEAN
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT EXISTS (SELECT 1 FROM public.profiles WHERE id = uid AND role = 'ADMIN');
+$$;
+
+CREATE OR REPLACE FUNCTION public.current_role_of(uid UUID)
+RETURNS TEXT
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT role FROM public.profiles WHERE id = uid;
+$$;
+
+-- 5. RLS Policies (drop old ones first; safe to re-run)
 DROP POLICY IF EXISTS "Users can view own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can update own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
 DROP POLICY IF EXISTS "Admins can update all profiles" ON public.profiles;
 
--- Allow users to view their own profile
 CREATE POLICY "Users can view own profile"
-  ON public.profiles
-  FOR SELECT
+  ON public.profiles FOR SELECT
   USING (auth.uid() = id);
 
--- Allow admins to view all profiles
 CREATE POLICY "Admins can view all profiles"
-  ON public.profiles
-  FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles
-      WHERE id = auth.uid() AND role = 'ADMIN'
-    )
-  );
+  ON public.profiles FOR SELECT
+  USING (public.is_admin(auth.uid()));
 
--- Allow users to update their own profile (cannot change their own role to ADMIN)
+-- A user can edit their own profile but can NEVER change their own role.
 CREATE POLICY "Users can update own profile"
-  ON public.profiles
-  FOR UPDATE
+  ON public.profiles FOR UPDATE
   USING (auth.uid() = id)
-  WITH CHECK (
-    auth.uid() = id AND (
-      role = (SELECT role FROM public.profiles WHERE id = auth.uid())
-      OR (SELECT role FROM public.profiles WHERE id = auth.uid()) = 'ADMIN'
-    )
-  );
+  WITH CHECK (auth.uid() = id AND role = public.current_role_of(id));
 
--- Allow users to insert their own profile
+CREATE POLICY "Admins can update all profiles"
+  ON public.profiles FOR UPDATE
+  USING (public.is_admin(auth.uid()))
+  WITH CHECK (public.is_admin(auth.uid()));
+
+-- Users may only create their own row, and only as USER.
 CREATE POLICY "Users can insert own profile"
-  ON public.profiles
-  FOR INSERT
-  WITH CHECK (auth.uid() = id);
+  ON public.profiles FOR INSERT
+  WITH CHECK (auth.uid() = id AND role = 'USER');
 
--- 5. Trigger function to automatically create profile on new auth signup
+-- 6. New sign-ups always start as USER.
+--    Role is never taken from user_metadata (anyone can set that at sign-up). Only app_metadata
+--    (server-side only) or the set_user_role() function below can make an ADMIN.
 CREATE OR REPLACE FUNCTION public.handle_new_user()
-RETURNS trigger AS $$
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   INSERT INTO public.profiles (id, email, full_name, phone, country, role)
   VALUES (
@@ -75,11 +79,8 @@ BEGIN
     new.email,
     COALESCE(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', ''),
     COALESCE(new.raw_user_meta_data->>'phone', ''),
-    COALESCE(new.raw_user_meta_data->>'country', 'US'),
-    CASE
-      WHEN UPPER(COALESCE(new.raw_app_meta_data->>'role', new.raw_user_meta_data->>'role', '')) = 'ADMIN' THEN 'ADMIN'
-      ELSE 'USER'
-    END
+    CASE WHEN UPPER(COALESCE(new.raw_user_meta_data->>'country', '')) IN ('CA', 'US') THEN UPPER(new.raw_user_meta_data->>'country') ELSE 'US' END,
+    CASE WHEN UPPER(COALESCE(new.raw_app_meta_data->>'role', '')) = 'ADMIN' THEN 'ADMIN' ELSE 'USER' END
   )
   ON CONFLICT (id) DO UPDATE
   SET
@@ -88,26 +89,60 @@ BEGIN
     updated_at = timezone('utc'::text, now());
   RETURN new;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$;
 
--- Recreate trigger on auth.users
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
-
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- 6. Backfill all existing users in auth.users into public.profiles
+-- 7. Keep the role in the login token: profiles.role -> auth.users.app_metadata.role
+--    (so the web/app can read user.app_metadata.role to show or hide the admin dashboard).
+CREATE OR REPLACE FUNCTION public.sync_role_to_auth()
+RETURNS trigger
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  UPDATE auth.users
+     SET raw_app_meta_data = COALESCE(raw_app_meta_data, '{}'::jsonb) || jsonb_build_object('role', new.role)
+   WHERE id = new.id;
+  RETURN new;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS on_profile_role_change ON public.profiles;
+CREATE TRIGGER on_profile_role_change
+  AFTER INSERT OR UPDATE OF role ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.sync_role_to_auth();
+
+-- 8. Make someone an admin (or back to user) by email. Run in the Supabase SQL editor or with
+--    `npm run set-role -- someone@example.com ADMIN`. Not callable by app users.
+CREATE OR REPLACE FUNCTION public.set_user_role(user_email TEXT, new_role TEXT)
+RETURNS TEXT
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE n INT;
+BEGIN
+  IF UPPER(new_role) NOT IN ('ADMIN', 'USER') THEN
+    RAISE EXCEPTION 'role must be ADMIN or USER';
+  END IF;
+  UPDATE public.profiles SET role = UPPER(new_role), updated_at = timezone('utc'::text, now())
+   WHERE LOWER(email) = LOWER(user_email);
+  GET DIAGNOSTICS n = ROW_COUNT;
+  IF n = 0 THEN
+    RAISE EXCEPTION 'No profile with email % (the person must sign up first)', user_email;
+  END IF;
+  RETURN user_email || ' is now ' || UPPER(new_role);
+END;
+$$;
+REVOKE ALL ON FUNCTION public.set_user_role(TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+
+-- 9. Backfill existing auth users (as USER unless app_metadata already says ADMIN)
 INSERT INTO public.profiles (id, email, full_name, phone, country, role)
 SELECT
   id,
   email,
   COALESCE(raw_user_meta_data->>'full_name', raw_user_meta_data->>'name', ''),
   COALESCE(raw_user_meta_data->>'phone', ''),
-  COALESCE(raw_user_meta_data->>'country', 'US'),
-  CASE
-    WHEN UPPER(COALESCE(raw_app_meta_data->>'role', raw_user_meta_data->>'role', '')) = 'ADMIN' THEN 'ADMIN'
-    ELSE 'USER'
-  END
+  CASE WHEN UPPER(COALESCE(raw_user_meta_data->>'country', '')) IN ('CA', 'US') THEN UPPER(raw_user_meta_data->>'country') ELSE 'US' END,
+  CASE WHEN UPPER(COALESCE(raw_app_meta_data->>'role', '')) = 'ADMIN' THEN 'ADMIN' ELSE 'USER' END
 FROM auth.users
 ON CONFLICT (id) DO NOTHING;

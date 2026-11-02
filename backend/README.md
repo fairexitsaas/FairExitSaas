@@ -2,6 +2,13 @@
 
 Scalable, production-ready REST API backend for FairExit built with **Node.js, Express.js, TypeScript, and Supabase**.
 
+> **FairExit Phase 1 API** (free check, $59 payment, upload, AI reading with prompt v0.6, the
+> "Check everything your report will use" page, report JSON/PDF, lawyer requests, ops dashboard):
+> see **[docs/API.md](docs/API.md)**. Hand-off prompt for an AI assistant:
+> [docs/AI-HANDOFF-PROMPT.md](docs/AI-HANDOFF-PROMPT.md). Typed web client:
+> [docs/client/fairexitApi.ts](docs/client/fairexitApi.ts). Database: run `npm run db:push`
+> (applies `sql/001` and `sql/002_fairexit_core.sql`).
+
 ---
 
 ## 1. Architecture Overview

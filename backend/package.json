@@ -9,7 +9,10 @@
     "dev": "tsx watch src/server.ts",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:push": "node scripts/push-db.js"
+    "db:push": "node scripts/push-db.js",
+    "regions:build": "node scripts/build-region-data.js ../FairExit-Phase1-Code-2026-10-25",
+    "typecheck": "tsc --noEmit",
+    "set-role": "node scripts/set-role.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
@@ -35,5 +38,12 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "private": true
+  "private": true,
+  "optionalDependencies": {
+    "playwright": "^1.48.0"
+  },
+  "files": [
+    "dist",
+    "prompts"
+  ]
 }

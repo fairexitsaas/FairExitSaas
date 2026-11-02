@@ -6,6 +6,7 @@ import { notFound } from './middleware/notFound'
 import { errorHandler } from './middleware/errorHandler'
 import { apiRateLimiter } from './middleware/rateLimiter'
 import routes from './routes'
+import webhookRoutes from './routes/webhook.routes'
 
 const app: Application = express()
 
@@ -15,8 +16,11 @@ app.use(helmet())
 // Enable CORS with secure options
 app.use(corsMiddleware)
 
+// Stripe webhooks need the raw body: mount before the JSON parser
+app.use('/api/v1/webhooks', webhookRoutes)
+
 // JSON and URL-encoded body parser with sensible limits
-app.use(express.json({ limit: '10mb' }))
+app.use(express.json({ limit: '25mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
 // Request correlation and logging
@@ -30,7 +34,8 @@ app.get('/', (_req, res) => {
   res.status(200).json({
     service: 'FairExit Backend API',
     version: '1.0.0',
-    documentation: '/api/v1/health',
+    documentation: 'backend/docs/API.md',
+    health: '/api/v1/health',
     status: 'online',
   })
 })

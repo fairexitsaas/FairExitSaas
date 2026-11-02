@@ -27,8 +27,8 @@ and paste it directly into Supabase Dashboard -> SQL Editor!
     process.exit(1)
   }
 
-  const sqlPath = path.resolve(__dirname, '..', 'sql', '001_create_profiles.sql')
-  const sqlContent = fs.readFileSync(sqlPath, 'utf8')
+  const sqlDir = path.resolve(__dirname, '..', 'sql')
+  const files = fs.readdirSync(sqlDir).filter((f) => f.endsWith('.sql')).sort()
 
   console.log('Connecting to Supabase PostgreSQL database...')
   const client = new Client({
@@ -38,9 +38,11 @@ and paste it directly into Supabase Dashboard -> SQL Editor!
 
   try {
     await client.connect()
-    console.log('Connected! Executing 001_create_profiles.sql...')
-    await client.query(sqlContent)
-    console.log('✅ Migration executed successfully! profiles table with ADMIN/USER role created.')
+    for (const f of files) {
+      console.log(`Connected! Executing ${f}...`)
+      await client.query(fs.readFileSync(path.join(sqlDir, f), 'utf8'))
+    }
+    console.log(`✅ ${files.length} migration file(s) executed (all are safe to re-run).`)
   } catch (err) {
     console.error('❌ Database migration failed:', err.message)
     process.exit(1)

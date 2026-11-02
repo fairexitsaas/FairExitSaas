@@ -23,6 +23,8 @@ export const corsOptions: CorsOptions = {
     'Accept',
     'Authorization',
     'X-Request-Id',
+    'X-Case-Token',
+    'X-Platform',
   ],
   exposedHeaders: ['X-Request-Id'],
   maxAge: 86400, // 24 hours

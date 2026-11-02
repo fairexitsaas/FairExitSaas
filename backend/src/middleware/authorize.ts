@@ -7,12 +7,11 @@ export function authorize(...allowedRoles: string[]) {
       return next(ApiError.unauthorized('User not authenticated'))
     }
 
-    const userRole =
-      (req.user.app_metadata?.role as string) ||
-      (req.user.user_metadata?.role as string) ||
-      'user'
+    // Only app_metadata is trusted (users can write their own user_metadata at sign-up).
+    // profiles.role is copied into app_metadata.role by the sql/001 trigger.
+    const userRole = String(req.user.app_metadata?.role || 'USER').toUpperCase()
 
-    if (allowedRoles.length > 0 && !allowedRoles.includes(userRole)) {
+    if (allowedRoles.length > 0 && !allowedRoles.map((r) => r.toUpperCase()).includes(userRole)) {
       return next(
         ApiError.forbidden(
           `Forbidden: Required role [${allowedRoles.join(', ')}], current role is [${userRole}]`

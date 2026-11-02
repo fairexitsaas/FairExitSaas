@@ -1,12 +1,15 @@
 "use client";
 
 import React, { useState } from "react";
+import { fairexit } from "@/lib/api/fairexit";
 
 interface AskLawyerModalProps {
   isOpen: boolean;
   onClose: () => void;
   country?: "US" | "CA";
   regionName?: string;
+  /** Free-check case, when there is one (sends the case summary, never documents) */
+  caseId?: string | null;
 }
 
 export default function AskLawyerModal({
@@ -14,6 +17,7 @@ export default function AskLawyerModal({
   onClose,
   country = "US",
   regionName = "your state",
+  caseId = null,
 }: AskLawyerModalProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -21,6 +25,7 @@ export default function AskLawyerModal({
   const [agreed, setAgreed] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
 
   if (!isOpen) return null;
 
@@ -28,7 +33,7 @@ export default function AskLawyerModal({
   const professionalWord = isUS ? "attorney" : "lawyer";
   const professionalPlural = isUS ? "Attorneys" : "Lawyers";
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
       setError("Please add your name.");
@@ -48,7 +53,21 @@ export default function AskLawyerModal({
     }
 
     setError("");
-    setSubmitted(true);
+    setSending(true);
+    try {
+      await fairexit.askLawyer({
+        ...(caseId ? { caseId } : { country, jurisdictionCode: regionName }),
+        name: name.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        consent: true,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not send. Please try again.");
+    } finally {
+      setSending(false);
+    }
   };
 
   const handleClose = () => {
@@ -181,6 +200,7 @@ export default function AskLawyerModal({
 
               <button
                 type="submit"
+                disabled={sending}
                 className="w-full mt-2 py-3 rounded-[9px] bg-[#0c8f72] hover:bg-[#0aa07e] text-white font-sans font-[700] text-[14px] leading-[20px] transition-colors cursor-pointer text-center shadow-xs"
               >
                 Send my details

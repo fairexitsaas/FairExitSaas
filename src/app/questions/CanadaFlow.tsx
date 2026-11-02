@@ -2,11 +2,12 @@
 
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import NextLink from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { estimate, EstimateResult } from "@/lib/severance-rules";
 import { QuestionBackButton, QuestionNextButton } from "@/components/common/QuestionNavButtons";
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
+import { saveFreeCheck } from "@/lib/api/fairexit";
 import SeveranceReportPreviewDialog from "@/components/dialogs/SeveranceReportPreviewDialog";
 import { triggerGetApp } from "@/context/GetAppContext";
 import { useAccessibility } from "@/context/AccessibilityContext";
@@ -208,16 +209,30 @@ function QuestionsContent() {
     };
   };
 
-  const handleUnlockReport = () => {
+  // FairExit API: the free check is saved as a case when results are shown (see handleStartAnalyze)
+  const router = useRouter();
+  const [caseId, setCaseId] = useState<string | null>(null);
+  const caseSaving = React.useRef<Promise<string> | null>(null);
+  const ensureCase = (latest?: Record<string, unknown>) => {
+    if (!caseSaving.current) {
+      caseSaving.current = saveFreeCheck("CA", latest || (state as unknown as Record<string, unknown>))
+        .then((id) => { setCaseId(id); return id; })
+        .catch((err) => { caseSaving.current = null; throw err; });
+    }
+    return caseSaving.current;
+  };
+
+  // "Get my report": go to the paid flow (pay -> upload -> check -> report) on /report
+  const handleUnlockReport = async () => {
     setCheckoutState("verifying");
-    setTimeout(() => {
-      setCheckoutState("success");
-      setTimeout(() => {
-        setIsReportUnlocked(true);
-        setCheckoutState("idle");
-        setInfoModal(null);
-      }, 900);
-    }, 1100);
+    try {
+      const id = caseId || (await ensureCase());
+      router.push(`/report?case=${id}`);
+    } catch (err) {
+      console.error("FairExit: could not save the free check", err);
+      setCheckoutState("idle");
+      alert("We couldn't reach FairExit right now. Please try again in a moment.");
+    }
   };
 
   // User answers tracking via useState for FairExit summary box
@@ -660,6 +675,8 @@ function QuestionsContent() {
   };
 
   const handleStartAnalyze = () => {
+    caseSaving.current = null; // answers may have changed since the last save
+    ensureCase().catch((err) => console.warn("FairExit: free check not saved yet", err));
     populateAllAnswers(state);
     setCurrentStep("step-analyzing");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -4552,6 +4569,7 @@ function QuestionsContent() {
         onClose={() => setAskLawyerOpen(false)}
         country="CA"
         regionName={state.province || "Ontario"}
+        caseId={caseId}
       />
 
       {/* ── STICKY BOTTOM BAR ("Your details — Ontario · 14 yrs [View]") ── */}
