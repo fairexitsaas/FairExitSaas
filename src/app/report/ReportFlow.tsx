@@ -125,13 +125,6 @@ export default function ReportFlow() {
     })();
   }, [caseId, sp, refresh]);
 
-  // poll while the AI works
-  useEffect(() => {
-    if (!cs || !["reading", "building"].includes(cs.status)) return;
-    const t = setInterval(refresh, 3000);
-    return () => clearInterval(t);
-  }, [cs, refresh]);
-
   const urlStep = sp?.get("step");
   const step = view || urlStep || cs?.nextStep;
   const country = cs?.country || "CA";
@@ -232,18 +225,20 @@ export default function ReportFlow() {
         cs={cs}
         onContinue={() => {
           setView("ready");
+          refresh();
         }}
       />
     );
   }
 
-  // Report Ready state (COMMON / Paid · report ready (PDF))
-  if (step === "ready" || view === "ready") {
+  // Report Ready or Building state (COMMON / Paid · report ready (PDF))
+  if (step === "ready" || view === "ready" || step === "building" || view === "building") {
     return (
       <PaidReportReadyPage
         caseId={caseId}
         cs={cs}
-        />
+        onDone={refresh}
+      />
     );
   }
 
@@ -259,7 +254,7 @@ export default function ReportFlow() {
         <Card><Kicker>Step 2 of 4</Kicker><H1>Reading your documents…</H1><Spinner text="This usually takes under a minute." />
           <p className="text-[13px] text-[#5a6b78] mt-3">You can leave this page; your progress is saved.</p></Card>
       )}
-      {step === "check" && <CheckStep cs={cs} words={words} onAddClearerCopy={() => setView("upload")} onBuilt={refresh} />}
+      {step === "check" && <CheckStep cs={cs} words={words} onAddClearerCopy={() => setView("upload")} onBuilt={() => { setView("building"); void refresh(); }} />}
       {step === "building" && (
         <Card><Kicker>Step 4 of 4</Kicker><H1>Building your report…</H1><Spinner text="This takes a minute or two." />
           <p className="text-[13px] text-[#5a6b78] mt-3">We&apos;ll also email it to {cs.email || "you"}.</p></Card>
@@ -421,7 +416,9 @@ function UploadStep({ cs, words, onRead }: { cs: any; words: any; onRead: () => 
 function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: any; onAddClearerCopy: () => void; onBuilt: () => void }) {
   const [page, setPage] = useState<any>(null);
   const [busyKey, setBusyKey] = useState<string>("");
+  const [buildPending, setBuildPending] = useState(false);
   const [err, setErr] = useState("");
+  const buildPendingRef = useRef(false);
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   useEffect(() => { fairexit.checkPage(cs.id).then(setPage).catch((e) => setErr(errText(e))); }, [cs.id]);
@@ -441,12 +438,20 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
     try { setPage(await fairexit.attest(cs.id)); } catch (e) { setErr(errText(e)); }
   }
   async function build() {
+    if (buildPendingRef.current) return;
     if (!page.build.enabled) {
       const k = page.build.firstUnconfirmedKey;
       if (k && rowRefs.current[k]) rowRefs.current[k]!.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
-    try { await fairexit.buildReport(cs.id); onBuilt(); } catch (e) { setErr(errText(e)); }
+    buildPendingRef.current = true;
+    setBuildPending(true);
+    setErr("");
+    try { await fairexit.buildReport(cs.id); onBuilt(); } catch (e) {
+      setErr(errText(e));
+      buildPendingRef.current = false;
+      setBuildPending(false);
+    }
   }
 
   if (!page) return err ? <ErrorBox text={err} /> : <Spinner text="Loading what we read…" />;
@@ -490,7 +495,7 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
           <span>{page.finalAgreement.text}</span>
         </label>
       </Card>
-      <Btn className={`w-full mt-3 ${page.build.enabled ? "shadow-[0_0_0_4px_rgba(14,178,141,0.25)]" : ""}`} onClick={build}>{page.build.enabled ? page.build.label : page.build.allRequiredConfirmed ? "Tick the box above to build your report" : page.build.label}</Btn>
+      <Btn className={`w-full mt-3 ${page.build.enabled ? "shadow-[0_0_0_4px_rgba(14,178,141,0.25)]" : ""}`} disabled={buildPending} onClick={build}>{buildPending ? "Starting your report…" : page.build.enabled ? page.build.label : page.build.allRequiredConfirmed ? "Tick the box above to build your report" : page.build.label}</Btn>
     </div>
   );
 }

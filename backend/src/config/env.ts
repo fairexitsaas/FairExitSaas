@@ -55,7 +55,11 @@ const envSchema = z.object({
     .string()
     .default('900000')
     .transform((val) => parseInt(val, 10)),
-  RATE_LIMIT_MAX: z
+  READ_RATE_LIMIT_MAX: z
+    .string()
+    .default('600')
+    .transform((val) => parseInt(val, 10)),
+  WRITE_RATE_LIMIT_MAX: z
     .string()
     .default('100')
     .transform((val) => parseInt(val, 10)),

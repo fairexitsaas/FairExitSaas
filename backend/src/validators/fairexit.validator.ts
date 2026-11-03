@@ -1,4 +1,4 @@
-import { z } from 'zod'
+﻿import { z } from 'zod'
 
 const platform = z.enum(['web', 'ios', 'android']).default('web')
 const country = z.enum(['CA', 'US'])
@@ -104,16 +104,18 @@ export const googleIapSchema = z.object({ purchaseToken: z.string().min(10).max(
 export const uploadSlotSchema = z.object({
   kind: z.enum(['letter', 'contract']),
   fileName: z.string().max(200).optional(),
-  mimeType: z.string().max(80),
+  mimeType: z.string().max(120),
   sizeBytes: z.number().int().positive().optional(),
 })
 
 export const uploadBase64Schema = z.object({
   kind: z.enum(['letter', 'contract']),
   fileName: z.string().max(200).optional(),
-  mimeType: z.string().max(80),
+  mimeType: z.string().max(120),
   dataBase64: z.string().min(10),
 })
+
+export const updateDocSchema = z.object({ kind: z.enum(['letter', 'contract']) })
 
 export const contractStatusSchema = z.object({ status: z.enum(['never', 'missing']) })
 

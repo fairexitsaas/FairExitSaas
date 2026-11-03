@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getReportInputs, ReportInputs } from "@/lib/report-storage";
+import { fairexit } from "@/lib/api/fairexit";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 
 interface CanadaReviewPageProps {
@@ -23,17 +24,14 @@ interface ReviewItem {
   citation?: string;
   hasOnlyChange?: boolean;
   confirmed?: boolean;
-  // User change state
   userChanged?: boolean;
   userChangeAck?: boolean;
-  // Inline change UI states
   isEditingInline?: boolean;
   inlineInputValue?: string;
   showPlausibilityAlert?: boolean;
   isReReading?: boolean;
   showSecondLook?: boolean;
 }
-
 
 const MONTHS_MAP: Record<string, string> = {
   jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
@@ -43,7 +41,7 @@ const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 
 function parseDateToISO(str?: string): string {
   if (!str) return "";
-  const m = str.match(/([a-zA-Z]{3,})\s+([0-9]{1,2}),?\s+([0-9]{4})/);
+  const m = str.match(/([a-zA-Z]{3,})s+([0-9]{1,2}),?s+([0-9]{4})/);
   if (m) {
     const mon = MONTHS_MAP[m[1].toLowerCase().slice(0, 3)];
     const day = m[2].padStart(2, "0");
@@ -209,20 +207,34 @@ export default function CanadaReviewPage({
   const [data] = useState<ReportInputs>(() => getReportInputs());
   const [explainQuestions, setExplainQuestions] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSubmittingBuild, setIsSubmittingBuild] = useState(false);
+  const [buildError, setBuildError] = useState("");
+  const buildSubmitLock = useRef(false);
+
+  // Resolved intake answers (from server case answers or client storage)
+  const answers = (cs?.answers as Record<string, any>) || {};
+  const intakeOfferNum = answers.offer !== undefined && answers.offer !== null && answers.offer !== ""
+    ? Number(answers.offer)
+    : (data.offer !== undefined && data.offer !== null && data.offer !== "" ? Number(data.offer) : null);
 
   // ══════════════════════════════════════════════════════════
   // Section 1: Conflict resolution ("Check these first")
   // ══════════════════════════════════════════════════════════
-  // Money offer conflict: Document says $24,000, intake says $20,000
-  const intakeOffer = data.offer ? Number(data.offer) : 20000;
-  const docOffer = 24000;
-  // Show money conflict if intake differs from document (as in Photo 4)
-  const [hasOfferConflict] = useState<boolean>(intakeOffer !== docOffer || true);
+  const [hasOfferConflict, setHasOfferConflict] = useState<boolean>(false);
+  const [docOfferDisplay, setDocOfferDisplay] = useState<string>("");
+  const [docOfferQuote, setDocOfferQuote] = useState<string>("");
+  const [docOfferWhere, setDocOfferWhere] = useState<string>("");
+  const [intakeOfferDisplay, setIntakeOfferDisplay] = useState<string>(intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
   const [offerConflictChoice, setOfferConflictChoice] = useState<"letter" | "intake" | "custom" | null>(null);
   const [showOfferConflictCustom, setShowOfferConflictCustom] = useState(false);
   const [offerConflictCustomVal, setOfferConflictCustomVal] = useState("");
 
   // Contract limit conflict: Contract says yes, intake says no
+  const [hasContractConflict, setHasContractConflict] = useState<boolean>(false);
+  const [docContractLimitDisplay, setDocContractLimitDisplay] = useState<string>("");
+  const [docContractLimitQuote, setDocContractLimitQuote] = useState<string>("");
+  const [docContractLimitWhere, setDocContractLimitWhere] = useState<string>("");
+  const [intakeContractLimitDisplay, setIntakeContractLimitDisplay] = useState<string>("");
   const [contractConflictChoice, setContractConflictChoice] = useState<"contract" | "told" | "custom" | null>(null);
   const [showContractConflictCustom, setShowContractConflictCustom] = useState(false);
   const [contractConflictCustomVal, setContractConflictCustomVal] = useState("");
@@ -233,9 +245,13 @@ export default function CanadaReviewPage({
   const [workingWeeks, setWorkingWeeks] = useState<string>("");
   const [workingWeeksSaved, setWorkingWeeksSaved] = useState<boolean>(false);
 
-  // Bonus question (Canada only, when person had bonus on step 2 / Photo 5)
-  const initialHadBonus = data.otherPay?.toLowerCase().includes("bonus") || true;
-  const [hasBonusQuestion] = useState<boolean>(initialHadBonus);
+  // Bonus question (Canada only, when person had bonus on step 2)
+  const [hasBonusQuestion, setHasBonusQuestion] = useState<boolean>(
+    Boolean(
+      (typeof answers.otherPay === "string" && answers.otherPay.toLowerCase().includes("bonus")) ||
+      (typeof data.otherPay === "string" && data.otherPay.toLowerCase().includes("bonus"))
+    )
+  );
   const [bonusAmount, setBonusAmount] = useState<string>("");
   const [bonusSaved, setBonusSaved] = useState<boolean>(false);
 
@@ -250,42 +266,42 @@ export default function CanadaReviewPage({
     {
       id: "province",
       label: "Province",
-      value: data.provinceName || "Ontario",
+      value: answers.provinceName || data.provinceName || (cs?.jurisdiction as any)?.name || data.province || "Ontario",
       source: "From your answers",
       confirmed: false,
     },
     {
       id: "age",
       label: "Age",
-      value: String(data.age || 52),
+      value: answers.age !== undefined && answers.age !== null ? String(answers.age) : (data.age ? String(data.age) : ""),
       source: "From your answers",
       confirmed: false,
     },
     {
       id: "years",
       label: "Years on the job",
-      value: `${data.years || 14} years`,
+      value: answers.years !== undefined && answers.years !== null ? `${answers.years} years` : (data.years ? `${data.years} years` : ""),
       source: "From your answers",
       confirmed: false,
     },
     {
       id: "salary",
       label: "Pay per year",
-      value: `$${Number(data.salary || 110000).toLocaleString()}`,
+      value: answers.salary ? `$${Number(answers.salary).toLocaleString()}` : (data.salary ? `$${Number(data.salary).toLocaleString()}` : ""),
       source: "From your answers",
       confirmed: false,
     },
     {
       id: "role",
       label: "Your role",
-      value: data.role || "Middle management / Senior / Director",
+      value: answers.role || data.role || "",
       source: "From your answers",
       confirmed: false,
     },
     {
       id: "howEnded",
       label: "How your job ended",
-      value: data.howEnded || "Laid off, no cause",
+      value: answers.howEnded || data.howEnded || "",
       source: "From your answers",
       confirmed: false,
     },
@@ -294,36 +310,37 @@ export default function CanadaReviewPage({
     {
       id: "offerMoney",
       label: "Money offered",
-      value: "$24,000",
-      originalDocumentValue: "$24,000",
-      source: "Your letter, paragraph 2",
-      citation: `"The Company is prepared to offer you a lump-sum severance payment in the gross amount of $24,000, less statutory deductions, subject to the execution and return of the attached Full and Final Release."`,
+      value: intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
       confirmed: false,
     },
     {
       id: "offerNotice",
       label: "Notice or pay in place of notice",
-      value: "8 weeks of pay",
-      originalDocumentValue: "8 weeks of pay",
-      source: "Your letter, paragraph 2",
-      citation: `"This payment includes and satisfies the 8 weeks of statutory termination pay to which you are entitled pursuant to the Employment Standards Act, 2000."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
       confirmed: false,
     },
     {
       id: "offerVacation",
       label: "Vacation pay on that notice",
-      value: "Not mentioned",
-      originalDocumentValue: "Not mentioned",
+      value: "",
+      originalDocumentValue: "",
       source: "Your letter",
+      citation: "",
       confirmed: false,
     },
     {
       id: "offerLastDay",
       label: "Last day of work",
-      value: "Oct 31, 2026",
-      originalDocumentValue: "Oct 31, 2026",
-      source: "Your letter, paragraph 1",
-      citation: `"Your employment with the Company will terminate effective October 31, 2026."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
       confirmed: false,
     },
     {
@@ -338,28 +355,28 @@ export default function CanadaReviewPage({
     {
       id: "offerDecideBy",
       label: "Decide by",
-      value: "Nov 14, 2026 (14 days from your last day)",
-      originalDocumentValue: "Nov 14, 2026 (14 days from your last day)",
-      source: "Your letter, last page",
-      citation: `"Please sign and return the enclosed Release by no later than 5:00 PM EST on November 14, 2026. Failing which, this offer will automatically expire."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
       confirmed: false,
     },
     {
       id: "offerRelease",
       label: "You must sign a release to get it",
-      value: "Yes, a full release",
-      originalDocumentValue: "Yes, a full release",
-      source: "Your letter, last page",
-      citation: `"The payment outlined above is conditional upon your signing and delivering the enclosed Full and Final Release of all claims against the Company."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
       confirmed: false,
     },
     {
       id: "offerBenefitsEnd",
       label: "Benefits end",
-      value: "Oct 31, 2026",
-      originalDocumentValue: "Oct 31, 2026",
-      source: "Your letter, paragraph 3",
-      citation: `"All group health and dental benefit coverage will cease on your final date of employment, October 31, 2026."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
       confirmed: false,
     },
 
@@ -367,29 +384,29 @@ export default function CanadaReviewPage({
     {
       id: "contractLimit",
       label: "Limits you to the legal minimum",
-      value: "Yes",
-      originalDocumentValue: "Yes",
-      source: "Your contract, section 8",
-      citation: `"In the event of termination without cause, the Employer shall provide you solely with the minimum notice or pay in lieu thereof required by the applicable Employment Standards Act, and no more."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your contract",
+      citation: "",
       confirmed: false,
     },
     {
       id: "contractStartDate",
       label: "Start date",
-      value: "Mar 4, 2013",
-      originalDocumentValue: "Mar 4, 2013",
-      source: "Your contract, page 1",
-      citation: `"Commencement Date: Your continuous employment will officially commence on March 4, 2013."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your contract",
+      citation: "",
       confirmed: false,
     },
     {
       id: "contractJobTitle",
       label: "Job title when hired",
-      value: "Senior Analyst",
-      originalDocumentValue: "Senior Analyst",
-      source: "Your contract, page 1",
+      value: "",
+      originalDocumentValue: "",
+      source: "Your contract",
       isOptional: true,
-      citation: `"Position: You are engaged in the role of Senior Financial Analyst reporting to the VP Finance."`,
+      citation: "",
       confirmed: false,
     },
   ]);
@@ -397,12 +414,194 @@ export default function CanadaReviewPage({
   // Overall declaration checkbox
   const [declaredCorrect, setDeclaredCorrect] = useState(false);
 
+  // Load real extracted facts and saved review data from backend
+  useEffect(() => {
+    const activeCaseId = caseId || cs?.id;
+    if (!activeCaseId) return;
+
+    fairexit.getReviewData(activeCaseId).then((res) => {
+      if (!res) return;
+      const facts: any[] = res.originalExtractedFacts || [];
+      const corrections: Record<string, any> = res.correctedFacts || {};
+      const checkRows: Record<string, any> = res.checkState?.rows || {};
+      const conflicts: any[] = res.reviewModel?.conflicts || [];
+      const missingList: any[] = res.reviewModel?.missing || [];
+
+      // 1. Process Offer Conflict
+      const confOffer = conflicts.find((c: any) => c.key === 'offer_amount');
+      const fOffer = facts.find((f: any) => f.key === 'offer_amount');
+      const dOfferNum = fOffer?.value ? Number(String(fOffer.value).replace(/[^0-9.]/g, '')) : null;
+      const iOfferNum = intakeOfferNum;
+
+      if (confOffer) {
+        setHasOfferConflict(true);
+        setDocOfferDisplay(confOffer.document.display || (dOfferNum ? `$${dOfferNum.toLocaleString()}` : String(fOffer?.value || "")));
+        setDocOfferQuote(confOffer.document.quote || fOffer?.quote || "");
+        setDocOfferWhere(confOffer.document.where || fOffer?.where || "");
+        setIntakeOfferDisplay(confOffer.answers.display || (iOfferNum ? `$${iOfferNum.toLocaleString()}` : ""));
+      } else if (dOfferNum !== null && iOfferNum !== null && Math.abs(dOfferNum - iOfferNum) >= 1) {
+        setHasOfferConflict(true);
+        setDocOfferDisplay(`$${dOfferNum.toLocaleString()}`);
+        setDocOfferQuote(fOffer?.quote || "");
+        setDocOfferWhere(fOffer?.where || "");
+        setIntakeOfferDisplay(`$${iOfferNum.toLocaleString()}`);
+      } else {
+        setHasOfferConflict(false);
+        if (dOfferNum !== null) setDocOfferDisplay(`$${dOfferNum.toLocaleString()}`);
+        if (iOfferNum !== null) setIntakeOfferDisplay(`$${iOfferNum.toLocaleString()}`);
+      }
+
+      // 2. Process Contract Conflict
+      const confMin = conflicts.find((c: any) => c.key === 'min_only_clause');
+      const fMin = facts.find((f: any) => f.key === 'min_only_clause');
+      const iMin = answers.minClause || data.minClause;
+
+      if (confMin) {
+        setHasContractConflict(true);
+        setDocContractLimitDisplay(confMin.document.display || "Yes, it limits me");
+        setDocContractLimitQuote(confMin.document.quote || fMin?.quote || "");
+        setDocContractLimitWhere(confMin.document.where || fMin?.where || "");
+        setIntakeContractLimitDisplay(confMin.answers.display || (iMin === 'no' ? "No, it doesn't limit me" : "No"));
+      } else if (fMin?.value && /yes|limit|minimum/i.test(fMin.value) && (iMin === 'no' || iMin === 'unsure' || !iMin)) {
+        setHasContractConflict(true);
+        setDocContractLimitDisplay("Yes, it limits me");
+        setDocContractLimitQuote(fMin.quote || "");
+        setDocContractLimitWhere(fMin.where || "");
+        setIntakeContractLimitDisplay("No, it doesn't limit me");
+      } else {
+        setHasContractConflict(false);
+      }
+
+      // 3. Process Bonus Question
+      const hadBonus = Boolean(
+        (typeof answers.otherPay === 'string' && answers.otherPay.toLowerCase().includes('bonus')) ||
+        (typeof data.otherPay === 'string' && data.otherPay.toLowerCase().includes('bonus')) ||
+        (typeof answers.bonus === 'string' && answers.bonus.toLowerCase() === 'yes') ||
+        res?.missingKeys?.includes('bonus_amount') ||
+        missingList.some((m: any) => m.key === 'bonus_amount')
+      );
+      setHasBonusQuestion(hadBonus);
+
+      // 4. Update items from extracted facts and review rows
+      const allModelRows: any[] = [];
+      if (res.reviewModel?.groups) {
+        for (const grp of res.reviewModel.groups) {
+          if (Array.isArray(grp.rows)) {
+            allModelRows.push(...grp.rows);
+          }
+        }
+      }
+
+      setItems((prev) =>
+        prev.map((item) => {
+          const keyMap: Record<string, string> = {
+            province: 'province',
+            age: 'age',
+            years: 'years',
+            salary: 'pay',
+            role: 'role',
+            howEnded: 'ended',
+            offerMoney: 'offer_amount',
+            offerNotice: 'notice_weeks',
+            offerVacation: 'vacation_on_notice',
+            offerLastDay: 'last_day',
+            offerNoticeWorked: 'working_notice_weeks',
+            offerDecideBy: 'sign_by',
+            offerRelease: 'release_required',
+            offerBenefitsEnd: 'benefits_end',
+            contractLimit: 'min_only_clause',
+            contractStartDate: 'contract_start',
+            contractJobTitle: 'job_title_contract',
+          };
+          const factKey = keyMap[item.id] || item.id;
+          const modelRow = allModelRows.find((r: any) => r.key === factKey);
+
+          const fact = facts.find((f: any) => f.key === factKey);
+          const correction = corrections[factKey];
+          const checkRow = checkRows[factKey];
+
+          let origVal = item.originalDocumentValue || "";
+          let cit = item.citation || "";
+          let src = item.source;
+          let val = item.value;
+          let confirmed = item.confirmed;
+          let userChanged = item.userChanged;
+          let userChangeAck = item.userChangeAck;
+
+          if (modelRow) {
+            if (modelRow.display || modelRow.value != null) {
+              val = modelRow.display || String(modelRow.value);
+            }
+            if (modelRow.docDisplay || modelRow.docValue != null) {
+              origVal = modelRow.docDisplay || String(modelRow.docValue);
+            }
+            if (modelRow.quote) {
+              cit = modelRow.where ? `"${modelRow.quote}" · ${modelRow.where}` : `"${modelRow.quote}"`;
+            }
+            if (modelRow.sourceLine) {
+              src = modelRow.sourceLine;
+            }
+            if (modelRow.status === 'confirmed') confirmed = true;
+            if (modelRow.status === 'corrected') {
+              userChanged = true;
+              userChangeAck = Boolean(modelRow.needsChangeAck === false);
+            }
+          } else if (fact && fact.value !== null && fact.value !== undefined && fact.value !== "") {
+            let formatted = String(fact.value);
+            if (factKey === 'offer_amount') {
+              const n = Number(formatted.replace(/[^0-9.]/g, ''));
+              formatted = n > 0 ? `${n.toLocaleString()}` : formatted;
+            } else if (factKey === 'notice_weeks') {
+              formatted = formatted.includes('week') ? formatted : `${formatted} weeks of pay`;
+            } else if (factKey === 'vacation_on_notice') {
+              formatted = formatted === 'paid' ? "Yes, it's paid" : formatted === 'not_paid' ? "No, not paid" : formatted === 'not_mentioned' ? "Not mentioned" : formatted;
+            } else if (factKey === 'release_required') {
+              formatted = /full/i.test(formatted) ? "Yes, a full release" : /yes/i.test(formatted) ? "Yes" : /no/i.test(formatted) ? "No release required" : formatted;
+            } else if (factKey === 'min_only_clause') {
+              formatted = /yes/i.test(formatted) ? "Yes" : /no/i.test(formatted) ? "No" : formatted;
+            }
+            origVal = formatted;
+            val = formatted;
+            if (fact.quote) {
+              cit = fact.where ? `"${fact.quote}" · ${fact.where}` : `"${fact.quote}"`;
+            }
+            if (fact.where) {
+              src = fact.document === 'contract' ? `Your contract, ${fact.where}` : `Your letter, ${fact.where}`;
+            }
+          }
+
+          if (checkRow) {
+            if (checkRow.status === 'confirmed') confirmed = true;
+            if (checkRow.status === 'corrected') {
+              userChanged = true;
+              val = String(checkRow.user_value ?? checkRow.value);
+              userChangeAck = !!checkRow.change_ack;
+            }
+          } else if (correction) {
+            userChanged = true;
+            val = String(correction.user_value);
+            userChangeAck = !!correction.change_ack;
+            if (correction.status === 'confirmed') confirmed = true;
+          }
+
+          return {
+            ...item,
+            value: val,
+            originalDocumentValue: origVal,
+            source: src,
+            citation: cit,
+            confirmed,
+            userChanged,
+            userChangeAck,
+          };
+        })
+      );
+    }).catch((e) => console.warn('Could not load review data:', e));
+  }, [caseId, cs, intakeOfferNum]);
+
   // Track changes made by user
   const changedItemsCount = items.filter((i) => i.userChanged).length;
 
-  // Confirmation calculation:
-  // An item counts as confirmed if:
-  // - It is confirmed directly (and if userChanged is true, only if userChangeAck is ticked)
   const confirmedItemsCount = items.filter((i) => {
     if (i.userChanged) {
       return i.userChangeAck === true;
@@ -410,13 +609,16 @@ export default function CanadaReviewPage({
     return i.confirmed === true;
   }).length;
 
-  // Conflicts and missing numbers
+  // Conflicts and missing numbers confirmations
   const conflict1Confirmed = !hasOfferConflict || offerConflictChoice !== null ? 1 : 0;
-  const conflict2Confirmed = contractConflictChoice !== null ? 1 : 0;
+  const conflict2Confirmed = !hasContractConflict || contractConflictChoice !== null ? 1 : 0;
   const numberWeeksConfirmed = workingWeeksSaved ? 1 : 0;
   const numberBonusConfirmed = !hasBonusQuestion || bonusSaved ? 1 : 0;
 
-  const totalCount = 16;
+  const activeConflictsCount = (hasOfferConflict ? 1 : 0) + (hasContractConflict ? 1 : 0);
+  const activeMissingCount = 1 + (hasBonusQuestion ? 1 : 0);
+  const totalCount = items.length + activeConflictsCount + activeMissingCount;
+
   const confirmedCount = Math.min(
     totalCount,
     confirmedItemsCount + conflict1Confirmed + conflict2Confirmed + numberWeeksConfirmed + numberBonusConfirmed
@@ -427,12 +629,23 @@ export default function CanadaReviewPage({
 
   // ── Handlers for Items ──
   const toggleConfirm = (id: string) => {
+    const item = items.find((i) => i.id === id);
+    const newConfirmed = !item?.confirmed;
     setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        return { ...item, confirmed: !item.confirmed };
-      })
+      prev.map((i) => (i.id === id ? { ...i, confirmed: newConfirmed } : i))
     );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId && newConfirmed) {
+      const keyMap: Record<string, string> = {
+        province: 'province', age: 'age', years: 'years', salary: 'pay', role: 'role', howEnded: 'ended',
+        offerMoney: 'offer_amount', offerNotice: 'notice_weeks', offerVacation: 'vacation_on_notice',
+        offerLastDay: 'last_day', offerNoticeWorked: 'working_notice_weeks', offerDecideBy: 'sign_by',
+        offerRelease: 'release_required', offerBenefitsEnd: 'benefits_end', contractLimit: 'min_only_clause',
+        contractStartDate: 'contract_start', contractJobTitle: 'job_title_contract',
+      };
+      const factKey = keyMap[id] || id;
+      fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: item?.value }).catch(() => {});
+    }
   };
 
   const handleConfirmAll = () => {
@@ -448,19 +661,23 @@ export default function CanadaReviewPage({
         userChangeAck: item.userChanged ? true : item.userChangeAck,
       }))
     );
-    setOfferConflictChoice("letter");
-    setContractConflictChoice("contract");
+    if (hasOfferConflict) setOfferConflictChoice("letter");
+    if (hasContractConflict) setContractConflictChoice("contract");
     setWorkingWeeksSaved(true);
-    setBonusSaved(true);
+    if (hasBonusQuestion) setBonusSaved(true);
     setDeclaredCorrect(true);
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {});
+    }
   };
 
   const handleChooseOfferConflict = (choice: "letter" | "intake" | "custom", customVal?: string) => {
     setOfferConflictChoice(choice);
     setShowOfferConflictCustom(false);
-    let chosenVal = "$24,000";
+    let chosenVal = docOfferDisplay;
     if (choice === "intake") {
-      chosenVal = `$${intakeOffer.toLocaleString()}`;
+      chosenVal = intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
     } else if (choice === "custom" && customVal) {
       const clean = Number(customVal.replace(/[^0-9]/g, ""));
       chosenVal = clean > 0 ? `$${clean.toLocaleString()}` : customVal;
@@ -470,14 +687,18 @@ export default function CanadaReviewPage({
         i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true } : i
       )
     );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { key: 'offer_amount', action: choice === 'custom' ? 'change' : 'confirm', value: chosenVal }).catch(() => {});
+    }
   };
 
   const handleChooseContractConflict = (choice: "contract" | "told" | "custom", customVal?: string) => {
     setContractConflictChoice(choice);
     setShowContractConflictCustom(false);
-    let chosenVal = "Yes";
+    let chosenVal = docContractLimitDisplay || "Yes";
     if (choice === "told") {
-      chosenVal = "No";
+      chosenVal = intakeContractLimitDisplay || "No";
     } else if (choice === "custom" && customVal) {
       chosenVal = customVal;
     }
@@ -486,6 +707,10 @@ export default function CanadaReviewPage({
         i.id === "contractLimit" ? { ...i, value: chosenVal, confirmed: true } : i
       )
     );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { key: 'min_only_clause', action: choice === 'custom' ? 'change' : 'confirm', value: chosenVal }).catch(() => {});
+    }
   };
 
   const handleSaveWorkingWeeks = (weeks: string) => {
@@ -497,10 +722,12 @@ export default function CanadaReviewPage({
         i.id === "offerNoticeWorked" ? { ...i, value: displayVal, confirmed: true } : i
       )
     );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { key: 'working_notice_weeks', action: 'change', value: displayVal }).catch(() => {});
+    }
   };
 
-  // Open inline editor for an item (Photo 3)
-    // Open inline editor for an item
   const startInlineEdit = (id: string) => {
     setItems((prev) =>
       prev.map((item) => {
@@ -526,7 +753,6 @@ export default function CanadaReviewPage({
     );
   };
 
-  // Cancel inline editor
   const cancelInlineEdit = (id: string) => {
     setItems((prev) =>
       prev.map((item) =>
@@ -543,8 +769,6 @@ export default function CanadaReviewPage({
     );
   };
 
-  // Save inline value (check plausibility e.g. $3,000 vs $24,000)
-    // Save inline value (check plausibility e.g. $3,000 vs $24,000 for money fields)
   const handleSaveInline = (id: string, inputVal: string, force = false) => {
     const item = items.find((i) => i.id === id);
     if (!item) return;
@@ -557,7 +781,6 @@ export default function CanadaReviewPage({
       formattedVal = cfg.formatSave(formattedVal);
     }
 
-    // Plausibility Check (Photo 3): only for dollar fields
     if (cfg?.type === "dollar") {
       const cleanNum = Number(inputVal.replace(/[^0-9]/g, ""));
       const origNum = Number(item.originalDocumentValue?.replace(/[^0-9]/g, "") || 0);
@@ -573,7 +796,6 @@ export default function CanadaReviewPage({
     const isChangedFromDoc = isDocItem && formattedVal !== item.originalDocumentValue;
 
     if (isChangedFromDoc) {
-      // Trigger re-reading animation (Photo 2: "Looking again at your document…")
       setItems((prev) =>
         prev.map((i) =>
           i.id === id
@@ -582,7 +804,6 @@ export default function CanadaReviewPage({
         )
       );
 
-      // After ~1.2s, show second look (Photo 2)
       setTimeout(() => {
         setItems((prev) =>
           prev.map((i) =>
@@ -593,7 +814,6 @@ export default function CanadaReviewPage({
         );
       }, 1200);
     } else {
-      // Direct save for intake answers or when matching document value
       setItems((prev) =>
         prev.map((i) =>
           i.id === id
@@ -608,6 +828,17 @@ export default function CanadaReviewPage({
             : i
         )
       );
+      const activeCaseId = caseId || cs?.id;
+      if (activeCaseId) {
+        const keyMap: Record<string, string> = {
+        province: 'province', age: 'age', years: 'years', salary: 'pay', role: 'role', howEnded: 'ended',
+        offerMoney: 'offer_amount', offerNotice: 'notice_weeks', offerVacation: 'vacation_on_notice',
+        offerLastDay: 'last_day', offerNoticeWorked: 'working_notice_weeks', offerDecideBy: 'sign_by',
+        offerRelease: 'release_required', offerBenefitsEnd: 'benefits_end', contractLimit: 'min_only_clause',
+        contractStartDate: 'contract_start', contractJobTitle: 'job_title_contract',
+      };
+      fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
+      }
     }
   };
 
@@ -617,7 +848,6 @@ export default function CanadaReviewPage({
     );
   };
 
-  // Photo 2: User chooses "Use $24,000" (reverts to document value)
   const handleUseDocumentValue = (id: string) => {
     setItems((prev) =>
       prev.map((item) => {
@@ -635,8 +865,6 @@ export default function CanadaReviewPage({
     );
   };
 
-  // Photo 2 -> Photo 1: User chooses "Keep $26,000"
-    // Photo 2 -> Photo 1: User chooses "Keep $26,000"
   const handleKeepUserValue = (id: string) => {
     setItems((prev) =>
       prev.map((item) => {
@@ -653,7 +881,7 @@ export default function CanadaReviewPage({
           ...item,
           value: formattedVal,
           userChanged: true,
-          userChangeAck: false, // Requires ticking the checkbox (Photo 1)
+          userChangeAck: false,
           confirmed: false,
           isEditingInline: false,
           showSecondLook: false,
@@ -662,7 +890,6 @@ export default function CanadaReviewPage({
     );
   };
 
-  // Toggle user change acknowledgement checkbox (Photo 1)
   const toggleUserChangeAck = (id: string) => {
     setItems((prev) =>
       prev.map((item) => {
@@ -722,7 +949,6 @@ export default function CanadaReviewPage({
 
       {/* ── Stepper Navigation ── */}
       <div className="w-full max-w-[720px] mx-auto px-4 pt-6 pb-2">
-        {/* Stepper circles */}
         <div className="relative flex items-center justify-between pb-3">
           <div
             className={`absolute left-[15px] right-[15px] top-[9px] rounded-full -z-0 transition-all duration-500 ${
@@ -785,7 +1011,6 @@ export default function CanadaReviewPage({
           ))}
         </div>
 
-        {/* Stepper sub-bar: step indicator & toggle */}
         <div className="flex items-center justify-between mt-3 text-[12px] text-[#5A6B78] border-b border-[#E7E4DD] pb-3">
           <div className="font-bold tracking-tight text-[#5A6B78]">
             Your report · Step 2 of 3 · Check everything
@@ -820,17 +1045,14 @@ export default function CanadaReviewPage({
       {/* ── Main Single-Column 720px Card ── */}
       <main className="w-full max-w-[720px] mx-auto px-4 mt-4">
         <div className="bg-white border border-[#E7E4DD] rounded-[14px] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] p-5 sm:p-7 md:p-8">
-          {/* Pill Tag */}
           <div className="inline-flex items-center px-3 py-1 bg-white border border-[#E7E4DD] rounded-[6px] text-[12px] font-[700] text-[#062C55] mb-4">
             We read your documents
           </div>
 
-          {/* Heading */}
           <h1 className="font-serif font-[500] text-[24px] sm:text-[27px] leading-[1.15] text-[#062C55] tracking-[-0.5px] mb-3">
             Check everything your report will use
           </h1>
 
-          {/* Lead Paragraph */}
           <p className="font-sans font-normal text-[15px] sm:text-[15.5px] leading-[24px] text-[#17242F] mb-6">
             We&apos;ve read your letter and contract. Before we build your report, check that everything we found is right. Your report is built only on what you confirm here. About 2 minutes.
           </p>
@@ -843,7 +1065,7 @@ export default function CanadaReviewPage({
                   All set
                 </span>
                 <span className="font-sans font-[400] text-[13px] text-[#5A6B78]">
-                  16 of 16 confirmed
+                  {confirmedCount} of {totalCount} confirmed
                 </span>
               </div>
               <div className="w-full h-[4px] bg-[#EEF1F3] rounded-[2px] mt-2.5 overflow-hidden">
@@ -871,7 +1093,6 @@ export default function CanadaReviewPage({
                   </span>
                 </div>
               </div>
-              {/* Progress track */}
               <div className="w-full h-[4px] bg-[#EEF1F3] rounded-[2px] mt-2.5 overflow-hidden">
                 <div
                   className="h-full bg-[#0EB28D] rounded-[2px] transition-all duration-300"
@@ -883,279 +1104,281 @@ export default function CanadaReviewPage({
 
           {!isAllConfirmed && (
             <>
-              {/* ══════════════════════════════════════════════════
-                  SECTION 1: Check these first (Photo 4)
-                 ══════════════════════════════════════════════════ */}
-              <div className="mb-8">
-                <div className="flex items-baseline gap-2 mb-3">
-                  <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
-                    Check these first
-                  </h2>
-                  <span className="font-sans font-normal text-[12.5px] text-[#5A6B78]">
-                    your answers and your documents differ
-                  </span>
-                </div>
-
-                <div className="space-y-4">
-                  {/* Conflict Card 1: Money offered (Photo 4) */}
-                  {hasOfferConflict && (
-                    <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
-                      <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#B07A00] uppercase block mb-1">
-                        CHECK THIS
-                      </span>
-                      <h3 className="font-serif font-[600] text-[20px] leading-[26px] text-[#062C55] mb-1">
-                        Money offered
-                      </h3>
-                      <p className="font-sans text-[14px] text-[#5A6B78] leading-[21px] mb-4">
-                        Your letter and your answers give different amounts. Which is right?
-                      </p>
-
-                      {/* Two Tiles */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                        {/* Tile 1: Your letter says */}
-                        <div
-                          className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
-                            offerConflictChoice === "letter"
-                              ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                              : "bg-[#FAF9F5] border-[#E7E4DD]"
-                          }`}
-                        >
-                          <div>
-                            <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                              Your letter says
-                            </span>
-                            <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
-                              $24,000
-                            </span>
-                            <p className="font-sans italic text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
-                              &ldquo;a lump sum of $24,000, less required deductions&rdquo; · paragraph 2
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleChooseOfferConflict("letter")}
-                            className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                              offerConflictChoice === "letter"
-                                ? "bg-[#0C8F72] text-white"
-                                : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
-                            }`}
-                          >
-                            {offerConflictChoice === "letter" ? "✓ Selected" : "Use this"}
-                          </button>
-                        </div>
-
-                        {/* Tile 2: You told us */}
-                        <div
-                          className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
-                            offerConflictChoice === "intake"
-                              ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                              : "bg-[#FAF9F5] border-[#E7E4DD]"
-                          }`}
-                        >
-                          <div>
-                            <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                              You told us
-                            </span>
-                            <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
-                              ${intakeOffer.toLocaleString()}
-                            </span>
-                            <p className="font-sans text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
-                              Based on your initial intake answers.
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleChooseOfferConflict("intake")}
-                            className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                              offerConflictChoice === "intake"
-                                ? "bg-[#0C8F72] text-white"
-                                : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
-                            }`}
-                          >
-                            {offerConflictChoice === "intake" ? "✓ Selected" : "Use this"}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* "Something else" link opens editor inside card (Photo 4) */}
-                      <div className="mt-3.5">
-                        {!showOfferConflictCustom ? (
-                          <button
-                            type="button"
-                            onClick={() => setShowOfferConflictCustom(true)}
-                            className="font-sans text-[13.5px] font-[700] text-[#0C8F72] underline hover:opacity-80 cursor-pointer"
-                          >
-                            Something else
-                          </button>
-                        ) : (
-                          <div className="p-3.5 bg-[#FAF9F5] border border-[#E7E4DD] rounded-[10px] mt-2 space-y-3">
-                            <label className="block text-[13px] font-[700] text-[#062C55]">
-                              Enter correct offer amount in dollars:
-                            </label>
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                placeholder="e.g. 25000"
-                                value={offerConflictCustomVal}
-                                onChange={(e) => setOfferConflictCustomVal(e.target.value)}
-                                className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] bg-white text-[14px] text-[#062C55] w-[180px]"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (offerConflictCustomVal) {
-                                    handleChooseOfferConflict("custom", offerConflictCustomVal);
-                                  }
-                                }}
-                                className="h-[38px] px-4 rounded-[8px] bg-[#062C55] text-white text-[13px] font-bold"
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setShowOfferConflictCustom(false)}
-                                className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] text-[#5A6B78] text-[13px]"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Conflict Card 2: Limits you to the legal minimum (Photo 4) */}
-                  <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
-                    <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#B07A00] uppercase block mb-1">
-                      CHECK THIS
+              {/* SECTION 1: Check these first (Only if conflict exists) */}
+              {(hasOfferConflict || hasContractConflict) && (
+                <div className="mb-8">
+                  <div className="flex items-baseline gap-2 mb-3">
+                    <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
+                      Check these first
+                    </h2>
+                    <span className="font-sans font-normal text-[12.5px] text-[#5A6B78]">
+                      your answers and your documents differ
                     </span>
-                    <h3 className="font-serif font-[600] text-[20px] leading-[26px] text-[#062C55] mb-1.5">
-                      Limits you to the legal minimum
-                    </h3>
-                    <p className="font-sans text-[14px] text-[#5A6B78] leading-[21px] mb-4">
-                      You told us your contract doesn&apos;t limit you. Section 8 seems to. Which is right?
-                    </p>
+                  </div>
 
-                    {/* Two Option Boxes */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      {/* Box 1: Your contract says */}
-                      <div
-                        className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
-                          contractConflictChoice === "contract"
-                            ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                            : "bg-[#FAF9F5] border-[#E7E4DD]"
-                        }`}
-                      >
-                        <div>
-                          <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                            Your contract says
-                          </span>
-                          <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
-                            Yes, it limits me
-                          </span>
-                          <p className="font-sans italic text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
-                            &ldquo;...you will receive only the minimum required by the ESA...&rdquo; · section 8
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleChooseContractConflict("contract")}
-                          className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                            contractConflictChoice === "contract"
-                              ? "bg-[#0C8F72] text-white"
-                              : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
-                          }`}
-                        >
-                          {contractConflictChoice === "contract" ? "✓ Selected" : "Use this"}
-                        </button>
-                      </div>
+                  <div className="space-y-4">
+                    {/* Conflict Card 1: Money offered */}
+                    {hasOfferConflict && (
+                      <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
+                        <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#B07A00] uppercase block mb-1">
+                          CHECK THIS
+                        </span>
+                        <h3 className="font-serif font-[600] text-[20px] leading-[26px] text-[#062C55] mb-1">
+                          Money offered
+                        </h3>
+                        <p className="font-sans text-[14px] text-[#5A6B78] leading-[21px] mb-4">
+                          Your letter and your answers give different amounts. Which is right?
+                        </p>
 
-                      {/* Box 2: You told us */}
-                      <div
-                        className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
-                          contractConflictChoice === "told"
-                            ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                            : "bg-[#FAF9F5] border-[#E7E4DD]"
-                        }`}
-                      >
-                        <div>
-                          <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                            You told us
-                          </span>
-                          <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
-                            No, it doesn&apos;t
-                          </span>
-                          <p className="font-sans text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
-                            Based on your initial intake answers.
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleChooseContractConflict("told")}
-                          className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                            contractConflictChoice === "told"
-                              ? "bg-[#0C8F72] text-white"
-                              : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
-                          }`}
-                        >
-                          {contractConflictChoice === "told" ? "✓ Selected" : "Use this"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* "Something else" link opens editor inside card (Photo 4) */}
-                    <div className="mt-3.5">
-                      {!showContractConflictCustom ? (
-                        <button
-                          type="button"
-                          onClick={() => setShowContractConflictCustom(true)}
-                          className="font-sans text-[13.5px] font-[700] text-[#0C8F72] underline hover:opacity-80 cursor-pointer"
-                        >
-                          Something else
-                        </button>
-                      ) : (
-                        <div className="p-3.5 bg-[#FAF9F5] border border-[#E7E4DD] rounded-[10px] mt-2 space-y-3">
-                          <label className="block text-[13px] font-[700] text-[#062C55]">
-                            Enter clarification or custom status:
-                          </label>
-                          <div className="flex gap-2">
-                            <input
-                              type="text"
-                              placeholder="e.g. Clause is ambiguous / under review"
-                              value={contractConflictCustomVal}
-                              onChange={(e) => setContractConflictCustomVal(e.target.value)}
-                              className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] bg-white text-[14px] text-[#062C55] flex-1"
-                            />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          {/* Tile 1: Your letter says */}
+                          <div
+                            className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
+                              offerConflictChoice === "letter"
+                                ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
+                                : "bg-[#FAF9F5] border-[#E7E4DD]"
+                            }`}
+                          >
+                            <div>
+                              <span className="font-sans text-[12.5px] text-[#5A6B78] block">
+                                Your letter says
+                              </span>
+                              <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
+                                {docOfferDisplay || "—"}
+                              </span>
+                              {docOfferQuote && (
+                                <p className="font-sans italic text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
+                                  &ldquo;{docOfferQuote}&rdquo;{docOfferWhere ? ` · ${docOfferWhere}` : ""}
+                                </p>
+                              )}
+                            </div>
                             <button
                               type="button"
-                              onClick={() => {
-                                if (contractConflictCustomVal) {
-                                  handleChooseContractConflict("custom", contractConflictCustomVal);
-                                }
-                              }}
-                              className="h-[38px] px-4 rounded-[8px] bg-[#062C55] text-white text-[13px] font-bold"
+                              onClick={() => handleChooseOfferConflict("letter")}
+                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                                offerConflictChoice === "letter"
+                                  ? "bg-[#0C8F72] text-white"
+                                  : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
+                              }`}
                             >
-                              Save
+                              {offerConflictChoice === "letter" ? "✓ Selected" : "Use this"}
                             </button>
+                          </div>
+
+                          {/* Tile 2: You told us */}
+                          <div
+                            className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
+                              offerConflictChoice === "intake"
+                                ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
+                                : "bg-[#FAF9F5] border-[#E7E4DD]"
+                            }`}
+                          >
+                            <div>
+                              <span className="font-sans text-[12.5px] text-[#5A6B78] block">
+                                You told us
+                              </span>
+                              <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
+                                {intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "—")}
+                              </span>
+                              <p className="font-sans text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
+                                Based on your initial intake answers.
+                              </p>
+                            </div>
                             <button
                               type="button"
-                              onClick={() => setShowContractConflictCustom(false)}
-                              className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] text-[#5A6B78] text-[13px]"
+                              onClick={() => handleChooseOfferConflict("intake")}
+                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                                offerConflictChoice === "intake"
+                                  ? "bg-[#0C8F72] text-white"
+                                  : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
+                              }`}
                             >
-                              Cancel
+                              {offerConflictChoice === "intake" ? "✓ Selected" : "Use this"}
                             </button>
                           </div>
                         </div>
-                      )}
-                    </div>
+
+                        {/* "Something else" link */}
+                        <div className="mt-3.5">
+                          {!showOfferConflictCustom ? (
+                            <button
+                              type="button"
+                              onClick={() => setShowOfferConflictCustom(true)}
+                              className="font-sans text-[13.5px] font-[700] text-[#0C8F72] underline hover:opacity-80 cursor-pointer"
+                            >
+                              Something else
+                            </button>
+                          ) : (
+                            <div className="p-3.5 bg-[#FAF9F5] border border-[#E7E4DD] rounded-[10px] mt-2 space-y-3">
+                              <label className="block text-[13px] font-[700] text-[#062C55]">
+                                Enter correct offer amount in dollars:
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="e.g. 25000"
+                                  value={offerConflictCustomVal}
+                                  onChange={(e) => setOfferConflictCustomVal(e.target.value)}
+                                  className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] bg-white text-[14px] text-[#062C55] w-[180px]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (offerConflictCustomVal) {
+                                      handleChooseOfferConflict("custom", offerConflictCustomVal);
+                                    }
+                                  }}
+                                  className="h-[38px] px-4 rounded-[8px] bg-[#062C55] text-white text-[13px] font-bold"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowOfferConflictCustom(false)}
+                                  className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] text-[#5A6B78] text-[13px]"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Conflict Card 2: Limits you to the legal minimum */}
+                    {hasContractConflict && (
+                      <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
+                        <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#B07A00] uppercase block mb-1">
+                          CHECK THIS
+                        </span>
+                        <h3 className="font-serif font-[600] text-[20px] leading-[26px] text-[#062C55] mb-1.5">
+                          Limits you to the legal minimum
+                        </h3>
+                        <p className="font-sans text-[14px] text-[#5A6B78] leading-[21px] mb-4">
+                          You told us your contract doesn&apos;t limit you. Your contract seems to. Which is right?
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                          {/* Box 1: Your contract says */}
+                          <div
+                            className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
+                              contractConflictChoice === "contract"
+                                ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
+                                : "bg-[#FAF9F5] border-[#E7E4DD]"
+                            }`}
+                          >
+                            <div>
+                              <span className="font-sans text-[12.5px] text-[#5A6B78] block">
+                                Your contract says
+                              </span>
+                              <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
+                                {docContractLimitDisplay || "Yes, it limits me"}
+                              </span>
+                              {docContractLimitQuote && (
+                                <p className="font-sans italic text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
+                                  &ldquo;{docContractLimitQuote}&rdquo;{docContractLimitWhere ? ` · ${docContractLimitWhere}` : ""}
+                                </p>
+                              )}
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleChooseContractConflict("contract")}
+                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                                contractConflictChoice === "contract"
+                                  ? "bg-[#0C8F72] text-white"
+                                  : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
+                              }`}
+                            >
+                              {contractConflictChoice === "contract" ? "✓ Selected" : "Use this"}
+                            </button>
+                          </div>
+
+                          {/* Box 2: You told us */}
+                          <div
+                            className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
+                              contractConflictChoice === "told"
+                                ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
+                                : "bg-[#FAF9F5] border-[#E7E4DD]"
+                            }`}
+                          >
+                            <div>
+                              <span className="font-sans text-[12.5px] text-[#5A6B78] block">
+                                You told us
+                              </span>
+                              <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
+                                {intakeContractLimitDisplay || "No, it doesn't"}
+                              </span>
+                              <p className="font-sans text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
+                                Based on what you told us.
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleChooseContractConflict("told")}
+                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                                contractConflictChoice === "told"
+                                  ? "bg-[#0C8F72] text-white"
+                                  : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
+                              }`}
+                            >
+                              {contractConflictChoice === "told" ? "✓ Selected" : "Use this"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* "Something else" link */}
+                        <div className="mt-3.5">
+                          {!showContractConflictCustom ? (
+                            <button
+                              type="button"
+                              onClick={() => setShowContractConflictCustom(true)}
+                              className="font-sans text-[13.5px] font-[700] text-[#0C8F72] underline hover:opacity-80 cursor-pointer"
+                            >
+                              Something else
+                            </button>
+                          ) : (
+                            <div className="p-3.5 bg-[#FAF9F5] border border-[#E7E4DD] rounded-[10px] mt-2 space-y-3">
+                              <label className="block text-[13px] font-[700] text-[#062C55]">
+                                Enter clarification or custom status:
+                              </label>
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Clause is ambiguous / under review"
+                                  value={contractConflictCustomVal}
+                                  onChange={(e) => setContractConflictCustomVal(e.target.value)}
+                                  className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] bg-white text-[14px] text-[#062C55] flex-1"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (contractConflictCustomVal) {
+                                      handleChooseContractConflict("custom", contractConflictCustomVal);
+                                    }
+                                  }}
+                                  className="h-[38px] px-4 rounded-[8px] bg-[#062C55] text-white text-[13px] font-bold"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowContractConflictCustom(false)}
+                                  className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] text-[#5A6B78] text-[13px]"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* ══════════════════════════════════════════════════
-                  SECTION 2: We need one more number (Photo 5)
-                 ══════════════════════════════════════════════════ */}
+              {/* SECTION 2: We need one more number (Missing numbers) */}
               <div className="mb-8">
                 <div className="flex items-baseline gap-2 mb-3">
                   <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
@@ -1176,7 +1399,6 @@ export default function CanadaReviewPage({
                       Did you keep working after they told you? How many weeks?
                     </p>
 
-                    {/* Input Group */}
                     <div className="flex flex-wrap items-center gap-2.5">
                       <div className="relative">
                         <input
@@ -1216,7 +1438,7 @@ export default function CanadaReviewPage({
                     </p>
                   </div>
 
-                  {/* Card 2: Bonus each year (Photo 5: Canada only when bonus ticked) */}
+                  {/* Card 2: Bonus each year (Only if user had bonus in answers) */}
                   {hasBonusQuestion && (
                     <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#2F6AA3] rounded-[14px] p-5 sm:p-6 shadow-xs">
                       <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#2F6AA3] uppercase block mb-1">
@@ -1272,9 +1494,7 @@ export default function CanadaReviewPage({
             </>
           )}
 
-          {/* ══════════════════════════════════════════════════
-              SECTION 3: About you (you told us)
-             ══════════════════════════════════════════════════ */}
+          {/* SECTION 3: About you (you told us) */}
           <div className="mb-8">
             <div className="flex items-baseline gap-2 mb-3">
               <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
@@ -1307,9 +1527,7 @@ export default function CanadaReviewPage({
             </div>
           </div>
 
-          {/* ══════════════════════════════════════════════════
-              SECTION 4: Your offer (from your letter)
-             ══════════════════════════════════════════════════ */}
+          {/* SECTION 4: Your offer (from your letter) */}
           <div className="mb-8">
             <div className="flex items-baseline gap-2 mb-3">
               <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
@@ -1342,9 +1560,7 @@ export default function CanadaReviewPage({
             </div>
           </div>
 
-          {/* ══════════════════════════════════════════════════
-              SECTION 5: Your contract (from your contract)
-             ══════════════════════════════════════════════════ */}
+          {/* SECTION 5: Your contract (from your contract) */}
           <div className="mb-8">
             <div className="flex items-baseline gap-2 mb-3">
               <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
@@ -1377,9 +1593,7 @@ export default function CanadaReviewPage({
             </div>
           </div>
 
-          {/* ══════════════════════════════════════════════════
-              CONFIRMATION CHECKBOX CARD (Photo 1 & All Confirmed)
-             ══════════════════════════════════════════════════ */}
+          {/* Confirmation Checkbox Box */}
           <div
             onClick={() => setDeclaredCorrect(!declaredCorrect)}
             className={`rounded-[14px] p-4.5 sm:p-5 mt-8 mb-5 flex items-start gap-3.5 shadow-xs cursor-pointer transition border ${
@@ -1407,27 +1621,48 @@ export default function CanadaReviewPage({
             </p>
           </div>
 
-          {/* ══════════════════════════════════════════════════
-              BOTTOM CTA BUTTON
-             ══════════════════════════════════════════════════ */}
+          {/* Bottom Action CTA */}
           <div>
+            {buildError && <p role="alert" className="mb-3 text-sm text-[#A3231F]">{buildError}</p>}
             <button
               type="button"
-              disabled={!canBuild}
-              onClick={() => {
-                if (onContinue) {
-                  onContinue();
+              disabled={!canBuild || isSubmittingBuild}
+              onClick={async () => {
+                if (buildSubmitLock.current) return;
+                const activeCaseId = caseId || cs?.id;
+                if (!activeCaseId) return;
+                buildSubmitLock.current = true;
+                setIsSubmittingBuild(true);
+                setBuildError("");
+                let started = false;
+                try {
+                  await fairexit.attest(activeCaseId);
+                  await fairexit.buildReport(activeCaseId);
+                  started = true;
+                } catch (err) {
+                  setBuildError(err instanceof Error ? err.message : "Could not start report generation. Please try again.");
+                } finally {
+                  setIsSubmittingBuild(false);
+                }
+                if (started) {
+                  if (onContinue) onContinue();
+                  else setIsDone(true);
                 } else {
-                  setIsDone(true);
+                  buildSubmitLock.current = false;
                 }
               }}
               className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] transition flex items-center justify-center ${
-                canBuild
+                canBuild && !isSubmittingBuild
                   ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
                   : "bg-[#C9D1D7] text-white cursor-not-allowed opacity-90"
               }`}
             >
-              {canBuild ? (
+              {isSubmittingBuild ? (
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                  <span>Starting report build…</span>
+                </div>
+              ) : canBuild ? (
                 "Build my report (PDF) →"
               ) : remainingCount > 0 ? (
                 `Confirm ${remainingCount} more to build your report`
@@ -1479,7 +1714,7 @@ export default function CanadaReviewPage({
   );
 }
 
-// ── Single Review Item Card Component with Photo 1, 2, 3 flows ──
+// ── Single Review Item Card Component ──
 function ItemCard({
   item,
   onToggleConfirm,
@@ -1507,7 +1742,7 @@ function ItemCard({
 }) {
   const cfg = CA_FIELD_CONFIGS[item.id];
 
-  // 1. PHOTO 1: Violet Changed Row with Required Acknowledgement (when user changed & not editing)
+  // 1. Changed Row with Required Acknowledgement
   if (item.userChanged && !item.isEditingInline) {
     return (
       <div className="rounded-[12px] border border-[#D8C6FA] bg-[#FAF7FD] border-l-4 border-l-[#8A50EE] p-4 sm:p-5 transition">
@@ -1528,7 +1763,7 @@ function ItemCard({
 
             {/* Comparison line */}
             <div className="text-[12.5px] text-[#7A3CE3] font-semibold mt-1">
-              Your letter: {item.originalDocumentValue || "$24,000"} → Your value: {item.value}
+              {item.source}: {item.originalDocumentValue || "Original"} → Your value: {item.value}
             </div>
 
             {/* Source and citation */}
@@ -1558,7 +1793,7 @@ function ItemCard({
           </button>
         </div>
 
-        {/* Required Acknowledgement Checkbox Box (Photo 1) */}
+        {/* Required Acknowledgement Checkbox Box */}
         <div
           onClick={onToggleUserChangeAck}
           className="bg-white border border-[#E5DCF9] rounded-[8px] p-3.5 mt-3.5 flex items-start gap-3 cursor-pointer hover:border-[#D8C6FA] transition"
@@ -1578,11 +1813,10 @@ function ItemCard({
     );
   }
 
-  // 2. CONFIRMED ROW STATE (when confirmed & not editing)
+  // 2. CONFIRMED ROW STATE
   if (item.confirmed && !item.isEditingInline) {
     return (
       <div className="rounded-[12px] bg-[#EEF8F3] border border-[#C7E6D6] p-3.5 sm:px-5 sm:py-3.5 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
-        {/* Left side: Icon, Label with colon, Value */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <svg
@@ -1613,7 +1847,6 @@ function ItemCard({
           </div>
         </div>
 
-        {/* Right side: Underlined Change text link */}
         <button
           type="button"
           onClick={onStartInlineEdit}
@@ -1625,10 +1858,9 @@ function ItemCard({
     );
   }
 
-  // 3. NORMAL OR EDITING STATE (Photo 2: Upper side original row, downside option to change accordingly)
+  // 3. NORMAL OR EDITING STATE
   return (
     <div className="rounded-[12px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-4 sm:px-5 sm:py-4">
-      {/* Upper side: Original Row (always stays visible) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1 pr-2">
           <div className="flex items-center gap-2">
@@ -1642,7 +1874,7 @@ function ItemCard({
             )}
           </div>
           <div className="font-sans font-bold text-[16px] text-[#062C55] mt-0.5">
-            {item.value}
+            {item.value || "—"}
           </div>
           <div className="font-sans text-[12.5px] text-[#5A6B78] mt-1 flex flex-wrap items-center gap-1.5">
             <span>{item.source}</span>
@@ -1661,7 +1893,6 @@ function ItemCard({
           </div>
         </div>
 
-        {/* Right side: Action Buttons */}
         <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
           {!item.hasOnlyChange && (
             <button
@@ -1682,7 +1913,6 @@ function ItemCard({
         </div>
       </div>
 
-      {/* Downside: Option to change accordingly (Photo 2) */}
       {item.isEditingInline && (
         <div className="mt-4 pt-3.5 border-t border-[#F0EFEA]">
           <ItemCardInlineEditor
@@ -1701,7 +1931,7 @@ function ItemCard({
   );
 }
 
-// ── Inline Editor Sub-component (Clean local state, Photo 2 layout) ──
+// ── Inline Editor Sub-component ──
 function ItemCardInlineEditor({
   item,
   fieldConfig,
@@ -1752,46 +1982,37 @@ function ItemCardInlineEditor({
 
   return (
     <div className="bg-[#FAF9F5] border border-[#E7E4DD] rounded-[10px] p-4 sm:p-5 space-y-3.5 animate-in fade-in duration-150">
-      {/* Top header */}
       <div className="flex items-center justify-between">
-        <span className="font-sans font-bold text-[14px] text-[#062C55]">
+        <label className="font-sans font-[700] text-[13.5px] text-[#062C55]">
           {label}
-        </span>
+        </label>
         <button
           type="button"
           onClick={onCancel}
-          className="text-[12.5px] font-semibold text-[#5A6B78] hover:text-[#062C55] cursor-pointer"
+          className="text-[12.5px] font-[600] text-[#5A6B78] hover:text-[#062C55] underline cursor-pointer"
         >
-          ✕ Cancel
+          Cancel
         </button>
       </div>
 
-      {/* Input controls based on field type */}
       <div>
-        {type === "select" ? (
-          <div className="relative w-full sm:w-[320px]">
-            <select
-              value={localInput}
-              onChange={(e) => setLocalInput(e.target.value)}
-              className="w-full h-[44px] px-3.5 pr-8 bg-white border-2 border-[#0EB28D] ring-2 ring-[#0EB28D]/20 rounded-[8px] text-[15px] font-[600] text-[#062C55] focus:outline-none appearance-none cursor-pointer"
-              autoFocus
-            >
-              {fieldConfig?.options?.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#062C55]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
+        {type === "select" && fieldConfig?.options ? (
+          <select
+            value={localInput}
+            onChange={(e) => setLocalInput(e.target.value)}
+            className="w-full sm:w-[320px] h-[44px] px-3 bg-white border-2 border-[#0EB28D] ring-2 ring-[#0EB28D]/20 rounded-[8px] text-[15px] font-[600] text-[#062C55] focus:outline-none cursor-pointer"
+            autoFocus
+          >
+            {fieldConfig.options.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
         ) : type === "date" ? (
           <input
             type="date"
-            value={localInput.includes("-") ? localInput : parseDateToISO(localInput)}
+            value={localInput}
             onChange={(e) => setLocalInput(e.target.value)}
             className="w-full sm:w-[240px] h-[44px] px-3.5 bg-white border-2 border-[#0EB28D] ring-2 ring-[#0EB28D]/20 rounded-[8px] text-[15px] font-[600] text-[#062C55] focus:outline-none cursor-pointer"
             autoFocus
@@ -1805,7 +2026,7 @@ function ItemCardInlineEditor({
               type="text"
               value={localInput.replace(/[^0-9]/g, "")}
               onChange={(e) => setLocalInput(e.target.value.replace(/[^0-9]/g, ""))}
-              placeholder={fieldConfig?.placeholder || "24000"}
+              placeholder={fieldConfig?.placeholder || "0"}
               className="w-full h-[44px] pl-8 pr-3.5 bg-white border-2 border-[#0EB28D] ring-2 ring-[#0EB28D]/20 rounded-[8px] text-[16px] font-[600] text-[#062C55] focus:outline-none"
               autoFocus
             />
@@ -1822,7 +2043,6 @@ function ItemCardInlineEditor({
         )}
       </div>
 
-      {/* Buttons: Save, Not in my documents (if document item), Not sure */}
       <div className="flex flex-wrap items-center gap-2 pt-0.5">
         <button
           type="button"
@@ -1855,11 +2075,10 @@ function ItemCardInlineEditor({
         </button>
       </div>
 
-      {/* PHOTO 3: Plausibility Alert Box */}
       {item.showPlausibilityAlert && (
         <div className="bg-[#FAF9F5] border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[10px] p-4 mt-3 animate-in fade-in duration-200">
           <p className="font-sans text-[13.5px] text-[#062C55] font-semibold mb-3">
-            That&apos;s very different from what your letter says ({item.originalDocumentValue || "$24,000"}). Is {displayVal} right?
+            That&apos;s very different from what your letter says ({item.originalDocumentValue || "original"}). Is {displayVal} right?
           </p>
           <div className="flex items-center gap-2.5">
             <button
@@ -1877,20 +2096,18 @@ function ItemCardInlineEditor({
               }}
               className="h-[36px] px-4 rounded-[7px] bg-white border border-[#D8D3C8] text-[#062C55] font-[700] text-[13px] hover:bg-[#F6F4EF] transition cursor-pointer"
             >
-              Fix it
+              Let me fix it
             </button>
           </div>
         </div>
       )}
 
-      {/* Re-reading loader state (~1.2s) */}
       {item.isReReading && (
-        <div className="p-3.5 bg-white border border-[#E7E4DD] rounded-[8px] flex items-center gap-3 mt-3">
+        <div className="flex items-center gap-2.5 p-3.5 bg-[#FAF9F5] border border-[#E7E4DD] rounded-[8px] mt-3 animate-in fade-in duration-150">
           <svg
-            className="animate-spin h-5 w-5 text-[#0EB28D]"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
+            className="animate-spin h-4 w-4 text-[#0EB28D]"
             viewBox="0 0 24 24"
+            fill="none"
           >
             <circle
               className="opacity-25"
@@ -1912,11 +2129,10 @@ function ItemCardInlineEditor({
         </div>
       )}
 
-      {/* PHOTO 2: Second Look Box */}
       {item.showSecondLook && (
         <div className="bg-[#FAF9F5] border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[10px] p-4 mt-3 animate-in fade-in duration-200">
           <p className="font-sans text-[13.5px] text-[#062C55] mb-3">
-            We looked again. Your letter{item.citation ? ", paragraph 2, says:" : `, says: ${item.originalDocumentValue}`}
+            We looked again. {item.source ? `${item.source} says:` : `Your letter says: ${item.originalDocumentValue}`}
             {item.citation && (
               <em className="block font-serif italic font-medium mt-1 text-[#17242F]">
                 &ldquo;{item.citation.replace(/^"|"$/g, "")}&rdquo;
@@ -1929,7 +2145,7 @@ function ItemCardInlineEditor({
               onClick={onUseDocumentValue}
               className="h-[36px] px-4 rounded-[7px] bg-[#062C55] hover:bg-[#041D38] text-white font-[700] text-[13px] transition cursor-pointer"
             >
-              Use {item.originalDocumentValue || "$24,000"}
+              Use {item.originalDocumentValue || "document value"}
             </button>
             <button
               type="button"

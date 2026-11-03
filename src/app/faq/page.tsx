@@ -473,6 +473,7 @@ function FaqContent() {
             width={20}
             height={14}
             className="w-5 h-3.5 object-cover rounded-[2px] shrink-0"
+            style={{ width: "auto", height: "auto" }}
             priority
           />
           <span>{isCanada ? "Canada" : "United States"} · Frequently asked questions</span>
@@ -619,6 +620,7 @@ function FaqContent() {
               width={16}
               height={11}
               className="w-4 h-[11px] object-cover rounded-[2px] shrink-0 inline-block"
+              style={{ width: "auto", height: "auto" }}
             />
             <span>{isCanada ? "US FAQ" : "Canada FAQ"}?</span>
           </button>

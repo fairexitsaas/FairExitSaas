@@ -1,9 +1,10 @@
-import { Request, Response } from 'express'
+﻿import { Request, Response } from 'express'
 import { ApiResponse } from '../utils/ApiResponse'
 import { ApiError } from '../utils/ApiError'
 import { env } from '../config/env'
 import { db } from '../config/db'
 import { caseService } from '../services/case.service'
+import { logger } from '../utils/logger'
 import { documentService } from '../services/document.service'
 import { flowService } from '../services/flow.service'
 import { paymentService } from '../services/payment.service'
@@ -116,6 +117,10 @@ export const caseController = {
   uploadSlot: async (req: Request, res: Response) => ApiResponse.created(res, await documentService.createUploadSlot(C(req), req.body), 'PUT the file to upload.url, then call /complete'),
   completeUpload: async (req: Request, res: Response) => ApiResponse.ok(res, { document: await documentService.complete(C(req), req.params.docId), ...(await documentService.list(await caseService.get(C(req).id))) }),
   uploadBase64: async (req: Request, res: Response) => ApiResponse.created(res, { document: await documentService.uploadBase64(C(req), req.body), ...(await documentService.list(await caseService.get(C(req).id))) }),
+  updateDocKind: async (req: Request, res: Response) => {
+    const doc = await documentService.updateKind(C(req), req.params.docId, req.body.kind)
+    return ApiResponse.ok(res, { document: doc, ...(await documentService.list(await caseService.get(C(req).id))) }, 'Updated')
+  },
   removeDoc: async (req: Request, res: Response) => {
     await documentService.remove(C(req), req.params.docId)
     return ApiResponse.ok(res, await documentService.list(await caseService.get(C(req).id)), 'Removed')
@@ -140,10 +145,16 @@ export const caseController = {
 
   // ---------------------------------------------------------------- report
   startBuild: async (req: Request, res: Response) => {
-    const r = await flowService.startBuild(C(req))
-    return res.status(202).json({ success: true, statusCode: 202, message: 'Building your report', data: r })
+    const r = await flowService.startBuild(C(req), req.id)
+    const statusCode = r.status === 'ready' ? 200 : 202
+    return res.status(statusCode).json({ success: true, statusCode, message: r.started ? 'Building your report' : r.status === 'ready' ? 'Report is already ready' : 'Report is already processing', data: r })
   },
-  reportStatus: async (req: Request, res: Response) => ApiResponse.ok(res, flowService.reportStatus(C(req))),
+  reportStatus: async (req: Request, res: Response) => {
+    const c = C(req)
+    const status = flowService.reportStatus(c)
+    logger.info('[STATUS][POLL]', { requestId: req.id, caseId: c.id, reportId: status.reportId, generationId: status.generationId, status: status.status, stage: status.stage })
+    return ApiResponse.ok(res, status)
+  },
   report: async (req: Request, res: Response) => ApiResponse.ok(res, flowService.report(C(req))),
   reportHtml: async (req: Request, res: Response) => {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
@@ -152,7 +163,7 @@ export const caseController = {
   },
   reportPdf: async (req: Request, res: Response) => {
     const c = C(req)
-    const buf = await flowService.pdf(c)
+    const buf = await flowService.pdf(c, req.id)
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `${req.query.download === '0' ? 'inline' : 'attachment'}; filename="FairExit-Severance-Report-${c.report_id}.pdf"`)
     res.send(buf)

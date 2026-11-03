@@ -1,3 +1,4 @@
+
 # Fairexit — Next.js + Supabase Authentication
 
 A complete, clean, and production-ready authentication implementation built with **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS**, and official **Supabase SSR** (`@supabase/ssr` & `@supabase/supabase-js`).

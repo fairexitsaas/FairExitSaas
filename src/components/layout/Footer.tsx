@@ -166,6 +166,7 @@ export default function Footer({
                     width={16}
                     height={11}
                     className="w-4 h-[11px] object-cover rounded-[2px] shrink-0 inline-block"
+                    style={{ width: "auto", height: "auto" }}
                   />
                   <span>In Canada? →</span>
                 </button>

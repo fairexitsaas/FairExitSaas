@@ -91,7 +91,8 @@ Store your environment variables in `backend/.env`.
 | `SUPABASE_ANON_KEY` | Supabase anon/publishable API key | `sb_publishable_...` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role secret key (optional for server-only jobs) | `eyJhbGci...` |
 | `RATE_LIMIT_WINDOW_MS` | Rate limit window in ms (default: 15 min) | `900000` |
-| `RATE_LIMIT_MAX` | Max general requests per window | `100` |
+| `READ_RATE_LIMIT_MAX` | Max read/poll requests per IP per window | `600` |
+| `WRITE_RATE_LIMIT_MAX` | Max write/generation requests per IP per window | `100` |
 | `AUTH_RATE_LIMIT_MAX` | Max auth requests per window | `20` |
 
 ---
@@ -241,3 +242,37 @@ Authorization: Bearer <access_token>
    - Enable Apple.
    - Enter `Service ID`, `Team ID`, `Key ID`, and the `.p8` private key.
 
+
+
+---
+
+## 9. FairExit Backend — Phase 1: Document Processing and Data Extraction
+
+### Overview
+Phase 1 implements secure document upload, Claude Call A extraction, raw response persistence, schema validation, and independent user fact review/correction storage.
+
+### Dedicated Endpoints
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1/documents` | Upload/register document (base64 or direct storage slot) |
+| `POST` | `/api/v1/documents/:id/process` | Trigger Claude Call A extraction for documents |
+| `GET` | `/api/v1/documents/:id` | Retrieve document metadata and processing status |
+| `GET` | `/api/v1/documents/:id/extracted-facts` | Retrieve immutable original AI-extracted facts |
+| `GET` | `/api/v1/documents/:id/review` | Retrieve full review data (extracted facts + user corrections) |
+| `PUT` | `/api/v1/documents/:id/review` | Save user-corrected facts independently |
+| `GET` | `/api/v1/health` | Backend service health check |
+
+### Claude Call A Integration
+- **Source Prompt:** `backend/prompts/report-prompt-v0.6.txt` (matches `codebase/prompt-claude-draft-v0.6.txt`).
+- **Prompt Integrity:** Verified via SHA-256 hash `E914AC5878FA8AD1A26D1CA4058EDAD0AA1CB9D1C70A0BD5CF483849311B7724`.
+- **Validation:** Strict runtime validation of Claude output using Zod (`callAOutputSchema`).
+- **Separation of Concerns:** Original extracted facts (`extracted_facts`) are never modified when users submit corrections (`corrected_facts`).
+
+### How to Run Tests
+```bash
+cd backend
+npm run test          # Runs all 50 unit and integration tests (Vitest)
+npm run typecheck     # Runs TypeScript verification (tsc --noEmit)
+npm run dev           # Starts development server with live reload (PORT 5000)
+```

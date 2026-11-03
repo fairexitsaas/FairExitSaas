@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getReportInputs, ReportInputs } from "@/lib/report-storage";
+import { fairexit } from "@/lib/api/fairexit";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 
 interface USReviewPageProps {
@@ -32,7 +33,6 @@ interface USReviewItem {
   showSecondLook?: boolean;
 }
 
-
 const MONTHS_MAP: Record<string, string> = {
   jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
   jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
@@ -41,7 +41,7 @@ const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Se
 
 function parseDateToISO(str?: string): string {
   if (!str) return "";
-  const m = str.match(/([a-zA-Z]{3,})\s+([0-9]{1,2}),?\s+([0-9]{4})/);
+  const m = str.match(/([a-zA-Z]{3,})s+([0-9]{1,2}),?s+([0-9]{4})/);
   if (m) {
     const mon = MONTHS_MAP[m[1].toLowerCase().slice(0, 3)];
     const day = m[2].padStart(2, "0");
@@ -190,10 +190,24 @@ export default function USReviewPage({
   const [data] = useState<ReportInputs>(() => getReportInputs());
   const [explainQuestions, setExplainQuestions] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSubmittingBuild, setIsSubmittingBuild] = useState(false);
+  const [buildError, setBuildError] = useState("");
+  const buildSubmitLock = useRef(false);
+
+  // Resolved intake answers (from server case answers or client storage)
+  const answers = (cs?.answers as Record<string, any>) || {};
+  const intakeOfferNum = answers.offer !== undefined && answers.offer !== null && answers.offer !== ""
+    ? Number(answers.offer)
+    : (data.offer !== undefined && data.offer !== null && data.offer !== "" ? Number(data.offer) : null);
 
   // ══════════════════════════════════════════════════════════
   // Section 1: Conflict resolution ("Check these first")
   // ══════════════════════════════════════════════════════════
+  const [hasNoticeConflict, setHasNoticeConflict] = useState<boolean>(false);
+  const [docNoticeVal, setDocNoticeVal] = useState<string>("");
+  const [docNoticeQuote, setDocNoticeQuote] = useState<string>("");
+  const [docNoticeWhere, setDocNoticeWhere] = useState<string>("");
+  const [intakeNoticeVal, setIntakeNoticeVal] = useState<string>("");
   const [noticeConflictChoice, setNoticeConflictChoice] = useState<"agreement" | "told" | "custom" | null>(null);
   const [showNoticeConflictCustom, setShowNoticeConflictCustom] = useState(false);
   const [noticeConflictCustomVal, setNoticeConflictCustomVal] = useState("");
@@ -211,39 +225,39 @@ export default function USReviewPage({
   const [declaredCorrect, setDeclaredCorrect] = useState(false);
 
   // ══════════════════════════════════════════════════════════
-  // Review Items (13 items total matching US Figma spec)
+  // Review Items (13 items total matching US spec)
   // ══════════════════════════════════════════════════════════
   const [items, setItems] = useState<USReviewItem[]>([
     // Section 3: About you (4 items)
     {
       id: "state",
       label: "State",
-      value: data.state || "California",
-      originalDocumentValue: data.state || "California",
+      value: answers.state || data.state || (cs?.jurisdiction as any)?.name || "California",
+      originalDocumentValue: answers.state || data.state || (cs?.jurisdiction as any)?.name || "California",
       source: "From your answers",
       confirmed: false,
     },
     {
       id: "age",
       label: "Age",
-      value: String(data.age || 52),
-      originalDocumentValue: String(data.age || 52),
+      value: answers.age !== undefined && answers.age !== null ? String(answers.age) : (data.age ? String(data.age) : ""),
+      originalDocumentValue: answers.age !== undefined && answers.age !== null ? String(answers.age) : (data.age ? String(data.age) : ""),
       source: "From your answers",
       confirmed: false,
     },
     {
       id: "years",
       label: "Years on the job",
-      value: `${data.years || 9} years`,
-      originalDocumentValue: `${data.years || 9} years`,
+      value: answers.years !== undefined && answers.years !== null ? `${answers.years} years` : (data.years ? `${data.years} years` : ""),
+      originalDocumentValue: answers.years !== undefined && answers.years !== null ? `${answers.years} years` : (data.years ? `${data.years} years` : ""),
       source: "From your answers",
       confirmed: false,
     },
     {
       id: "salary",
       label: "Pay per year",
-      value: `$${Number(data.salary || 128000).toLocaleString()}`,
-      originalDocumentValue: `$${Number(data.salary || 128000).toLocaleString()}`,
+      value: answers.salary ? `$${Number(answers.salary).toLocaleString()}` : (data.salary ? `$${Number(data.salary).toLocaleString()}` : ""),
+      originalDocumentValue: answers.salary ? `$${Number(answers.salary).toLocaleString()}` : (data.salary ? `$${Number(data.salary).toLocaleString()}` : ""),
       source: "From your answers",
       confirmed: false,
     },
@@ -252,64 +266,64 @@ export default function USReviewPage({
     {
       id: "offerMoney",
       label: "Money offered",
-      value: "$22,154 (about 9 weeks)",
-      originalDocumentValue: "$22,154 (about 9 weeks)",
-      source: "Your agreement, section 2",
-      citation: `"The Company will provide you a severance payment of $22,154, equivalent to approximately 9 weeks of base salary, subject to applicable withholdings and upon execution of this Agreement."`,
+      value: intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
       confirmed: false,
     },
     {
       id: "signRelease",
       label: "You must sign a release",
-      value: "Yes",
-      originalDocumentValue: "Yes",
-      source: "Your agreement, section 4",
-      citation: `"Payment is contingent upon the Employee delivering an executed general release of all claims against the Company."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
       confirmed: false,
     },
     {
       id: "daysToDecide",
       label: "Days to decide",
-      value: "14 days",
-      originalDocumentValue: "14 days",
-      source: "Your agreement, section 6",
-      citation: `"You have fourteen (14) days to consider this Agreement."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
       confirmed: false,
     },
     {
       id: "revocationPeriod",
       label: "7 days to change your mind after signing",
-      value: "Not mentioned",
-      originalDocumentValue: "Not mentioned",
-      source: "Your agreement, the revocation section",
-      citation: `"No revocation period is specified in this agreement."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
       confirmed: false,
     },
     {
       id: "seeAttorney",
       label: "Tells you to see an attorney",
-      value: "No",
-      originalDocumentValue: "No",
-      source: "Your agreement, the “consult an attorney” line",
-      citation: `"This agreement does not contain language advising consultation with legal counsel prior to execution."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
       confirmed: false,
     },
     {
       id: "agesTitlesList",
       label: "List of ages and job titles",
-      value: "Missing",
-      originalDocumentValue: "Missing",
-      source: "The list attached to your agreement (or its absence)",
-      citation: `"No OWBPA disclosure attachment or Exhibit containing decisional unit ages and job titles was found attached."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "The list attached to your agreement",
+      citation: "",
       confirmed: false,
     },
     {
       id: "nonCompete",
       label: "Non-compete",
-      value: "No",
-      originalDocumentValue: "No",
-      source: "Your agreement (all pages)",
-      citation: `"The agreement contains confidentiality and non-solicitation covenants, but no post-employment non-compete restriction."`,
+      value: "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
       confirmed: false,
     },
     {
@@ -327,17 +341,173 @@ export default function USReviewPage({
     {
       id: "advanceNotice",
       label: "Advance notice you got",
-      value: "12 days",
-      originalDocumentValue: "12 days",
-      source: "Your agreement, the separation date and notice section",
-      citation: `"This Agreement confirms you received 12 days' notice before your layoff date"`,
-      warningNote: "This doesn't match your answer. Choose one at the top.",
+      value: "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
       confirmed: false,
     },
   ]);
 
+  // Load real extracted facts and saved review data from backend
+  useEffect(() => {
+    const activeCaseId = caseId || cs?.id;
+    if (!activeCaseId) return;
+
+    fairexit.getReviewData(activeCaseId).then((res) => {
+      if (!res) return;
+      const facts: any[] = res.originalExtractedFacts || [];
+      const corrections: Record<string, any> = res.correctedFacts || {};
+      const checkRows: Record<string, any> = res.checkState?.rows || {};
+      const conflicts: any[] = res.reviewModel?.conflicts || [];
+
+      // 1. Process Notice Conflict
+      const confNotice = conflicts.find((c: any) => c.key === 'advance_notice');
+      const fNotice = facts.find((f: any) => f.key === 'advance_notice');
+      const intakeNotice = answers.advanceNotice || data.userAnswers?.advanceNotice || (data.flagged ? "None, or the same day" : "");
+
+      if (confNotice) {
+        setHasNoticeConflict(true);
+        setDocNoticeVal(confNotice.document.display || String(fNotice?.value || ""));
+        setDocNoticeQuote(confNotice.document.quote || fNotice?.quote || "");
+        setDocNoticeWhere(confNotice.document.where || fNotice?.where || "");
+        setIntakeNoticeVal(confNotice.answers.display || intakeNotice || "None, or the same day");
+      } else if (fNotice?.value && intakeNotice && String(fNotice.value).toLowerCase() !== intakeNotice.toLowerCase()) {
+        const dVal = String(fNotice.value).includes('day') ? String(fNotice.value) : `${fNotice.value} days`;
+        setHasNoticeConflict(true);
+        setDocNoticeVal(dVal);
+        setDocNoticeQuote(fNotice.quote || "");
+        setDocNoticeWhere(fNotice.where || "");
+        setIntakeNoticeVal(intakeNotice);
+      } else {
+        setHasNoticeConflict(false);
+        if (fNotice?.value) {
+          const dVal = String(fNotice.value).includes('day') ? String(fNotice.value) : `${fNotice.value} days`;
+          setDocNoticeVal(dVal);
+        }
+      }
+
+      // 2. Process Last Day of Work (check if present in agreement)
+      const fLastDay = facts.find((f: any) => f.key === 'last_day');
+      if (fLastDay?.value) {
+        setLastDayWork(String(fLastDay.value));
+        setLastDayWorkSaved(true);
+      }
+
+      // 3. Update items from extracted facts and review rows
+      const allModelRows: any[] = [];
+      if (res.reviewModel?.groups) {
+        for (const grp of res.reviewModel.groups) {
+          if (Array.isArray(grp.rows)) {
+            allModelRows.push(...grp.rows);
+          }
+        }
+      }
+
+      setItems((prev) =>
+        prev.map((item) => {
+          const keyMap: Record<string, string> = {
+            state: 'state',
+            age: 'age',
+            years: 'years',
+            salary: 'pay',
+            offerMoney: 'offer_amount',
+            signRelease: 'release_required',
+            daysToDecide: 'days_to_decide',
+            revocationPeriod: 'take_back',
+            seeAttorney: 'attorney_line',
+            agesTitlesList: 'age_list',
+            nonCompete: 'non_compete',
+            lastDayAgreement: 'last_day',
+            advanceNotice: 'advance_notice',
+          };
+          const factKey = keyMap[item.id] || item.id;
+          const modelRow = allModelRows.find((r: any) => r.key === factKey);
+
+          const fact = facts.find((f: any) => f.key === factKey);
+          const correction = corrections[factKey];
+          const checkRow = checkRows[factKey];
+
+          let origVal = item.originalDocumentValue || "";
+          let cit = item.citation || "";
+          let src = item.source;
+          let val = item.value;
+          let warningNote = item.warningNote;
+          let confirmed = item.confirmed;
+          let userChanged = item.userChanged;
+          let userChangeAck = item.userChangeAck;
+
+          if (fact && fact.value !== null && fact.value !== undefined && fact.value !== "") {
+            let formatted = String(fact.value);
+            if (factKey === 'offer_amount') {
+              const n = Number(formatted.replace(/[^0-9.]/g, ''));
+              formatted = n > 0 ? `$${n.toLocaleString()}` : formatted;
+              const pay = Number(answers.salary || data.salary || 0);
+              if (pay > 0 && n > 0) {
+                const wks = Math.round(n / (pay / 52));
+                if (wks > 0) formatted += ` (about ${wks} weeks)`;
+              }
+            } else if (factKey === 'days_to_decide') {
+              formatted = formatted.includes('day') ? formatted : `${formatted} days`;
+            } else if (factKey === 'advance_notice') {
+              formatted = formatted.includes('day') ? formatted : `${formatted} days`;
+            } else if (factKey === 'release_required') {
+              formatted = /yes|true|full/i.test(formatted) ? "Yes" : /no/i.test(formatted) ? "No" : formatted;
+            } else if (factKey === 'take_back') {
+              formatted = formatted === '7_days' || formatted === '7' ? "7 days" : /not/i.test(formatted) ? "Not mentioned" : formatted;
+            } else if (factKey === 'attorney_line') {
+              formatted = /yes|advis/i.test(formatted) ? "Yes" : /no/i.test(formatted) ? "No" : formatted;
+            } else if (factKey === 'age_list') {
+              formatted = /provided|given|yes/i.test(formatted) ? "Provided" : /miss|no/i.test(formatted) ? "Missing" : formatted;
+            } else if (factKey === 'non_compete') {
+              formatted = /yes/i.test(formatted) ? "Yes" : /no/i.test(formatted) ? "No" : formatted;
+            }
+
+            origVal = formatted;
+            val = formatted;
+            if (fact.quote) {
+              cit = fact.where ? `"${fact.quote}" · ${fact.where}` : `"${fact.quote}"`;
+            }
+            if (fact.where) {
+              src = `Your agreement, ${fact.where}`;
+            }
+            if (item.id === 'lastDayAgreement') {
+              warningNote = undefined;
+            }
+          }
+
+          if (checkRow) {
+            if (checkRow.status === 'confirmed') confirmed = true;
+            if (checkRow.status === 'corrected') {
+              userChanged = true;
+              val = String(checkRow.user_value ?? checkRow.value);
+              userChangeAck = !!checkRow.change_ack;
+            }
+          } else if (correction) {
+            userChanged = true;
+            val = String(correction.user_value);
+            userChangeAck = !!correction.change_ack;
+            if (correction.status === 'confirmed') confirmed = true;
+          }
+
+          return {
+            ...item,
+            value: val,
+            originalDocumentValue: origVal,
+            source: src,
+            citation: cit,
+            warningNote,
+            confirmed,
+            userChanged,
+            userChangeAck,
+          };
+        })
+      );
+    }).catch((e) => console.warn('Could not load US review data:', e));
+  }, [caseId, cs, intakeOfferNum]);
+
   // Confirmation counting
-  const totalCount = 13;
+  const totalCount = items.length;
   const confirmedItemsCount = items.filter((i) => {
     if (i.userChanged) {
       return i.userChangeAck === true;
@@ -345,14 +515,13 @@ export default function USReviewPage({
     return i.confirmed === true;
   }).length;
 
-  const conflictConfirmed = noticeConflictChoice !== null ? 1 : 0;
+  const conflictConfirmed = !hasNoticeConflict || noticeConflictChoice !== null ? 1 : 0;
   const missingLastDayConfirmed = lastDayWorkSaved ? 1 : 0;
 
-  // An item counts towards 13
   const confirmedCount = Math.min(
     totalCount,
     confirmedItemsCount +
-      (conflictConfirmed > 0 && !items.find((i) => i.id === "advanceNotice")?.confirmed ? 1 : 0) +
+      (hasNoticeConflict && conflictConfirmed > 0 && !items.find((i) => i.id === "advanceNotice")?.confirmed ? 1 : 0) +
       (missingLastDayConfirmed > 0 && !items.find((i) => i.id === "lastDayAgreement")?.confirmed ? 1 : 0)
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
@@ -362,12 +531,22 @@ export default function USReviewPage({
 
   // ── Handlers ──
   const toggleConfirm = (id: string) => {
+    const item = items.find((i) => i.id === id);
+    const newConfirmed = !item?.confirmed;
     setItems((prev) =>
-      prev.map((item) => {
-        if (item.id !== id) return item;
-        return { ...item, confirmed: !item.confirmed };
-      })
+      prev.map((i) => (i.id === id ? { ...i, confirmed: newConfirmed } : i))
     );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId && newConfirmed) {
+      const keyMap: Record<string, string> = {
+        state: 'usState', age: 'age', years: 'years', salary: 'salary',
+        offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
+        revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
+        nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
+      };
+      const factKey = keyMap[id] || id;
+      fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: item?.value }).catch(() => {});
+    }
   };
 
   const handleConfirmAll = () => {
@@ -376,25 +555,29 @@ export default function USReviewPage({
         ...item,
         value:
           item.id === "lastDayAgreement" && (item.value === "Not in your agreement" || !lastDayWork)
-            ? "Oct 31, 2026"
+            ? (item.originalDocumentValue && item.originalDocumentValue !== "Not in your agreement" ? item.originalDocumentValue : (lastDayWork || "Not specified"))
             : item.value,
         warningNote: undefined,
         confirmed: true,
         userChangeAck: item.userChanged ? true : item.userChangeAck,
       }))
     );
-    setLastDayWork((prev) => prev || "Oct 31, 2026");
+    if (hasNoticeConflict) setNoticeConflictChoice("agreement");
+    setLastDayWork((prev) => prev || items.find(i => i.id === "lastDayAgreement")?.value || "");
     setLastDayWorkSaved(true);
-    setNoticeConflictChoice("agreement");
     setDeclaredCorrect(true);
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {});
+    }
   };
 
   const handleChooseNoticeConflict = (choice: "agreement" | "told" | "custom", customVal?: string) => {
     setNoticeConflictChoice(choice);
     setShowNoticeConflictCustom(false);
-    let chosenVal = "12 days";
+    let chosenVal = docNoticeVal;
     if (choice === "told") {
-      chosenVal = "None, or the same day";
+      chosenVal = intakeNoticeVal || "None, or the same day";
     } else if (choice === "custom" && customVal) {
       chosenVal = customVal;
     }
@@ -405,10 +588,15 @@ export default function USReviewPage({
           : i
       )
     );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { key: 'advance_notice', action: choice === 'custom' ? 'change' : 'confirm', value: chosenVal }).catch(() => {});
+    }
   };
 
   const handleSaveLastDay = (dayStr: string) => {
-    const finalVal = dayStr.trim() ? dayStr : "Oct 31, 2026";
+    const finalVal = dayStr.trim() ? dayStr : "";
+    if (!finalVal) return;
     setLastDayWork(finalVal);
     setLastDayWorkSaved(true);
     setItems((prev) =>
@@ -418,6 +606,10 @@ export default function USReviewPage({
           : i
       )
     );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { key: 'last_day', action: 'change', value: finalVal }).catch(() => {});
+    }
   };
 
   const handleUndoLastDay = () => {
@@ -431,7 +623,7 @@ export default function USReviewPage({
     );
   };
 
-    const startInlineEdit = (id: string) => {
+  const startInlineEdit = (id: string) => {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
@@ -472,7 +664,7 @@ export default function USReviewPage({
     );
   };
 
-    const handleSaveInline = (id: string, inputVal: string, force = false) => {
+  const handleSaveInline = (id: string, inputVal: string, force = false) => {
     const item = items.find((i) => i.id === id);
     if (!item) return;
 
@@ -484,7 +676,6 @@ export default function USReviewPage({
       formattedVal = cfg.formatSave(formattedVal);
     }
 
-    // Photo 3 Plausibility check: Far from original document value (only for dollar fields)
     if (cfg?.type === "dollar") {
       const cleanNum = Number(inputVal.replace(/[^0-9]/g, ""));
       const origNum = Number(item.originalDocumentValue?.replace(/[^0-9]/g, "") || 0);
@@ -500,7 +691,6 @@ export default function USReviewPage({
     const isChangedFromDoc = isDocItem && formattedVal !== item.originalDocumentValue;
 
     if (isChangedFromDoc) {
-      // Photo 2: Re-reading state ("Looking again at your document…") ~1.2s
       setItems((prev) =>
         prev.map((i) =>
           i.id === id
@@ -519,14 +709,12 @@ export default function USReviewPage({
         );
       }, 1200);
     } else {
-      // Direct save for intake answers or when matching document value
       setItems((prev) =>
         prev.map((i) =>
           i.id === id
             ? {
                 ...i,
                 value: formattedVal,
-                warningNote: undefined,
                 isEditingInline: false,
                 confirmed: true,
                 userChanged: false,
@@ -535,6 +723,16 @@ export default function USReviewPage({
             : i
         )
       );
+      const activeCaseId = caseId || cs?.id;
+      if (activeCaseId) {
+        const keyMap: Record<string, string> = {
+        state: 'state', age: 'age', years: 'years', salary: 'pay',
+        offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
+        revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
+        nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
+      };
+      fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
+      }
     }
   };
 
@@ -561,7 +759,7 @@ export default function USReviewPage({
     );
   };
 
-    const handleKeepUserValue = (id: string) => {
+  const handleKeepUserValue = (id: string) => {
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
@@ -576,9 +774,8 @@ export default function USReviewPage({
         return {
           ...item,
           value: formattedVal,
-          warningNote: undefined,
           userChanged: true,
-          userChangeAck: false, // Requires acknowledgement checkbox (Photo 1)
+          userChangeAck: false,
           confirmed: false,
           isEditingInline: false,
           showSecondLook: false,
@@ -608,7 +805,7 @@ export default function USReviewPage({
   return (
     <div className="min-h-screen bg-[#F6F4EF] text-[#17242F] font-sans antialiased selection:bg-[#0EB28D]/20 pb-20">
       {/* ── Top Header Navigation ── */}
-      <header className="w-full bg-[#F6F4EF]/92 backdrop-blur-md border-b border-[#E7E4DD] px-4 lg:px-[40px] h-[51px] sm:h-[57px] flex items-center sticky top-0 z-40">
+      <header className="w-full bg-[#F6F4EF]/92 backdrop-blur-md border-b border-[#E7E4DD] px-4 lg:px-[40px] h-[57px] flex items-center sticky top-0 z-40">
         <div className="w-full max-w-[1200px] mx-auto flex items-center justify-between">
           <Link href="/" className="flex items-center group">
             <Image
@@ -644,7 +841,7 @@ export default function USReviewPage({
         </div>
       </header>
 
-      {/* ── Stepper Navigation (US Steps) ── */}
+      {/* ── Stepper Navigation ── */}
       <div className="w-full max-w-[720px] mx-auto px-4 pt-6 pb-2">
         <div className="relative flex items-center justify-between pb-3">
           <div
@@ -666,10 +863,10 @@ export default function USReviewPage({
           )}
 
           {[
-            { label: "Situation", done: true },
-            { label: "The layoff", done: true },
-            { label: "The papers", done: true },
-            { label: "Key question", done: true },
+            { label: "Eligible", done: true },
+            { label: "Basics", done: true },
+            { label: "Money", done: true },
+            { label: "Key questions", done: true },
             { label: "Details", done: true },
             { label: "Your results", active: true },
           ].map((st, i) => (
@@ -685,33 +882,29 @@ export default function USReviewPage({
                   className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-extrabold ${
                     st.done
                       ? "bg-[#0EB28D] text-white border border-[#0EB28D]"
-                      : "bg-[#062C55] text-white border border-[#062C55]"
+                      : st.active
+                      ? "bg-[#062C55] text-white border border-[#062C55]"
+                      : "bg-white text-[#8A96A0] border border-[#D8D3C8]"
                   }`}
                 >
-                  {st.done ? "✓" : "✦"}
+                  {st.done ? "✓" : st.active ? "✦" : ""}
                 </div>
               )}
-              <div className="mt-1.5 text-center">
-                {st.active ? (
-                  <>
-                    <span className="hidden sm:inline font-sans font-[800] text-[11px] leading-[17px] text-[#062C55]">
-                      Your results
-                    </span>
-                    <span className="sm:hidden block font-sans font-[800] text-[10.5px] leading-[14px] text-[#062C55]">
-                      Your<br />results
-                    </span>
-                  </>
-                ) : (
-                  <span className="font-sans font-[600] text-[11px] leading-[17px] text-[#0C8F72]">
-                    {st.label}
-                  </span>
-                )}
-              </div>
+              <span
+                className={`font-sans font-[600] text-[11px] leading-[17px] mt-1.5 ${
+                  st.done
+                    ? "text-[#0C8F72]"
+                    : st.active
+                    ? "text-[#062C55] font-extrabold"
+                    : "text-[#8A96A0]"
+                }`}
+              >
+                {st.label}
+              </span>
             </div>
           ))}
         </div>
 
-        {/* Stepper sub-bar: step indicator & toggle */}
         <div className="flex items-center justify-between mt-3 text-[12px] text-[#5A6B78] border-b border-[#E7E4DD] pb-3">
           <div className="font-bold tracking-tight text-[#5A6B78]">
             Your report · Step 2 of 3 · Check everything
@@ -743,22 +936,19 @@ export default function USReviewPage({
         </div>
       </div>
 
-      {/* ── Main Single-Column Card (720px) ── */}
+      {/* ── Main Single-Column 720px Card ── */}
       <main className="w-full max-w-[720px] mx-auto px-4 mt-4">
-        <div className="bg-white border border-[#E7E4DD] rounded-[12px] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] p-5 sm:p-7 md:p-8">
-          {/* Pill Tag */}
-          <div className="inline-flex items-center px-3.5 py-1 bg-white border border-[#E7E4DD] rounded-[6px] text-[12px] font-[700] text-[#062C55] mb-4">
-            Your report · check
+        <div className="bg-white border border-[#E7E4DD] rounded-[14px] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] p-5 sm:p-7 md:p-8">
+          <div className="inline-flex items-center px-3 py-1 bg-white border border-[#E7E4DD] rounded-[6px] text-[12px] font-[700] text-[#062C55] mb-4">
+            We read your documents
           </div>
 
-          {/* Heading */}
           <h1 className="font-serif font-[500] text-[24px] sm:text-[27px] leading-[1.15] text-[#062C55] tracking-[-0.5px] mb-3">
             Check everything your report will use
           </h1>
 
-          {/* Lead Paragraph */}
           <p className="font-sans font-normal text-[15px] sm:text-[15.5px] leading-[24px] text-[#17242F] mb-6">
-            We&apos;ve read your separation agreement and contract. Before we build your report, check that everything we found is right. Your report is built only on what you confirm here. About 2 minutes.
+            We&apos;ve read your severance agreement. Before we build your report, check that everything we found is right. Your report is built only on what you confirm here. About 2 minutes.
           </p>
 
           {/* Progress Card */}
@@ -769,7 +959,7 @@ export default function USReviewPage({
                   All set
                 </span>
                 <span className="font-sans font-[400] text-[13px] text-[#5A6B78]">
-                  13 of 13 confirmed
+                  {confirmedCount} of {totalCount} confirmed
                 </span>
               </div>
               <div className="w-full h-[4px] bg-[#EEF1F3] rounded-[2px] mt-2.5 overflow-hidden">
@@ -806,13 +996,10 @@ export default function USReviewPage({
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════
-              SECTION 1: Check these first (Conflict Card)
-              (Hidden in All Confirmed state, matches Photo 4)
-             ══════════════════════════════════════════════════ */}
-          {!isAllConfirmed && noticeConflictChoice === null && (
+          {/* SECTION 1: Check these first (Conflict card if exists) */}
+          {hasNoticeConflict && (
             <div className="mb-8">
-              <div className="flex flex-wrap items-baseline gap-2 mb-3">
+              <div className="flex items-baseline gap-2 mb-3">
                 <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
                   Check these first
                 </h2>
@@ -821,7 +1008,6 @@ export default function USReviewPage({
                 </span>
               </div>
 
-              {/* Conflict Card: Advance notice you got */}
               <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
                 <span className="font-sans font-[700] text-[12px] tracking-[0.5px] text-[#5A6B78] uppercase block mb-1">
                   ADVANCE NOTICE YOU GOT
@@ -830,7 +1016,6 @@ export default function USReviewPage({
                   Which is right?
                 </h3>
 
-                {/* Two Comparison Tiles */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* Tile 1: Your agreement says */}
                   <div
@@ -845,13 +1030,15 @@ export default function USReviewPage({
                         Your agreement says
                       </span>
                       <span className="font-sans font-bold text-[18px] text-[#062C55] block mt-0.5">
-                        12 days
+                        {docNoticeVal || "—"}
                       </span>
-                      <p className="font-serif italic text-[14.5px] text-[#17242F] mt-2 mb-3 leading-[20px]">
-                        &ldquo;This Agreement confirms you received 12 days&apos; notice before your layoff date&rdquo;
-                      </p>
+                      {docNoticeQuote && (
+                        <p className="font-serif italic text-[14.5px] text-[#17242F] mt-2 mb-3 leading-[20px]">
+                          &ldquo;{docNoticeQuote}&rdquo;
+                        </p>
+                      )}
                       <span className="font-sans text-[12px] text-[#5A6B78] block">
-                        Your agreement, the separation date and notice section
+                        {docNoticeWhere ? `Your agreement, ${docNoticeWhere}` : "Your agreement"}
                       </span>
                     </div>
                     <button
@@ -880,7 +1067,7 @@ export default function USReviewPage({
                         You told us
                       </span>
                       <span className="font-sans font-bold text-[18px] text-[#062C55] block mt-0.5">
-                        None, or the same day
+                        {intakeNoticeVal || "None, or the same day"}
                       </span>
                       <p className="font-sans text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[18px]">
                         Based on your initial intake answers.
@@ -952,76 +1139,46 @@ export default function USReviewPage({
             </div>
           )}
 
-          {/* ══════════════════════════════════════════════════
-              SECTION 2: We need one more answer
-              (Collapses to confirmed green row with Undo in All Confirmed state)
-             ══════════════════════════════════════════════════ */}
-          <div className="mb-8">
-            <h2 className="font-sans font-[700] text-[17px] text-[#062C55] mb-3">
-              We need one more answer
-            </h2>
-
-            {lastDayWorkSaved ? (
-              /* Photo 4 Collapsed Green Confirmed Row */
-              <div className="rounded-[14px] bg-[#EEF8F3] border border-[#C7E6D6] border-l-4 border-l-[#0EB28D] p-3.5 sm:px-4 sm:py-3 flex items-center justify-between shadow-xs">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-[20px] h-[20px] rounded-full bg-[#0C8F72] text-white flex items-center justify-center text-[11px] font-bold shrink-0">
-                    ✓
-                  </div>
-                  <div className="font-sans text-[14px]">
-                    <span className="font-bold text-[#062C55]">Last day of work</span>{" "}
-                    <span className="text-[#17242F] ml-1">{lastDayWork || "Oct 31, 2026"}</span>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleUndoLastDay}
-                  className="font-sans font-[700] text-[13.5px] text-[#0C8F72] underline hover:opacity-80 cursor-pointer"
-                >
-                  Undo
-                </button>
+          {/* SECTION 2: We need one more answer (Only if last day not specified yet) */}
+          {!lastDayWorkSaved && (
+            <div className="mb-8">
+              <div className="flex items-baseline gap-2 mb-3">
+                <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
+                  We need one more answer
+                </h2>
+                <span className="font-sans font-normal text-[12.5px] text-[#5A6B78]">
+                  your agreement doesn&apos;t say
+                </span>
               </div>
-            ) : (
-              <div className="bg-[#F4F8FC] border border-[#D3E1F0] border-l-4 border-l-[#2F6FB0] rounded-[14px] p-5 sm:p-6 shadow-xs">
-                <p className="font-sans font-[700] text-[15.5px] leading-[24px] text-[#062C55] mb-1">
+
+              <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#2F6AA3] rounded-[14px] p-5 sm:p-6 shadow-xs">
+                <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#2F6AA3] uppercase block mb-1">
+                  LAST DAY OF WORK
+                </span>
+                <p className="font-sans font-[700] text-[15px] sm:text-[16px] text-[#062C55] mb-3.5">
                   What was (or will be) your last day of work?
-                </p>
-                <p className="font-sans text-[12.5px] leading-[19px] text-[#5A6B78] mb-3.5">
-                  Your agreement doesn&apos;t say. Your deadlines are counted from this day.
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2.5">
                   <input
-                    type="text"
-                    placeholder="e.g. Oct 31, 2026"
-                    value={lastDayWork}
-                    onChange={(e) => {
-                      setLastDayWork(e.target.value);
-                    }}
-                    className="w-full sm:w-[240px] h-[44px] px-3.5 bg-white border border-[#CDD3D8] rounded-[10px] text-[15px] font-[600] text-[#062C55] placeholder:text-[#8A96A0] focus:outline-none focus:ring-1 focus:ring-[#2F6FB0]"
+                    type="date"
+                    value={lastDayWork ? (parseDateToISO(lastDayWork) || lastDayWork) : ""}
+                    onChange={(e) => setLastDayWork(formatDateFromISO(e.target.value) || e.target.value)}
+                    className="h-[45.5px] px-3.5 bg-[#FFFDF5] border border-[#E7C074] border-l-4 border-l-[#E7B74D] rounded-[10px] text-[15px] font-[600] text-[#062C55] focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => handleSaveLastDay(lastDayWork)}
-                    className="h-[44px] px-5 rounded-[9px] font-sans font-[700] text-[14px] bg-[#2F6FB0] hover:bg-[#25588C] text-white transition cursor-pointer flex items-center justify-center"
+                    className="h-[45.5px] px-5 rounded-[10px] bg-[#062C55] hover:bg-[#041D38] text-white font-sans font-[700] text-[14px] transition cursor-pointer"
                   >
                     Save
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSaveLastDay("Not sure")}
-                    className="h-[44px] px-4 rounded-[10px] bg-white border border-[#CDD3D8] text-[#062C55] font-sans font-[700] text-[14px] hover:bg-[#F6F4EF] transition cursor-pointer"
-                  >
-                    Not sure
-                  </button>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* ══════════════════════════════════════════════════
-              SECTION 3: About you (you told us) - 4 items
-             ══════════════════════════════════════════════════ */}
+          {/* SECTION 3: About you (you told us) */}
           <div className="mb-8">
             <div className="flex items-baseline gap-2 mb-3">
               <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
@@ -1054,9 +1211,7 @@ export default function USReviewPage({
             </div>
           </div>
 
-          {/* ══════════════════════════════════════════════════
-              SECTION 4: Your agreement (from your documents) - 8 items
-             ══════════════════════════════════════════════════ */}
+          {/* SECTION 4: Your agreement (from your documents) */}
           <div className="mb-8">
             <div className="flex items-baseline gap-2 mb-3">
               <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
@@ -1089,9 +1244,7 @@ export default function USReviewPage({
             </div>
           </div>
 
-          {/* ══════════════════════════════════════════════════
-              SECTION 5: The layoff (from your documents) - 1 item
-             ══════════════════════════════════════════════════ */}
+          {/* SECTION 5: The layoff (from your documents) */}
           <div className="mb-8">
             <div className="flex items-baseline gap-2 mb-3">
               <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
@@ -1124,13 +1277,10 @@ export default function USReviewPage({
             </div>
           </div>
 
-          {/* ══════════════════════════════════════════════════
-              CONFIRMATION CHECKBOX CARD
-              (Pre-ticked in all confirmed, adds 'This includes X changes')
-             ══════════════════════════════════════════════════ */}
+          {/* Confirmation Checkbox Box */}
           <div
             onClick={() => setDeclaredCorrect(!declaredCorrect)}
-            className={`rounded-[12px] p-4.5 sm:p-5 mt-8 mb-5 flex items-start gap-3.5 shadow-xs cursor-pointer transition border ${
+            className={`rounded-[14px] p-4.5 sm:p-5 mt-8 mb-5 flex items-start gap-3.5 shadow-xs cursor-pointer transition border ${
               declaredCorrect
                 ? "bg-[#EEF8F3] border-[#0C8F72]"
                 : "bg-white border-[#E7E4DD] hover:border-[#C9D1D7]"
@@ -1145,7 +1295,7 @@ export default function USReviewPage({
             >
               {declaredCorrect && "✓"}
             </div>
-            <p className="font-sans font-[700] text-[14px] leading-[21px] text-[#062C55] select-none">
+            <p className="font-sans font-[700] text-[14.5px] leading-[22px] text-[#17242F] select-none">
               I&apos;ve checked each item against my documents and confirmed it&apos;s correct to the best of my knowledge. I understand my report is built on what I confirmed here.
               {changedItemsCount > 0 && (
                 <span className="block mt-1 font-bold text-[#7A3CE3]">
@@ -1155,27 +1305,48 @@ export default function USReviewPage({
             </p>
           </div>
 
-          {/* ══════════════════════════════════════════════════
-              BOTTOM CTA BUTTON
-             ══════════════════════════════════════════════════ */}
+          {/* Bottom Action CTA */}
           <div>
+            {buildError && <p role="alert" className="mb-3 text-sm text-[#A3231F]">{buildError}</p>}
             <button
               type="button"
-              disabled={!canBuild}
-              onClick={() => {
-                if (onContinue) {
-                  onContinue();
+              disabled={!canBuild || isSubmittingBuild}
+              onClick={async () => {
+                if (buildSubmitLock.current) return;
+                const activeCaseId = caseId || cs?.id;
+                if (!activeCaseId) return;
+                buildSubmitLock.current = true;
+                setIsSubmittingBuild(true);
+                setBuildError("");
+                let started = false;
+                try {
+                  await fairexit.attest(activeCaseId);
+                  await fairexit.buildReport(activeCaseId);
+                  started = true;
+                } catch (err) {
+                  setBuildError(err instanceof Error ? err.message : "Could not start report generation. Please try again.");
+                } finally {
+                  setIsSubmittingBuild(false);
+                }
+                if (started) {
+                  if (onContinue) onContinue();
+                  else setIsDone(true);
                 } else {
-                  setIsDone(true);
+                  buildSubmitLock.current = false;
                 }
               }}
-              className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] leading-[22px] transition flex items-center justify-center ${
-                canBuild
+              className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] transition flex items-center justify-center ${
+                canBuild && !isSubmittingBuild
                   ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
-                  : "bg-[#D6DCDA] text-[#33424E] cursor-not-allowed opacity-90"
+                  : "bg-[#C9D1D7] text-white cursor-not-allowed opacity-90"
               }`}
             >
-              {canBuild ? (
+              {isSubmittingBuild ? (
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                  <span>Starting report build…</span>
+                </div>
+              ) : canBuild ? (
                 "Build my report (PDF) →"
               ) : remainingCount > 0 ? (
                 `Confirm ${remainingCount} more to build your report`
@@ -1255,9 +1426,7 @@ function USItemCard({
 }) {
   const cfg = US_FIELD_CONFIGS[item.id];
 
-  // ══════════════════════════════════════════════════════════
-  // PHOTO 1: Violet Changed Row with Required Acknowledgement (when user changed & not editing)
-  // ══════════════════════════════════════════════════════════
+  // 1. Changed Row with Required Acknowledgement
   if (item.userChanged && !item.isEditingInline) {
     return (
       <div className="rounded-[12px] border border-[#D8C6FA] bg-[#FAF7FD] border-l-4 border-l-[#8A50EE] p-4 sm:p-5 transition">
@@ -1278,7 +1447,7 @@ function USItemCard({
 
             {/* Comparison line */}
             <div className="text-[12.5px] text-[#7A3CE3] font-semibold mt-1">
-              Your agreement: {item.originalDocumentValue || "14 days"} → Your value: {item.value}
+              {item.source}: {item.originalDocumentValue || "Original"} → Your value: {item.value}
             </div>
 
             {/* Source and citation */}
@@ -1308,7 +1477,7 @@ function USItemCard({
           </button>
         </div>
 
-        {/* Required Acknowledgement Checkbox Box (Photo 1) */}
+        {/* Required Acknowledgement Checkbox Box */}
         <div
           onClick={onToggleUserChangeAck}
           className="bg-white border border-[#E5DCF9] rounded-[8px] p-3.5 mt-3.5 flex items-start gap-3 cursor-pointer hover:border-[#D8C6FA] transition"
@@ -1328,58 +1497,58 @@ function USItemCard({
     );
   }
 
-  // ══════════════════════════════════════════════════════════
-  // CONFIRMED ROW STATE (Photos 4 & 5: One line collapsed with tick)
-  // ══════════════════════════════════════════════════════════
+  // 2. CONFIRMED ROW STATE
   if (item.confirmed && !item.isEditingInline) {
     return (
-      <div className="rounded-[12px] bg-[#EEF8F3] border border-[#C7E6D6] p-3 sm:px-4 sm:py-2.5 transition">
-        <div className="w-full">
-          <div className="flex items-center justify-between">
-            <span className="font-sans font-[600] text-[14.5px] text-[#062C55]">
-              {item.label}:
-            </span>
-            <div className="flex items-center gap-1.5">
-              <div className="w-[18px] h-[18px] rounded-full bg-[#0C8F72] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-                ✓
-              </div>
-              <span className="font-sans font-[700] text-[14.5px] text-[#062C55]">
-                {item.value}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center justify-between mt-0.5">
-            <span className="font-sans text-[12px] text-[#5A6B78]">
-              {item.source}
-            </span>
-            <button
-              type="button"
-              onClick={onStartInlineEdit}
-              className="font-sans font-[700] text-[13px] text-[#5A6B78] underline hover:text-[#062C55] cursor-pointer"
+      <div className="rounded-[12px] bg-[#EEF8F3] border border-[#C7E6D6] p-3.5 sm:px-5 sm:py-3.5 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <svg
+              className="w-4 h-4 shrink-0 text-[#0C8F72]"
+              viewBox="0 0 16 16"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              Change
-            </button>
+              <path
+                d="M3.5 8.5L6.5 11.5L12.5 4.5"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="font-sans font-[600] text-[15.5px] leading-[21px] text-[#062C55]">
+              {item.label} :
+            </span>
+          </div>
+          <div className="font-sans font-[600] text-[15px] leading-[24px] text-[#17242F] pl-[24px] mt-0.5">
+            {item.value}
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={onStartInlineEdit}
+          className="font-sans font-[700] text-[13px] leading-[20px] text-[#5A6B78] underline hover:text-[#062C55] transition cursor-pointer self-start sm:self-center ml-[24px] sm:ml-0 shrink-0"
+        >
+          Change
+        </button>
       </div>
     );
   }
 
-  // ══════════════════════════════════════════════════════════
-  // NORMAL OR EDITING STATE (Photo 2: Upper side original row, downside option to change accordingly)
-  // ══════════════════════════════════════════════════════════
+  // 3. NORMAL OR EDITING STATE
   return (
     <div className="rounded-[12px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-4 sm:px-5 sm:py-4">
-      {/* Upper side: Original Row (always stays visible) */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1 pr-2">
-          <span className="font-sans font-[600] text-[15.5px] leading-[21px] text-[#062C55] block">
+          <div className="font-sans font-normal text-[13px] text-[#5A6B78]">
             {item.label}
-          </span>
-          <div className="font-sans font-[700] text-[16px] leading-[25px] text-[#062C55] mt-0.5">
-            {item.value}
           </div>
-          <div className="font-sans text-[12.5px] leading-[20px] text-[#5A6B78] mt-1 flex flex-wrap items-center gap-1.5">
+          <div className="font-sans font-bold text-[16px] text-[#062C55] mt-0.5">
+            {item.value || "—"}
+          </div>
+          <div className="font-sans text-[12.5px] text-[#5A6B78] mt-1 flex flex-wrap items-center gap-1.5">
             <span>{item.source}</span>
             {item.citation && (
               <>
@@ -1387,7 +1556,7 @@ function USItemCard({
                 <button
                   type="button"
                   onClick={() => onViewCitation(item.citation!)}
-                  className="font-sans font-[700] text-[12.5px] leading-[20px] text-[#0C8F72] hover:opacity-80 underline cursor-pointer"
+                  className="text-[#0C8F72] underline hover:opacity-80 font-medium cursor-pointer"
                 >
                   See the words
                 </button>
@@ -1395,19 +1564,18 @@ function USItemCard({
             )}
           </div>
           {item.warningNote && (
-            <div className="font-sans text-[12.5px] leading-[20px] text-[#8A5A00] mt-1">
+            <div className="text-[12px] text-[#B07A00] font-medium mt-1">
               {item.warningNote}
             </div>
           )}
         </div>
 
-        {/* Right side: Action Buttons */}
         <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
           {!item.hasOnlyChange && (
             <button
               type="button"
               onClick={onToggleConfirm}
-              className="w-[88px] h-[44px] rounded-[10px] bg-white border border-[#0C8F72] hover:bg-[#0C8F72]/5 text-[#0C8F72] font-sans font-[700] text-[14px] leading-[22px] transition cursor-pointer flex items-center justify-center"
+              className="h-[40px] px-5 rounded-[10px] font-sans font-[700] text-[14px] transition cursor-pointer flex items-center justify-center gap-1.5 bg-white border border-[#0C8F72] text-[#0C8F72] hover:bg-[#0C8F72]/5"
             >
               Yes
             </button>
@@ -1415,14 +1583,13 @@ function USItemCard({
           <button
             type="button"
             onClick={onStartInlineEdit}
-            className="w-[88px] h-[44px] rounded-[10px] bg-white border border-[#CDD3D8] hover:bg-[#F6F4EF] text-[#062C55] font-sans font-[700] text-[14px] leading-[22px] transition cursor-pointer flex items-center justify-center"
+            className="w-[88px] h-[40px] rounded-[10px] bg-white border border-[#D8D3C8] text-[#062C55] font-sans font-[700] text-[14px] hover:bg-[#F6F4EF] transition cursor-pointer flex items-center justify-center"
           >
             Change
           </button>
         </div>
       </div>
 
-      {/* Downside: Option to change accordingly (Photo 2) */}
       {item.isEditingInline && (
         <div className="mt-4 pt-3.5 border-t border-[#F0EFEA]">
           <USItemCardInlineEditor
@@ -1441,7 +1608,7 @@ function USItemCard({
   );
 }
 
-// ── US Inline Editor Sub-component (Photo 2 layout) ──
+// ── US Inline Editor Sub-component ──
 function USItemCardInlineEditor({
   item,
   fieldConfig,
@@ -1488,52 +1655,41 @@ function USItemCardInlineEditor({
       ? `$${Number(localInput.replace(/[^0-9]/g, "") || 0).toLocaleString()}`
       : type === "date" && localInput.includes("-")
       ? formatDateFromISO(localInput)
-      : type === "number" && item.id === "daysToDecide"
-      ? `${localInput.replace(/[^0-9]/g, "")} days`
       : localInput;
 
   return (
     <div className="bg-[#FAF9F5] border border-[#E7E4DD] rounded-[10px] p-4 sm:p-5 space-y-3.5 animate-in fade-in duration-150">
-      {/* Top header */}
       <div className="flex items-center justify-between">
-        <span className="font-sans font-bold text-[14px] text-[#062C55]">
+        <label className="font-sans font-[700] text-[13.5px] text-[#062C55]">
           {label}
-        </span>
+        </label>
         <button
           type="button"
           onClick={onCancel}
-          className="text-[12.5px] font-semibold text-[#5A6B78] hover:text-[#062C55] cursor-pointer"
+          className="text-[12.5px] font-[600] text-[#5A6B78] hover:text-[#062C55] underline cursor-pointer"
         >
-          ✕ Cancel
+          Cancel
         </button>
       </div>
 
-      {/* Input controls based on field type */}
       <div>
-        {type === "select" ? (
-          <div className="relative w-full sm:w-[320px]">
-            <select
-              value={localInput}
-              onChange={(e) => setLocalInput(e.target.value)}
-              className="w-full h-[44px] px-3.5 pr-8 bg-white border-2 border-[#0EB28D] ring-2 ring-[#0EB28D]/20 rounded-[8px] text-[15px] font-[600] text-[#062C55] focus:outline-none appearance-none cursor-pointer"
-              autoFocus
-            >
-              {fieldConfig?.options?.map((opt) => (
-                <option key={opt} value={opt}>
-                  {opt}
-                </option>
-              ))}
-            </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-[#062C55]">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
-          </div>
+        {type === "select" && fieldConfig?.options ? (
+          <select
+            value={localInput}
+            onChange={(e) => setLocalInput(e.target.value)}
+            className="w-full sm:w-[320px] h-[44px] px-3 bg-white border-2 border-[#0EB28D] ring-2 ring-[#0EB28D]/20 rounded-[8px] text-[15px] font-[600] text-[#062C55] focus:outline-none cursor-pointer"
+            autoFocus
+          >
+            {fieldConfig.options.map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
         ) : type === "date" ? (
           <input
             type="date"
-            value={localInput.includes("-") ? localInput : parseDateToISO(localInput)}
+            value={localInput}
             onChange={(e) => setLocalInput(e.target.value)}
             className="w-full sm:w-[240px] h-[44px] px-3.5 bg-white border-2 border-[#0EB28D] ring-2 ring-[#0EB28D]/20 rounded-[8px] text-[15px] font-[600] text-[#062C55] focus:outline-none cursor-pointer"
             autoFocus
@@ -1547,7 +1703,7 @@ function USItemCardInlineEditor({
               type="text"
               value={localInput.replace(/[^0-9]/g, "")}
               onChange={(e) => setLocalInput(e.target.value.replace(/[^0-9]/g, ""))}
-              placeholder={fieldConfig?.placeholder || "22154"}
+              placeholder={fieldConfig?.placeholder || "0"}
               className="w-full h-[44px] pl-8 pr-3.5 bg-white border-2 border-[#0EB28D] ring-2 ring-[#0EB28D]/20 rounded-[8px] text-[16px] font-[600] text-[#062C55] focus:outline-none"
               autoFocus
             />
@@ -1564,7 +1720,6 @@ function USItemCardInlineEditor({
         )}
       </div>
 
-      {/* Buttons: Save, Not in my documents (if document item), Not sure */}
       <div className="flex flex-wrap items-center gap-2 pt-0.5">
         <button
           type="button"
@@ -1597,11 +1752,10 @@ function USItemCardInlineEditor({
         </button>
       </div>
 
-      {/* PHOTO 3: Plausibility Alert Box */}
       {item.showPlausibilityAlert && (
         <div className="bg-[#FAF9F5] border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[10px] p-4 mt-3 animate-in fade-in duration-200">
           <p className="font-sans text-[13.5px] text-[#062C55] font-semibold mb-3">
-            That&apos;s very different from what your agreement says ({item.originalDocumentValue || "$22,154"}). Is {displayVal} right?
+            That&apos;s very different from what your agreement says ({item.originalDocumentValue || "original"}). Is {displayVal} right?
           </p>
           <div className="flex items-center gap-2.5">
             <button
@@ -1619,20 +1773,18 @@ function USItemCardInlineEditor({
               }}
               className="h-[36px] px-4 rounded-[7px] bg-white border border-[#D8D3C8] text-[#062C55] font-[700] text-[13px] hover:bg-[#F6F4EF] transition cursor-pointer"
             >
-              Fix it
+              Let me fix it
             </button>
           </div>
         </div>
       )}
 
-      {/* Re-reading loader state (~1.2s) */}
       {item.isReReading && (
-        <div className="p-3.5 bg-white border border-[#E7E4DD] rounded-[8px] flex items-center gap-3 mt-3">
+        <div className="flex items-center gap-2.5 p-3.5 bg-[#FAF9F5] border border-[#E7E4DD] rounded-[8px] mt-3 animate-in fade-in duration-150">
           <svg
-            className="animate-spin h-5 w-5 text-[#0EB28D]"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
+            className="animate-spin h-4 w-4 text-[#0EB28D]"
             viewBox="0 0 24 24"
+            fill="none"
           >
             <circle
               className="opacity-25"
@@ -1654,11 +1806,10 @@ function USItemCardInlineEditor({
         </div>
       )}
 
-      {/* PHOTO 2: Second Look Box */}
       {item.showSecondLook && (
         <div className="bg-[#FAF9F5] border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[10px] p-4 mt-3 animate-in fade-in duration-200">
           <p className="font-sans text-[13.5px] text-[#062C55] mb-3">
-            We looked again. Your agreement{item.citation ? ", section 6, says:" : `, says: ${item.originalDocumentValue}`}
+            We looked again. {item.source ? `${item.source} says:` : `Your agreement says: ${item.originalDocumentValue}`}
             {item.citation && (
               <em className="block font-serif italic font-medium mt-1 text-[#17242F]">
                 &ldquo;{item.citation.replace(/^"|"$/g, "")}&rdquo;
@@ -1671,7 +1822,7 @@ function USItemCardInlineEditor({
               onClick={onUseDocumentValue}
               className="h-[36px] px-4 rounded-[7px] bg-[#062C55] hover:bg-[#041D38] text-white font-[700] text-[13px] transition cursor-pointer"
             >
-              Use {item.originalDocumentValue}
+              Use {item.originalDocumentValue || "document value"}
             </button>
             <button
               type="button"

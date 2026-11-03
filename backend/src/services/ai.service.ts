@@ -2,11 +2,12 @@
  * The three Claude calls from prompt v0.6. Inputs are assembled here; the prompt text itself is
  * loaded unchanged from backend/prompts/report-prompt-v0.6.txt (see fairexit/prompts.ts).
  */
+import zlib from 'zlib'
 import { db } from '../config/db'
 import { env } from '../config/env'
 import { ApiError } from '../utils/ApiError'
 import { logger } from '../utils/logger'
-import { callClaudeJson, ContentBlock } from './claude.service'
+import { callClaudeJson, ContentBlock, type ClaudeLogContext } from './claude.service'
 import { documentService } from './document.service'
 import { systemPromptCallA, systemPromptCallA2, systemPromptCallB, promptSha256 } from '../fairexit/prompts'
 import { mockCallA, mockCallA2, mockCallB } from '../fairexit/mocks'
@@ -14,6 +15,51 @@ import type { CaseRow, CallAOutput, CallA2Output, DocKind } from '../fairexit/ty
 import type { Jurisdiction } from '../fairexit/jurisdictions'
 
 type CallName = 'A' | 'A2' | 'B'
+
+function extractTextFromDocx(buffer: Buffer): string {
+  try {
+    let offset = 0
+    while (offset < buffer.length - 4) {
+      if (buffer.readUInt32LE(offset) === 0x04034b50) {
+        const compressionMethod = buffer.readUInt16LE(offset + 8)
+        const compressedSize = buffer.readUInt32LE(offset + 18)
+        const fileNameLen = buffer.readUInt16LE(offset + 26)
+        const extraLen = buffer.readUInt16LE(offset + 28)
+        const fileName = buffer.toString('utf8', offset + 30, offset + 30 + fileNameLen)
+        const dataStart = offset + 30 + fileNameLen + extraLen
+
+        if (fileName === 'word/document.xml') {
+          let xml = ''
+          const slice = buffer.subarray(dataStart, dataStart + compressedSize)
+          if (compressionMethod === 8) {
+            xml = zlib.inflateRawSync(slice).toString('utf8')
+          } else if (compressionMethod === 0) {
+            xml = slice.toString('utf8')
+          }
+          if (xml) {
+            return xml
+              .replace(/<\/w:p>/g, '\n')
+              .replace(/<w:br\/>/g, '\n')
+              .replace(/<w:tab\/>/g, '\t')
+              .replace(/<[^>]+>/g, '')
+              .replace(/&amp;/g, '&')
+              .replace(/&lt;/g, '<')
+              .replace(/&gt;/g, '>')
+              .replace(/&quot;/g, '"')
+              .replace(/&apos;/g, "'")
+              .trim()
+          }
+        }
+        offset = dataStart + compressedSize
+      } else {
+        offset++
+      }
+    }
+  } catch (err) {
+    logger.warn('Error extracting text from docx', { error: (err as Error).message })
+  }
+  return buffer.toString('utf8').replace(/[^\x20-\x7E\t\r\n]/g, ' ').replace(/\s+/g, ' ').trim()
+}
 
 async function record(caseId: string, call: CallName, r: { status: 'ok' | 'error'; model?: string; usage?: { input_tokens: number; output_tokens: number }; durationMs?: number; error?: string; output?: unknown }) {
   await db().from('ai_calls').insert({
@@ -47,6 +93,14 @@ async function documentBlocks(c: CaseRow, j: Jurisdiction, kinds: DocKind[]): Pr
       blocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: f.data.toString('base64') }, title: label })
     } else if (f.mime === 'text/plain') {
       blocks.push({ type: 'document', source: { type: 'text', media_type: 'text/plain', data: f.data.toString('utf8') }, title: label })
+    } else if (
+      f.mime.includes('wordprocessingml') ||
+      f.mime.includes('msword') ||
+      f.storagePath?.endsWith('.docx') ||
+      f.storagePath?.endsWith('.doc')
+    ) {
+      const text = extractTextFromDocx(f.data)
+      blocks.push({ type: 'document', source: { type: 'text', media_type: 'text/plain', data: text }, title: label })
     } else {
       blocks.push({ type: 'image', source: { type: 'base64', media_type: f.mime, data: f.data.toString('base64') } })
     }
@@ -76,6 +130,7 @@ export const aiService = {
       if (!out || (!Array.isArray(out.facts) && !out.error)) throw new Error('Call A returned an unexpected shape')
       if (!Array.isArray(out.missing)) out.missing = []
       await record(c.id, 'A', { status: 'ok', model: r.model, usage: r.usage, durationMs: r.durationMs })
+      logger.info('[CLAUDE][CALL_A_RESPONSE]', { caseId: c.id, model: r.model, durationMs: r.durationMs, factCount: out.facts.length })
       return out
     } catch (err) {
       await record(c.id, 'A', { status: 'error', error: (err as Error).message, durationMs: Date.now() - started })
@@ -113,12 +168,13 @@ export const aiService = {
   },
 
   /** CALL B · WRITE THE REPORT */
-  async callB(c: CaseRow, input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async callB(c: CaseRow, input: Record<string, unknown>, context?: ClaudeLogContext): Promise<Record<string, unknown>> {
     const started = Date.now()
     try {
       if (env.AI_MODE === 'mock') {
         const out = mockCallB(input)
         await record(c.id, 'B', { status: 'ok', model: 'mock', durationMs: Date.now() - started })
+        logger.info('[CLAUDE][CALL_B_RESPONSE]', { ...context, model: 'mock', durationMs: Date.now() - started })
         return out
       }
       const r = await callClaudeJson<Record<string, unknown>>({
@@ -126,6 +182,7 @@ export const aiService = {
         content: [{ type: 'text', text: `INPUT (JSON):\n${JSON.stringify(input, null, 2)}\n\nReturn the JSON described in OUTPUT only.` }],
         maxTokens: env.CALL_B_MAX_TOKENS,
         label: 'Call B',
+        context,
       })
       await record(c.id, 'B', { status: 'ok', model: r.model, usage: r.usage, durationMs: r.durationMs })
       return r.json

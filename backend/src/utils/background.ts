@@ -8,15 +8,30 @@ import { logger } from './logger'
  */
 const running = new Set<string>()
 
-export function runInBackground(key: string, label: string, fn: () => Promise<void>): boolean {
+export function reserveBackground(key: string): boolean {
   if (running.has(key)) return false
   running.add(key)
+  return true
+}
+
+export function releaseBackground(key: string) {
+  running.delete(key)
+}
+
+/** Schedule a task whose key was reserved synchronously before asynchronous DB work. */
+export function runReservedBackground(key: string, label: string, fn: () => Promise<void>): boolean {
+  if (!running.has(key)) return false
   setImmediate(() => {
     fn()
       .catch((err) => logger.error(`Background job failed: ${label}`, { key, message: (err as Error).message, stack: (err as Error).stack }))
       .finally(() => running.delete(key))
   })
   return true
+}
+
+export function runInBackground(key: string, label: string, fn: () => Promise<void>): boolean {
+  if (!reserveBackground(key)) return false
+  return runReservedBackground(key, label, fn)
 }
 
 export function isRunning(key: string) {

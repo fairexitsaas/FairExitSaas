@@ -45,7 +45,7 @@ export function errorHandler(
   }
   // 5. General Error
   else if (err instanceof Error) {
-    if (message.includes('fetch failed')) {
+    if (err.message.includes('fetch failed')) {
       statusCode = 503
       message =
         'Authentication service is unreachable. Please verify your SUPABASE_URL and network connection in backend/.env'
@@ -54,14 +54,11 @@ export function errorHandler(
     }
   }
 
-  // Log error safely without leaking sensitive information
-  logger.error(`Error processing request [${req.method} ${req.originalUrl}]`, {
-    requestId,
-    statusCode,
-    message,
-    errors,
-    stack: err instanceof Error ? err.stack : undefined,
-  })
+  // Routine throttling is a warning, not an exception with a noisy stack trace.
+  const route = req.originalUrl.split('?')[0]
+  const logDetails = { requestId, statusCode, message, errors, method: req.method, route }
+  if (statusCode === 429) logger.warn('[HTTP][RATE_LIMITED]', logDetails)
+  else logger.error(`Error processing request [${req.method} ${route}]`, { ...logDetails, stack: err instanceof Error ? err.stack : undefined })
 
   // Prevent duplicate responses if headers already sent
   if (res.headersSent) {

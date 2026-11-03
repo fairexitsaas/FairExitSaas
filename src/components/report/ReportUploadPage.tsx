@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -119,6 +119,10 @@ export default function ReportUploadPage({
     const newItems: UploadedFileItem[] = [];
     const activeCaseId = caseId || cs?.id;
 
+    // Track current state including previously uploaded files and items in this batch
+    let currentHasContract = files.some((f) => f.type === "contract");
+    let currentHasLetter = files.some((f) => f.type === "letter");
+
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
       if (/heic|heif/i.test(file.type) || /\.heic$/i.test(file.name)) {
@@ -126,17 +130,45 @@ export default function ReportUploadPage({
         continue;
       }
 
-      // Auto-classify based on filename or existing items
+      // Auto-classify based on filename
       const lower = file.name.toLowerCase();
       let detectedType: "contract" | "letter" | "other" = "other";
-      if (lower.includes("contract") || lower.includes("offer letter") || lower.includes("agreement")) {
-        detectedType = "contract";
-      } else if (lower.includes("severance") || lower.includes("termination") || lower.includes("letter") || lower.includes("release") || lower.includes("separation")) {
+
+      // 1. Severance / Separation is always a severance letter (even if named "Separation Agreement")
+      if (
+        lower.includes("severance") ||
+        lower.includes("separation") ||
+        lower.includes("termination") ||
+        lower.includes("release") ||
+        lower.includes("exit") ||
+        lower.includes("layoff")
+      ) {
         detectedType = "letter";
-      } else {
-        if (!hasContract) detectedType = "contract";
-        else if (!hasLetter) detectedType = "letter";
       }
+      // 2. Employment contract / offer letter
+      else if (
+        lower.includes("contract") ||
+        lower.includes("offer") ||
+        lower.includes("appointment") ||
+        lower.includes("agreement") ||
+        lower.includes("handbook") ||
+        lower.includes("employment")
+      ) {
+        detectedType = "contract";
+      }
+      // 3. Fallback based on what is currently missing
+      else {
+        if (!currentHasContract) {
+          detectedType = "contract";
+        } else if (!currentHasLetter) {
+          detectedType = "letter";
+        } else {
+          detectedType = "letter";
+        }
+      }
+
+      if (detectedType === "contract") currentHasContract = true;
+      if (detectedType === "letter") currentHasLetter = true;
 
       const item: UploadedFileItem = {
         id: `upload-${Date.now()}-${i}`,
@@ -150,9 +182,15 @@ export default function ReportUploadPage({
       if (activeCaseId) {
         try {
           const kind = detectedType === "contract" ? "contract" : "letter";
-          await fairexit.uploadFile(activeCaseId, kind, file);
+          const res = await fairexit.uploadFile(activeCaseId, kind, file);
+          if (res?.document?.id) {
+            item.serverDocId = res.document.id;
+          }
         } catch (e: unknown) {
           console.warn("Backend upload note:", e);
+          setErrorMessage(
+            `Could not upload ${file.name}: ${e instanceof Error ? e.message : "Upload failed"}`
+          );
         }
       }
 
@@ -162,14 +200,32 @@ export default function ReportUploadPage({
     setFiles((prev) => [...prev, ...newItems]);
   };
 
-  const handleTypeChange = (id: string, newType: "contract" | "letter" | "other") => {
+  const handleTypeChange = async (id: string, newType: "contract" | "letter" | "other") => {
     setFiles((prev) =>
       prev.map((f) => (f.id === id ? { ...f, type: newType } : f))
     );
+    const activeCaseId = caseId || cs?.id;
+    const targetFile = files.find((f) => f.id === id);
+    if (activeCaseId && targetFile?.serverDocId && (newType === "contract" || newType === "letter")) {
+      try {
+        await fairexit.updateDocumentKind(activeCaseId, targetFile.serverDocId, newType);
+      } catch (e) {
+        console.warn("Failed to update document type on server:", e);
+      }
+    }
   };
 
   const handleRemoveFile = async (id: string) => {
+    const targetFile = files.find((f) => f.id === id);
     setFiles((prev) => prev.filter((f) => f.id !== id));
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId && targetFile?.serverDocId) {
+      try {
+        await fairexit.removeDocument(activeCaseId, targetFile.serverDocId);
+      } catch (e) {
+        console.warn("Failed to remove document on server:", e);
+      }
+    }
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -235,22 +291,50 @@ export default function ReportUploadPage({
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
       try {
-        if (contractStatus === "never") {
-          await fairexit.setContractStatus(activeCaseId, "never");
-        } else if (contractStatus === "missing" || contractStatus === "later") {
-          await fairexit.setContractStatus(activeCaseId, "missing");
+        // Sync document kinds with the server first if any kinds changed
+        const serverDocData = await fairexit.documents(activeCaseId).catch(() => null);
+        if (serverDocData?.documents) {
+          for (const f of files) {
+            if (f.serverDocId && (f.type === "contract" || f.type === "letter")) {
+              const matched = (serverDocData.documents as Array<{ id: string; kind: string }>).find((d) => d.id === f.serverDocId);
+              if (matched && matched.kind !== f.type) {
+                await fairexit.updateDocumentKind(activeCaseId, f.serverDocId, f.type).catch(() => {});
+              }
+            }
+          }
         }
+
+        // If no contract document is uploaded, ensure contract_status is set on the server
+        if (!hasContract) {
+          if (contractStatus === "never") {
+            await fairexit.setContractStatus(activeCaseId, "never");
+          } else if (contractStatus === "missing" || contractStatus === "later") {
+            await fairexit.setContractStatus(activeCaseId, "missing");
+          }
+        }
+
         await fairexit.startRead(activeCaseId);
+
+        setIsSubmitting(false);
+        if (onContinue) {
+          onContinue();
+        } else {
+          router.push(`/report?case=${activeCaseId || "demo"}&step=reading`);
+        }
       } catch (err: unknown) {
         console.warn("Start read note:", err);
+        setIsSubmitting(false);
+        const msg = err instanceof Error ? err.message : "Failed to start reading documents. Please check your files.";
+        setErrorMessage(msg);
+        return;
       }
-    }
-
-    setIsSubmitting(false);
-    if (onContinue) {
-      onContinue();
     } else {
-      router.push(`/report?case=${activeCaseId || "demo"}&step=reading`);
+      setIsSubmitting(false);
+      if (onContinue) {
+        onContinue();
+      } else {
+        router.push(`/report?case=demo&step=reading`);
+      }
     }
   };
 

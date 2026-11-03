@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ReportInputs, getReportInputs, saveReportInputs } from "@/lib/report-storage";
+import { ReportInputs, getReportInputs, saveReportInputs, defaultMockReportInputs } from "@/lib/report-storage";
 import {
   ApplePayBadge,
   GooglePayBadge,
@@ -14,6 +14,7 @@ import {
   InteracBadge,
 } from "./PaymentBadges";
 import ReportVideoModal from "./ReportVideoModal";
+import ReportVideoPlayer from "./ReportVideoPlayer";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import TermsConditionsModal from "@/components/dialogs/TermsConditionsModal";
 import CheckoutDialog from "@/components/dialogs/CheckoutDialog";
@@ -32,7 +33,7 @@ export default function ReportSalesPage({
   onPaySuccess,
 }: ReportSalesPageProps) {
   const router = useRouter();
-  const [data, setData] = useState<ReportInputs>(() => getReportInputs());
+  const [data, setData] = useState<ReportInputs>(defaultMockReportInputs);
   const [explainEach, setExplainEach] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -421,7 +422,7 @@ export default function ReportSalesPage({
             </div>
 
             {/* Headline */}
-            <h1 className="font-serif font-[500] text-[22px] sm:text-[24px] leading-[27px] text-[#062C55] tracking-[-0.5px] mb-2.5">
+            <h1 suppressHydrationWarning className="font-serif font-[500] text-[22px] sm:text-[24px] leading-[27px] text-[#062C55] tracking-[-0.5px] mb-2.5">
               Your offer is {offerFormatted}. Courts often award people with a profile like yours {courtRangeFormatted}.
             </h1>
 
@@ -440,7 +441,7 @@ export default function ReportSalesPage({
                   style={{ left: "28%" }}
                 >
                   <div className="px-2.5 py-0.5 bg-[#062C55] rounded-[6px] text-white font-sans font-[800] text-[11.5px] leading-[18px] whitespace-nowrap shadow-xs">
-                    Your offer · {offerFormatted}
+                    Your offer · <span suppressHydrationWarning>{offerFormatted}</span>
                   </div>
                   <div className="w-[3px] h-[14px] bg-[#062C55] rounded-[2px]" />
                 </div>
@@ -493,49 +494,7 @@ export default function ReportSalesPage({
             </div>
 
             {/* ── VIDEO / 45 SEC REPORT PREVIEW TEASER CARD ── */}
-            <div
-              onClick={() => setVideoModalOpen(true)}
-              className="relative w-full h-[220px] sm:h-[320px] rounded-[14px] bg-gradient-to-br from-[#062C55] via-[#083563] to-[#0B3F73] overflow-hidden mb-7 cursor-pointer group shadow-md transition-all hover:shadow-lg"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") setVideoModalOpen(true);
-              }}
-              aria-label="Play 45-second report preview video"
-            >
-              {/* Internal simulated report card mockup behind frosted glass */}
-              <div className="absolute inset-0 flex items-center justify-center p-4">
-                <div className="w-[280px] sm:w-[340px] bg-white/95 rounded-[12px] p-4 shadow-xl border border-white/20 select-none opacity-85 group-hover:opacity-95 transition-opacity">
-                  <div className="font-sans font-[800] text-[10.5px] tracking-[0.5px] text-[#0C8F72] uppercase">
-                    YOUR OFFER
-                  </div>
-                  <div className="font-serif text-[30px] sm:text-[34px] leading-tight text-[#062C55]">
-                    {offerFormatted}
-                  </div>
-                  <div className="w-full h-[1px] bg-[#DDE3E9] my-2" />
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="text-[#17242F]">Legal minimum</span>
-                    <span className="font-bold text-[#062C55]">{minFormatted}</span>
-                  </div>
-                  <div className="w-full h-[1px] bg-[#DDE3E9] my-2" />
-                  <div className="flex items-center justify-between text-[13px]">
-                    <span className="text-[#17242F]">Courts often award</span>
-                    <span className="font-bold text-[#062C55]">{courtRangeFormatted}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Blur frosted overlay */}
-              <div className="absolute inset-0 bg-[#062C55]/75 backdrop-blur-[6px] flex flex-col items-center justify-center p-4">
-                {/* Play Button */}
-                <div className="w-[58px] h-[58px] rounded-full bg-white/20 border border-white/40 flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg mb-3">
-                  <div className="w-0 h-0 border-y-[10px] border-y-transparent border-l-[17px] border-l-white ml-1" />
-                </div>
-                <span className="font-sans font-[800] text-[14px] text-white tracking-wide drop-shadow-sm text-center">
-                  What&apos;s in your report · 45 sec
-                </span>
-              </div>
-            </div>
+            <ReportVideoPlayer />
 
             {/* ── SECTION: YOUR OFFER, AT A GLANCE [FREE] ── */}
             <div className="border border-[#E7E4DD] rounded-[14px] p-4 sm:p-5 mb-6 bg-white">

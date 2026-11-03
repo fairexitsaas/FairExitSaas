@@ -54,6 +54,14 @@ export const caseService = {
   /** A job that died with the server (reading/building for > 20 min) becomes "failed" so the person can retry. */
   async healStale(row: CaseRow): Promise<CaseRow> {
     if ((row.status === 'reading' || row.status === 'building') && row.job_started_at && Date.now() - new Date(row.job_started_at).getTime() > STALE_JOB_MS) {
+      // Once Call B JSON is saved, a stale job only needs its PDF/storage step resumed.
+      if (
+        row.status === 'building' && row.report &&
+        (row.report as any)?._meta?.generation_id &&
+        (row.report as any)._meta.generation_id === (row.report_inputs as any)?.generationId
+      ) {
+        return this.update(row.id, { status: 'ready', status_detail: 'pdf_pending', job_started_at: null })
+      }
       const detail = row.status === 'reading' ? 'read_failed' : 'build_failed'
       return this.update(row.id, { status: 'failed', status_detail: detail })
     }
@@ -62,6 +70,19 @@ export const caseService = {
 
   async update(id: string, patch: Partial<CaseRow>): Promise<CaseRow> {
     return check(await db().from('cases').update(patch).eq('id', id).select('*').single(), 'Case') as CaseRow
+  },
+
+  /** Atomically claim a report build so concurrent requests cannot launch Call B twice. */
+  async claimBuild(id: string, patch: Partial<CaseRow>): Promise<CaseRow | null> {
+    const { data, error } = await db()
+      .from('cases')
+      .update(patch)
+      .eq('id', id)
+      .in('status', ['checking', 'failed'])
+      .select('*')
+      .maybeSingle()
+    if (error) throw new ApiError(500, `Database error (claim report build): ${error.message}`, undefined, false)
+    return data as CaseRow | null
   },
 
   /** Adds another valid token (email links, recovery on a new device). Keeps the last 10. */
