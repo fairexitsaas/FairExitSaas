@@ -6,6 +6,8 @@ export const ALLOWED_MIME_TYPES = [
   'image/png',
   'image/webp',
   'text/plain',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
 ] as const
 
 export const MAX_DOCUMENT_SIZE_BYTES = 15 * 1024 * 1024 // 15 MB
@@ -20,7 +22,7 @@ export const createDocumentSchema = z.object({
   fileName: z.string().max(255).optional(),
   mimeType: z.enum(ALLOWED_MIME_TYPES, {
     errorMap: () => ({
-      message: 'Unsupported file type. Use PDF, JPEG, PNG, WEBP or plain text.',
+      message: 'Unsupported file type. Use PDF, Word (.docx, .doc), JPEG, PNG, WEBP or plain text.',
     }),
   }),
   sizeBytes: z

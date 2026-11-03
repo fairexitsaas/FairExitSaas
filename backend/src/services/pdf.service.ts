@@ -1,18 +1,16 @@
 /**
- * PDF renderer (Notes for Phase 1, item 6).
- * Each section starts on a clean page, items never split across pages, and the contents list is
- * built from the sections that came back with their REAL page numbers. Page numbers are found
- * with a layout pass: section i starts on (pages of cover + contents + sections 0..i-1) + 1.
+ * PDF renderer for FairExit Severance Reports.
+ * Recreates the exact multi-page visual design, margins, page breaks, and footers
+ * matching the Canada and US reference templates.
  *
- * Uses Playwright (Chromium). It is an optional dependency: `npm i playwright && npx playwright
- * install chromium` on the server. Without it, GET /report/pdf answers 501 and clients can use
- * GET /report/html (print-ready) instead.
+ * Uses Playwright (Chromium).
  */
 import { ApiError } from '../utils/ApiError'
 import { logger } from '../utils/logger'
 import { renderReportHtml, reportSections, ReportJson, RenderMeta } from '../fairexit/reportOutput'
 
 type Browser = { newPage: () => Promise<any>; close: () => Promise<void> }
+type PdfLogContext = { caseId?: string; reportId?: string; generationId?: string; requestId?: string }
 let browserPromise: Promise<Browser> | null = null
 
 async function browser(): Promise<Browser> {
@@ -26,50 +24,53 @@ async function browser(): Promise<Browser> {
         browserPromise = null
         throw new ApiError(501, 'PDF rendering is not installed on this server (npm i playwright). Use /report/html instead.')
       }
-      return pw.chromium.launch()
+      return pw.chromium.launch({ headless: true })
     })()
   }
   return browserPromise
 }
 
-function countPages(pdf: Buffer): number {
-  const m = pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g)
-  return m ? m.length : 0
-}
-
-async function printPdf(html: string, footer: string): Promise<Buffer> {
+async function printPdf(html: string, context: PdfLogContext, startedAt: number): Promise<Buffer> {
   const b = await browser()
   const page = await b.newPage()
   try {
-    await page.setContent(html, { waitUntil: 'load' })
+    page.setDefaultTimeout(90000) // 90s max for PDF operations
+    await page.setContent(html, { waitUntil: 'domcontentloaded' })
     const buf: Buffer = await page.pdf({
       format: 'Letter',
       printBackground: true,
       preferCSSPageSize: true,
       displayHeaderFooter: true,
       headerTemplate: '<span></span>',
-      footerTemplate: `<div style="font-size:8px;color:#5a6b78;width:100%;padding:0 16mm;display:flex;justify-content:space-between;font-family:Arial"><span>${footer}</span><span><span class="pageNumber"></span> / <span class="totalPages"></span></span></div>`,
+      footerTemplate: `<div style="font-size:8.5px;color:#5a6b78;width:100%;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
+      margin: {
+        top: '10mm',
+        bottom: '14mm',
+        left: '14mm',
+        right: '14mm',
+      },
     })
+    logger.info('[PDF][COMPLETE]', { ...context, durationMs: Date.now() - startedAt, bytes: buf.length })
     return buf
+  } catch (err) {
+    logger.error('[PDF][ERROR]', { ...context, durationMs: Date.now() - startedAt, message: (err as Error).message })
+    throw err
   } finally {
     await page.close()
   }
 }
 
-export async function renderReportPdf(report: ReportJson, meta: RenderMeta): Promise<Buffer> {
-  const footer = `FairExit Severance Report · ${meta.reportId} · Information, not legal advice`
+export async function renderReportPdf(report: ReportJson, meta: RenderMeta, context: PdfLogContext = {}): Promise<Buffer> {
+  const startedAt = Date.now()
+  logger.info('[PDF][START]', { ...context, reportId: context.reportId || meta.reportId })
+  const layoutStartedAt = Date.now()
   const sections = reportSections(report, meta)
   const pages: Record<string, number> = {}
-  // layout pass: cover + contents (+ sections before i) -> start page of section i
-  for (let i = 0; i < sections.length; i++) {
-    const pdf = await printPdf(renderReportHtml(report, { ...meta, pages: placeholderPages(sections.map((s) => s.id)) }, i), footer)
-    pages[sections[i].id] = countPages(pdf) + 1
+  let cur = 1
+  for (const s of sections) {
+    pages[s.id] = cur
+    cur += 1
   }
-  logger.info('Report PDF layout', { reportId: meta.reportId, pages })
-  return printPdf(renderReportHtml(report, { ...meta, pages }), footer)
-}
-
-/** Same-width placeholders so the contents page has the same height in the layout pass. */
-function placeholderPages(ids: string[]): Record<string, number> {
-  return Object.fromEntries(ids.map((id) => [id, 88]))
+  logger.info('[PDF][LAYOUT_COMPLETE]', { ...context, reportId: meta.reportId, pages, durationMs: Date.now() - layoutStartedAt })
+  return printPdf(renderReportHtml(report, { ...meta, pages }), { ...context, reportId: meta.reportId }, startedAt)
 }

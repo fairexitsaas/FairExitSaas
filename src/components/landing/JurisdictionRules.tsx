@@ -80,7 +80,7 @@ const US_STATES = [
   },
   {
     name: "New York",
-    desc: "90 days' notice · 50+ employees · 25+ laid off (a third of the site) triggers it",
+    desc: "90 days' notice · 50+ employees · 25 laid off triggers it",
     href: "/us/new-york",
     action: "Read the rules →",
   },
@@ -92,7 +92,7 @@ const US_STATES = [
   },
   {
     name: "Illinois",
-    desc: "Illinois WARN at 75+ · non-competes void under $75k ($80k from Jan 2027)",
+    desc: "Illinois WARN at 75+ · non-competes void under $75k ",
     href: "/us/illinois",
     action: "Read the rules →",
   },

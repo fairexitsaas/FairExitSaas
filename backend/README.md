@@ -91,7 +91,8 @@ Store your environment variables in `backend/.env`.
 | `SUPABASE_ANON_KEY` | Supabase anon/publishable API key | `sb_publishable_...` |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service-role secret key (optional for server-only jobs) | `eyJhbGci...` |
 | `RATE_LIMIT_WINDOW_MS` | Rate limit window in ms (default: 15 min) | `900000` |
-| `RATE_LIMIT_MAX` | Max general requests per window | `100` |
+| `READ_RATE_LIMIT_MAX` | Max read/poll requests per IP per window | `600` |
+| `WRITE_RATE_LIMIT_MAX` | Max write/generation requests per IP per window | `100` |
 | `AUTH_RATE_LIMIT_MAX` | Max auth requests per window | `20` |
 
 ---

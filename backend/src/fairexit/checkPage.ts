@@ -648,6 +648,35 @@ export function setRow(ctx: CheckCtx, key: string, value: unknown, status: RowSt
   ctx.check.attested_at = null
 }
 
+export function autoConfirmAll(ctx: CheckCtx) {
+  const defs = rowDefs(ctx.country).filter((d) => rowVisible(ctx, d))
+  for (const d of defs) {
+    if (noContractRow(ctx, d)) continue
+    const o = rec(ctx, d.key)
+    if (!o.status) {
+      let v = current(ctx, d)
+      if (v === null || v === undefined || v === '') {
+        if (d.told) {
+          const told = d.told(ctx.answers)
+          if (told?.v !== undefined && told?.v !== null) v = told.v
+        }
+      }
+      if (v === null || v === undefined || v === '') {
+        if (d.ask) {
+          v = d.key === 'working_notice_weeks' ? '0' : d.key === 'bonus_amount' ? 0 : '0'
+        } else {
+          v = d.type === 'money' ? 0 : d.type === 'choice' ? 'none' : 'Not mentioned'
+        }
+      }
+      setRow(ctx, d.key, v, 'confirmed')
+      if (d.source === 'answers') writeBackToAnswers(ctx, d.key, v)
+    } else if (needsAck(o)) {
+      o.change_ack = true
+      o.change_ack_at = new Date().toISOString()
+    }
+  }
+}
+
 export function writeBackToAnswers(ctx: CheckCtx, key: string, value: unknown) {
   const d = def(ctx.country, key)
   if (d?.toAnswers && value !== null && value !== undefined) d.toAnswers(value, ctx.answers)

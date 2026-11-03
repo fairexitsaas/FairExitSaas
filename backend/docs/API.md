@@ -66,9 +66,9 @@ No account is needed for the whole flow ("No account needed" in the app). A case
 state, e.g. still reading), 422 (validation), 429 (rate limit / "Too many scans today"), 501 (PDF
 renderer not installed), 502 (Stripe/Apple/Google upstream error).
 
-**Polling:** poll every 3 seconds while `status` is `reading` or `building` (Call A takes ~20-90 s,
-Call B ~1-4 min). Set `RATE_LIMIT_MAX=600` on the server (the default 100 per 15 min is too low for
-the check page + polling).
+**Polling:** poll every 3-5 seconds while `status` is `reading` or `building` (Call A takes ~20-90 s,
+Call B ~1-4 min). Read/poll requests use `READ_RATE_LIMIT_MAX` (default 600 per 15 min), separately
+from `WRITE_RATE_LIMIT_MAX` (default 100 per 15 min), so normal polling cannot consume the write budget.
 
 ---
 
@@ -399,7 +399,11 @@ unconfirmed ("Confirm N more to build your report"). Any later row change clears
 Needs `build.enabled` (all required rows + attested). `{ "started": true, "status": "building", "reportId": "RPT-7Q4K2M" }`.
 
 ### GET /cases/:caseId/report/status
-`{ "status": "ready", "ready": true, "failed": false, "reportId": "RPT-7Q4K2M", "readyAt": "…", "deleteAfter": "…" }`
+`{ "status": "ready", "stage": "ready", "ready": true, "pdfReady": true, "failed": false, "reportId": "RPT-7Q4K2M", "generationId": "…", "readyAt": "…", "deleteAfter": "…" }`
+
+While building, `stage` reports `preparing`, `claude`, or `pdf`. A saved report whose PDF needs
+recovery is terminal `ready` with `pdfReady: false`; `GET /report/pdf` retries from the saved JSON
+and never calls Claude.
 
 ### GET /cases/:caseId/report — JSON for native report screens (app §0-§9 tabs)
 ```json
@@ -524,7 +528,7 @@ request closes. Jobs run in-process every 6 hours (`RUN_JOBS_IN_PROCESS=true`) a
 5. Live: set `ANTHROPIC_API_KEY`, `AI_MODE=live`; Stripe keys + webhook
    (`/api/v1/webhooks/stripe`, events `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
    `payment_intent.succeeded`, `charge.refunded`); Apple/Google IAP keys; `RESEND_API_KEY`; `CRON_SECRET`;
-   `PAYMENTS_MODE=live`; `RATE_LIMIT_MAX=600`.
+   `PAYMENTS_MODE=live`; configure `READ_RATE_LIMIT_MAX` and `WRITE_RATE_LIMIT_MAX` for expected traffic.
 6. New code pack from the client: copy `severance-rules.js` changes into `src/fairexit/severanceRules.ts`,
    run `npm run regions:build`, and replace `prompts/` if the prompt version changes.
 

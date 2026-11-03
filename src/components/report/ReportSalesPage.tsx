@@ -494,7 +494,7 @@ export default function ReportSalesPage({
             </div>
 
             {/* ── VIDEO / 45 SEC REPORT PREVIEW TEASER CARD ── */}
-            <ReportVideoPlayer onOpenModal={() => setVideoModalOpen(true)} />
+            <ReportVideoPlayer />
 
             {/* ── SECTION: YOUR OFFER, AT A GLANCE [FREE] ── */}
             <div className="border border-[#E7E4DD] rounded-[14px] p-4 sm:p-5 mb-6 bg-white">

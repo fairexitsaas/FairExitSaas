@@ -1,4 +1,4 @@
-import { z } from 'zod'
+﻿import { z } from 'zod'
 
 const platform = z.enum(['web', 'ios', 'android']).default('web')
 const country = z.enum(['CA', 'US'])
@@ -114,6 +114,8 @@ export const uploadBase64Schema = z.object({
   mimeType: z.string().max(120),
   dataBase64: z.string().min(10),
 })
+
+export const updateDocSchema = z.object({ kind: z.enum(['letter', 'contract']) })
 
 export const contractStatusSchema = z.object({ status: z.enum(['never', 'missing']) })
 

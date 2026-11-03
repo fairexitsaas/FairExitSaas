@@ -26,7 +26,7 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 // Request correlation and logging
 app.use(requestLogger)
 
-// Global rate limiting for API routes
+// Keep normal polling and reads separate from expensive writes and AI generation.
 app.use('/api', apiRateLimiter)
 
 // Root health & metadata endpoint

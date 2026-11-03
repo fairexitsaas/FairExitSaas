@@ -56,7 +56,7 @@ export default function ReportVideoModal({
         <div className="flex items-center gap-2 mb-2">
           <span className="w-2.5 h-2.5 rounded-full bg-[#0EB28D] animate-pulse" />
           <span className="font-sans font-[800] text-[11px] uppercase tracking-wider text-[#0C8F72]">
-            What&apos;s in your Severance Report · 45 sec
+            What&apos;s in your Severance Report · Preview
           </span>
         </div>
 

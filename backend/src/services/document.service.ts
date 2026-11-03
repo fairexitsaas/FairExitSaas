@@ -1,4 +1,4 @@
-import crypto from 'crypto'
+﻿import crypto from 'crypto'
 import { db, check } from '../config/db'
 import { env } from '../config/env'
 import { ApiError } from '../utils/ApiError'
@@ -120,6 +120,23 @@ export const documentService = {
     ) as CaseDocumentRow
     await afterUpload(c, input.kind)
     return docView(doc)
+  },
+
+  async updateKind(c: CaseRow, docId: string, kind: DocKind) {
+    assertCanChangeDocs(c)
+    const doc = check(await db().from('case_documents').select('*').eq('id', docId).eq('case_id', c.id).single(), 'Document') as CaseDocumentRow
+    if (doc.kind === kind) return docView(doc)
+    const page = await nextPage(c.id, kind)
+    const updated = check(
+      await db().from('case_documents').update({ kind, page }).eq('id', doc.id).select('*').single(),
+      'document'
+    ) as CaseDocumentRow
+    await afterUpload(c, kind)
+    if (doc.kind === 'contract' && kind !== 'contract') {
+      const left = (await caseService.documents(c.id)).filter((d) => d.kind === 'contract' && d.status === 'uploaded')
+      if (!left.length && c.contract_status === 'added') await caseService.update(c.id, { contract_status: null })
+    }
+    return docView(updated)
   },
 
   async remove(c: CaseRow, docId: string) {

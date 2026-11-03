@@ -1,4 +1,4 @@
-import { Router } from 'express'
+﻿import { Router } from 'express'
 import { caseController as cc } from '../controllers/case.controller'
 import { optionalAuthenticate, caseAccess } from '../middleware/caseAccess'
 import { validate } from '../middleware/validate'
@@ -36,6 +36,7 @@ one.get('/documents', h(cc.listDocs))
 one.post('/documents/upload-url', validate({ body: V.uploadSlotSchema }), h(cc.uploadSlot))
 one.post('/documents/:docId/complete', validate({ params: V.docParams }), h(cc.completeUpload))
 one.post('/documents', validate({ body: V.uploadBase64Schema }), h(cc.uploadBase64))
+one.patch('/documents/:docId', validate({ params: V.docParams, body: V.updateDocSchema }), h(cc.updateDocKind))
 one.delete('/documents/:docId', validate({ params: V.docParams }), h(cc.removeDoc))
 one.put('/contract-status', validate({ body: V.contractStatusSchema }), h(cc.setContractStatus))
 

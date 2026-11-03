@@ -7,7 +7,12 @@ export type Country = 'CA' | 'US'
 export type Platform = 'web' | 'ios' | 'android'
 
 export class FairExitApiError extends Error {
-  constructor(public status: number, message: string, public errors?: Array<{ field?: string; message?: string; code?: string }>) {
+  constructor(
+    public status: number,
+    message: string,
+    public errors?: Array<{ field?: string; message?: string; code?: string }>,
+    public retryAfterSeconds?: number,
+  ) {
     super(message)
   }
 }
@@ -22,16 +27,25 @@ export interface FairExitClientOptions {
 export function createFairExitClient(opts: FairExitClientOptions) {
   const base = opts.baseUrl.replace(/\/$/, '')
 
-  async function call<T>(method: string, path: string, body?: unknown, caseId?: string): Promise<T> {
+  async function call<T>(method: string, path: string, body?: unknown, caseId?: string, signal?: AbortSignal): Promise<T> {
     const headers: Record<string, string> = { 'X-Platform': opts.platform || 'web' }
     if (body !== undefined) headers['Content-Type'] = 'application/json'
     const ct = caseId && opts.getCaseToken?.(caseId)
     if (ct) headers['X-Case-Token'] = ct
     const at = opts.getAccessToken?.()
     if (at) headers.Authorization = `Bearer ${at}`
-    const res = await fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) })
+    const res = await fetch(`${base}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), cache: 'no-store', signal })
     const json = await res.json().catch(() => ({}))
-    if (!res.ok || json.success === false) throw new FairExitApiError(res.status, json.message || res.statusText, json.errors)
+    if (!res.ok || json.success === false) {
+      const headerRetryAfter = Number(res.headers.get('retry-after'))
+      const bodyRetryAfter = Number(json.retryAfterSeconds)
+      throw new FairExitApiError(
+        res.status,
+        json.message || res.statusText,
+        json.errors,
+        Number.isFinite(headerRetryAfter) && headerRetryAfter > 0 ? headerRetryAfter : bodyRetryAfter > 0 ? bodyRetryAfter : undefined,
+      )
+    }
     return json.data as T
   }
   const c = (id: string) => `/cases/${id}`
@@ -46,7 +60,7 @@ export function createFairExitClient(opts: FairExitClientOptions) {
     // case
     createCase: (country: Country, answers: Record<string, unknown>, industry?: string) =>
       call<{ caseId: string; caseToken: string; case: any }>('POST', '/cases', { country, answers, industry, platform: opts.platform || 'web' }),
-    getCase: (id: string) => call<any>('GET', c(id), undefined, id),
+    getCase: (id: string, signal?: AbortSignal) => call<any>('GET', c(id), undefined, id, signal),
     updateAnswers: (id: string, answers: Record<string, unknown>) => call<any>('PATCH', `${c(id)}/answers`, { answers }, id),
     claimCase: (id: string) => call<any>('POST', `${c(id)}/claim`, {}, id),
     deleteCase: (id: string) => call<any>('DELETE', c(id), undefined, id),
@@ -93,6 +107,7 @@ export function createFairExitClient(opts: FairExitClientOptions) {
         reader.readAsDataURL(file)
       })
     },
+    updateDocumentKind: (id: string, docId: string, kind: 'letter' | 'contract') => call<any>('PATCH', `${c(id)}/documents/${docId}`, { kind }, id),
     removeDocument: (id: string, docId: string) => call<any>('DELETE', `${c(id)}/documents/${docId}`, undefined, id),
     setContractStatus: (id: string, status: 'never' | 'missing') => call<any>('PUT', `${c(id)}/contract-status`, { status }, id),
 
@@ -116,7 +131,7 @@ export function createFairExitClient(opts: FairExitClientOptions) {
 
     // report
     buildReport: (id: string) => call<any>('POST', `${c(id)}/report`, {}, id),
-    reportStatus: (id: string) => call<any>('GET', `${c(id)}/report/status`, undefined, id),
+    reportStatus: (id: string, signal?: AbortSignal) => call<any>('GET', `${c(id)}/report/status`, undefined, id, signal),
     report: (id: string) => call<any>('GET', `${c(id)}/report`, undefined, id),
     /** Link usable in <a href> / WebView (token in the query string). */
     reportPdfUrl: (id: string, token: string) => `${base}${c(id)}/report/pdf?t=${encodeURIComponent(token)}`,

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -207,6 +207,9 @@ export default function CanadaReviewPage({
   const [data] = useState<ReportInputs>(() => getReportInputs());
   const [explainQuestions, setExplainQuestions] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isSubmittingBuild, setIsSubmittingBuild] = useState(false);
+  const [buildError, setBuildError] = useState("");
+  const buildSubmitLock = useRef(false);
 
   // Resolved intake answers (from server case answers or client storage)
   const answers = (cs?.answers as Record<string, any>) || {};
@@ -480,9 +483,24 @@ export default function CanadaReviewPage({
       setHasBonusQuestion(hadBonus);
 
       // 4. Update items from extracted facts and review rows
+      const allModelRows: any[] = [];
+      if (res.reviewModel?.groups) {
+        for (const grp of res.reviewModel.groups) {
+          if (Array.isArray(grp.rows)) {
+            allModelRows.push(...grp.rows);
+          }
+        }
+      }
+
       setItems((prev) =>
         prev.map((item) => {
           const keyMap: Record<string, string> = {
+            province: 'province',
+            age: 'age',
+            years: 'years',
+            salary: 'pay',
+            role: 'role',
+            howEnded: 'ended',
             offerMoney: 'offer_amount',
             offerNotice: 'notice_weeks',
             offerVacation: 'vacation_on_notice',
@@ -495,8 +513,8 @@ export default function CanadaReviewPage({
             contractStartDate: 'contract_start',
             contractJobTitle: 'job_title_contract',
           };
-          const factKey = keyMap[item.id];
-          if (!factKey) return item;
+          const factKey = keyMap[item.id] || item.id;
+          const modelRow = allModelRows.find((r: any) => r.key === factKey);
 
           const fact = facts.find((f: any) => f.key === factKey);
           const correction = corrections[factKey];
@@ -510,11 +528,29 @@ export default function CanadaReviewPage({
           let userChanged = item.userChanged;
           let userChangeAck = item.userChangeAck;
 
-          if (fact && fact.value !== null && fact.value !== undefined && fact.value !== "") {
+          if (modelRow) {
+            if (modelRow.display || modelRow.value != null) {
+              val = modelRow.display || String(modelRow.value);
+            }
+            if (modelRow.docDisplay || modelRow.docValue != null) {
+              origVal = modelRow.docDisplay || String(modelRow.docValue);
+            }
+            if (modelRow.quote) {
+              cit = modelRow.where ? `"${modelRow.quote}" · ${modelRow.where}` : `"${modelRow.quote}"`;
+            }
+            if (modelRow.sourceLine) {
+              src = modelRow.sourceLine;
+            }
+            if (modelRow.status === 'confirmed') confirmed = true;
+            if (modelRow.status === 'corrected') {
+              userChanged = true;
+              userChangeAck = Boolean(modelRow.needsChangeAck === false);
+            }
+          } else if (fact && fact.value !== null && fact.value !== undefined && fact.value !== "") {
             let formatted = String(fact.value);
             if (factKey === 'offer_amount') {
               const n = Number(formatted.replace(/[^0-9.]/g, ''));
-              formatted = n > 0 ? `$${n.toLocaleString()}` : formatted;
+              formatted = n > 0 ? `${n.toLocaleString()}` : formatted;
             } else if (factKey === 'notice_weeks') {
               formatted = formatted.includes('week') ? formatted : `${formatted} weeks of pay`;
             } else if (factKey === 'vacation_on_notice') {
@@ -601,7 +637,7 @@ export default function CanadaReviewPage({
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId && newConfirmed) {
       const keyMap: Record<string, string> = {
-        province: 'province', age: 'age', years: 'years', salary: 'salary', role: 'role', howEnded: 'howEnded',
+        province: 'province', age: 'age', years: 'years', salary: 'pay', role: 'role', howEnded: 'ended',
         offerMoney: 'offer_amount', offerNotice: 'notice_weeks', offerVacation: 'vacation_on_notice',
         offerLastDay: 'last_day', offerNoticeWorked: 'working_notice_weeks', offerDecideBy: 'sign_by',
         offerRelease: 'release_required', offerBenefitsEnd: 'benefits_end', contractLimit: 'min_only_clause',
@@ -630,6 +666,10 @@ export default function CanadaReviewPage({
     setWorkingWeeksSaved(true);
     if (hasBonusQuestion) setBonusSaved(true);
     setDeclaredCorrect(true);
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {});
+    }
   };
 
   const handleChooseOfferConflict = (choice: "letter" | "intake" | "custom", customVal?: string) => {
@@ -790,7 +830,14 @@ export default function CanadaReviewPage({
       );
       const activeCaseId = caseId || cs?.id;
       if (activeCaseId) {
-        fairexit.saveReviewData(activeCaseId, { key: id, action: 'change', value: formattedVal }).catch(() => {});
+        const keyMap: Record<string, string> = {
+        province: 'province', age: 'age', years: 'years', salary: 'pay', role: 'role', howEnded: 'ended',
+        offerMoney: 'offer_amount', offerNotice: 'notice_weeks', offerVacation: 'vacation_on_notice',
+        offerLastDay: 'last_day', offerNoticeWorked: 'working_notice_weeks', offerDecideBy: 'sign_by',
+        offerRelease: 'release_required', offerBenefitsEnd: 'benefits_end', contractLimit: 'min_only_clause',
+        contractStartDate: 'contract_start', contractJobTitle: 'job_title_contract',
+      };
+      fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
       }
     }
   };
@@ -1576,23 +1623,46 @@ export default function CanadaReviewPage({
 
           {/* Bottom Action CTA */}
           <div>
+            {buildError && <p role="alert" className="mb-3 text-sm text-[#A3231F]">{buildError}</p>}
             <button
               type="button"
-              disabled={!canBuild}
-              onClick={() => {
-                if (onContinue) {
-                  onContinue();
+              disabled={!canBuild || isSubmittingBuild}
+              onClick={async () => {
+                if (buildSubmitLock.current) return;
+                const activeCaseId = caseId || cs?.id;
+                if (!activeCaseId) return;
+                buildSubmitLock.current = true;
+                setIsSubmittingBuild(true);
+                setBuildError("");
+                let started = false;
+                try {
+                  await fairexit.attest(activeCaseId);
+                  await fairexit.buildReport(activeCaseId);
+                  started = true;
+                } catch (err) {
+                  setBuildError(err instanceof Error ? err.message : "Could not start report generation. Please try again.");
+                } finally {
+                  setIsSubmittingBuild(false);
+                }
+                if (started) {
+                  if (onContinue) onContinue();
+                  else setIsDone(true);
                 } else {
-                  setIsDone(true);
+                  buildSubmitLock.current = false;
                 }
               }}
               className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] transition flex items-center justify-center ${
-                canBuild
+                canBuild && !isSubmittingBuild
                   ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
                   : "bg-[#C9D1D7] text-white cursor-not-allowed opacity-90"
               }`}
             >
-              {canBuild ? (
+              {isSubmittingBuild ? (
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                  <span>Starting report build…</span>
+                </div>
+              ) : canBuild ? (
                 "Build my report (PDF) →"
               ) : remainingCount > 0 ? (
                 `Confirm ${remainingCount} more to build your report`

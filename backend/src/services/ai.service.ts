@@ -7,7 +7,7 @@ import { db } from '../config/db'
 import { env } from '../config/env'
 import { ApiError } from '../utils/ApiError'
 import { logger } from '../utils/logger'
-import { callClaudeJson, ContentBlock } from './claude.service'
+import { callClaudeJson, ContentBlock, type ClaudeLogContext } from './claude.service'
 import { documentService } from './document.service'
 import { systemPromptCallA, systemPromptCallA2, systemPromptCallB, promptSha256 } from '../fairexit/prompts'
 import { mockCallA, mockCallA2, mockCallB } from '../fairexit/mocks'
@@ -130,6 +130,7 @@ export const aiService = {
       if (!out || (!Array.isArray(out.facts) && !out.error)) throw new Error('Call A returned an unexpected shape')
       if (!Array.isArray(out.missing)) out.missing = []
       await record(c.id, 'A', { status: 'ok', model: r.model, usage: r.usage, durationMs: r.durationMs })
+      logger.info('[CLAUDE][CALL_A_RESPONSE]', { caseId: c.id, model: r.model, durationMs: r.durationMs, factCount: out.facts.length })
       return out
     } catch (err) {
       await record(c.id, 'A', { status: 'error', error: (err as Error).message, durationMs: Date.now() - started })
@@ -167,12 +168,13 @@ export const aiService = {
   },
 
   /** CALL B · WRITE THE REPORT */
-  async callB(c: CaseRow, input: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async callB(c: CaseRow, input: Record<string, unknown>, context?: ClaudeLogContext): Promise<Record<string, unknown>> {
     const started = Date.now()
     try {
       if (env.AI_MODE === 'mock') {
         const out = mockCallB(input)
         await record(c.id, 'B', { status: 'ok', model: 'mock', durationMs: Date.now() - started })
+        logger.info('[CLAUDE][CALL_B_RESPONSE]', { ...context, model: 'mock', durationMs: Date.now() - started })
         return out
       }
       const r = await callClaudeJson<Record<string, unknown>>({
@@ -180,6 +182,7 @@ export const aiService = {
         content: [{ type: 'text', text: `INPUT (JSON):\n${JSON.stringify(input, null, 2)}\n\nReturn the JSON described in OUTPUT only.` }],
         maxTokens: env.CALL_B_MAX_TOKENS,
         label: 'Call B',
+        context,
       })
       await record(c.id, 'B', { status: 'ok', model: r.model, usage: r.usage, durationMs: r.durationMs })
       return r.json
