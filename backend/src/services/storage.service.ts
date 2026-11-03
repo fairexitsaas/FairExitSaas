@@ -9,6 +9,8 @@ export const ALLOWED_DOC_TYPES: Record<string, string> = {
   'image/webp': 'webp',
   'image/gif': 'gif',
   'text/plain': 'txt',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/msword': 'doc',
 }
 
 export const storageService = {

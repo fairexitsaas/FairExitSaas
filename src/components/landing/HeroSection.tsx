@@ -38,6 +38,7 @@ export default function HeroSection({
               <span className="inline-flex items-center text-[11px] sm:text-[12px] font-extrabold uppercase tracking-[1.4px] text-[#0c8f72] flex-wrap gap-1.5">
                 <Image
                   className="h-[20px] sm:h-[22px] w-auto rounded-[2px]"
+                  style={{ width: "auto" }}
                   src={isCanada ? "/flag-ca.svg" : "/flag-us.svg"}
                   alt={isCanada ? "Canada" : "United States"}
                   width={34}

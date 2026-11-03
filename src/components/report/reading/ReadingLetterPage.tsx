@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { getReportInputs, ReportInputs } from "@/lib/report-storage";
+import { fairexit } from "@/lib/api/fairexit";
 
 interface ReadingLetterPageProps {
   caseId?: string | null;
@@ -21,6 +22,7 @@ function formatDollars(val: number | string | undefined, defaultVal = 0): string
 }
 
 export default function ReadingLetterPage({
+  caseId,
   cs,
   onDone,
 }: ReadingLetterPageProps) {
@@ -46,16 +48,65 @@ export default function ReadingLetterPage({
   const minFormatted = formatDollars(data.statutoryMin, 17000);
   const courtHighFormatted = formatDollars(data.courtAwardHigh, 193000);
 
-  // Auto transition after 3.5 seconds
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (onDone) {
-        onDone();
-      }
-    }, 3800);
+  const [readState, setReadState] = useState<{ done: boolean; failed: boolean; error?: string }>({ done: false, failed: false });
+  const [retrying, setRetrying] = useState(false);
 
-    return () => clearTimeout(timer);
-  }, [onDone]);
+  // Poll backend status or fallback to timer
+  useEffect(() => {
+    const activeCaseId = caseId || cs?.id;
+    if (!activeCaseId) {
+      const timer = setTimeout(() => {
+        if (onDone) onDone();
+      }, 3800);
+      return () => clearTimeout(timer);
+    }
+
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fairexit.readStatus(activeCaseId);
+        if (!isMounted) return;
+        if (res.done) {
+          clearInterval(interval);
+          setReadState({ done: true, failed: false });
+          if (onDone) onDone();
+        } else if (res.failed) {
+          clearInterval(interval);
+          setReadState({ done: false, failed: true, error: res.statusDetail || 'Scanner could not read documents' });
+        }
+      } catch (err: any) {
+        console.warn('readStatus polling error:', err);
+      }
+    }, 2000);
+
+    // Initial check immediately
+    fairexit.readStatus(activeCaseId).then((res) => {
+      if (!isMounted) return;
+      if (res.done) {
+        clearInterval(interval);
+        if (onDone) onDone();
+      }
+    }).catch(() => {});
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [caseId, cs, onDone]);
+
+  const handleRetry = async () => {
+    const activeCaseId = caseId || cs?.id;
+    if (!activeCaseId) return;
+    setRetrying(true);
+    setReadState({ done: false, failed: false });
+    try {
+      await fairexit.startRead(activeCaseId);
+    } catch (e: any) {
+      setReadState({ done: false, failed: true, error: e.message || 'Retry failed' });
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-[#F6F4EF] text-[#17242F] font-sans antialiased selection:bg-[#0EB28D]/20">
@@ -376,8 +427,22 @@ export default function ReadingLetterPage({
             </div>
 
             {/* Headline */}
+            {readState.failed ? (
+              <div className="mt-2 mb-4 p-4 rounded-xl bg-[#fbeceb] border border-[#f5c6cb] text-[#a3231f]">
+                <div className="font-bold text-[16px] mb-1">We couldn't read your document</div>
+                <p className="text-[14px] mb-3">{readState.error || 'Please make sure the text is clear and readable.'}</p>
+                <button
+                  type="button"
+                  onClick={handleRetry}
+                  disabled={retrying}
+                  className="px-4 py-2 rounded-lg bg-[#0EB28D] text-white font-bold text-[13px] hover:bg-[#0C8F72] transition disabled:opacity-50"
+                >
+                  {retrying ? 'Retrying…' : 'Try reading again'}
+                </button>
+              </div>
+            ) : null}
             <h1 className="font-serif font-[500] text-[22px] sm:text-[24px] leading-[27px] tracking-[-0.5px] text-[#062C55] mb-[8px]">
-              Reading your letter…
+              {readState.failed ? 'Scanner paused' : 'Reading your letter…'}
             </h1>
 
             {/* Subtitle */}

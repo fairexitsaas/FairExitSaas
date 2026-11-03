@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
+import ReportVideoPlayer from "./ReportVideoPlayer";
 
 interface ReportVideoModalProps {
   isOpen: boolean;
@@ -62,6 +63,9 @@ export default function ReportVideoModal({
         <h3 className="font-serif text-[24px] sm:text-[28px] font-semibold text-[#062C55] leading-tight mb-3">
           See exactly how your report works
         </h3>
+        <div className="mb-5 rounded-[12px] overflow-hidden">
+          <ReportVideoPlayer autoPlay={true} isModal={true} />
+        </div>
         <p className="font-sans text-[14px] sm:text-[15px] text-[#5A6B78] leading-relaxed mb-6">
           Every report is custom-compiled from your answers, severance letter, and employment contract.
           Here are the four high-leverage sections you unlock:

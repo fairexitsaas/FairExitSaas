@@ -8,6 +8,19 @@ import type { CaseRow, CaseDocumentRow, DocKind, ContractStatus } from '../faire
 
 const MAX_PAGES_PER_DOC = 20
 
+export function resolveDocExt(mimeType: string, fileName?: string): string | null {
+  if (ALLOWED_DOC_TYPES[mimeType]) return ALLOWED_DOC_TYPES[mimeType]
+  const lowerName = (fileName || '').toLowerCase()
+  if (lowerName.endsWith('.docx')) return 'docx'
+  if (lowerName.endsWith('.doc')) return 'doc'
+  if (lowerName.endsWith('.pdf')) return 'pdf'
+  if (lowerName.endsWith('.txt')) return 'txt'
+  if (lowerName.endsWith('.png')) return 'png'
+  if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'jpg'
+  if (lowerName.endsWith('.webp')) return 'webp'
+  return null
+}
+
 function assertCanChangeDocs(c: CaseRow) {
   if (!caseService.isPaid(c)) throw new ApiError(402, 'Payment is needed before adding documents')
   if (c.status === 'reading' || c.status === 'building') throw ApiError.conflict('Documents are being read. Wait until it finishes.')
@@ -34,6 +47,18 @@ async function afterUpload(c: CaseRow, kind: DocKind) {
 export const documentService = {
   view: docView,
 
+  async getById(docId: string): Promise<CaseDocumentRow> {
+    return check(
+      await db().from('case_documents').select('*').eq('id', docId).single(),
+      'Document'
+    ) as CaseDocumentRow
+  },
+
+  async viewDocById(docId: string) {
+    const doc = await this.getById(docId)
+    return { ...docView(doc), caseId: doc.case_id }
+  },
+
   async list(c: CaseRow) {
     const docs = await caseService.documents(c.id)
     return { documents: docs.map(docView), ...caseService.readiness(c, docs), contractStatus: c.contract_status }
@@ -42,8 +67,8 @@ export const documentService = {
   /** Step 1 of the direct-to-storage upload: returns a signed URL the client PUTs the bytes to. */
   async createUploadSlot(c: CaseRow, input: { kind: DocKind; fileName?: string; mimeType: string; sizeBytes?: number }) {
     assertCanChangeDocs(c)
-    const ext = ALLOWED_DOC_TYPES[input.mimeType]
-    if (!ext) throw ApiError.badRequest(`Unsupported file type ${input.mimeType}. Use PDF, JPEG, PNG, WEBP or plain text (iPhone HEIC photos must be converted to JPEG).`)
+    const ext = resolveDocExt(input.mimeType, input.fileName)
+    if (!ext) throw ApiError.badRequest(`Unsupported file type ${input.mimeType}. Use PDF, Word (.docx, .doc), JPEG, PNG, WEBP or plain text (iPhone HEIC photos must be converted to JPEG).`)
     if (input.sizeBytes && input.sizeBytes > env.MAX_UPLOAD_MB * 1024 * 1024) throw ApiError.badRequest(`File too large (max ${env.MAX_UPLOAD_MB} MB)`)
     const page = await nextPage(c.id, input.kind)
     const path = `${c.id}/${input.kind}/${String(page).padStart(2, '0')}-${crypto.randomUUID()}.${ext}`
@@ -78,8 +103,8 @@ export const documentService = {
   /** One-call alternative for small files: JSON body with base64 data (max ~7 MB of file). */
   async uploadBase64(c: CaseRow, input: { kind: DocKind; fileName?: string; mimeType: string; dataBase64: string }) {
     assertCanChangeDocs(c)
-    const ext = ALLOWED_DOC_TYPES[input.mimeType]
-    if (!ext) throw ApiError.badRequest(`Unsupported file type ${input.mimeType}`)
+    const ext = resolveDocExt(input.mimeType, input.fileName)
+    if (!ext) throw ApiError.badRequest(`Unsupported file type ${input.mimeType}. Use PDF, Word (.docx, .doc), JPEG, PNG, WEBP or plain text.`)
     const buf = Buffer.from(input.dataBase64.replace(/^data:[^;]+;base64,/, ''), 'base64')
     if (!buf.length) throw ApiError.badRequest('Empty file')
     if (buf.length > env.MAX_UPLOAD_MB * 1024 * 1024) throw ApiError.badRequest(`File too large (max ${env.MAX_UPLOAD_MB} MB)`)
@@ -121,9 +146,16 @@ export const documentService = {
   /** Files for Claude, in order: letter pages then contract pages. */
   async loadForAi(c: CaseRow, kinds: DocKind[] = ['letter', 'contract']) {
     const docs = (await caseService.documents(c.id)).filter((d) => d.status === 'uploaded' && kinds.includes(d.kind))
-    const out: Array<{ kind: DocKind; page: number; pages: number; mime: string; data: Buffer }> = []
+    const out: Array<{ kind: DocKind; page: number; pages: number; mime: string; data: Buffer; storagePath: string }> = []
     for (const d of docs) {
-      out.push({ kind: d.kind, page: d.page, pages: docs.filter((x) => x.kind === d.kind).length, mime: d.mime_type, data: await storageService.download(env.DOCUMENTS_BUCKET, d.storage_path) })
+      out.push({
+        kind: d.kind,
+        page: d.page,
+        pages: docs.filter((x) => x.kind === d.kind).length,
+        mime: d.mime_type,
+        data: await storageService.download(env.DOCUMENTS_BUCKET, d.storage_path),
+        storagePath: d.storage_path,
+      })
     }
     return out
   },

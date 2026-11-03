@@ -241,3 +241,37 @@ Authorization: Bearer <access_token>
    - Enable Apple.
    - Enter `Service ID`, `Team ID`, `Key ID`, and the `.p8` private key.
 
+
+
+---
+
+## 9. FairExit Backend — Phase 1: Document Processing and Data Extraction
+
+### Overview
+Phase 1 implements secure document upload, Claude Call A extraction, raw response persistence, schema validation, and independent user fact review/correction storage.
+
+### Dedicated Endpoints
+
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1/documents` | Upload/register document (base64 or direct storage slot) |
+| `POST` | `/api/v1/documents/:id/process` | Trigger Claude Call A extraction for documents |
+| `GET` | `/api/v1/documents/:id` | Retrieve document metadata and processing status |
+| `GET` | `/api/v1/documents/:id/extracted-facts` | Retrieve immutable original AI-extracted facts |
+| `GET` | `/api/v1/documents/:id/review` | Retrieve full review data (extracted facts + user corrections) |
+| `PUT` | `/api/v1/documents/:id/review` | Save user-corrected facts independently |
+| `GET` | `/api/v1/health` | Backend service health check |
+
+### Claude Call A Integration
+- **Source Prompt:** `backend/prompts/report-prompt-v0.6.txt` (matches `codebase/prompt-claude-draft-v0.6.txt`).
+- **Prompt Integrity:** Verified via SHA-256 hash `E914AC5878FA8AD1A26D1CA4058EDAD0AA1CB9D1C70A0BD5CF483849311B7724`.
+- **Validation:** Strict runtime validation of Claude output using Zod (`callAOutputSchema`).
+- **Separation of Concerns:** Original extracted facts (`extracted_facts`) are never modified when users submit corrections (`corrected_facts`).
+
+### How to Run Tests
+```bash
+cd backend
+npm run test          # Runs all 50 unit and integration tests (Vitest)
+npm run typecheck     # Runs TypeScript verification (tsc --noEmit)
+npm run dev           # Starts development server with live reload (PORT 5000)
+```

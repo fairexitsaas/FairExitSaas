@@ -104,14 +104,14 @@ export const googleIapSchema = z.object({ purchaseToken: z.string().min(10).max(
 export const uploadSlotSchema = z.object({
   kind: z.enum(['letter', 'contract']),
   fileName: z.string().max(200).optional(),
-  mimeType: z.string().max(80),
+  mimeType: z.string().max(120),
   sizeBytes: z.number().int().positive().optional(),
 })
 
 export const uploadBase64Schema = z.object({
   kind: z.enum(['letter', 'contract']),
   fileName: z.string().max(200).optional(),
-  mimeType: z.string().max(80),
+  mimeType: z.string().max(120),
   dataBase64: z.string().min(10),
 })
 
