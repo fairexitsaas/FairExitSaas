@@ -122,14 +122,7 @@ export default function ReportSalesPage({
     setPayError("");
     saveReportInputs({ email, remindMe: subscribeNews });
 
-    if (!termsAccepted) {
-      // Open Terms & Conditions modal first (Step 2)
-      setTermsModalOpen(true);
-      return;
-    }
-
-    // Terms accepted -> open Secure Checkout dialog (Step 3)
-    setCheckoutDialogOpen(true);
+    proceedToPayment();
   };
 
   const proceedToPayment = async () => {
@@ -140,16 +133,6 @@ export default function ReportSalesPage({
 
     const activeCaseId = caseId || cs?.id;
 
-    // Fire mock payment in background if available, but never block user navigation
-    try {
-      const { fairexit } = await import("@/lib/api/fairexit");
-      if (activeCaseId) {
-        fairexit.mockPay(activeCaseId).catch(() => {});
-      }
-    } catch {
-      // Ignore background errors
-    }
-
     setIsPaying(false);
     setCheckoutDialogOpen(false);
     setTermsModalOpen(false);
@@ -157,9 +140,8 @@ export default function ReportSalesPage({
     // Directly navigate to the upload step without checking payments or details
     if (onPaySuccess) {
       onPaySuccess(activeCaseId || undefined);
-    } else {
-      router.push(`/report?step=upload${activeCaseId ? `&case=${activeCaseId}` : ""}`);
     }
+    router.push(`/report?step=upload${activeCaseId ? `&case=${activeCaseId}` : ""}`);
   };
 
   return (
@@ -992,7 +974,7 @@ export default function ReportSalesPage({
         onAllAccepted={() => {
           setTermsAccepted(true);
           setTermsModalOpen(false);
-          setCheckoutDialogOpen(true);
+          proceedToPayment();
         }}
       />
 

@@ -43,15 +43,6 @@ async function resolveCaseForRequest(req: Request, caseId?: string): Promise<{ c
     userId: authUser?.id || null,
   })
 
-  // For testing/mock mode: ensure case is marked as paid so upload is accepted
-  if (env.PAYMENTS_MODE === 'mock') {
-    await caseService.update(created.row.id, {
-      status: 'paid',
-      paid_at: new Date().toISOString(),
-      payment_provider: 'mock',
-      amount_cents: env.REPORT_PRICE_CENTS,
-    })
-  }
 
   return { caseRow: created.row, caseToken: created.token }
 }
@@ -66,15 +57,6 @@ export const documentController = {
     const startTime = Date.now()
     const { caseRow: c, caseToken } = await resolveCaseForRequest(req, body.caseId)
 
-    // Ensure case has paid status for document handling in dev/mock mode
-    if (!caseService.isPaid(c) && env.PAYMENTS_MODE === 'mock') {
-      await caseService.update(c.id, {
-        status: 'paid',
-        paid_at: new Date().toISOString(),
-        payment_provider: 'mock',
-      })
-      c.status = 'paid'
-    }
 
     let docResult: any
     let uploadSlot: any = null

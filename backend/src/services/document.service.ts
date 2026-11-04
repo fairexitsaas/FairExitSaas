@@ -22,7 +22,7 @@ export function resolveDocExt(mimeType: string, fileName?: string): string | nul
 }
 
 function assertCanChangeDocs(c: CaseRow) {
-  // if (!caseService.isPaid(c)) throw new ApiError(402, 'Payment is needed before adding documents')
+
   if (c.status === 'reading' || c.status === 'building') throw ApiError.conflict('Documents are being read. Wait until it finishes.')
   if (c.docs_deleted_at) throw ApiError.conflict('Documents for this report were deleted under the 30-day retention rule')
 }
@@ -152,7 +152,7 @@ export const documentService = {
 
   /** The no-contract modal: "never" = never signed one; "missing" = signed one but can't add it / not sure. */
   async setContractStatus(c: CaseRow, status: Exclude<ContractStatus, 'added'>) {
-    // if (!caseService.isPaid(c)) throw new ApiError(402, 'Payment is needed first')
+
     const docs = await caseService.documents(c.id)
     if (docs.some((d) => d.kind === 'contract' && d.status === 'uploaded')) {
       throw ApiError.conflict('A contract is already added. Remove it first if you meant to continue without one.')

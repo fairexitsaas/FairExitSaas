@@ -5,7 +5,7 @@ import { computeFreeResult } from '../fairexit/freeCheck'
 import { buildJurisdiction, codeFromAnswers, Country } from '../fairexit/jurisdictions'
 import { RULES_VERSION } from '../fairexit/severanceRules'
 import type { CaseRow, CaseDocumentRow, Platform, CaseStatus } from '../fairexit/types'
-import { PAID_STATUSES } from '../fairexit/types'
+
 
 const STALE_JOB_MS = 20 * 60 * 1000
 
@@ -107,20 +107,20 @@ export const caseService = {
   },
 
   isPaid(row: CaseRow) {
-    return PAID_STATUSES.includes(row.status) || (row.status === 'failed' && !!row.paid_at)
+    return true
   },
 
   nextStep(row: CaseRow, docs: CaseDocumentRow[]): string {
     if (!row.covered) return 'not_covered'
     const s: CaseStatus = row.status
-    if (s === 'free_check' || s === 'pending_payment') return 'pay'
+    if (s === 'free_check' || s === 'pending_payment') return 'upload'
     if (s === 'paid') return 'upload'
     if (s === 'reading') return 'reading'
     if (s === 'checking') return 'check'
     if (s === 'building') return 'building'
     if (s === 'ready') return 'ready'
     if (s === 'failed') return row.status_detail === 'build_failed' ? 'check' : 'upload'
-    return docs.length ? 'upload' : 'pay'
+    return 'upload'
   },
 
   readiness(row: CaseRow, docs: CaseDocumentRow[]) {
@@ -128,7 +128,7 @@ export const caseService = {
     const letterPages = uploaded.filter((d) => d.kind === 'letter').length
     const contractPages = uploaded.filter((d) => d.kind === 'contract').length
     const contractOk = contractPages > 0 || row.contract_status === 'never' || row.contract_status === 'missing'
-    return { letterPages, contractPages, contractOk, canRead: this.isPaid(row) && letterPages > 0 && contractOk }
+    return { letterPages, contractPages, contractOk, canRead: letterPages > 0 && contractOk }
   },
 
   view(row: CaseRow, docs: CaseDocumentRow[] = []) {

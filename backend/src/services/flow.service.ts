@@ -97,7 +97,7 @@ export const flowService = {
   async startRead(c: CaseRow) {
     const docs = await caseService.documents(c.id)
     const r = caseService.readiness(c, docs)
-    // if (!caseService.isPaid(c)) throw new ApiError(402, 'Payment is needed first')
+
     if (c.status === 'reading') return { started: false, status: c.status }
     if (c.status === 'building') throw ApiError.conflict('Your report is being built')
     if (!r.letterPages) throw ApiError.badRequest('Add your severance letter first — the report needs at least that.')

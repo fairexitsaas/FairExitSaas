@@ -36,11 +36,11 @@ export const caseController = {
 
   updateAnswers: async (req: Request, res: Response) => {
     const c = C(req)
-    if (caseService.isPaid(c) && c.call_a) throw ApiError.conflict('After your documents are read, change answers on the check page instead')
+    if (c.call_a) throw ApiError.conflict('After your documents are read, change answers on the check page instead')
     const answers = { ...c.answers, ...req.body.answers }
     const code = codeFromAnswers(c.country, answers)
     const jurisdiction = code ? buildJurisdiction(code) : null
-    if (caseService.isPaid(c) && !jurisdiction) throw ApiError.unprocessable('jurisdiction_not_covered')
+    if (!jurisdiction) throw ApiError.unprocessable('jurisdiction_not_covered')
     const updated = await caseService.update(c.id, { answers, jurisdiction_code: code, jurisdiction, covered: !!jurisdiction, free_result: computeFreeResult(c.country, answers) })
     return ApiResponse.ok(res, await fullView(updated), 'Answers updated')
   },

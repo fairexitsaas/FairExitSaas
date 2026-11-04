@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import NextLink from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import ReportSalesPage from "@/components/report/ReportSalesPage";
@@ -83,6 +83,7 @@ const money = (n: number, country: string) => "$" + Math.round(n).toLocaleString
    Main
    ========================================================================= */
 export default function ReportFlow() {
+  const router = useRouter();
   const sp = useSearchParams();
   const [caseId, setCaseId] = useState<string | null>(() => sp?.get("case") || null);
   const [cs, setCs] = useState<any>(null);
@@ -144,6 +145,7 @@ export default function ReportFlow() {
       }
     }
     setView("upload");
+    router.push(`/report?step=upload${id ? `&case=${id}` : ""}`);
   };
 
   // If jurisdiction is genuinely not covered (e.g. Quebec), show the not covered screen
@@ -168,7 +170,7 @@ export default function ReportFlow() {
 
   // Allow post-pay steps (upload, reading, review, ready) directly during testing
   const isPostPayStep = step === "upload" || view === "upload" || step === "reading" || view === "reading" || step === "review" || view === "review" || step === "ready" || view === "ready";
-  if ((urlStep === "pay" || step === "pay" || !cs || !cs.paid) && !isPostPayStep) {
+  if ((urlStep === "pay" || step === "pay") && !isPostPayStep) {
     return (
       <ReportSalesPage
         caseId={caseId}
