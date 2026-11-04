@@ -40,7 +40,7 @@ const envSchema = z.object({
     .default('http://localhost:3000'),
   CORS_ORIGINS: z
     .string()
-    .default('http://localhost:3000,http://127.0.0.1:3000')
+    .default('http://localhost:3000,http://127.0.0.1:3000,https://fair-exit-saas.vercel.app')
     .transform((val) => val.split(',').map((origin) => origin.trim()).filter(Boolean)),
   SUPABASE_URL: z
     .string()

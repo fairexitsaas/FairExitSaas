@@ -10,23 +10,29 @@ import webhookRoutes from './routes/webhook.routes'
 
 const app: Application = express()
 
-// Security HTTP headers
-app.use(helmet())
+// 1. Trust reverse proxy (Vercel, Cloudflare, etc.) for accurate client IP identification and rate-limiting
+app.set('trust proxy', 1)
 
-// Enable CORS with secure options
+// 2. Enable CORS with secure options first so all preflight and cross-origin calls are handled
 app.use(corsMiddleware)
+app.options('*', corsMiddleware)
 
-// Stripe webhooks need the raw body: mount before the JSON parser
+// 3. Security HTTP headers with cross-origin access permitted for web clients
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}))
+
+// 4. Stripe webhooks need the raw body: mount before the JSON parser
 app.use('/api/v1/webhooks', webhookRoutes)
 
-// JSON and URL-encoded body parser with sensible limits
+// 5. JSON and URL-encoded body parser with sensible limits
 app.use(express.json({ limit: '25mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// Request correlation and logging
+// 6. Request correlation and logging
 app.use(requestLogger)
 
-// Keep normal polling and reads separate from expensive writes and AI generation.
+// 7. Rate limiting (skips preflight OPTIONS)
 app.use('/api', apiRateLimiter)
 
 // Root health & metadata endpoint
@@ -50,4 +56,3 @@ app.use(notFound)
 app.use(errorHandler)
 
 export default app
-

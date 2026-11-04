@@ -23,7 +23,22 @@ export function GetAppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleOpen = () => setIsOpen(true);
     window.addEventListener("open-get-app", handleOpen);
-    return () => window.removeEventListener("open-get-app", handleOpen);
+
+    if (typeof window !== "undefined" && window.location.hash === "#app") {
+      setIsOpen(true);
+    }
+
+    const handleHashChange = () => {
+      if (typeof window !== "undefined" && window.location.hash === "#app") {
+        setIsOpen(true);
+      }
+    };
+    window.addEventListener("hashchange", handleHashChange);
+
+    return () => {
+      window.removeEventListener("open-get-app", handleOpen);
+      window.removeEventListener("hashchange", handleHashChange);
+    };
   }, []);
 
   return (

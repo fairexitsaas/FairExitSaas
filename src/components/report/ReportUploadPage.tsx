@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
@@ -356,10 +357,10 @@ export default function ReportUploadPage({
 
           {/* Desktop Nav Links */}
           <nav className="hidden md:flex items-center gap-[22px] text-[13.5px] font-[600] text-[#5A6B78]">
-            <Link href="/how-it-works" className="hover:text-[#062C55] transition">
+            <Link href="/#how" className="hover:text-[#062C55] transition">
               How it works
             </Link>
-            <Link href="/pricing" className="hover:text-[#062C55] transition">
+            <Link href="/#paths" className="hover:text-[#062C55] transition">
               Pricing
             </Link>
             <Link href="/faq" className="hover:text-[#062C55] transition">
@@ -371,12 +372,13 @@ export default function ReportUploadPage({
             <Link href="/about" className="hover:text-[#062C55] transition">
               About
             </Link>
-            <Link
-              href="/app"
+            <button
+              type="button"
+              onClick={() => triggerGetApp()}
               className="text-[#0C8F72] font-[700] text-[12.5px] hover:underline"
             >
               Get the app
-            </Link>
+            </button>
             <Link
               href="/"
               className="text-[#5A6B78] hover:text-[#062C55] transition underline text-[13px] font-[600]"

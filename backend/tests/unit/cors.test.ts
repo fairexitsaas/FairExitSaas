@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 import cors from 'cors'
-import { createCorsOptions, getAllowedOrigins } from '../../src/config/cors'
+import { createCorsOptions, getAllowedOrigins, isOriginAllowed } from '../../src/config/cors'
 
 describe('CORS configuration', () => {
   it('normalizes configured origins and includes the canonical frontend URL', () => {
@@ -31,6 +31,14 @@ describe('CORS configuration', () => {
     expect(response.headers['access-control-allow-credentials']).toBe('true')
     expect(response.headers['access-control-allow-headers']).toContain('Authorization')
     expect(response.headers['access-control-allow-headers']).toContain('X-Case-Token')
+  })
+
+  it('allows Vercel production and preview subdomains dynamically', () => {
+    expect(isOriginAllowed('https://fair-exit-saas.vercel.app', [], 'production')).toBe(true)
+    expect(isOriginAllowed('https://fair-exit-saas-git-preview.vercel.app', [], 'production')).toBe(true)
+    expect(isOriginAllowed('https://fairexit.io', [], 'production')).toBe(true)
+    expect(isOriginAllowed('https://app.fairexit.io', [], 'production')).toBe(true)
+    expect(isOriginAllowed('http://localhost:3000', [], 'production')).toBe(true)
   })
 
   it('rejects an origin outside the production allowlist', () => {

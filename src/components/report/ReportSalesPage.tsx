@@ -18,6 +18,7 @@ import ReportVideoPlayer from "./ReportVideoPlayer";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import TermsConditionsModal from "@/components/dialogs/TermsConditionsModal";
 import CheckoutDialog from "@/components/dialogs/CheckoutDialog";
+import { triggerGetApp } from "@/context/GetAppContext";
 
 interface ReportSalesPageProps {
   caseId?: string | null;
@@ -183,7 +184,7 @@ export default function ReportSalesPage({
             <Link href="/#how" className="hover:text-[#062C55] transition-colors">
               How it works
             </Link>
-            <Link href="/pricing" className="hover:text-[#062C55] transition-colors">
+            <Link href="/#paths" className="hover:text-[#062C55] transition-colors">
               Pricing
             </Link>
             <Link href="/faq" className="hover:text-[#062C55] transition-colors">
@@ -195,12 +196,13 @@ export default function ReportSalesPage({
             <Link href="/about" className="hover:text-[#062C55] transition-colors">
               About
             </Link>
-            <Link
-              href="/app"
+            <button
+              type="button"
+              onClick={() => triggerGetApp()}
               className="text-[#0C8F72] font-[700] hover:text-[#096B55] transition-colors"
             >
               Get the app
-            </Link>
+            </button>
             <Link
               href="/"
               className="underline text-[#5A6B78] hover:text-[#062C55] transition-colors"
@@ -238,7 +240,7 @@ export default function ReportSalesPage({
             <Link href="/#how" className="block hover:text-[#062C55]" onClick={() => setMobileMenuOpen(false)}>
               How it works
             </Link>
-            <Link href="/pricing" className="block hover:text-[#062C55]" onClick={() => setMobileMenuOpen(false)}>
+            <Link href="/#paths" className="block hover:text-[#062C55]" onClick={() => setMobileMenuOpen(false)}>
               Pricing
             </Link>
             <Link href="/faq" className="block hover:text-[#062C55]" onClick={() => setMobileMenuOpen(false)}>
@@ -250,9 +252,13 @@ export default function ReportSalesPage({
             <Link href="/about" className="block hover:text-[#062C55]" onClick={() => setMobileMenuOpen(false)}>
               About
             </Link>
-            <Link href="/app" className="block text-[#0C8F72] font-bold" onClick={() => setMobileMenuOpen(false)}>
+            <button
+              type="button"
+              onClick={() => { setMobileMenuOpen(false); triggerGetApp(); }}
+              className="block text-left text-[#0C8F72] font-bold"
+            >
               Get the app
-            </Link>
+            </button>
             <Link href="/" className="block underline text-[#5A6B78]" onClick={() => setMobileMenuOpen(false)}>
               Exit ✕
             </Link>

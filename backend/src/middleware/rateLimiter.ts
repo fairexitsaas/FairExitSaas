@@ -9,6 +9,7 @@ export function createApiLimiter(policy: 'read' | 'write' | 'auth', max: number,
     max,
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
     handler: (req, res) => {
       const route = req.originalUrl.split('?')[0]
       const resetTime = (req as typeof req & { rateLimit?: { resetTime?: Date } }).rateLimit?.resetTime
@@ -40,7 +41,11 @@ export const authRateLimiter = createApiLimiter('auth', env.AUTH_RATE_LIMIT_MAX)
 
 export function apiRateLimitDispatcher(readLimiter: RateLimitRequestHandler, writeLimiter: RateLimitRequestHandler): RequestHandler {
   return (req, res, next) => {
-    const isRead = ['GET', 'HEAD', 'OPTIONS'].includes(req.method)
+    // OPTIONS preflight requests must NEVER be throttled or rate-limited
+    if (req.method === 'OPTIONS') {
+      return next()
+    }
+    const isRead = ['GET', 'HEAD'].includes(req.method)
     return (isRead ? readLimiter : writeLimiter)(req, res, next)
   }
 }
