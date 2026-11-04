@@ -132,8 +132,9 @@ export const caseController = {
 
   // ---------------------------------------------------------------- AI read
   startRead: async (req: Request, res: Response) => {
-    const r = await flowService.startRead(C(req))
-    return res.status(202).json({ success: true, statusCode: 202, message: 'Reading your documents', data: r })
+    const r = await flowService.startRead(C(req), req.id)
+    const statusCode = r.status === 'checking' ? 200 : 202
+    return res.status(statusCode).json({ success: true, statusCode, message: r.status === 'checking' ? 'Documents read successfully' : 'Reading your documents', data: r })
   },
   readStatus: async (req: Request, res: Response) => ApiResponse.ok(res, flowService.readStatus(C(req))),
 

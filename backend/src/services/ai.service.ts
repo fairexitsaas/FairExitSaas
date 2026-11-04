@@ -172,9 +172,11 @@ export const aiService = {
     const started = Date.now()
     try {
       if (env.AI_MODE === 'mock') {
+        logger.info('[CLAUDE][CALL_B_START]', { ...context, model: 'mock', attempt: 1 })
         const out = mockCallB(input)
-        await record(c.id, 'B', { status: 'ok', model: 'mock', durationMs: Date.now() - started })
-        logger.info('[CLAUDE][CALL_B_RESPONSE]', { ...context, model: 'mock', durationMs: Date.now() - started })
+        const durationMs = Date.now() - started
+        await record(c.id, 'B', { status: 'ok', model: 'mock', durationMs })
+        logger.info('[CLAUDE][CALL_B_SUCCESS]', { ...context, model: 'mock', durationMs, tokens: { input: 0, output: 0 } })
         return out
       }
       const r = await callClaudeJson<Record<string, unknown>>({

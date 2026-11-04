@@ -6,7 +6,7 @@ import crypto from 'crypto'
 import { env } from '../config/env'
 import { ApiError } from '../utils/ApiError'
 import { logger } from '../utils/logger'
-import { reserveBackground, releaseBackground, runReservedBackground, runInBackground } from '../utils/background'
+import { reserveBackground, releaseBackground, runInBackground } from '../utils/background'
 import { caseService } from './case.service'
 import { aiService, assertDailyLimit } from './ai.service'
 import { emailService } from './email.service'
@@ -90,11 +90,110 @@ async function renderAndStorePdf(c: CaseRow, report: ReportJson, meta: RenderMet
   }
 }
 
+async function executeReportBuildJob(
+  c: CaseRow,
+  claimed: CaseRow,
+  input: Record<string, unknown>,
+  rulesAsOf: string | null,
+  generationId: string,
+  reportId: string,
+  requestedAt: number,
+  requestId?: string,
+): Promise<{ status: 'ready'; reportId: string; readyAt: string; pdfReady: boolean }> {
+  let stage = 'claude'
+  let savedReport: ReportJson | undefined
+  let done: CaseRow | undefined
+
+  try {
+    await caseService.update(c.id, { status_detail: 'claude' })
+    const raw = await aiService.callB(c, input, { requestId, caseId: c.id, reportId, generationId })
+
+    stage = 'validation'
+    const validationStartedAt = Date.now()
+    const { ok, problems, report } = validateShape(raw)
+    logger.info('[CLAUDE][JSON_VALIDATION]', { requestId, caseId: c.id, reportId, generationId, ok, durationMs: Date.now() - validationStartedAt, problemCount: problems.length })
+    if (!ok) throw new Error('Call B output failed the shape check: ' + problems.join('; '))
+    savedReport = report
+
+    const warnings = ruleWarnings(report, (input.sources as Array<{ id: string }>).map((s) => s.id), allowedAmounts(input as Record<string, any>))
+    if (warnings.length) logger.warn('[REPORT][RULE_WARNINGS]', { requestId, caseId: c.id, reportId, generationId, warnings })
+
+    stage = 'json_persistence'
+    const persistenceStartedAt = Date.now()
+    const now = new Date()
+    done = await caseService.update(c.id, {
+      status: 'building', status_detail: 'pdf', job_started_at: claimed.job_started_at,
+      report: { ...report, _meta: { warnings, generated_at: now.toISOString(), rules_as_of: rulesAsOf, model: env.AI_MODE === 'mock' ? 'mock' : env.ANTHROPIC_MODEL, generation_id: generationId } },
+      report_ready_at: now.toISOString(),
+      report_pdf_path: null,
+      docs_delete_after: new Date(now.getTime() + env.RETENTION_DOCS_DAYS * 864e5).toISOString(),
+      report_delete_after: new Date(new Date(now).setMonth(now.getMonth() + env.RETENTION_REPORT_MONTHS)).toISOString(),
+      rules_version: RULES_VERSION, prompt_version: PROMPT_VERSION, prompt_sha256: promptSha256(),
+    })
+    logger.info('[REPORT][JSON_SAVED]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - persistenceStartedAt })
+
+    stage = 'pdf'
+    const pdfResult = await renderAndStorePdf(done, report, flowService.renderMeta(done), generationId, requestId)
+    if (pdfResult.stored) {
+      logger.info('[REPORT][COMPLETE]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: true })
+    } else {
+      logger.warn('[REPORT][JSON_READY]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: false, stage: 'pdf_pending' })
+    }
+
+    if (done?.email) {
+      try {
+        const token = await caseService.addToken(done)
+        await emailService.reportReady(done, token)
+      } catch (error) {
+        logger.warn('[REPORT][EMAIL_ERROR]', { requestId, caseId: c.id, reportId, generationId, message: (error as Error).message })
+      }
+    }
+
+    return {
+      status: 'ready',
+      reportId,
+      readyAt: now.toISOString(),
+      pdfReady: pdfResult.stored,
+    }
+  } catch (error) {
+    if (savedReport && (stage === 'json_persistence' || stage === 'pdf')) {
+      const latest = done || await caseService.get(c.id).catch(() => null)
+      const persistedForThisGeneration = latest?.report && latest.report_ready_at && (latest.report as any)?._meta?.generation_id === generationId
+      if (persistedForThisGeneration && latest) {
+        await caseService.update(c.id, { status: 'ready', status_detail: 'pdf_pending', job_started_at: null })
+        logger.error('[PDF][ERROR]', { requestId, caseId: c.id, reportId, generationId, stage, message: (error as Error).message })
+        return {
+          status: 'ready',
+          reportId,
+          readyAt: latest.report_ready_at || new Date().toISOString(),
+          pdfReady: false,
+        }
+      }
+    }
+
+    const lastError = (error as Error).message || 'Report generation failed'
+    const failedStage = stage
+    logger.error('[REPORT][FAILED]', { requestId, caseId: c.id, reportId, generationId, stage, durationMs: Date.now() - requestedAt, message: lastError })
+    await caseService.update(c.id, {
+      status: 'failed',
+      status_detail: stage === 'claude' ? 'claude_failed' : stage === 'validation' ? 'validation_failed' : 'build_failed',
+      job_started_at: null,
+      report_inputs: {
+        ...(claimed?.report_inputs || {}),
+        lastError,
+        failedStage,
+        errorAt: new Date().toISOString(),
+      },
+    })
+    throw error
+  }
+}
+
 export const flowService = {
   // -------------------------------------------------------------------------
   // AI reads the documents (Call A)
   // -------------------------------------------------------------------------
-  async startRead(c: CaseRow) {
+  async startRead(c: CaseRow, requestId?: string) {
     const docs = await caseService.documents(c.id)
     const r = caseService.readiness(c, docs)
 
@@ -114,7 +213,6 @@ export const flowService = {
           await caseService.update(c.id, { status: 'failed', status_detail: 'jurisdiction_not_covered', job_started_at: null })
           return
         }
-        // a fresh read keeps the person's answer rows and drops document rows (they come from the new read)
         const fresh = await caseService.get(c.id)
         const keep: CheckState = { rows: {}, attested: false, attested_at: null, dismissed: [] }
         for (const [k, v] of Object.entries(fresh.check_state?.rows || {})) if (v.source === 'answers') keep.rows[k] = v
@@ -123,7 +221,7 @@ export const flowService = {
           attested_at: null, job_started_at: null, prompt_version: PROMPT_VERSION, prompt_sha256: promptSha256(),
         })
       } catch (err) {
-        logger.error('Call A failed', { caseId: c.id, message: (err as Error).message })
+        logger.error('Call A failed', { requestId, caseId: c.id, message: (err as Error).message })
         await caseService.update(c.id, {
           status: 'failed',
           status_detail: 'read_failed',
@@ -284,7 +382,6 @@ export const flowService = {
     ctx.check.dismissed = Array.from(new Set([...(ctx.check.dismissed || []), key]))
 
     if (key === 'years') {
-      // contract start date vs "years on the job" (an answers row)
       const v = body.choice === 'document' ? card.document.value : body.choice === 'answers' ? card.answers.value : body.choice === 'other' ? CP.coerce(ctx, 'years', body.value) : null
       if (body.choice === 'not_sure') CP.setRow(ctx, 'years', card.answers.value, 'not_sure')
       else {
@@ -298,7 +395,6 @@ export const flowService = {
       if (card.answers.value === 'unsure') CP.setRow(ctx, key, null, 'not_sure')
       else {
         const v = key === 'days_to_decide' || key === 'advance_notice' ? card.document.value : card.answers.value
-        // US range answers ("21 to 44 days") are not a value; the row keeps the document number but is flagged as not sure
         if ((key === 'days_to_decide' || key === 'advance_notice')) CP.setRow(ctx, key, v, 'not_sure')
         else CP.setRow(ctx, key, card.answers.value, 'corrected', { user: card.answers.value, doc: card.document.value })
       }
@@ -344,14 +440,23 @@ export const flowService = {
       logger.info('[REPORT][ALREADY_PROCESSING]', { requestId, caseId: c.id, reportId: c.report_id, generationId: (c.report_inputs as any)?.generationId, stage: c.status_detail })
       return { started: false, status: 'building', reportId: c.report_id, generationId: (c.report_inputs as any)?.generationId }
     }
-    if (c.status === 'ready' && c.report) {
-      logger.info('[REPORT][ALREADY_COMPLETE]', { requestId, caseId: c.id, reportId: c.report_id, pdfReady: !!c.report_pdf_path })
-      return { started: false, status: 'ready', reportId: c.report_id, readyAt: c.report_ready_at, pdfReady: !!c.report_pdf_path }
-    }
-    if (c.report && c.report_ready_at && c.report_id) {
-      await caseService.update(c.id, { status: 'ready', status_detail: 'pdf_pending', job_started_at: null })
-      logger.info('[REPORT][JSON_RECOVERED]', { requestId, caseId: c.id, reportId: c.report_id, generationId: (c.report_inputs as any)?.generationId })
-      return { started: false, status: 'ready', reportId: c.report_id, readyAt: c.report_ready_at, pdfReady: !!c.report_pdf_path }
+
+    // Idempotency: If valid report JSON is already saved, NEVER invoke Claude Call B again.
+    // Recover only the PDF/storage stage directly.
+    if (c.report) {
+      if (!c.report_pdf_path) {
+        logger.info('[REPORT][RECOVERING_PDF_FROM_SAVED_JSON]', { requestId, caseId: c.id, reportId: c.report_id, generationId: (c.report_inputs as any)?.generationId })
+        const pdfResult = await renderAndStorePdf(
+          c,
+          c.report as unknown as ReportJson,
+          this.renderMeta(c),
+          (c.report_inputs as any)?.generationId || 'recovery',
+          requestId,
+        )
+        return { started: false, status: 'ready', reportId: c.report_id, readyAt: c.report_ready_at, pdfReady: pdfResult.stored }
+      }
+      logger.info('[REPORT][ALREADY_COMPLETE]', { requestId, caseId: c.id, reportId: c.report_id, pdfReady: true })
+      return { started: false, status: 'ready', reportId: c.report_id, readyAt: c.report_ready_at, pdfReady: true }
     }
 
     this.assertCheckable(c)
@@ -367,14 +472,8 @@ export const flowService = {
     const generationId = crypto.randomUUID()
     logger.info('[REPORT][INPUT_PREPARED]', { requestId, caseId: c.id, reportId, generationId, durationMs: preparationDurationMs })
 
-    // Reserve synchronously in this process, then claim the durable DB state for cross-process safety.
     if (!reserveBackground(generationKey)) {
       const existingGenerationId = (c.report_inputs as any)?.generationId
-      if (c.status === 'failed') {
-        await caseService.update(c.id, {
-          status: 'building', status_detail: c.report ? 'pdf' : 'claude', job_started_at: new Date().toISOString(),
-        })
-      }
       logger.info('[REPORT][ALREADY_PROCESSING]', { requestId, caseId: c.id, reportId: c.report_id, generationId: existingGenerationId, stage: c.report ? 'pdf' : 'claude' })
       return { started: false, status: 'building', reportId: c.report_id, generationId: existingGenerationId }
     }
@@ -411,101 +510,30 @@ export const flowService = {
       throw error
     }
 
-    const scheduled = runReservedBackground(generationKey, 'Call B and PDF', async () => {
-      let stage = 'claude'
-      let savedReport: ReportJson | undefined
-      let done: CaseRow | undefined
-      try {
-        await caseService.update(c.id, { status_detail: 'claude' })
-        const raw = await aiService.callB(c, input, { requestId, caseId: c.id, reportId, generationId })
-
-        stage = 'validation'
-        const validationStartedAt = Date.now()
-        const { ok, problems, report } = validateShape(raw)
-        logger.info('[CLAUDE][JSON_VALIDATION]', { requestId, caseId: c.id, reportId, generationId, ok, durationMs: Date.now() - validationStartedAt, problemCount: problems.length })
-        if (!ok) throw new Error('Call B output failed the shape check: ' + problems.join('; '))
-        savedReport = report
-
-        const warnings = ruleWarnings(report, (input.sources as Array<{ id: string }>).map((s) => s.id), allowedAmounts(input as Record<string, any>))
-        if (warnings.length) logger.warn('[REPORT][RULE_WARNINGS]', { requestId, caseId: c.id, reportId, generationId, warnings })
-
-        stage = 'json_persistence'
-        const persistenceStartedAt = Date.now()
-        const now = new Date()
-        done = await caseService.update(c.id, {
-          status: 'building', status_detail: 'pdf', job_started_at: claimed.job_started_at,
-          report: { ...report, _meta: { warnings, generated_at: now.toISOString(), rules_as_of: rulesAsOf, model: env.AI_MODE === 'mock' ? 'mock' : env.ANTHROPIC_MODEL, generation_id: generationId } },
-          report_ready_at: now.toISOString(),
-          report_pdf_path: null,
-          docs_delete_after: new Date(now.getTime() + env.RETENTION_DOCS_DAYS * 864e5).toISOString(),
-          report_delete_after: new Date(new Date(now).setMonth(now.getMonth() + env.RETENTION_REPORT_MONTHS)).toISOString(),
-          rules_version: RULES_VERSION, prompt_version: PROMPT_VERSION, prompt_sha256: promptSha256(),
-        })
-        logger.info('[REPORT][JSON_SAVED]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - persistenceStartedAt })
-
-        stage = 'pdf'
-        const pdfResult = await renderAndStorePdf(done, report, flowService.renderMeta(done), generationId, requestId)
-        if (pdfResult.stored) {
-          logger.info('[REPORT][COMPLETE]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: true })
-        } else {
-          logger.warn('[REPORT][JSON_READY]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: false, stage: 'pdf_pending' })
-        }
-      } catch (error) {
-        if (savedReport && (stage === 'json_persistence' || stage === 'pdf')) {
-          const latest = done || await caseService.get(c.id).catch(() => null)
-          const persistedForThisGeneration = latest?.report && latest.report_ready_at && (latest.report as any)?._meta?.generation_id === generationId
-          if (persistedForThisGeneration && latest) {
-            // The JSON is durable even if the database acknowledgement was lost. Recover only the PDF stage.
-            if (stage === 'pdf') {
-              await caseService.update(c.id, { status: 'ready', status_detail: 'pdf_pending', job_started_at: null })
-              logger.error('[PDF][ERROR]', { requestId, caseId: c.id, reportId, generationId, stage, message: (error as Error).message })
-            } else {
-              logger.warn('[REPORT][JSON_RECOVERED]', { requestId, caseId: c.id, reportId, generationId, stage, message: (error as Error).message })
-              try {
-                await caseService.update(c.id, { status: 'building', status_detail: 'pdf', job_started_at: claimed.job_started_at })
-                const pdfResult = await renderAndStorePdf(latest, latest.report as unknown as ReportJson, flowService.renderMeta(latest), generationId, requestId)
-                logger.info(pdfResult.stored ? '[REPORT][COMPLETE]' : '[REPORT][JSON_READY]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: pdfResult.stored, recovered: true })
-              } catch (pdfError) {
-                await caseService.update(c.id, { status: 'ready', status_detail: 'pdf_pending', job_started_at: null })
-                logger.error('[PDF][ERROR]', { requestId, caseId: c.id, reportId, generationId, stage: 'pdf_recovery', message: (pdfError as Error).message })
-              }
-            }
-          } else {
-            // Persistence acknowledgement and read both failed; leave the claimed job recoverable rather than
-            // risking a second Claude call when the database may already contain this generation's JSON.
-            logger.error('[REPORT][PERSISTENCE_UNCERTAIN]', { requestId, caseId: c.id, reportId, generationId, stage, message: (error as Error).message })
-          }
-        } else {
-          logger.error('[REPORT][FAILED]', { requestId, caseId: c.id, reportId, generationId, stage, durationMs: Date.now() - requestedAt, message: (error as Error).message })
-          await caseService.update(c.id, {
-            status: 'failed',
-            status_detail: stage === 'claude' ? 'claude_failed' : stage === 'validation' ? 'validation_failed' : 'build_failed',
-            job_started_at: null,
-            report_inputs: {
-              ...(claimed?.report_inputs || {}),
-              lastError: (error as Error).message || 'Report generation failed',
-              failedStage: stage,
-            },
-          })
-        }
-      }
-
-      if (done?.email) {
-        try {
-          const token = await caseService.addToken(done)
-          await emailService.reportReady(done, token)
-        } catch (error) {
-          logger.warn('[REPORT][EMAIL_ERROR]', { requestId, caseId: c.id, reportId, generationId, message: (error as Error).message })
-        }
-      }
-    })
-
-    if (!scheduled) {
+    try {
+      const result = await executeReportBuildJob(
+        c,
+        claimed,
+        input,
+        rulesAsOf,
+        generationId,
+        reportId,
+        requestedAt,
+        requestId,
+      )
       releaseBackground(generationKey)
-      await caseService.update(c.id, { status: 'checking', status_detail: null, job_started_at: null })
-      return { started: false, status: 'checking', reportId, generationId }
+      return {
+        started: true,
+        status: result.status,
+        reportId,
+        generationId,
+        readyAt: result.readyAt,
+        pdfReady: result.pdfReady,
+      }
+    } catch (err) {
+      releaseBackground(generationKey)
+      throw err
     }
-    return { started: true, status: 'building', reportId, generationId }
   },
 
   reportStatus(c: CaseRow) {
@@ -555,7 +583,6 @@ export const flowService = {
       jurisdiction: meta.jurisdiction,
       rulesAsOf: meta.rulesAsOf,
       report,
-      /** numbers for native graphs: range gauge (CA), legal-minimum card (US), factor values */
       numbers: meta.numbers || null,
       sources: meta.sources.filter((s) => (report.citations_used || []).includes(s.id)),
     }
@@ -594,7 +621,6 @@ export const flowService = {
     }
   },
 
-  /** Deadlines & reminders screen: only dates the person confirmed, plus the region's own deadline facts. */
   deadlines(c: CaseRow) {
     const ctx = ctxOf(c)
     const val = (k: string) => CP.confirmedValue(ctx, k)

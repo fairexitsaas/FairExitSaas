@@ -478,26 +478,28 @@ export default function ReportUploadPage({
             <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#5A6B78]">
               Your report · Step 1 of 3 · Add your documents
             </span>
-            <div className="flex items-center gap-[8px]">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={explainEach}
-                onClick={() => setExplainEach(!explainEach)}
-                className={`relative inline-flex h-[20px] w-[36px] shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
-                  explainEach ? "bg-[#0EB28D]" : "bg-gray-300"
+            <button
+              type="button"
+              role="switch"
+              aria-checked={explainEach}
+              onClick={() => setExplainEach(!explainEach)}
+              className="flex items-center gap-2 cursor-pointer focus:outline-none select-none"
+            >
+              <span
+                className={`relative inline-block w-9 h-5 shrink-0 rounded-full transition-colors duration-200 ease-in-out ${
+                  explainEach ? "bg-[#0EB28D]" : "bg-[#CFD8DF]"
                 }`}
               >
                 <span
-                  className={`pointer-events-none inline-block h-[16px] w-[16px] transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                    explainEach ? "translate-x-[18px]" : "translate-x-[2px]"
+                  className={`pointer-events-none absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ease-in-out ${
+                    explainEach ? "translate-x-4" : "translate-x-0"
                   }`}
                 />
-              </button>
+              </span>
               <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#0C8F72]">
                 Explain each question
               </span>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -534,26 +536,28 @@ export default function ReportUploadPage({
             <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#5A6B78]">
               Your report · Step 1 of 3 · Add your documents
             </span>
-            <div className="flex items-center gap-[8px]">
-              <button
-                type="button"
-                role="switch"
-                aria-checked={explainEach}
-                onClick={() => setExplainEach(!explainEach)}
-                className={`relative inline-flex h-[20px] w-[36px] shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${
-                  explainEach ? "bg-[#0EB28D]" : "bg-gray-300"
+            <button
+              type="button"
+              role="switch"
+              aria-checked={explainEach}
+              onClick={() => setExplainEach(!explainEach)}
+              className="flex items-center gap-2 cursor-pointer focus:outline-none select-none"
+            >
+              <span
+                className={`relative inline-block w-9 h-5 shrink-0 rounded-full transition-colors duration-200 ease-in-out ${
+                  explainEach ? "bg-[#0EB28D]" : "bg-[#CFD8DF]"
                 }`}
               >
                 <span
-                  className={`pointer-events-none inline-block h-[16px] w-[16px] transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                    explainEach ? "translate-x-[18px]" : "translate-x-[2px]"
+                  className={`pointer-events-none absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ease-in-out ${
+                    explainEach ? "translate-x-4" : "translate-x-0"
                   }`}
                 />
-              </button>
+              </span>
               <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#0C8F72]">
                 Explain each question
               </span>
-            </div>
+            </button>
           </div>
         </div>
       </section>

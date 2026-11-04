@@ -48,6 +48,9 @@ export default function PaidReportReadyPage({
   const [buildStatus, setBuildStatus] = useState<"building" | "ready" | "failed">(
     isInitiallyReady ? "ready" : "building"
   );
+  type FailureKind = "polling_timeout" | "claude_failed" | "pdf_failed" | "generic_failed" | null;
+  const [failureKind, setFailureKind] = useState<FailureKind>(null);
+  const [pdfPending, setPdfPending] = useState(false);
   const [buildError, setBuildError] = useState<string>("");
   const [buildProgressStep, setBuildProgressStep] = useState<number>(2);
   const [pollVersion, setPollVersion] = useState(0);
@@ -62,6 +65,7 @@ export default function PaidReportReadyPage({
     // If report is already marked ready in the initial case data, don't start a poll
     if (cs?.status === "ready" && !!cs?.report) {
       setBuildStatus("ready");
+      setPdfPending(!cs?.report_pdf_path);
       return;
     }
 
@@ -73,27 +77,61 @@ export default function PaidReportReadyPage({
       onValue: (res) => {
         if (res.ready) {
           setBuildStatus("ready");
+          setFailureKind(null);
+          setPdfPending(!res.pdfReady);
           notifySuccess("Your severance report is ready!");
           onDone?.();
         } else if (res.failed) {
           setBuildStatus("failed");
-          const msg =
-            res.error ||
-            (res.statusDetail === "build_failed"
-              ? "The AI analysis could not be completed for these documents. Please try again."
-              : "Report generation failed.");
-          setBuildError(msg);
-          showErrorModal({
-            title: "Report Generation Failed",
-            message: msg,
-            stage: res.failedStage || "Report Generation",
-            onRetry: handleRetryBuild,
-            retryLabel: "Retry Generation",
-          });
+          const stage = res.failedStage || (res.statusDetail?.includes("claude") ? "claude" : res.statusDetail?.includes("pdf") ? "pdf" : "Report Generation");
+          const isClaudeErr = stage === "claude" || res.statusDetail === "claude_failed" || res.statusDetail === "build_failed";
+          const isPdfErr = stage === "pdf" || res.statusDetail === "pdf_failed" || res.statusDetail === "pdf_pending";
+
+          if (isPdfErr) {
+            setFailureKind("pdf_failed");
+            const msg = res.error || "Report calculations are saved, but PDF rendering was delayed. Click to generate your PDF.";
+            setBuildError(msg);
+            showErrorModal({
+              title: "PDF Compilation Delayed",
+              message: msg,
+              stage: "PDF Compilation",
+              onRetry: handleDownload,
+              retryLabel: "Generate PDF Now",
+            });
+          } else if (isClaudeErr) {
+            setFailureKind("claude_failed");
+            const msg = res.error || "The AI document analysis could not be completed for these documents. Please try again.";
+            setBuildError(msg);
+            showErrorModal({
+              title: "AI Analysis Incomplete",
+              message: msg,
+              stage: "Claude AI Analysis",
+              onRetry: handleRetryBuild,
+              retryLabel: "Retry AI Analysis",
+            });
+          } else {
+            setFailureKind("generic_failed");
+            const msg = res.error || "Report generation failed. Please try again.";
+            setBuildError(msg);
+            showErrorModal({
+              title: "Report Generation Failed",
+              message: msg,
+              stage: stage || "Report Generation",
+              onRetry: handleRetryBuild,
+              retryLabel: "Retry Generation",
+            });
+          }
         } else if (res.status === "building") {
           setBuildStatus("building");
+          setFailureKind(null);
+          if (res.stage === "pdf" || res.statusDetail === "pdf") {
+            setBuildProgressStep(3);
+          } else {
+            setBuildProgressStep(2);
+          }
         } else {
           setBuildStatus("failed");
+          setFailureKind("generic_failed");
           const msg = "The report build has not started. Please return to the review step and select Build my report.";
           setBuildError(msg);
           showErrorModal({
@@ -107,19 +145,24 @@ export default function PaidReportReadyPage({
       },
       onError: (error) => {
         setBuildStatus("failed");
+        setFailureKind("polling_timeout");
         const apiErr =
           error instanceof FairExitApiError
             ? error
-            : new FairExitApiError(0, error instanceof Error ? error.message : "Report status check failed");
+            : new FairExitApiError(0, error instanceof Error ? error.message : "Report status check timed out");
         setBuildError(apiErr.message);
         showErrorModal({
-          title: "Report Status Check Failed",
-          message: apiErr.message,
+          title: "Connection Timed Out",
+          message: "We're taking longer than usual to check your report status. Your report may still be processing. Check status again to see if it has finished.",
           stage: "Report Status Check",
           statusCode: apiErr.status,
           requestId: apiErr.requestId,
-          onRetry: handleRetryBuild,
-          retryLabel: "Retry Checking",
+          onRetry: () => {
+            setBuildStatus("building");
+            setBuildError("");
+            setPollVersion((v) => v + 1);
+          },
+          retryLabel: "Check Status Again",
         });
       },
     });
@@ -399,8 +442,10 @@ export default function PaidReportReadyPage({
                   {isDownloading ? (
                     <div className="flex items-center gap-2">
                       <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      <span>Opening PDF…</span>
+                      <span>{pdfPending ? "Compiling PDF…" : "Opening PDF…"}</span>
                     </div>
+                  ) : pdfPending ? (
+                    "Generate and download report (PDF)"
                   ) : (
                     "Download my report (PDF)"
                   )}
@@ -480,24 +525,81 @@ export default function PaidReportReadyPage({
                 </p>
               </div>
             ) : (
-              /* Failed State */
-              <div className="w-full max-w-[480px] flex flex-col items-center">
+              /* Failed State: Tailored by Failure Kind */
+              <div className="w-full max-w-[500px] flex flex-col items-center">
                 <div className="w-12 h-12 rounded-full bg-[#FBECEB] border border-[#F5C2C0] flex items-center justify-center text-[#D42E2B] text-xl font-bold mb-3">
                   !
                 </div>
-                <h3 className="font-serif font-[600] text-[20px] text-[#062C55] mb-2">
-                  We couldn&apos;t build your report
-                </h3>
-                <p className="font-sans text-[13.5px] text-[#5A6B78] leading-[21px] mb-5">
-                  {buildError || "An error occurred while compiling your report. Your confirmed answers are safely saved."}
-                </p>
-                <button
-                  type="button"
-                  onClick={handleRetryBuild}
-                  className="px-6 h-[44px] rounded-[10px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[15px] transition cursor-pointer"
-                >
-                  Try again
-                </button>
+                {failureKind === "pdf_failed" ? (
+                  <>
+                    <h3 className="font-serif font-[600] text-[20px] text-[#062C55] mb-2">
+                      Report calculations saved · PDF compilation delayed
+                    </h3>
+                    <p className="font-sans text-[13.5px] text-[#5A6B78] leading-[21px] mb-5">
+                      Your legal entitlements and severance calculations are 100% saved! PDF rendering experienced a temporary delay. You can generate and download your PDF now.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleDownload}
+                      disabled={isDownloading}
+                      className="px-6 h-[44px] rounded-[10px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[15px] transition cursor-pointer"
+                    >
+                      {isDownloading ? "Generating PDF…" : "Generate PDF Now"}
+                    </button>
+                  </>
+                ) : failureKind === "polling_timeout" ? (
+                  <>
+                    <h3 className="font-serif font-[600] text-[20px] text-[#062C55] mb-2">
+                      Connection to status server timed out
+                    </h3>
+                    <p className="font-sans text-[13.5px] text-[#5A6B78] leading-[21px] mb-5">
+                      We were unable to reach the server to check your report status. Your report build may still be active in the cloud. Check status again to resume.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setBuildStatus("building");
+                        setBuildError("");
+                        setPollVersion((v) => v + 1);
+                      }}
+                      className="px-6 h-[44px] rounded-[10px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[15px] transition cursor-pointer"
+                    >
+                      Check status again
+                    </button>
+                  </>
+                ) : failureKind === "claude_failed" ? (
+                  <>
+                    <h3 className="font-serif font-[600] text-[20px] text-[#062C55] mb-2">
+                      AI document analysis incomplete
+                    </h3>
+                    <p className="font-sans text-[13.5px] text-[#5A6B78] leading-[21px] mb-5">
+                      {buildError || "Claude AI encountered an issue evaluating your severance documents. Your confirmed facts are safely saved. Click below to retry the analysis."}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRetryBuild}
+                      className="px-6 h-[44px] rounded-[10px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[15px] transition cursor-pointer"
+                    >
+                      Retry AI analysis
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="font-serif font-[600] text-[20px] text-[#062C55] mb-2">
+                      We couldn&apos;t build your report
+                    </h3>
+                    <p className="font-sans text-[13.5px] text-[#5A6B78] leading-[21px] mb-5">
+                      {buildError || "An error occurred while compiling your report. Your confirmed answers are safely saved."}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRetryBuild}
+                      className="px-6 h-[44px] rounded-[10px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[15px] transition cursor-pointer"
+                    >
+                      Try again
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>

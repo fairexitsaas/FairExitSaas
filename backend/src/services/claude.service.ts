@@ -9,7 +9,7 @@ import { ApiError } from '../utils/ApiError'
 import { logger } from '../utils/logger'
 
 /** Hard timeout for a single Claude streaming attempt (ms). Prevents infinite hangs. */
-const CLAUDE_STREAM_TIMEOUT_MS = 4 * 60 * 1000 // 4 minutes per attempt
+const CLAUDE_STREAM_TIMEOUT_MS = Number(process.env.CLAUDE_STREAM_TIMEOUT_MS) || (process.env.VERCEL ? 50 * 1000 : 240 * 1000)
 
 export type ContentBlock =
   | { type: 'text'; text: string }
@@ -54,13 +54,13 @@ export function parseJsonOutput<T = unknown>(text: string): T {
   }
 }
 
-async function streamOnce(body: Record<string, unknown>) {
+async function streamOnce(body: Record<string, unknown>, context?: ClaudeLogContext, timeoutMs = CLAUDE_STREAM_TIMEOUT_MS) {
   const responseStartedAt = Date.now()
   // Abort controller for hard timeout — prevents indefinite hang on slow Claude responses
   const controller = new AbortController()
   const timeoutHandle = setTimeout(() => {
     controller.abort()
-  }, CLAUDE_STREAM_TIMEOUT_MS)
+  }, timeoutMs)
 
   let res: Response
   try {
@@ -77,8 +77,9 @@ async function streamOnce(body: Record<string, unknown>) {
   } catch (fetchErr: any) {
     clearTimeout(timeoutHandle)
     if (fetchErr?.name === 'AbortError') {
-      const e = new Error(`Claude stream timed out after ${CLAUDE_STREAM_TIMEOUT_MS / 1000}s`) as Error & { status?: number }
+      const e = new Error(`Claude stream timed out after ${timeoutMs / 1000}s`) as Error & { status?: number; isTimeout?: boolean }
       e.status = 408
+      e.isTimeout = true
       throw e
     }
     throw fetchErr
@@ -138,8 +139,9 @@ async function streamOnce(body: Record<string, unknown>) {
     }
   } catch (streamErr: any) {
     if (streamErr?.name === 'AbortError') {
-      const e = new Error(`Claude stream timed out after ${CLAUDE_STREAM_TIMEOUT_MS / 1000}s`) as Error & { status?: number }
+      const e = new Error(`Claude stream timed out after ${timeoutMs / 1000}s`) as Error & { status?: number; isTimeout?: boolean }
       e.status = 408
+      e.isTimeout = true
       throw e
     }
     throw streamErr
@@ -156,6 +158,7 @@ export async function callClaudeJson<T = unknown>(opts: {
   maxTokens: number
   label: string
   context?: ClaudeLogContext
+  timeoutMs?: number
 }): Promise<ClaudeResult<T>> {
   if (!env.ANTHROPIC_API_KEY) {
     throw ApiError.internal('ANTHROPIC_API_KEY is not set. Set it, or use AI_MODE=mock for local development.')
@@ -168,36 +171,82 @@ export async function callClaudeJson<T = unknown>(opts: {
   }
   const started = Date.now()
   const callName = opts.label.toUpperCase().replace(/\s/g, '_')
+  const streamTimeoutMs = opts.timeoutMs || CLAUDE_STREAM_TIMEOUT_MS
   let lastErr: unknown
   for (let attempt = 1; attempt <= 3; attempt++) {
     const attemptStartedAt = Date.now()
     try {
       const event = attempt === 1 ? `${callName}_START` : `${callName}_RETRY`
-      logger.info(`[CLAUDE][${event}]`, { ...opts.context, attempt, model: env.ANTHROPIC_MODEL, maxTokens: opts.maxTokens, timeoutMs: CLAUDE_STREAM_TIMEOUT_MS })
-      const out = await streamOnce(body)
+      logger.info(`[CLAUDE][${event}]`, {
+        ...opts.context,
+        attempt,
+        model: env.ANTHROPIC_MODEL,
+        maxTokens: opts.maxTokens,
+        timeoutMs: streamTimeoutMs,
+      })
+      const out = await streamOnce(body, opts.context, streamTimeoutMs)
       if (out.stopReason === 'max_tokens') {
         throw new Error(`${opts.label}: output hit max_tokens (${opts.maxTokens}); JSON is incomplete`)
       }
-      logger.info(`[CLAUDE][${callName}_RESPONSE]`, { ...opts.context, attempt, model: out.model, durationMs: out.responseDurationMs, inputTokens: out.usage.input_tokens, outputTokens: out.usage.output_tokens, stopReason: out.stopReason })
+      logger.info(`[CLAUDE][${callName}_RESPONSE]`, {
+        ...opts.context,
+        attempt,
+        model: out.model,
+        durationMs: out.responseDurationMs,
+        inputTokens: out.usage.input_tokens,
+        outputTokens: out.usage.output_tokens,
+        stopReason: out.stopReason,
+      })
       const parseStartedAt = Date.now()
       const json = parseJsonOutput<T>(out.text)
       const parseDurationMs = Date.now() - parseStartedAt
       const durationMs = Date.now() - started
       logger.info(`[CLAUDE][${callName}_JSON_PARSE]`, { ...opts.context, durationMs: parseDurationMs, validJson: true })
+      logger.info(`[CLAUDE][${callName}_SUCCESS]`, {
+        ...opts.context,
+        attempt,
+        model: out.model,
+        durationMs,
+        tokens: out.usage,
+      })
       return { json, rawText: out.text, model: out.model, stopReason: out.stopReason, usage: out.usage, durationMs, responseDurationMs: out.responseDurationMs, parseDurationMs, attempts: attempt }
-    } catch (err) {
+    } catch (err: any) {
       lastErr = err
       const status = (err as { status?: number }).status
-      // 408 = timed out — no point retrying immediately, but do try once more after a short wait
-      // 409 is no longer in RETRYABLE (non-idempotent conflict should not be retried)
-      const retry = status ? RETRYABLE.has(status) : /fetch failed|ECONNRESET|socket/i.test(String((err as Error).message))
-      logger.warn(`[CLAUDE][${callName}_ATTEMPT_ERROR]`, { ...opts.context, attempt, status: status ?? null, durationMs: Date.now() - attemptStartedAt, message: (err as Error).message })
-      if (!retry || attempt === 3) break
+      const isTimeout = !!err?.isTimeout || err?.name === 'AbortError' || /timed out/i.test(err?.message || '')
+      if (isTimeout) {
+        logger.error(`[CLAUDE][${callName}_TIMEOUT]`, {
+          ...opts.context,
+          attempt,
+          durationMs: Date.now() - attemptStartedAt,
+          elapsedMs: Date.now() - started,
+          timeoutMs: streamTimeoutMs,
+          message: err.message,
+        })
+      } else {
+        logger.warn(`[CLAUDE][${callName}_ATTEMPT_ERROR]`, {
+          ...opts.context,
+          attempt,
+          status: status ?? null,
+          durationMs: Date.now() - attemptStartedAt,
+          message: err.message,
+        })
+      }
+      // If timed out or reached attempt 3 or unretryable, stop retrying
+      if (isTimeout || attempt === 3) break
+      const retry = status ? RETRYABLE.has(status) : /fetch failed|ECONNRESET|socket/i.test(String(err.message))
+      if (!retry) break
       const backoffMs = Math.min(30000, 3000 * 2 ** (attempt - 1))
       logger.info(`[CLAUDE][${callName}_RETRY_WAIT]`, { ...opts.context, attempt, backoffMs })
       await sleep(backoffMs)
     }
   }
-  logger.error(`[CLAUDE][${callName}_ERROR]`, { ...opts.context, durationMs: Date.now() - started, message: (lastErr as Error)?.message || String(lastErr) })
+  logger.error(`[CLAUDE][${callName}_ERROR]`, {
+    ...opts.context,
+    durationMs: Date.now() - started,
+    message: (lastErr as Error)?.message || String(lastErr),
+    isTimeout: !!(lastErr as any)?.isTimeout,
+    status: (lastErr as any)?.status || null,
+  })
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr))
 }
