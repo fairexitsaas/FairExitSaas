@@ -6,7 +6,8 @@ import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getReportInputs, ReportInputs } from "@/lib/report-storage";
-import { fairexit } from "@/lib/api/fairexit";
+import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
+import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 
 interface USReviewPageProps {
@@ -186,6 +187,7 @@ export default function USReviewPage({
   cs,
   onContinue,
 }: USReviewPageProps) {
+  const { showErrorModal } = useErrorModal();
   const router = useRouter();
   const [isDone, setIsDone] = useState(false);
   const [data] = useState<ReportInputs>(() => getReportInputs());
@@ -1315,7 +1317,14 @@ export default function USReviewPage({
               onClick={async () => {
                 if (buildSubmitLock.current) return;
                 const activeCaseId = caseId || cs?.id;
-                if (!activeCaseId) return;
+                if (!activeCaseId) {
+                  showErrorModal({
+                    title: "Case Not Found",
+                    message: "No case identifier was found to start building your report.",
+                    stage: "Report Generation",
+                  });
+                  return;
+                }
                 buildSubmitLock.current = true;
                 setIsSubmittingBuild(true);
                 setBuildError("");
@@ -1324,8 +1333,16 @@ export default function USReviewPage({
                   await fairexit.attest(activeCaseId);
                   await fairexit.buildReport(activeCaseId);
                   started = true;
-                } catch (err) {
-                  setBuildError(err instanceof Error ? err.message : "Could not start report generation. Please try again.");
+                } catch (err: unknown) {
+                  const apiErr = err instanceof FairExitApiError ? err : new FairExitApiError(0, err instanceof Error ? err.message : "Could not start report generation. Please try again.");
+                  setBuildError(apiErr.message);
+                  showErrorModal({
+                    title: "Report Generation Failed",
+                    message: apiErr.message,
+                    stage: apiErr.stage || "Report Generation",
+                    statusCode: apiErr.status,
+                    requestId: apiErr.requestId,
+                  });
                 } finally {
                   setIsSubmittingBuild(false);
                 }

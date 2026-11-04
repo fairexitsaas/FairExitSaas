@@ -6,6 +6,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
+import { useErrorModal } from "@/context/ErrorModalContext";
+import { notifyError, notifySuccess } from "@/lib/notifications";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import ReportSalesPage from "@/components/report/ReportSalesPage";
 import ReportUploadPage from "@/components/report/ReportUploadPage";
@@ -83,6 +85,7 @@ const money = (n: number, country: string) => "$" + Math.round(n).toLocaleString
    Main
    ========================================================================= */
 export default function ReportFlow() {
+  const { showErrorModal } = useErrorModal();
   const router = useRouter();
   const sp = useSearchParams();
   const [caseId, setCaseId] = useState<string | null>(() => sp?.get("case") || null);
@@ -416,6 +419,7 @@ function UploadStep({ cs, words, onRead }: { cs: any; words: any; onRead: () => 
    Step 8 · Check everything your report will use (server-driven)
    ========================================================================= */
 function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: any; onAddClearerCopy: () => void; onBuilt: () => void }) {
+  const { showErrorModal } = useErrorModal();
   const [page, setPage] = useState<any>(null);
   const [busyKey, setBusyKey] = useState<string>("");
   const [buildPending, setBuildPending] = useState(false);
@@ -449,8 +453,21 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
     buildPendingRef.current = true;
     setBuildPending(true);
     setErr("");
-    try { await fairexit.buildReport(cs.id); onBuilt(); } catch (e) {
-      setErr(errText(e));
+    try {
+      await fairexit.buildReport(cs.id);
+      onBuilt();
+    } catch (e: unknown) {
+      const apiErr = e instanceof FairExitApiError ? e : new FairExitApiError(0, errText(e));
+      setErr(apiErr.message);
+      showErrorModal({
+        title: "Report Generation Failed",
+        message: apiErr.message,
+        stage: "Report Generation",
+        statusCode: apiErr.status,
+        requestId: apiErr.requestId,
+        onRetry: build,
+        retryLabel: "Try Again",
+      });
       buildPendingRef.current = false;
       setBuildPending(false);
     }

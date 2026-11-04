@@ -9,7 +9,9 @@ import {
   getReportInputs,
   ReportInputs,
 } from "@/lib/report-storage";
-import { fairexit } from "@/lib/api/fairexit";
+import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
+import { useErrorModal } from "@/context/ErrorModalContext";
+import { notifySuccess, notifyError } from "@/lib/notifications";
 import NoContractModal from "@/components/dialogs/NoContractModal";
 
 export interface UploadedFileItem {
@@ -41,6 +43,7 @@ export default function ReportUploadPage({
   cs,
   onContinue,
 }: ReportUploadPageProps) {
+  const { showErrorModal } = useErrorModal();
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -187,11 +190,18 @@ export default function ReportUploadPage({
           if (res?.document?.id) {
             item.serverDocId = res.document.id;
           }
+          notifySuccess(`Uploaded ${file.name}`);
         } catch (e: unknown) {
-          console.warn("Backend upload note:", e);
-          setErrorMessage(
-            `Could not upload ${file.name}: ${e instanceof Error ? e.message : "Upload failed"}`
-          );
+          const apiErr = e instanceof FairExitApiError ? e : new FairExitApiError(0, e instanceof Error ? e.message : "Upload failed");
+          const msg = `Could not upload ${file.name}: ${apiErr.message}`;
+          setErrorMessage(msg);
+          showErrorModal({
+            title: "Document Upload Failed",
+            message: msg,
+            stage: "Document Upload",
+            statusCode: apiErr.status,
+            requestId: apiErr.requestId,
+          });
         }
       }
 
@@ -323,19 +333,27 @@ export default function ReportUploadPage({
           router.push(`/report?case=${activeCaseId || "demo"}&step=reading`);
         }
       } catch (err: unknown) {
-        console.warn("Start read note:", err);
         setIsSubmitting(false);
-        const msg = err instanceof Error ? err.message : "Failed to start reading documents. Please check your files.";
-        setErrorMessage(msg);
+        const apiErr = err instanceof FairExitApiError ? err : new FairExitApiError(0, err instanceof Error ? err.message : "Failed to start reading documents. Please check your files.");
+        setErrorMessage(apiErr.message);
+        showErrorModal({
+          title: "Document Reading Failed",
+          message: apiErr.message,
+          stage: "Document Reading",
+          statusCode: apiErr.status,
+          requestId: apiErr.requestId,
+          onRetry: handleContinue,
+          retryLabel: "Retry",
+        });
         return;
       }
     } else {
       setIsSubmitting(false);
-      if (onContinue) {
-        onContinue();
-      } else {
-        router.push(`/report?case=demo&step=reading`);
-      }
+      showErrorModal({
+        title: "Case Identifier Required",
+        message: "No active case found to start reading documents. Please start from the beginning or reload.",
+        stage: "Document Upload",
+      });
     }
   };
 

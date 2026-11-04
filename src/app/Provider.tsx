@@ -3,6 +3,8 @@
 import { CountryContext, CountryCode } from "@/context/CountryContext";
 import { AccessibilityProvider } from "@/context/AccessibilityContext";
 import { GetAppProvider } from "@/context/GetAppContext";
+import { ErrorModalProvider } from "@/context/ErrorModalContext";
+import { Toaster } from "sonner";
 import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import CountrySelectionDialog from "@/components/dialogs/CountrySelectionDialog";
@@ -95,14 +97,28 @@ export default function Provider({ children }: ProviderProp) {
     <AccessibilityProvider>
       <GetAppProvider>
         <CountryContext.Provider value={{ Country, setCountry }}>
-          {children}
-          {mounted && !isAdminRoute && !isQuestionsRoute && (
-            <CountrySelectionDialog
-              isOpen={isCountryModalOpen}
-              onSelect={handleSelectCountry}
+          <ErrorModalProvider>
+            {children}
+            <Toaster
+              position="top-right"
+              richColors
+              closeButton
+              theme="light"
+              toastOptions={{
+                style: {
+                  fontFamily: 'var(--font-dm-sans), sans-serif',
+                  borderRadius: '14px',
+                },
+              }}
             />
-          )}
-          <AccessibilityDialog />
+            {mounted && !isAdminRoute && !isQuestionsRoute && (
+              <CountrySelectionDialog
+                isOpen={isCountryModalOpen}
+                onSelect={handleSelectCountry}
+              />
+            )}
+            <AccessibilityDialog />
+          </ErrorModalProvider>
         </CountryContext.Provider>
       </GetAppProvider>
     </AccessibilityProvider>

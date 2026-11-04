@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { notifyError, notifySuccess } from "@/lib/notifications";
 import { fairexit, Country } from "@/lib/api/fairexit";
 
 export interface AskLawyerModalProps {
@@ -64,10 +65,11 @@ export default function AskLawyerModal({
         consent: true,
       });
       setSubmitted(true);
-    } catch (err) {
-      console.warn("askLawyer demo/offline fallback:", err);
-      // In testing/offline mode, continue to confirmation view
-      setSubmitted(true);
+      notifySuccess("Inquiry sent successfully!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unable to submit lawyer consultation request.";
+      setError(msg);
+      notifyError(msg);
     } finally {
       setSending(false);
     }

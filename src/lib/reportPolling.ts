@@ -3,13 +3,17 @@ type PollError = { status?: number; retryAfterSeconds?: number }
 export interface PollLoopOptions<T> {
   poll: (signal: AbortSignal) => Promise<T>
   onValue: (value: T) => void
-  onError?: (error: unknown, retryInMs: number) => void
+  onError?: (error: unknown, retryInMs?: number) => void
   isTerminal: (value: T) => boolean
   intervalMs?: number
   maxBackoffMs?: number
+  maxRetries?: number
 }
 
-/** One non-overlapping, abortable poll loop with exponential failure backoff. */
+/**
+ * Robust, non-overlapping, abortable polling loop with terminal state detection,
+ * Retry-After backoff, and terminal error handling.
+ */
 export function startPollLoop<T>(options: PollLoopOptions<T>): () => void {
   const intervalMs = options.intervalMs ?? 4000
   const maxBackoffMs = options.maxBackoffMs ?? 30000
@@ -30,16 +34,36 @@ export function startPollLoop<T>(options: PollLoopOptions<T>): () => void {
       if (!active) return
       failures = 0
       options.onValue(value)
-      if (!options.isTerminal(value)) schedule(intervalMs)
-    } catch (error) {
-      if (!active || (error instanceof DOMException && error.name === 'AbortError')) return
+      if (!options.isTerminal(value)) {
+        schedule(intervalMs)
+      } else {
+        active = false
+      }
+    } catch (error: unknown) {
+      if (!active || (error instanceof DOMException && error.name === 'AbortError') || (error instanceof Error && error.name === 'AbortError')) {
+        return
+      }
       failures += 1
-      const retryAfterSeconds = (error as PollError)?.retryAfterSeconds
-      const delayMs = retryAfterSeconds && retryAfterSeconds > 0
-        ? retryAfterSeconds * 1000
-        : Math.min(maxBackoffMs, intervalMs * 2 ** Math.min(failures - 1, 8))
+      const pollErr = error as PollError
+      const retryAfterSeconds = pollErr?.retryAfterSeconds
+
+      if (pollErr?.status === 429 && retryAfterSeconds && retryAfterSeconds > 0) {
+        const delayMs = retryAfterSeconds * 1000
+        options.onError?.(error, delayMs)
+        schedule(delayMs)
+        return
+      }
+
+      // If a non-429 terminal error (e.g. 401, 403, 404, 500) occurs or repeated failures:
+      const delayMs = Math.min(maxBackoffMs, intervalMs * 2 ** Math.min(failures - 1, 8))
       options.onError?.(error, delayMs)
-      schedule(delayMs)
+
+      // Only continue polling if error is not marked terminal
+      if (failures <= (options.maxRetries ?? 2)) {
+        schedule(delayMs)
+      } else {
+        active = false
+      }
     } finally {
       controller = undefined
     }
@@ -49,6 +73,9 @@ export function startPollLoop<T>(options: PollLoopOptions<T>): () => void {
   return () => {
     active = false
     if (timer) clearTimeout(timer)
-    controller?.abort()
+    if (controller) {
+      controller.abort()
+      controller = undefined
+    }
   }
 }

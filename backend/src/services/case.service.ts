@@ -7,7 +7,7 @@ import { RULES_VERSION } from '../fairexit/severanceRules'
 import type { CaseRow, CaseDocumentRow, Platform, CaseStatus } from '../fairexit/types'
 
 
-const STALE_JOB_MS = 20 * 60 * 1000
+const STALE_JOB_MS = 3.5 * 60 * 1000
 
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
@@ -51,7 +51,7 @@ export const caseService = {
     return this.healStale(row)
   },
 
-  /** A job that died with the server (reading/building for > 20 min) becomes "failed" so the person can retry. */
+  /** A job that died with the server or timed out (> 3.5 min) becomes "failed" so the person can retry. */
   async healStale(row: CaseRow): Promise<CaseRow> {
     if ((row.status === 'reading' || row.status === 'building') && row.job_started_at && Date.now() - new Date(row.job_started_at).getTime() > STALE_JOB_MS) {
       // Once Call B JSON is saved, a stale job only needs its PDF/storage step resumed.
@@ -63,7 +63,19 @@ export const caseService = {
         return this.update(row.id, { status: 'ready', status_detail: 'pdf_pending', job_started_at: null })
       }
       const detail = row.status === 'reading' ? 'read_failed' : 'build_failed'
-      return this.update(row.id, { status: 'failed', status_detail: detail })
+      const lastError = row.status === 'reading'
+        ? 'Document analysis timed out. Please try again.'
+        : 'Report generation timed out. Please try again.'
+      return this.update(row.id, {
+        status: 'failed',
+        status_detail: detail,
+        job_started_at: null,
+        report_inputs: {
+          ...(row.report_inputs || {}),
+          lastError,
+          failedStage: row.status === 'reading' ? 'read' : 'claude',
+        },
+      })
     }
     return row
   },

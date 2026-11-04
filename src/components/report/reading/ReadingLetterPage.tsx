@@ -5,7 +5,10 @@ import Link from "next/link";
 import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
 import { getReportInputs, ReportInputs } from "@/lib/report-storage";
-import { fairexit } from "@/lib/api/fairexit";
+import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
+import { startPollLoop } from "@/lib/reportPolling";
+import { useErrorModal } from "@/context/ErrorModalContext";
+import { notifySuccess, notifyError } from "@/lib/notifications";
 
 interface ReadingLetterPageProps {
   caseId?: string | null;
@@ -27,6 +30,7 @@ export default function ReadingLetterPage({
   cs,
   onDone,
 }: ReadingLetterPageProps) {
+  const { showErrorModal } = useErrorModal();
   const [data] = useState<ReportInputs>(() => getReportInputs());
   const [explainEach, setExplainEach] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -51,49 +55,65 @@ export default function ReadingLetterPage({
 
   const [readState, setReadState] = useState<{ done: boolean; failed: boolean; error?: string }>({ done: false, failed: false });
   const [retrying, setRetrying] = useState(false);
+  const [pollVersion, setPollVersion] = useState(0);
 
-  // Poll backend status or fallback to timer
+  // Poll backend status using startPollLoop (single loop, non-overlapping, abortable)
   useEffect(() => {
     const activeCaseId = caseId || cs?.id;
     if (!activeCaseId) {
-      const timer = setTimeout(() => {
-        if (onDone) onDone();
-      }, 3800);
-      return () => clearTimeout(timer);
+      showErrorModal({
+        title: "Case Not Found",
+        message: "No case identifier was found. Please return to the upload step and add your documents.",
+        stage: "Document Reading",
+      });
+      setReadState({ done: false, failed: true, error: "Case identifier missing" });
+      return;
     }
 
-    let isMounted = true;
-    const interval = setInterval(async () => {
-      try {
-        const res = await fairexit.readStatus(activeCaseId);
-        if (!isMounted) return;
+    const stopPolling = startPollLoop({
+      poll: (signal) => fairexit.readStatus(activeCaseId, signal),
+      intervalMs: 3000,
+      maxRetries: 2,
+      isTerminal: (res) => res.done || res.failed,
+      onValue: (res) => {
         if (res.done) {
-          clearInterval(interval);
           setReadState({ done: true, failed: false });
+          notifySuccess("Documents read and analyzed successfully!");
           if (onDone) onDone();
         } else if (res.failed) {
-          clearInterval(interval);
-          setReadState({ done: false, failed: true, error: res.statusDetail || 'Scanner could not read documents' });
+          const msg = res.error || res.statusDetail || "Scanner could not read documents. Please ensure clear, readable pages.";
+          setReadState({ done: false, failed: true, error: msg });
+          showErrorModal({
+            title: "Document Reading Failed",
+            message: msg,
+            stage: "Document Reading",
+            onRetry: handleRetry,
+            retryLabel: "Retry Reading",
+          });
         }
-      } catch (err: any) {
-        console.warn('readStatus polling error:', err);
-      }
-    }, 2000);
-
-    // Initial check immediately
-    fairexit.readStatus(activeCaseId).then((res) => {
-      if (!isMounted) return;
-      if (res.done) {
-        clearInterval(interval);
-        if (onDone) onDone();
-      }
-    }).catch(() => {});
+      },
+      onError: (error) => {
+        const apiErr =
+          error instanceof FairExitApiError
+            ? error
+            : new FairExitApiError(0, error instanceof Error ? error.message : "Document reading status check failed");
+        setReadState({ done: false, failed: true, error: apiErr.message });
+        showErrorModal({
+          title: "Document Reading Check Failed",
+          message: apiErr.message,
+          stage: "Document Reading Status",
+          statusCode: apiErr.status,
+          requestId: apiErr.requestId,
+          onRetry: handleRetry,
+          retryLabel: "Retry Checking",
+        });
+      },
+    });
 
     return () => {
-      isMounted = false;
-      clearInterval(interval);
+      stopPolling();
     };
-  }, [caseId, cs, onDone]);
+  }, [caseId, cs?.id, onDone, pollVersion, showErrorModal]);
 
   const handleRetry = async () => {
     const activeCaseId = caseId || cs?.id;
@@ -102,8 +122,22 @@ export default function ReadingLetterPage({
     setReadState({ done: false, failed: false });
     try {
       await fairexit.startRead(activeCaseId);
-    } catch (e: any) {
-      setReadState({ done: false, failed: true, error: e.message || 'Retry failed' });
+      setPollVersion((v) => v + 1);
+    } catch (e: unknown) {
+      const apiErr =
+        e instanceof FairExitApiError
+          ? e
+          : new FairExitApiError(0, e instanceof Error ? e.message : "Retry failed");
+      setReadState({ done: false, failed: true, error: apiErr.message });
+      showErrorModal({
+        title: "Could Not Restart Reading",
+        message: apiErr.message,
+        stage: "Document Reading",
+        statusCode: apiErr.status,
+        requestId: apiErr.requestId,
+        onRetry: handleRetry,
+        retryLabel: "Try Again",
+      });
     } finally {
       setRetrying(false);
     }
@@ -431,13 +465,13 @@ export default function ReadingLetterPage({
             {/* Headline */}
             {readState.failed ? (
               <div className="mt-2 mb-4 p-4 rounded-xl bg-[#fbeceb] border border-[#f5c6cb] text-[#a3231f]">
-                <div className="font-bold text-[16px] mb-1">We couldn't read your document</div>
+                <div className="font-bold text-[16px] mb-1">We couldn&apos;t read your document</div>
                 <p className="text-[14px] mb-3">{readState.error || 'Please make sure the text is clear and readable.'}</p>
                 <button
                   type="button"
                   onClick={handleRetry}
                   disabled={retrying}
-                  className="px-4 py-2 rounded-lg bg-[#0EB28D] text-white font-bold text-[13px] hover:bg-[#0C8F72] transition disabled:opacity-50"
+                  className="px-4 py-2 rounded-lg bg-[#0EB28D] text-white font-bold text-[13px] hover:bg-[#0C8F72] transition disabled:opacity-50 cursor-pointer"
                 >
                   {retrying ? 'Retrying…' : 'Try reading again'}
                 </button>

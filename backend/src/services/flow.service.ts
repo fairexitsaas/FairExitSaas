@@ -124,18 +124,29 @@ export const flowService = {
         })
       } catch (err) {
         logger.error('Call A failed', { caseId: c.id, message: (err as Error).message })
-        await caseService.update(c.id, { status: 'failed', status_detail: 'read_failed', job_started_at: null })
+        await caseService.update(c.id, {
+          status: 'failed',
+          status_detail: 'read_failed',
+          job_started_at: null,
+          report_inputs: {
+            ...(c.report_inputs || {}),
+            lastError: (err as Error).message || 'Scanner could not read documents',
+            failedStage: 'read',
+          },
+        })
       }
     })
     return { started: true, status: 'reading' }
   },
 
   readStatus(c: CaseRow) {
+    const isFailed = c.status === 'failed'
     return {
       status: c.status,
       statusDetail: c.status_detail,
       done: c.status === 'checking' || c.status === 'building' || c.status === 'ready',
-      failed: c.status === 'failed' && (c.status_detail === 'read_failed' || c.status_detail === 'jurisdiction_not_covered'),
+      failed: isFailed,
+      error: isFailed ? ((c.report_inputs as any)?.lastError || c.status_detail || 'Document reading failed') : null,
       readAt: c.call_a_at,
       missing: c.call_a?.missing || [],
       lowConfidenceKeys: (c.call_a?.facts || []).filter((f) => f.confidence === 'low').map((f) => f.key),
@@ -466,7 +477,16 @@ export const flowService = {
           }
         } else {
           logger.error('[REPORT][FAILED]', { requestId, caseId: c.id, reportId, generationId, stage, durationMs: Date.now() - requestedAt, message: (error as Error).message })
-          await caseService.update(c.id, { status: 'failed', status_detail: 'build_failed', job_started_at: null })
+          await caseService.update(c.id, {
+            status: 'failed',
+            status_detail: stage === 'claude' ? 'claude_failed' : stage === 'validation' ? 'validation_failed' : 'build_failed',
+            job_started_at: null,
+            report_inputs: {
+              ...(claimed?.report_inputs || {}),
+              lastError: (error as Error).message || 'Report generation failed',
+              failedStage: stage,
+            },
+          })
         }
       }
 
@@ -489,15 +509,21 @@ export const flowService = {
   },
 
   reportStatus(c: CaseRow) {
+    const isReady = c.status === 'ready' && !!c.report
+    const isFailed = c.status === 'failed'
+    const lastError = (c.report_inputs as any)?.lastError || null
+    const failedStage = (c.report_inputs as any)?.failedStage || null
     return {
       status: c.status,
       statusDetail: c.status_detail,
       reportId: c.report_id,
       generationId: (c.report_inputs as any)?.generationId || null,
-      stage: c.status === 'building' ? c.status_detail : c.status === 'ready' && !c.report_pdf_path ? 'pdf_pending' : c.status,
-      ready: c.status === 'ready' && !!c.report,
-      pdfReady: c.status === 'ready' && !!c.report_pdf_path,
-      failed: c.status === 'failed' && c.status_detail === 'build_failed',
+      stage: c.status === 'building' ? (c.status_detail || 'building') : isReady && !c.report_pdf_path ? 'pdf_pending' : c.status,
+      ready: isReady,
+      pdfReady: isReady && !!c.report_pdf_path,
+      failed: isFailed,
+      error: isFailed ? (lastError || (c.status_detail === 'build_failed' ? 'The AI analysis could not be completed for these documents. Please try again.' : c.status_detail || 'Report generation failed.')) : null,
+      failedStage: isFailed ? failedStage : null,
       readyAt: c.report_ready_at,
       deleteAfter: c.report_delete_after,
     }

@@ -8,6 +8,8 @@ import { getReportInputs, ReportInputs } from "@/lib/report-storage";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
 import { startPollLoop } from "@/lib/reportPolling";
+import { useErrorModal } from "@/context/ErrorModalContext";
+import { notifySuccess, notifyError } from "@/lib/notifications";
 
 interface PaidReportReadyPageProps {
   caseId?: string | null;
@@ -33,6 +35,7 @@ export default function PaidReportReadyPage({
   onDownload,
   onDone,
 }: PaidReportReadyPageProps) {
+  const { showErrorModal } = useErrorModal();
   const [data] = useState<ReportInputs>(() => getReportInputs());
   const [explainQuestions, setExplainQuestions] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -51,37 +54,73 @@ export default function PaidReportReadyPage({
   const retryLock = useRef(false);
 
   const activeId = caseId || cs?.id;
+
   // Poll only the report status endpoint while a build is active.
   useEffect(() => {
     if (!activeId) return;
 
+    // If report is already marked ready in the initial case data, don't start a poll
+    if (cs?.status === "ready" && !!cs?.report) {
+      setBuildStatus("ready");
+      return;
+    }
+
     const stopPolling = startPollLoop({
       poll: (signal) => fairexit.reportStatus(activeId, signal),
       intervalMs: 4000,
-      maxBackoffMs: 30000,
+      maxRetries: 2,
       isTerminal: (res) => res.status !== "building",
       onValue: (res) => {
         if (res.ready) {
           setBuildStatus("ready");
+          notifySuccess("Your severance report is ready!");
           onDone?.();
         } else if (res.failed) {
           setBuildStatus("failed");
-          setBuildError(res.statusDetail === "build_failed"
-            ? "The AI analysis could not be completed for these documents. Please try again."
-            : "Report generation failed.");
+          const msg =
+            res.error ||
+            (res.statusDetail === "build_failed"
+              ? "The AI analysis could not be completed for these documents. Please try again."
+              : "Report generation failed.");
+          setBuildError(msg);
+          showErrorModal({
+            title: "Report Generation Failed",
+            message: msg,
+            stage: res.failedStage || "Report Generation",
+            onRetry: handleRetryBuild,
+            retryLabel: "Retry Generation",
+          });
         } else if (res.status === "building") {
           setBuildStatus("building");
         } else {
           setBuildStatus("failed");
-          setBuildError("The report build has not started. Return to the review step and select Build my report.");
+          const msg = "The report build has not started. Please return to the review step and select Build my report.";
+          setBuildError(msg);
+          showErrorModal({
+            title: "Report Not Started",
+            message: msg,
+            stage: "Report Generation",
+            onRetry: handleRetryBuild,
+            retryLabel: "Retry",
+          });
         }
       },
-      onError: (error, retryInMs) => {
-        if (error instanceof FairExitApiError && error.status === 429) {
-          console.warn(`Report status limited; retrying in ${retryInMs}ms`);
-        } else {
-          console.warn(`Report status check failed; retrying in ${retryInMs}ms`, error);
-        }
+      onError: (error) => {
+        setBuildStatus("failed");
+        const apiErr =
+          error instanceof FairExitApiError
+            ? error
+            : new FairExitApiError(0, error instanceof Error ? error.message : "Report status check failed");
+        setBuildError(apiErr.message);
+        showErrorModal({
+          title: "Report Status Check Failed",
+          message: apiErr.message,
+          stage: "Report Status Check",
+          statusCode: apiErr.status,
+          requestId: apiErr.requestId,
+          onRetry: handleRetryBuild,
+          retryLabel: "Retry Checking",
+        });
       },
     });
 
@@ -94,7 +133,7 @@ export default function PaidReportReadyPage({
       stopPolling();
       clearTimeout(stepTimer);
     };
-  }, [activeId, onDone, pollVersion]);
+  }, [activeId, cs?.status, cs?.report, onDone, pollVersion, showErrorModal]);
 
   const handleRetryBuild = async () => {
     if (!activeId || retryLock.current) return;
@@ -106,10 +145,24 @@ export default function PaidReportReadyPage({
       await fairexit.attest(activeId).catch(() => {});
       await fairexit.buildReport(activeId);
       setPollVersion((version) => version + 1);
-    } catch (e) {
+    } catch (e: unknown) {
       console.error("Retry build error:", e);
       setBuildStatus("failed");
-      setBuildError(e instanceof Error ? e.message : "Report generation could not be started.");
+      const apiErr =
+        e instanceof FairExitApiError
+          ? e
+          : new FairExitApiError(0, e instanceof Error ? e.message : "Report generation could not be started.");
+      setBuildError(apiErr.message);
+      showErrorModal({
+        title: "Report Generation Failed",
+        message: apiErr.message,
+        stage: "Report Generation",
+        statusCode: apiErr.status,
+        requestId: apiErr.requestId,
+        onRetry: handleRetryBuild,
+        retryLabel: "Try Again",
+      });
+    } finally {
       retryLock.current = false;
     }
   };
@@ -167,8 +220,17 @@ export default function PaidReportReadyPage({
       anchor.click();
       anchor.remove();
       window.setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000);
-    } catch (e) {
-      setDownloadError(e instanceof Error ? e.message : "PDF generation failed. Your saved report is safe; please try again.");
+      notifySuccess("Downloaded your FairExit report PDF!");
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "PDF generation failed. Your saved report is safe; please try again.";
+      setDownloadError(msg);
+      showErrorModal({
+        title: "PDF Download Failed",
+        message: msg,
+        stage: "PDF Download",
+        onRetry: handleDownload,
+        retryLabel: "Retry Download",
+      });
     } finally {
       setIsDownloading(false);
     }
