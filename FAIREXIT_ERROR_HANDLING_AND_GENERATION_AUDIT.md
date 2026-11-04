@@ -105,6 +105,35 @@ FairExit operates across two tiers:
 - **Cause:** In `src/lib/reportPolling.ts`, errors thrown during `options.poll()` were caught in a generic catch block that increased `failures` and rescheduled another poll forever using exponential backoff up to 30 seconds.
 - **Resolution:** Polling now halts on non-429 fatal HTTP or network errors after `maxRetries: 2`, and delegates to `onError` to surface the blocking modal.
 
+### Root Cause 6: Production PDF Serverless Loading Failure (`ApiError 501: PDF on serverless needs: npm i puppeteer-core @sparticuz/chromium`)
+- **Status:** CONFIRMED & RESOLVED.
+- **Production Symptom:**
+  - In Report ID `RPT-YCWLS8` (Case ID: `7be99c79-287c-4c99-b89a-98b01d1ae2a6`), Report JSON was saved successfully and Claude Call B finished in ~95.7 seconds.
+  - PDF layout completed (`[PDF][LAYOUT_COMPLETE]`), but `launchSparticuz()` failed and `GET /cases/:id/report/pdf` returned HTTP 501.
+- **Underlying Root Causes Identified:**
+  1. **ESM vs CJS Dynamic Import (`ERR_REQUIRE_ESM`):**
+     `@sparticuz/chromium@153.0.0` is an ES Module (`"type": "module"` in its `package.json`). `backend/tsconfig.json` compiles with `"module": "commonjs"`. In Node.js runtimes (Node 20.x on AWS Lambda / Vercel Serverless), calling `require('@sparticuz/chromium')` synchronously throws `Error [ERR_REQUIRE_ESM]: require() of ES Module ... not supported. Instead change the require of ... to a dynamic import()`.
+  2. **Indiscriminate Exception Masking in `pdfBrowser.ts`:**
+     In `backend/src/services/pdfBrowser.ts`, `launchSparticuz()` had:
+     ```ts
+     try {
+       chromium = require('@sparticuz/chromium')
+       puppeteer = require('puppeteer-core')
+     } catch {
+       throw new ApiError(501, 'PDF on serverless needs: npm i puppeteer-core @sparticuz/chromium')
+     }
+     ```
+     This caught `ERR_REQUIRE_ESM` (and any other module-loading error) with an empty parameter, logged nothing, and threw a misleading generic 501 message claiming the packages were not installed when both packages were in fact already installed in `backend/package.json` and `backend/package-lock.json`.
+  3. **Bundler Path Relocation Risk:**
+     `@sparticuz/chromium` resolves its compressed Brotli assets (`chromium.br`, etc.) relative to `build/paths.js`. When serverless bundlers trace and relocate JS files, internal `getBinPath()` can point to `/var/task/bin` instead of the actual `node_modules/@sparticuz/chromium/bin` directory unless candidate search directories are inspected and passed to `executablePath(binDir)`.
+- **Resolution Implemented:**
+  1. Replaced synchronous `require('@sparticuz/chromium')` with a dual loader: a native dynamic `import('@sparticuz/chromium')` (via `new Function('s', 'return import(s)')`) that executes ESM imports natively in Node 20/22/24 CommonJS runtimes, falling back to `require()` only in environments that support synchronous ESM require.
+  2. Implemented independent diagnostic loaders `loadChromium()` and `loadPuppeteerCore()` that record structured logs (`[PDF][SPARTICUZ_LOADED]`, `[PDF][SPARTICUZ_LOAD_ERROR]`, `[PDF][PUPPETEER_LOADED]`, `[PDF][PUPPETEER_LOAD_ERROR]`) preserving exact error messages, codes, and stack traces.
+  3. Implemented `resolveSparticuzBinPath()` to verify the presence of `chromium.br` across candidate locations (`cwd/node_modules`, `cwd/backend/node_modules`, and `LAMBDA_TASK_ROOT`), passing the verified directory directly to `chromium.executablePath(binDir)`.
+  4. Added structured telemetry for every stage of Chromium execution: `[PDF][SPARTICUZ_INIT]`, `[PDF][SPARTICUZ_BIN_LOCATION]`, `[PDF][SPARTICUZ_EXECUTABLE_RESOLVED]`, `[PDF][SPARTICUZ_LAUNCH_SUCCESS]`, and `[PDF][SPARTICUZ_LAUNCH_ERROR]`.
+  5. Retained static symbol references for `@vercel/nft` AST file tracing and configured `backend/vercel.json` with `"includeFiles": "node_modules/@sparticuz/chromium/**"`.
+  6. Added comprehensive unit tests in `backend/tests/unit/pdfBrowser.test.ts` verifying serverless driver detection, bin path resolution, ESM loading, and puppeteer wrapper methods (all 9 tests passing).
+
 ---
 
 ## 4. Evidence Supporting Each Root Cause
@@ -214,6 +243,8 @@ FairExit operates across two tiers:
 | `backend/src/controllers/case.controller.ts` | Controller | Handled awaited `startBuild` (200 on ready, 202 on building); passed `req.id` correlation. |
 | `backend/src/routes/internal.routes.ts` | Internal Routes | Added `POST /jobs/process-report` for queue/cron triggers. |
 | `backend/src/services/case.service.ts` | Case Service | Reduced `STALE_JOB_MS` to 3.5m; healed stale jobs to `pdf_pending` if JSON exists, or `claude_failed`. |
+| `backend/src/services/pdfBrowser.ts` | PDF Browser Service | Fixed serverless dynamic ESM loading for `@sparticuz/chromium`, added candidate bin resolution, eliminated generic 501 swallowing, and added structured diagnostics. |
+| `backend/tests/unit/pdfBrowser.test.ts` | Test Suite | Added unit tests covering driver picking, serverless detection, bin resolution, ESM loading, and puppeteer wrapping. |
 | `backend/vitest.config.ts` | Test Config | Enforced `AI_MODE: 'mock'` and `NODE_ENV: 'test'` to guarantee 0 billable Claude tokens spent. |
 | `backend/tests/unit/reportLifecycle.test.ts` | Test Suite | Added comprehensive unit tests covering interruption, timeouts, retries, stale jobs, PDF recovery, and status transitions. |
 
@@ -223,11 +254,12 @@ FairExit operates across two tiers:
 
 | Test Suite / Verification | Scope | Command | Result |
 | :--- | :--- | :--- | :--- |
-| **Backend Vitest Unit & Integration Tests** | Full test suite: report lifecycle, polling loop, Call A, Call B, CORS, Rate Limiter, ApiError, PDF Recovery, Document Processing | `npm test` (in `backend`) | **PASSED** (14 test files passed, 70 tests passed, 1 skipped). |
+| **Backend Vitest Unit & Integration Tests** | Full test suite: report lifecycle, polling loop, Call A, Call B, CORS, Rate Limiter, ApiError, PDF Recovery, Document Processing, PDF Browser Serverless Driver | `npm test` (in `backend`) | **PASSED** (15 test files passed, 79 tests passed, 1 skipped). |
+| **PDF Browser Serverless & ESM Unit Tests** | Serverless detection, dynamic import vs CJS fallback, bin path resolution, puppeteer wrapper | `npx vitest run tests/unit/pdfBrowser.test.ts` (in `backend`) | **PASSED** (9 tests passed). |
 | **Backend TypeScript Typecheck** | Backend routes, controllers, services, middleware, validators | `npm run typecheck` (in `backend`) | **PASSED** (0 errors). |
 | **Backend Production Build** | TypeScript compiler output in `backend/dist` | `npm run build` (in `backend`) | **PASSED** (0 errors). |
 | **Frontend TypeScript Typecheck** | Frontend components, providers, dialogs, API clients, contexts | `npx tsc --noEmit` (in root) | **PASSED** (0 errors). |
-| **Frontend Production Build** | Next.js 16 App Router optimized build, route compilation, static generation | `npx next build --webpack` (in root) | **PASSED** (33 routes compiled successfully, exit code 0). |
+| **Frontend Production Build** | Next.js 16 App Router optimized build, route compilation, static generation | `npm run build` (in root) | **PASSED** (33 routes compiled successfully, exit code 0). |
 | **Real PDF Generation Test** | Headless Chromium multi-page PDF generation test with mock data | `node -e "..."` (in `backend`) | **PASSED** (22-page severance report PDF, 1.23 MB rendered in 4.2 seconds). |
 | **Report Lifecycle & Recovery Test (`reportLifecycle.test.ts`)** | Interruption, timeouts, retries, duplicate job rejection, stale jobs healing, PDF recovery without Claude | `vitest run tests/unit/reportLifecycle.test.ts` | **PASSED** (5 tests passed). |
 
@@ -281,9 +313,35 @@ To verify the deployment in production, inspect the logs in Vercel or your loggi
      }
    }
    ```
-4. **Verify PDF Rendering & Supabase Upload:**
-   Look for `[PDF][START]`, `[PDF][LAYOUT_COMPLETE]`, `[PDF][COMPLETE]`, and `[STORAGE][UPLOAD_COMPLETE]`.
-5. **Verify Status Polling Frequency:**
+4. **Verify PDF Serverless Initialization & Rendering:**
+   Filter for `[PDF][SPARTICUZ_INIT]`, `[PDF][SPARTICUZ_LOADED]`, `[PDF][SPARTICUZ_EXECUTABLE_RESOLVED]`, and `[PDF][SPARTICUZ_LAUNCH_SUCCESS]`.
+   ```json
+   {
+     "level": "INFO",
+     "message": "[PDF][SPARTICUZ_LOADED]",
+     "details": { "method": "dynamic_import" }
+   }
+   {
+     "level": "INFO",
+     "message": "[PDF][SPARTICUZ_EXECUTABLE_RESOLVED]",
+     "details": { "executablePath": "/tmp/chromium", "exists": true }
+   }
+   {
+     "level": "INFO",
+     "message": "[PDF][COMPLETE]",
+     "details": { "durationMs": 3450, "bytes": 1284500 }
+   }
+   ```
+5. **Verify Real Vercel PDF Request for Case `7be99c79-287c-4c99-b89a-98b01d1ae2a6`:**
+   Because Report JSON is already saved in the database for `RPT-YCWLS8`, sending a GET request to the PDF recovery endpoint recovers the PDF without calling Claude:
+   ```bash
+   curl -I "https://fair-exit-saas-backend.vercel.app/api/v1/cases/7be99c79-287c-4c99-b89a-98b01d1ae2a6/report/pdf" \
+     -H "Authorization: Bearer <USER_OR_ADMIN_JWT_OR_CASE_TOKEN>"
+   ```
+   Or open in the browser:
+   `https://fair-exit-saas-backend.vercel.app/api/v1/cases/7be99c79-287c-4c99-b89a-98b01d1ae2a6/report/pdf?t=<caseToken>`
+   Verify HTTP 200 with `Content-Type: application/pdf` and `Content-Disposition: attachment; filename="FairExit-Severance-Report-RPT-YCWLS8.pdf"`.
+6. **Verify Status Polling Frequency:**
    Filter for `[STATUS][POLL]`. Verify that status polls arrive every 4 seconds, maintain the same `generationId`, and cease completely once `status: 'ready'` or `status: 'failed'` is reached.
-6. **Verify Failure & Timeout Trapping:**
+7. **Verify Failure & Timeout Trapping:**
    If Claude stalls or times out, verify that `[CLAUDE][CALL_B_TIMEOUT]` logs before the 120s function limit, and `[REPORT][FAILED]` persists `lastError` and `failedStage: 'claude'`.
