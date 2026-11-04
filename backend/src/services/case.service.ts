@@ -1,5 +1,6 @@
 import crypto from 'crypto'
 import { db, check } from '../config/db'
+import { env } from '../config/env'
 import { ApiError } from '../utils/ApiError'
 import { computeFreeResult } from '../fairexit/freeCheck'
 import { buildJurisdiction, codeFromAnswers, Country } from '../fairexit/jurisdictions'
@@ -106,6 +107,11 @@ export const caseService = {
     ) as CaseDocumentRow[]
   },
 
+  isEntitled(row: CaseRow) {
+    if (env.PAYMENT_BYPASS_ENABLED) return true
+    return this.isPaid(row)
+  },
+
   isPaid(row: CaseRow) {
     return PAID_STATUSES.includes(row.status) || (row.status === 'failed' && !!row.paid_at)
   },
@@ -113,14 +119,17 @@ export const caseService = {
   nextStep(row: CaseRow, docs: CaseDocumentRow[]): string {
     if (!row.covered) return 'not_covered'
     const s: CaseStatus = row.status
-    if (s === 'free_check' || s === 'pending_payment') return 'pay'
+    if (s === 'free_check' || s === 'pending_payment') {
+      if (env.PAYMENT_BYPASS_ENABLED) return 'upload'
+      return 'pay'
+    }
     if (s === 'paid') return 'upload'
     if (s === 'reading') return 'reading'
     if (s === 'checking') return 'check'
     if (s === 'building') return 'building'
     if (s === 'ready') return 'ready'
     if (s === 'failed') return row.status_detail === 'build_failed' ? 'check' : 'upload'
-    return docs.length ? 'upload' : 'pay'
+    return docs.length ? 'upload' : (env.PAYMENT_BYPASS_ENABLED ? 'upload' : 'pay')
   },
 
   readiness(row: CaseRow, docs: CaseDocumentRow[]) {
@@ -128,7 +137,7 @@ export const caseService = {
     const letterPages = uploaded.filter((d) => d.kind === 'letter').length
     const contractPages = uploaded.filter((d) => d.kind === 'contract').length
     const contractOk = contractPages > 0 || row.contract_status === 'never' || row.contract_status === 'missing'
-    return { letterPages, contractPages, contractOk, canRead: this.isPaid(row) && letterPages > 0 && contractOk }
+    return { letterPages, contractPages, contractOk, canRead: this.isEntitled(row) && letterPages > 0 && contractOk }
   },
 
   view(row: CaseRow, docs: CaseDocumentRow[] = []) {
@@ -146,6 +155,8 @@ export const caseService = {
       answers: row.answers,
       freeResult: row.free_result,
       paid: this.isPaid(row),
+      entitled: this.isEntitled(row),
+      bypassEnabled: env.PAYMENT_BYPASS_ENABLED,
       paidAt: row.paid_at,
       payment: row.paid_at ? { provider: row.payment_provider, amountCents: row.amount_cents, currency: row.currency } : null,
       email: row.email,

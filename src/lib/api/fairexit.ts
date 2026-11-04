@@ -89,7 +89,11 @@ export function createFairExitClient(opts: FairExitClientOptions) {
         if (put.ok) {
           return await call<any>('POST', `${c(id)}/documents/${slot.document.id}/complete`, {}, id)
         }
-      } catch (err) {
+        console.warn('Direct upload PUT to storage returned non-ok status:', put.status, 'falling back to base64 upload')
+      } catch (err: unknown) {
+        if (err instanceof FairExitApiError && [400, 401, 402, 403, 404, 409, 413, 422, 429].includes(err.status)) {
+          throw err
+        }
         console.warn('Direct upload slot failed, falling back to base64 upload:', err)
       }
       return new Promise((resolve, reject) => {

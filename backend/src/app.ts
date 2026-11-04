@@ -35,8 +35,8 @@ app.use(requestLogger)
 // 7. Rate limiting (skips preflight OPTIONS)
 app.use('/api', apiRateLimiter)
 
-// Root health & metadata endpoint
-app.get('/', (_req, res) => {
+// Root health & metadata endpoint (also handles Vercel serverless function root routes /api and /api/index)
+app.get(['/', '/api', '/api/index'], (_req, res) => {
   res.status(200).json({
     service: 'FairExit Backend API',
     version: '1.0.0',

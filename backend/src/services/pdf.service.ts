@@ -36,6 +36,9 @@ async function printPdf(html: string, context: PdfLogContext, startedAt: number)
   try {
     page.setDefaultTimeout(90000) // 90s max for PDF operations
     await page.setContent(html, { waitUntil: 'domcontentloaded' })
+    try {
+      await page.evaluateHandle('document.fonts.ready')
+    } catch { /* proceed if fonts offline */ }
     const buf: Buffer = await page.pdf({
       format: 'Letter',
       printBackground: true,

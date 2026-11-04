@@ -15,7 +15,10 @@ export function normalizeOrigin(value: string): string | undefined {
   }
 }
 
-export function getAllowedOrigins(corsOrigins: string[], frontendUrl: string): string[] {
+export function getAllowedOrigins(
+  corsOrigins: string[] = env.CORS_ORIGINS || [],
+  frontendUrl: string = env.FRONTEND_URL || '',
+): string[] {
   const combined = [
     ...corsOrigins,
     frontendUrl,
@@ -30,8 +33,8 @@ export function getAllowedOrigins(corsOrigins: string[], frontendUrl: string): s
 
 export function isOriginAllowed(
   origin: string,
-  normalizedAllowedOrigins: string[],
-  nodeEnv: string,
+  normalizedAllowedOrigins: string[] = getAllowedOrigins(),
+  nodeEnv: string = 'production',
 ): boolean {
   if (nodeEnv === 'development' || nodeEnv === 'test') {
     return true

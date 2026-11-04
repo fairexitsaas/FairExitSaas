@@ -247,7 +247,7 @@ function gaugeSvg(frac: number): string {
   ;[[0, 1 / 3, '#E0574A'], [1 / 3, 2 / 3, '#EEB33C'], [2 / 3, 1, '#1FB487']].forEach((s, i) => {
     h += arc((s[0] as number) + (i ? g / 2 : 0.01), (s[1] as number) - (i < 2 ? g / 2 : 0.01), s[2] as string)
   })
-  const clamped = Math.max(0.02, Math.min(0.98, frac))
+  const clamped = Math.max(0.12, Math.min(0.88, frac))
   const nd = pt(clamped, r - 22)
   h += `<line x1="${cx}" y1="${cy}" x2="${nd[0].toFixed(2)}" y2="${nd[1].toFixed(2)}" stroke="#062C55" stroke-width="4" stroke-linecap="round"/>`
   h += `<circle cx="${cx}" cy="${cy}" r="8" fill="#062C55"/><circle cx="${cx}" cy="${cy}" r="3" fill="#FFFFFF"/>`
@@ -382,13 +382,58 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
   // -------------------------------------------------------------------------
   const p = m.pages || {}
   const tocItems = [
-    { num: '1', title: 'Where you stand', desc: 'Your offer checked against the rules, and what lines up.', range: p['s1_glance'] ? `pages ${p['s1_glance']}–${(p['s1_factors'] || p['s1_release'] || p['s1_glance']) + 1}` : 'pages 4–9' },
-    { num: '2', title: isUS ? "Why there's no minimum" : 'Two numbers to understand', desc: isUS ? "What you're owed comes from what was promised." : 'The legal minimum, and what a court might award.', range: p['s2_numbers'] ? `pages ${p['s2_numbers']}–${p['s2_numbers'] + 1}` : (isUS ? 'pages 9–10' : 'pages 10–11') },
-    { num: '3', title: "What's in your letter and contract", desc: 'Clause by clause, with sources.', range: p['s3_clauses'] ? `pages ${p['s3_clauses']}–${p['s3_clauses'] + 3}` : (isUS ? 'pages 11–15' : 'pages 12–16') },
-    { num: '4', title: 'Questions to prepare', desc: "Calm questions for HR, and this week's steps.", range: p['s4_questions'] ? `pages ${p['s4_questions']}–${p['s4_questions'] + 1}` : (isUS ? 'pages 16–18' : 'pages 17–19') },
-    { num: '5', title: 'Your next step', desc: 'The three paths, side by side.', range: p['s5_next_steps'] ? `pages ${p['s5_next_steps']}–${p['s5_next_steps'] + 1}` : (isUS ? 'pages 19–20' : 'pages 20–21') },
-    { num: '6', title: 'Where every number comes from', desc: 'Every number and rule, with its official source.', range: p['s6_sources'] ? `page ${p['s6_sources']}` : (isUS ? 'page 21' : 'page 22') },
-    { num: '7', title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', desc: 'How to hand this report over, and your report ID.', range: p['s7_lawyer'] ? `page ${p['s7_lawyer']}` : (isUS ? 'page 22' : 'page 23') },
+    {
+      num: '1',
+      title: 'Where you stand',
+      desc: 'Your offer checked against the rules, and what lines up.',
+      range: p['s1_cover'] && (p['s1_factors'] || p['s1_release'])
+        ? `pages ${p['s1_cover']}–${p['s1_factors'] || p['s1_release']}`
+        : 'pages 4–9',
+    },
+    {
+      num: '2',
+      title: isUS ? "Why there's no minimum" : 'Two numbers to understand',
+      desc: isUS ? "What you're owed comes from what was promised." : 'The legal minimum, and what a court might award.',
+      range: p['s2_cover'] && p['s2_numbers']
+        ? `pages ${p['s2_cover']}–${p['s2_numbers']}`
+        : (isUS ? 'pages 9–10' : 'pages 10–11'),
+    },
+    {
+      num: '3',
+      title: "What's in your letter and contract",
+      desc: 'Clause by clause, with sources.',
+      range: p['s3_cover'] && (p['s3_clause_last'] || p['s3_clause_3'] || p['s3_clauses'])
+        ? `pages ${p['s3_cover']}–${p['s3_clause_last'] || p['s3_clause_3'] || p['s3_clauses']}`
+        : (isUS ? 'pages 11–15' : 'pages 12–16'),
+    },
+    {
+      num: '4',
+      title: 'Questions to prepare',
+      desc: "Calm questions for HR, and this week's steps.",
+      range: p['s4_cover'] && p['s4_practical']
+        ? `pages ${p['s4_cover']}–${p['s4_practical']}`
+        : (isUS ? 'pages 16–18' : 'pages 17–19'),
+    },
+    {
+      num: '5',
+      title: 'Your next step',
+      desc: 'The three paths, side by side.',
+      range: p['s5_cover'] && p['s5_three_paths']
+        ? `pages ${p['s5_cover']}–${p['s5_three_paths']}`
+        : (isUS ? 'pages 19–20' : 'pages 20–21'),
+    },
+    {
+      num: '6',
+      title: 'Where every number comes from',
+      desc: 'Every number and rule, with its official source.',
+      range: p['s6_sources'] ? `page ${p['s6_sources']}` : (isUS ? 'page 21' : 'page 22'),
+    },
+    {
+      num: '7',
+      title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer',
+      desc: 'How to hand this report over, and your report ID.',
+      range: p['s7_lawyer'] ? `page ${p['s7_lawyer']}` : (isUS ? 'page 22' : 'page 23'),
+    },
   ]
 
   const tocHtml = `
@@ -617,41 +662,38 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
         <span class="pill pill-yellow">${countAsk} TO ASK ABOUT</span>
       </div>
 
-      <table class="checks-table">
-        <thead>
-          <tr>
-            <th style="width: 18%;">WHAT WE CHECKED</th>
-            <th style="width: 22%;">YOUR ${esc(w.letter).toUpperCase()} SAYS</th>
-            <th style="width: 20%;">YOUR ${esc(w.contract).toUpperCase()} SAYS</th>
-            <th style="width: 22%;">THE RULES SAY</th>
-            <th style="width: 18%;">DOES IT LINE UP?</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${checks.map((c) => {
-            const st = c.status || 'info'
-            const badgeClass = st === 'ok' ? 'badge-ok' : st === 'bad' ? 'badge-bad' : st === 'ask' ? 'badge-ask' : 'badge-info'
-            const icon = st === 'ok' ? '✓' : st === 'bad' ? '✕' : st === 'ask' ? '!' : 'ℹ'
-            return `
-              <tr class="check-row">
-                <td class="td-topic"><b>${esc(c.topic)}</b></td>
-                <td>${esc(c.letter_says || '—')}</td>
-                <td>${esc(c.contract_says || '—')}</td>
-                <td>${esc(c.rule_says || '—')}</td>
-                <td>
-                  <div class="status-cell">
-                    <span class="status-icon-circle ${badgeClass}">${icon}</span>
-                    <div class="status-text-box">
-                      <span class="status-title ${badgeClass}">${esc(STATUS_LABEL[st] || st)}</span>
-                      ${c.why ? `<span class="status-why">${esc(c.why)}</span>` : ''}
-                    </div>
+      <div class="checks-cards-list">
+        <div class="checks-header-row">
+          <div class="ch-col col-1">WHAT WE CHECKED</div>
+          <div class="ch-col col-2">YOUR ${esc(w.letter).toUpperCase()} SAYS</div>
+          <div class="ch-col col-3">YOUR ${esc(w.contract).toUpperCase()} SAYS</div>
+          <div class="ch-col col-4">THE RULES SAY</div>
+          <div class="ch-col col-5">DOES IT LINE UP?</div>
+        </div>
+        ${checks.map((c) => {
+          const st = c.status || 'info'
+          const badgeClass = st === 'ok' ? 'badge-ok' : st === 'bad' ? 'badge-bad' : st === 'ask' ? 'badge-ask' : 'badge-info'
+          const icon = st === 'ok' ? '✓' : st === 'bad' ? '✕' : st === 'ask' ? '!' : 'ℹ'
+          return `
+            <div class="check-card-row">
+              <div class="ch-col col-1 bold navy">${esc(c.topic)}</div>
+              <div class="ch-col col-2">${esc(c.letter_says || '—')}</div>
+              <div class="ch-col col-3">${esc(c.contract_says || '—')}</div>
+              <div class="ch-col col-4">${esc(c.rule_says || '—')}</div>
+              <div class="ch-col col-5">
+                <div class="status-cell">
+                  <span class="status-icon-circle ${badgeClass}">${icon}</span>
+                  <div class="status-text-box">
+                    <span class="status-title ${badgeClass}">${esc(STATUS_LABEL[st] || st)}</span>
+                    ${c.why ? `<span class="status-why">${esc(c.why)}</span>` : ''}
                   </div>
-                </td>
-              </tr>
-            `
-          }).join('')}
-        </tbody>
-      </table>
+                </div>
+              </div>
+            </div>
+          `
+        }).join('')}
+      </div>
+      <div class="checks-dashed-rule"></div>
       <div class="checks-footer-note">Checked against ${esc(m.jurisdiction.name)}'s ${esc(m.jurisdiction.statute_short || 'rules')} and court decisions. Sources are on the Sources page.</div>
       ${footerPill()}
     </div>
@@ -690,13 +732,13 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
         </div>
 
         <div class="linear-scale-container">
-          <div class="scale-label-offer" style="left: ${Math.max(5, Math.min(90, pos))}%;">
+          <div class="scale-label-offer" style="left: ${Math.max(6, Math.min(88, pos))}%;">
             Offer ${offerAmt}
             <div class="scale-pointer"></div>
           </div>
           <div class="scale-bar">
-            <div class="scale-segment-min"></div>
-            <div class="scale-segment-range"></div>
+            <div class="scale-segment-gradient"></div>
+            <div class="scale-segment-hatch"></div>
           </div>
           <div class="scale-footer-row">
             <span>Legal minimum ${minAmt}</span>
@@ -882,11 +924,41 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
   sec.push({ id: 's2_numbers', title: s2Title, html: s2DetailHtml })
 
   // -------------------------------------------------------------------------
-  // 6. SECTION 3: What's in your letter and contract (ca12-ca16.png)
+  // 6. SECTION 3: What's in your letter and contract (ca12-ca16.png / us11-us15.png)
   // -------------------------------------------------------------------------
   const clauses = r.clauses && r.clauses.length ? r.clauses : [
-    { title: 'The payout', status: 'bad', what_it_says: '"Eight (8) weeks ... termination pay and fourteen and one-half (14.5) weeks severance pay, your full entitlements."', what_it_means: 'Vacation pay is owed on termination pay. "Full entitlements" is only true if your contract validly limits you to the minimum.', question_to_ask: 'The money is paid whether you sign or not. Ask about the missing vacation pay.', source_id: 'ESA s.57' },
-    { title: 'The release', status: 'ask', what_it_says: '"Releases all claims arising out of your employment."', what_it_means: 'Standard language, but signing gives up common law claims.', question_to_ask: 'Ask if the release can be narrowed to termination claims only.', source_id: 'e-Laws' },
+    {
+      title: 'The payout',
+      status: 'bad',
+      what_it_says: '“Eight (8) weeks … $17,307.69” termination pay and “Fourteen and one-half (14.5) weeks … $31,370.19” severance pay, “your full entitlements”.',
+      what_it_means: 'The weeks are right, but vacation pay is owed on termination pay: 6% × $17,307.69 = about $1,038. The minimum is $49,716.',
+      question_to_ask: 'The $48,678 is paid whether you sign or not. Ask about the missing vacation pay.',
+      source_id: 'ESA s.57, s.64–65, s.5 (e-Laws) · ontario.ca vacation guide',
+    },
+    {
+      title: 'The “only the minimum” clause',
+      status: 'ask',
+      what_it_says: 's.8: “the minimum notice … required by the Employment Standards Act … no further notice … at common law.” s.7: ““Cause’ includes … any breach of Company policy, unsatisfactory performance …”',
+      what_it_means: 'Under the ESA only “wilful misconduct, disobedience or wilful neglect of duty that is not trivial and has not been condoned” removes termination pay. Ontario’s Court of Appeal: an employment agreement “must be interpreted as a whole”.',
+      question_to_ask: 'Ask a lawyer to read s.7 and s.8 together.',
+      source_id: 'Waksdale v. Swegon North America Inc., 2020 ONCA 391 · ontario.ca termination guide',
+    },
+    {
+      title: 'Life insurance and disability stop too early',
+      status: 'bad',
+      what_it_says: 'Health and dental continue 8 weeks. “Life insurance and long-term disability coverage end on the Termination Date.”',
+      what_it_means: 'Pay instead of notice also requires continuing the benefit plan contributions that keep your benefits through the notice period.',
+      question_to_ask: 'Ask them to confirm life insurance and disability continue to November 23, 2026.',
+      source_id: 'ESA s.61(1)(b) (e-Laws)',
+    },
+    {
+      title: 'Your bonus, your promotion and the release',
+      status: 'ask',
+      what_it_says: 'No 2026 bonus (“actively employed on the payment date”). Signed in 2012 as a $58,000 technician; supervisor since 2019, no new contract (s.11 says changes don’t affect it). $5,000 for a full release by Oct 5.',
+      what_it_means: 'If a longer notice period applies, a bonus earned during it is owed unless the plan clearly and unambiguously removes it. Arguments that an old contract no longer fits a bigger job rarely win alone, and s.11 is written to block them.',
+      question_to_ask: 'Ask for more time before signing, and how the 2026 bonus is handled.',
+      source_id: 'Matthews v. Ocean Nutrition Canada Ltd., 2020 SCC 26',
+    },
   ]
 
   const s3CoverHtml = `
@@ -895,7 +967,7 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
       <div class="huge-section-digit">3</div>
       <h2 class="huge-section-title">What's in your letter and contract</h2>
       <div class="heavy-divider"></div>
-      <p class="section-cover-desc">Clause by clause, with sources. What each section says, what it means in plain English, and the questions to ask.</p>
+      <p class="section-cover-desc">Clause by clause: what your documents say, what the rules say, and what it could mean for you. Each point shows where it comes from.</p>
       <div class="in-this-section-box">
         <div class="its-kicker">IN THIS SECTION</div>
         ${clauses.map((c) => `<div class="its-item">${esc(c.title)}</div>`).join('')}
@@ -905,50 +977,71 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
   `
   sec.push({ id: 's3_cover', title: "Section 3 · What's in your letter and contract", html: s3CoverHtml })
 
-  const s3ClausesHtml = `
-    <div class="page clauses-page">
-      <div class="section-kicker">SECTION 3 OF 5 · WHAT'S IN YOUR LETTER AND CONTRACT</div>
-      <div class="header-divider"></div>
-      <h2 class="section-heading">The terms to understand and the <i>questions to ask.</i></h2>
-      <p class="section-sub">For each: what your documents say, what the rules say, and what it means.</p>
+  // Each clause gets its own dedicated page matching ca13-ca16.png
+  clauses.forEach((c, idx) => {
+    const isBad = c.status === 'bad'
+    const isOk = c.status === 'ok'
+    const pillClass = isBad ? 'pill-red' : isOk ? 'pill-green' : 'pill-yellow'
+    const pillLabel = isBad
+      ? (idx === 0 ? 'JUST BELOW THE LEGAL MINIMUM' : "DOESN'T LINE UP")
+      : isOk
+        ? 'LINES UP'
+        : (idx === 1 ? 'MAY NOT HOLD · A LAWYER CONFIRMS' : 'ASK ABOUT IT')
 
-      <div class="clauses-list">
-        ${clauses.map((c, idx) => `
-          <div class="clause-block">
-            <div class="clause-top-badge"><span class="pill pill-yellow">WORTH A CLOSER LOOK</span></div>
-            <div class="clause-heading">${idx + 1}. ${esc(c.title)}</div>
-            <div class="clause-two-boxes">
-              <div class="c-box">
-                <div class="c-box-header">YOUR DOCUMENTS SAY</div>
-                <div class="c-box-body">${esc(c.what_it_says)}</div>
-              </div>
-              <div class="c-box">
-                <div class="c-box-header">WHAT THE RULES SAY</div>
-                <div class="c-box-body">${esc(c.what_it_means)}</div>
-              </div>
-            </div>
-            <div class="clause-why"><b>Why it matters:</b> ${esc(c.what_it_means)}</div>
-            <div class="clause-action-box">
-              <span class="action-arrow">→</span>
-              <span>${esc(c.question_to_ask)}</span>
-            </div>
-            ${c.source_id ? `<div class="clause-source">Where this comes from: <u>${esc(c.source_id)}</u></div>` : ''}
+    const clauseHtml = `
+      <div class="page clause-page">
+        <div class="section-kicker-bar">
+          <span>SECTION 3 OF 5 · WHAT'S IN YOUR LETTER AND CONTRACT</span>
+          ${progressDots(3)}
+        </div>
+        <div class="header-divider"></div>
+        <h2 class="section-heading">The terms to understand and the <i>questions to ask.</i></h2>
+        <p class="section-sub">For each: what your documents say, what the rules say, and what it means.</p>
+
+        <div class="clause-pill-badge">
+          <span class="pill ${pillClass}">${pillLabel}</span>
+        </div>
+
+        <h3 class="clause-single-heading">${idx + 1}. ${esc(c.title)}</h3>
+
+        <div class="clause-two-boxes">
+          <div class="c-box c-box-white">
+            <div class="c-box-header">YOUR DOCUMENTS SAY</div>
+            <div class="c-box-body">${esc(c.what_it_says)}</div>
           </div>
-        `).join('')}
+          <div class="c-box c-box-beige">
+            <div class="c-box-header">WHAT THE RULES SAY</div>
+            <div class="c-box-body">${esc(c.what_it_means)}</div>
+          </div>
+        </div>
+
+        <div class="clause-why">
+          <b>Why it matters:</b> ${esc(c.what_it_means)}
+        </div>
+
+        <div class="clause-action-box">
+          <span class="action-arrow">→</span>
+          <span>${esc(c.question_to_ask)}</span>
+        </div>
+
+        ${c.source_id ? `
+          <div class="clause-dashed-rule"></div>
+          <div class="clause-source-line">Where this comes from: <u>${esc(c.source_id)}</u></div>
+        ` : ''}
+        ${footerPill()}
       </div>
-      ${footerPill()}
-    </div>
-  `
-  sec.push({ id: 's3_clauses', title: 'Terms to understand', html: s3ClausesHtml })
+    `
+    const clauseId = idx === clauses.length - 1 ? 's3_clause_last' : `s3_clause_${idx}`
+    sec.push({ id: clauseId, title: c.title, html: clauseHtml })
+  })
 
   // -------------------------------------------------------------------------
-  // 7. SECTION 4: Questions to prepare (ca17-ca19.png)
+  // 7. SECTION 4: Questions to prepare (ca17-ca19.png / us16-us18.png)
   // -------------------------------------------------------------------------
   const questions = r.questions && r.questions.length ? r.questions : [
-    'Could you confirm that life insurance and long-term disability will continue through the notice period?',
-    'Could you confirm that vacation pay on the termination pay will be included?',
+    'Could you confirm that life insurance and long-term disability will continue to November 23, 2026, and that vacation pay on the termination pay will be included?',
     'How will my 2026 bonus be handled?',
-    'I’d like a little more time to review the release. Could we extend the deadline by two weeks?',
+    'I’d like a little more time to review the release. Could we extend the October 5 deadline by two weeks?',
   ]
 
   const s4CoverHtml = `
@@ -968,19 +1061,23 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
   `
   sec.push({ id: 's4_cover', title: 'Section 4 · Questions to prepare', html: s4CoverHtml })
 
-  const s4DetailHtml = `
+  const hrContact = a.hr_name || 'your HR contact (Denise Faulkner)'
+  const s4QuestionsHtml = `
     <div class="page questions-page">
-      <div class="section-kicker">SECTION 4 OF 5 · QUESTIONS TO PREPARE</div>
+      <div class="section-kicker-bar">
+        <span>SECTION 4 OF 5 · QUESTIONS TO PREPARE</span>
+        ${progressDots(4)}
+      </div>
       <div class="header-divider"></div>
       <h2 class="section-heading">Questions you might <i>choose to ask.</i></h2>
       <p class="section-sub">Neutral questions you might choose to send. You decide what to send. This is not a demand letter or legal advice.</p>
 
       <div class="email-mock-container">
         <div class="email-meta-header">
-          To: <b>your HR contact</b> · Subject: <b>A few questions about my separation offer</b>
+          To: <b>${esc(hrContact)}</b> · Subject: <b>A few questions about my separation offer</b>
         </div>
         <div class="email-body">
-          <p>Hi,</p>
+          <p>Hi Denise,</p>
           <p>Thank you for the letter. Before I decide, I have a few questions.</p>
           <ul class="email-questions-list">
             ${questions.map((q) => `<li>${esc(q)}</li>`).join('')}
@@ -995,10 +1092,60 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
       ${footerPill()}
     </div>
   `
-  sec.push({ id: 's4_questions', title: 'Questions to prepare', html: s4DetailHtml })
+  sec.push({ id: 's4_questions', title: 'Questions you might choose to ask', html: s4QuestionsHtml })
+
+  // Page 19 / ca19.png: "Take your time — and keep it simple"
+  const extraOfferStr = '$5,000'
+  const minOfferStr = nb?.offer ? money(nb.offer) : '$48,678'
+  const s4PracticalHtml = `
+    <div class="page practical-page">
+      <div class="section-kicker-bar">
+        <span>SECTION 4 OF 5 · QUESTIONS TO PREPARE</span>
+        ${progressDots(4)}
+      </div>
+      <div class="header-divider"></div>
+      <h2 class="section-heading">Take your time — <i>and keep it simple.</i></h2>
+      <p class="section-sub">Two things that help: not rushing, and keeping your questions clear.</p>
+
+      <div class="practical-block">
+        <h3 class="practical-heading">You usually don't have to decide on the spot</h3>
+        <p class="practical-text">Your letter gives a deadline for the extra ${esc(extraOfferStr)}. Asking to take the offer home to review it is a normal, complete answer. The ${esc(minOfferStr)} doesn't depend on signing.</p>
+      </div>
+
+      <div class="practical-divider"></div>
+
+      <div class="practical-block">
+        <h3 class="practical-heading">This week — the practical stuff</h3>
+        <div class="practical-bullets">
+          <div class="p-bullet">
+            <span class="bullet-dot teal"></span>
+            <div><b>Apply for ${isUS ? 'unemployment' : 'EI'}</b> within 4 weeks of your last day (${isUS ? 'state portal' : 'canada.ca'}).</div>
+          </div>
+          <div class="p-bullet">
+            <span class="bullet-dot teal"></span>
+            <div><b>Write down every date:</b> sign-by ${esc(deadlineStr)}, benefits Nov 23, 2-year claim limit.</div>
+          </div>
+          <div class="p-bullet">
+            <span class="bullet-dot teal"></span>
+            <div><b>Gather documents:</b> letter, contract, promotion note, bonus plan, pay stubs.</div>
+          </div>
+          <div class="p-bullet">
+            <span class="bullet-dot teal"></span>
+            <div><b>Check your final pay</b> for vacation pay.</div>
+          </div>
+          <div class="p-bullet">
+            <span class="bullet-dot teal"></span>
+            <div><b>Keep this report</b> to hand to a ${esc(w.lawyer)} if you choose.</div>
+          </div>
+        </div>
+      </div>
+      ${footerPill()}
+    </div>
+  `
+  sec.push({ id: 's4_practical', title: 'Take your time — and keep it simple', html: s4PracticalHtml })
 
   // -------------------------------------------------------------------------
-  // 8. SECTION 5: Your next step (ca20-ca21.png)
+  // 8. SECTION 5: Your next step (ca20-ca21.png / us19-us20.png)
   // -------------------------------------------------------------------------
   const s5CoverHtml = `
     <div class="page section-cover-page">
@@ -1006,43 +1153,57 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
       <div class="huge-section-digit">5</div>
       <h2 class="huge-section-title">Your next step</h2>
       <div class="heavy-divider"></div>
-      <p class="section-cover-desc">The three paths, side by side. Sign as is, ask HR with calm questions, or talk with an employment ${esc(w.lawyer)}.</p>
+      <p class="section-cover-desc">The three paths side by side, where every number in this report comes from, and how to hand it to a ${esc(w.lawyer)} if you want one.</p>
       <div class="in-this-section-box">
         <div class="its-kicker">IN THIS SECTION</div>
-        <div class="its-item">Three paths forward</div>
-        <div class="its-item">Timeline and deadlines</div>
+        <div class="its-item">You don't have to sign today</div>
+        <div class="its-item">Where every number comes from</div>
+        <div class="its-item">Talking to a ${esc(w.lawyer)}</div>
       </div>
       ${footerPill()}
     </div>
   `
   sec.push({ id: 's5_cover', title: 'Section 5 · Your next step', html: s5CoverHtml })
 
-  const nextSteps = r.next_steps && r.next_steps.length ? r.next_steps : [
-    'Confirm your deadlines: check the decide-by date in your letter.',
-    'Send neutral questions to HR if anything is missing or unclear.',
-    `Consult a licensed employment ${w.lawyer} if your offer is below minimum or if your common-law range is significant.`,
-    'Do not sign a release until your questions are answered.',
-  ]
-
-  const s5DetailHtml = `
-    <div class="page next-steps-page">
-      <div class="section-kicker">SECTION 5 OF 5 · YOUR NEXT STEP</div>
+  // Page 21 / ca21.png: "You don't have to sign today" (Three paths)
+  const s5ThreePathsHtml = `
+    <div class="page three-paths-page">
+      <div class="section-kicker-bar">
+        <span>SECTION 5 OF 5 · YOUR NEXT STEP</span>
+        ${progressDots(5)}
+      </div>
       <div class="header-divider"></div>
-      <h2 class="section-heading">Take your time, and <i>keep it simple.</i></h2>
-      <p class="section-sub">Steps you can take this week to protect your rights.</p>
+      <h2 class="section-heading">You don't have to <i>sign today.</i></h2>
+      <p class="section-sub">Here's how the three paths compare.</p>
 
-      <div class="steps-list">
-        ${nextSteps.map((s, idx) => `
-          <div class="step-card">
-            <div class="step-badge">${idx + 1}</div>
-            <div class="step-text">${esc(s)}</div>
-          </div>
-        `).join('')}
+      <div class="three-paths-grid">
+        <div class="path-card">
+          <div class="path-opt-kicker">OPTION 1</div>
+          <h3 class="path-title">Sign as-is</h3>
+          <p class="path-desc">Accept the offer and move on.</p>
+          <p class="path-bold-note">You get ${esc(offerStr)}. It gives up the contract question.</p>
+        </div>
+        <div class="path-card">
+          <div class="path-opt-kicker">OPTION 2</div>
+          <h3 class="path-title">Ask your questions</h3>
+          <p class="path-desc">Use Section 4 to raise it yourself.</p>
+          <p class="path-bold-note">You run it yourself, using Section 4.</p>
+        </div>
+        <div class="path-card">
+          <div class="path-opt-kicker">OPTION 3</div>
+          <h3 class="path-title">Talk to a ${esc(w.lawyer)}</h3>
+          <p class="path-desc">They can tell you what applies to you.</p>
+          <p class="path-bold-note">First call often free. The contract question needs a ${esc(w.lawyer)} to read it.</p>
+        </div>
+      </div>
+
+      <div class="honest-note-card">
+        <b>Honest note:</b> this report helps you ask the right questions. The contract question in Section 3 is one a ${esc(w.lawyer)} needs to read your contract to answer.
       </div>
       ${footerPill()}
     </div>
   `
-  sec.push({ id: 's5_next_steps', title: 'Your next step', html: s5DetailHtml })
+  sec.push({ id: 's5_three_paths', title: "You don't have to sign today", html: s5ThreePathsHtml })
 
   // -------------------------------------------------------------------------
   // 9. SECTION 6: Sources (ca22.png / us21.png)
@@ -1601,10 +1762,10 @@ b, strong, .bold {
   shrink: 0;
   margin-top: 2px;
 }
-.badge-ok { background: #0C8F72; color: #0C8F72; }
-.badge-bad { background: #D42E2B; color: #D42E2B; }
-.badge-ask { background: #B07A00; color: #B07A00; }
-.badge-info { background: #5A6B78; color: #5A6B78; }
+.status-title.badge-ok { background: transparent; color: #0C8F72; }
+.status-title.badge-bad { background: transparent; color: #D42E2B; }
+.status-title.badge-ask { background: transparent; color: #B07A00; }
+.status-title.badge-info { background: transparent; color: #5A6B78; }
 .status-icon-circle.badge-ok { background: #0C8F72; color: #FFF; }
 .status-icon-circle.badge-bad { background: #D42E2B; color: #FFF; }
 .status-icon-circle.badge-ask { background: #B07A00; color: #FFF; }
@@ -2048,6 +2209,183 @@ b, strong, .bold {
   text-align: center;
   line-height: 1.35;
 }
+
+/* Checks Cards List (ca7.png / us7.png) */
+.checks-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.checks-header-row {
+  display: grid;
+  grid-template-columns: 120px 145px 135px 150px 1fr;
+  gap: 10px;
+  padding: 4px 12px;
+  font-size: 7.5pt;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #5A6B78;
+}
+.check-card-row {
+  display: grid;
+  grid-template-columns: 120px 145px 135px 150px 1fr;
+  gap: 10px;
+  padding: 9px 12px;
+  background: #FFFFFF;
+  border: 1px solid #E7E4DD;
+  border-radius: 8px;
+  font-size: 8.5pt;
+  line-height: 1.35;
+  align-items: start;
+}
+.status-info {
+  display: flex;
+  flex-direction: column;
+}
+.checks-dashed-rule {
+  border-top: 1px dashed #D8D4CA;
+  margin: 14px 0 6px 0;
+}
+
+/* Linear Scale Bar (ca8.png) */
+.scale-segment-gradient {
+  width: 60%;
+  background: linear-gradient(to right, #D84C3E 0%, #EEB33C 45%, #24B07D 100%);
+}
+.scale-segment-hatch {
+  width: 40%;
+  background: repeating-linear-gradient(
+    45deg,
+    #E8E4DA,
+    #E8E4DA 6px,
+    #DCD6CA 6px,
+    #DCD6CA 12px
+  );
+}
+
+/* Individual Clause Page (ca13-ca16.png) */
+.clause-pill-badge {
+  margin-bottom: 8px;
+}
+.clause-single-heading {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 16pt;
+  font-weight: 700;
+  color: #062C55;
+  margin: 0 0 14px 0;
+}
+.c-box-white {
+  background: #FFFFFF;
+  border: 1px solid #E7E4DD;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.c-box-beige {
+  background: #FAF8F5;
+  border: 1px solid #E7E4DD;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.clause-dashed-rule {
+  border-top: 1px dashed #D8D4CA;
+  margin: 16px 0 8px 0;
+}
+.clause-source-line {
+  font-size: 8.5pt;
+  color: #5A6B78;
+}
+.clause-source-line u {
+  color: #062C55;
+  text-decoration: underline;
+}
+
+/* Practical Page (ca19.png) */
+.practical-block {
+  margin-bottom: 16px;
+}
+.practical-heading {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 14pt;
+  font-weight: 700;
+  color: #062C55;
+  margin: 0 0 8px 0;
+}
+.practical-text {
+  font-size: 10pt;
+  line-height: 1.5;
+  color: #27343F;
+  margin: 0;
+}
+.practical-divider {
+  width: 100%;
+  height: 1px;
+  background: #E7E4DD;
+  margin: 16px 0;
+}
+.practical-bullets {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.p-bullet {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 9.5pt;
+  line-height: 1.45;
+  color: #27343F;
+}
+
+/* Three Paths Page (ca21.png) */
+.three-paths-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.path-card {
+  border: 1px solid #E7E4DD;
+  border-radius: 8px;
+  padding: 16px;
+  background: #FFFFFF;
+  display: flex;
+  flex-direction: column;
+}
+.path-opt-kicker {
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #5A6B78;
+  margin-bottom: 6px;
+}
+.path-title {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 14pt;
+  color: #062C55;
+  margin: 0 0 10px 0;
+}
+.path-desc {
+  font-size: 9pt;
+  color: #5A6B78;
+  line-height: 1.4;
+  margin: 0 0 14px 0;
+}
+.path-bold-note {
+  font-size: 9pt;
+  color: #062C55;
+  line-height: 1.4;
+  margin-top: auto;
+}
+.honest-note-card {
+  border: 1px solid #E7E4DD;
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-size: 9pt;
+  color: #0C8F72;
+  background: #FFFFFF;
+  line-height: 1.45;
+}
+
 `
 
 export function renderReportHtml(r: ReportJson, m: RenderMeta, upTo?: number): string {
@@ -2058,6 +2396,9 @@ export function renderReportHtml(r: ReportJson, m: RenderMeta, upTo?: number): s
   <head>
     <meta charset="utf-8"/>
     <title>FairExit Severance Report ${esc(m.reportId)}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400;1,9..40,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,600&display=swap" rel="stylesheet">
     <style>${CSS}</style>
   </head>
   <body>

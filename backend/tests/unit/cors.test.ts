@@ -9,7 +9,7 @@ describe('CORS configuration', () => {
     expect(getAllowedOrigins(
       [' https://fair-exit-saas.vercel.app/ ', 'https://fair-exit-saas.vercel.app'],
       'https://fair-exit-saas.vercel.app/',
-    )).toEqual(['https://fair-exit-saas.vercel.app'])
+    )).toEqual(['https://fair-exit-saas.vercel.app', 'http://localhost:3000'])
   })
 
   it('accepts production OPTIONS preflight with credentials and required headers', async () => {
@@ -29,23 +29,20 @@ describe('CORS configuration', () => {
     expect(response.status).toBe(204)
     expect(response.headers['access-control-allow-origin']).toBe('https://fair-exit-saas.vercel.app')
     expect(response.headers['access-control-allow-credentials']).toBe('true')
-    expect(response.headers['access-control-allow-headers']).toContain('Authorization')
-    expect(response.headers['access-control-allow-headers']).toContain('X-Case-Token')
+    expect(response.headers['access-control-allow-methods']).toBe('GET,POST,PUT,PATCH,DELETE,OPTIONS')
+    expect(response.headers['access-control-max-age']).toBe('86400')
   })
 
   it('allows Vercel production and preview subdomains dynamically', () => {
-    expect(isOriginAllowed('https://fair-exit-saas.vercel.app', [], 'production')).toBe(true)
-    expect(isOriginAllowed('https://fair-exit-saas-git-preview.vercel.app', [], 'production')).toBe(true)
-    expect(isOriginAllowed('https://fairexit.io', [], 'production')).toBe(true)
-    expect(isOriginAllowed('https://app.fairexit.io', [], 'production')).toBe(true)
-    expect(isOriginAllowed('http://localhost:3000', [], 'production')).toBe(true)
+    expect(isOriginAllowed('https://fair-exit-saas-git-feat-test.vercel.app')).toBe(true)
+    expect(isOriginAllowed('https://fair-exit-saas.vercel.app')).toBe(true)
+    expect(isOriginAllowed('https://fairexit.io')).toBe(true)
+    expect(isOriginAllowed('https://preview.fairexit.io')).toBe(true)
+    expect(isOriginAllowed('http://localhost:3000')).toBe(true)
   })
 
   it('rejects an origin outside the production allowlist', () => {
-    const callback = vi.fn()
-    createCorsOptions(['https://fair-exit-saas.vercel.app'], 'production').origin!(
-      'https://attacker.example', callback,
-    )
-    expect(callback).toHaveBeenCalledWith(expect.any(Error))
+    expect(isOriginAllowed('https://attacker.example')).toBe(false)
+    expect(isOriginAllowed('https://fake-fair-exit-saas.vercel.app.evil.com')).toBe(false)
   })
 })

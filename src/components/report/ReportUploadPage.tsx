@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
@@ -52,6 +52,7 @@ export default function ReportUploadPage({
   const [contractStatus, setContractStatus] = useState<"none" | "never" | "missing" | "later">("none");
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   // Uploaded files list starts empty initially
@@ -115,6 +116,7 @@ export default function ReportUploadPage({
   // Handle file uploads
   const handleFilesAdded = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
+    setIsUploading(true);
     setErrorMessage("");
 
     const newItems: UploadedFileItem[] = [];
@@ -199,6 +201,7 @@ export default function ReportUploadPage({
     }
 
     setFiles((prev) => [...prev, ...newItems]);
+    setIsUploading(false);
   };
 
   const handleTypeChange = async (id: string, newType: "contract" | "letter" | "other") => {
@@ -699,6 +702,12 @@ export default function ReportUploadPage({
                 className="hidden"
                 onChange={(e) => handleFilesAdded(e.target.files)}
               />
+              {isUploading && (
+                <div className="flex items-center justify-center gap-2 mb-2 text-[#0EB28D] font-semibold text-[13.5px]">
+                  <span className="inline-block w-4 h-4 rounded-full border-2 border-[#0EB28D]/40 border-t-[#0EB28D] animate-spin" />
+                  <span>Uploading your file…</span>
+                </div>
+              )}
               <h4 className="font-sans font-[700] text-[15.5px] leading-[24px] text-[#062C55]">
                 {isUS ? "Drop your two documents here, or tap to add" : "Drop files here, or tap to add"}
               </h4>
@@ -799,7 +808,7 @@ export default function ReportUploadPage({
               <button
                 type="button"
                 onClick={handleContinue}
-                disabled={isSubmitting || (!bothAdded && contractStatus === "none")}
+                disabled={isSubmitting || isUploading || (!bothAdded && contractStatus === "none")}
                 className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] leading-[22px] transition duration-150 flex items-center justify-center gap-2 ${
                   bothAdded || contractStatus !== "none"
                     ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"

@@ -18,6 +18,7 @@ async function resolveCaseForRequest(req: Request, caseId?: string): Promise<{ c
 
   if (caseId) {
     const c = await caseService.get(caseId)
+    if (token && caseService.hasToken(c, token)) return { caseRow: c, caseToken: token }
     // Check ownership if case is tied to a user
     if (c.user_id && authUser?.id && c.user_id !== authUser.id) {
       throw ApiError.forbidden('You do not have permission to access this case')
@@ -28,6 +29,7 @@ async function resolveCaseForRequest(req: Request, caseId?: string): Promise<{ c
         throw ApiError.notFound('Case not found')
       }
     }
+    if (!token && !authUser?.id) throw ApiError.notFound('Case not found')
     return { caseRow: c, caseToken: token }
   }
 
@@ -138,6 +140,7 @@ export const documentController = {
     const id = req.params.id
     const doc = await documentService.viewDocById(id).catch(() => null)
     const caseId = doc ? doc.caseId : id
+    await resolveCaseForRequest(req, caseId)
 
     const result = await extractionService.processCaseDocuments(caseId)
     return ApiResponse.ok(res, result, 'Document extraction completed')
@@ -152,7 +155,7 @@ export const documentController = {
     try {
       // Try resolving as document ID
       const doc = await documentService.viewDocById(id)
-      const c = await caseService.get(doc.caseId)
+      const { caseRow: c } = await resolveCaseForRequest(req, doc.caseId)
       return ApiResponse.ok(res, {
         document: doc,
         caseId: c.id,
@@ -161,7 +164,7 @@ export const documentController = {
       }, 'Document retrieved successfully')
     } catch {
       // Fallback: try resolving as case ID
-      const c = await caseService.get(id)
+      const { caseRow: c } = await resolveCaseForRequest(req, id)
       const docs = await caseService.documents(c.id)
       return ApiResponse.ok(res, {
         caseId: c.id,
@@ -178,7 +181,10 @@ export const documentController = {
    */
   async getExtractedFacts(req: Request, res: Response) {
     const id = req.params.id
-    const { facts, missing } = await extractionService.getExtractedFacts(id)
+    const doc = await documentService.viewDocById(id).catch(() => null)
+    const caseId = doc ? doc.caseId : id
+    await resolveCaseForRequest(req, caseId)
+    const { facts, missing } = await extractionService.getExtractedFacts(caseId)
     return ApiResponse.ok(res, {
       facts,
       missing,
@@ -192,7 +198,10 @@ export const documentController = {
    */
   async getReview(req: Request, res: Response) {
     const id = req.params.id
-    const reviewData = await reviewService.getReviewData(id)
+    const doc = await documentService.viewDocById(id).catch(() => null)
+    const caseId = doc ? doc.caseId : id
+    await resolveCaseForRequest(req, caseId)
+    const reviewData = await reviewService.getReviewData(caseId)
     return ApiResponse.ok(res, reviewData, 'Review data retrieved successfully')
   },
 
@@ -203,7 +212,10 @@ export const documentController = {
   async updateReview(req: Request, res: Response) {
     const id = req.params.id
     const body: UpdateReviewInput = req.body
-    const result = await reviewService.saveUserCorrection(id, body)
+    const doc = await documentService.viewDocById(id).catch(() => null)
+    const caseId = doc ? doc.caseId : id
+    await resolveCaseForRequest(req, caseId)
+    const result = await reviewService.saveUserCorrection(caseId, body)
     return ApiResponse.ok(res, result, 'User corrections saved successfully')
   },
 }

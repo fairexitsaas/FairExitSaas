@@ -1,4 +1,4 @@
-﻿/**
+/**
  * The paid flow after upload: AI reads (Call A) -> check page (+ second look, Call A2) ->
  * final agreement -> build (Call B) -> ready.
  */
@@ -97,7 +97,7 @@ export const flowService = {
   async startRead(c: CaseRow) {
     const docs = await caseService.documents(c.id)
     const r = caseService.readiness(c, docs)
-    if (!caseService.isPaid(c)) throw new ApiError(402, 'Payment is needed first')
+    if (!caseService.isEntitled(c)) throw new ApiError(402, 'Payment is needed first')
     if (c.status === 'reading') return { started: false, status: c.status }
     if (c.status === 'building') throw ApiError.conflict('Your report is being built')
     if (!r.letterPages) throw ApiError.badRequest('Add your severance letter first — the report needs at least that.')
@@ -157,6 +157,7 @@ export const flowService = {
   },
 
   async rowAction(c: CaseRow, key: string, body: { action: string; value?: unknown; agreed?: boolean }) {
+    if (!caseService.isEntitled(c)) throw new ApiError(402, 'Payment is needed first')
     this.assertCheckable(c)
     const ctx = ctxOf(c)
     const d = CP.rowDef(ctx, key)
@@ -266,6 +267,7 @@ export const flowService = {
   },
 
   async resolveConflict(c: CaseRow, key: string, body: { choice: 'document' | 'answers' | 'other' | 'not_sure'; value?: unknown }) {
+    if (!caseService.isEntitled(c)) throw new ApiError(402, 'Payment is needed first')
     this.assertCheckable(c)
     const ctx = ctxOf(c)
     const card = CP.conflicts(ctx).find((x) => x.key === key)
@@ -311,6 +313,7 @@ export const flowService = {
   },
 
   async attest(c: CaseRow, agreed: boolean) {
+    if (!caseService.isEntitled(c)) throw new ApiError(402, 'Payment is needed first')
     this.assertCheckable(c)
     if (!agreed) throw ApiError.unprocessable('Tick the final agreement to continue')
     const ctx = ctxOf(c)
@@ -343,6 +346,7 @@ export const flowService = {
       return { started: false, status: 'ready', reportId: c.report_id, readyAt: c.report_ready_at, pdfReady: !!c.report_pdf_path }
     }
 
+    if (!caseService.isEntitled(c)) throw new ApiError(402, 'Payment is needed first')
     this.assertCheckable(c)
     const ctx = ctxOf(c)
     const model = CP.buildModel(ctx)
@@ -536,11 +540,13 @@ export const flowService = {
   },
 
   html(c: CaseRow) {
+    if (!caseService.isEntitled(c)) throw new ApiError(402, 'Payment is needed first')
     if (c.status !== 'ready' || !c.report) throw ApiError.conflict('Your report is not ready yet')
     return renderReportHtml(c.report as unknown as ReportJson, this.renderMeta(c))
   },
 
   async pdf(c: CaseRow, requestId?: string): Promise<Buffer> {
+    if (!caseService.isEntitled(c)) throw new ApiError(402, 'Payment is needed first')
     if (c.status !== 'ready' || !c.report) throw ApiError.conflict('Your report is not ready yet')
     if (c.report_pdf_path) {
       try {

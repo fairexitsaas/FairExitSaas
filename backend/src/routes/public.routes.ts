@@ -17,7 +17,7 @@ const router = Router()
 router.get('/config', (_req: Request, res: Response) =>
   ApiResponse.ok(res, {
     price: { amountCents: env.REPORT_PRICE_CENTS, currencies: { CA: 'CAD', US: 'USD' }, taxNote: 'plus applicable tax' },
-    payments: { mode: env.PAYMENTS_MODE, appleProductId: env.APPLE_IAP_PRODUCT_ID, googleProductId: env.GOOGLE_IAP_PRODUCT_ID },
+    payments: { mode: env.PAYMENTS_MODE, bypass: env.PAYMENT_BYPASS_ENABLED, appleProductId: env.APPLE_IAP_PRODUCT_ID, googleProductId: env.GOOGLE_IAP_PRODUCT_ID },
     ai: { mode: env.AI_MODE, promptVersion: PROMPT_VERSION },
     rules: { version: RULES_VERSION, lastUpdated: RULES_LAST_UPDATED, regionData: REGION_DATA_META },
     retention: { documentsDays: env.RETENTION_DOCS_DAYS, reportMonths: env.RETENTION_REPORT_MONTHS },
