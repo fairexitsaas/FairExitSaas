@@ -9,7 +9,7 @@ You are wiring an existing, finished FairExit frontend to its backend API. Do no
 and do not change any copy; only replace the simulated data and local logic with API calls.
 
 **Read first:** `API.md` (the full contract). Base URL comes from config
-(web: `NEXT_PUBLIC_API_URL`, default `http://localhost:5000/api/v1`).
+(web: `NEXT_PUBLIC_API_URL`, default `http://localhost:8000/api/v1`).
 
 **Rules**
 1. No account is needed. After the free check, call `POST /cases` once and store `caseId` + `caseToken`

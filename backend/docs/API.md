@@ -1,6 +1,6 @@
 # FairExit Phase 1 API (web, iOS, Android)
 
-Base URL: `https://<your-api>/api/v1` (local: `http://localhost:5000/api/v1`)
+Base URL: `https://<your-api>/api/v1` (local: `http://localhost:8000/api/v1`)
 
 This document is written so a developer **or an AI coding assistant** can wire the existing web
 frontend (Next.js), the iOS app and the Android app to the backend without reading the backend code.
@@ -535,7 +535,7 @@ request closes. Jobs run in-process every 6 hours (`RUN_JOBS_IN_PROCESS=true`) a
 ## 16. End-to-end smoke test (mock mode)
 
 ```bash
-API=http://localhost:5000/api/v1
+API=http://localhost:8000/api/v1
 R=$(curl -s -X POST $API/cases -H 'Content-Type: application/json' -d '{"country":"CA","platform":"web","answers":{"province":"ON","age":50,"years":12,"salary":78000,"roleFactor":1.15,"payroll":"yes","offer":24000,"clause":"yes","reason":"layoff","market":"mid","pay":{}}}')
 ID=$(echo $R | jq -r .data.caseId); T=$(echo $R | jq -r .data.caseToken); H="X-Case-Token: $T"
 curl -s -X POST $API/cases/$ID/checkout/prepare -H "$H" -H 'Content-Type: application/json' -d '{"email":"test@example.com","termsAccepted":true}' >/dev/null
@@ -570,7 +570,7 @@ curl -s $API/cases/$ID/check -H "$H" | jq '.data.counter, .data.conflicts, .data
 2. Webhook: Developers → Webhooks → add endpoint `https://<api>/api/v1/webhooks/stripe` with events
    `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `payment_intent.succeeded`,
    `charge.refunded`; copy the signing secret to `STRIPE_WEBHOOK_SECRET`.
-   Local testing: `stripe listen --forward-to localhost:5000/api/v1/webhooks/stripe` (it prints the `whsec_…`).
+   Local testing: `stripe listen --forward-to localhost:8000/api/v1/webhooks/stripe` (it prints the `whsec_…`).
 3. Tax: "$59 plus applicable tax" needs Stripe Tax (Dashboard → Tax, add your origin address). Then set
    `STRIPE_AUTOMATIC_TAX=true`. Leave it `false` until Stripe Tax is on, or Checkout fails.
 4. Apple Pay / Google Pay appear automatically in Checkout (enable them in Settings → Payment methods;

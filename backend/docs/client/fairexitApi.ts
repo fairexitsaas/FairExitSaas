@@ -12,7 +12,7 @@ export class FairExitApiError extends Error {
 }
 
 export interface FairExitClientOptions {
-  baseUrl: string // e.g. process.env.NEXT_PUBLIC_API_URL ("http://localhost:5000/api/v1")
+  baseUrl: string // e.g. process.env.NEXT_PUBLIC_API_URL ("http://localhost:8000/api/v1")
   platform?: Platform
   getCaseToken?: (caseId: string) => string | null | undefined
   getAccessToken?: () => string | null | undefined // Supabase session, optional

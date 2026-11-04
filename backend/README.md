@@ -83,7 +83,7 @@ Store your environment variables in `backend/.env`.
 
 | Variable | Description | Example |
 | :--- | :--- | :--- |
-| `PORT` | HTTP port for backend | `5000` |
+| `PORT` | HTTP port for backend | `8000` |
 | `NODE_ENV` | Environment (`development`, `production`, `test`) | `development` |
 | `FRONTEND_URL` | Canonical frontend web URL | `http://localhost:3000` |
 | `CORS_ORIGINS` | Comma-separated list of allowed web origins | `http://localhost:3000,http://127.0.0.1:3000` |
@@ -274,5 +274,5 @@ Phase 1 implements secure document upload, Claude Call A extraction, raw respons
 cd backend
 npm run test          # Runs all 50 unit and integration tests (Vitest)
 npm run typecheck     # Runs TypeScript verification (tsc --noEmit)
-npm run dev           # Starts development server with live reload (PORT 5000)
+npm run dev           # Starts development server with live reload (PORT 8000)
 ```

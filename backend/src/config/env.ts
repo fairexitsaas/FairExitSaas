@@ -28,7 +28,7 @@ const rawSupabaseAnonKey =
 const envSchema = z.object({
   PORT: z
     .string()
-    .default('5000')
+    .default('8000')
     .transform((val) => parseInt(val, 10))
     .pipe(z.number().positive()),
   NODE_ENV: z
