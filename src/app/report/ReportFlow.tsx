@@ -168,7 +168,7 @@ export default function ReportFlow() {
 
   // Allow post-pay steps (upload, reading, review, ready) directly during testing
   const isPostPayStep = step === "upload" || view === "upload" || step === "reading" || view === "reading" || step === "review" || view === "review" || step === "ready" || view === "ready";
-  if ((urlStep === "pay" || step === "pay" || !cs || (!cs.paid && !cs.entitled)) && !isPostPayStep) {
+  if ((urlStep === "pay" || step === "pay" || !cs || !cs.paid) && !isPostPayStep) {
     return (
       <ReportSalesPage
         caseId={caseId}

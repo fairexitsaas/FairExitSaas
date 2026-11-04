@@ -36,11 +36,11 @@ export const caseController = {
 
   updateAnswers: async (req: Request, res: Response) => {
     const c = C(req)
-    if (caseService.isEntitled(c) && c.call_a) throw ApiError.conflict('After your documents are read, change answers on the check page instead')
+    if (caseService.isPaid(c) && c.call_a) throw ApiError.conflict('After your documents are read, change answers on the check page instead')
     const answers = { ...c.answers, ...req.body.answers }
     const code = codeFromAnswers(c.country, answers)
     const jurisdiction = code ? buildJurisdiction(code) : null
-    if (caseService.isEntitled(c) && !jurisdiction) throw ApiError.unprocessable('jurisdiction_not_covered')
+    if (caseService.isPaid(c) && !jurisdiction) throw ApiError.unprocessable('jurisdiction_not_covered')
     const updated = await caseService.update(c.id, { answers, jurisdiction_code: code, jurisdiction, covered: !!jurisdiction, free_result: computeFreeResult(c.country, answers) })
     return ApiResponse.ok(res, await fullView(updated), 'Answers updated')
   },
@@ -105,14 +105,9 @@ export const caseController = {
   },
 
   mockPay: async (req: Request, res: Response) => {
-    if (!env.PAYMENT_BYPASS_ENABLED && (env.PAYMENTS_MODE !== 'mock' || env.NODE_ENV === 'production')) {
-      throw ApiError.forbidden('Mock payments are off')
-    }
+    if (env.PAYMENTS_MODE !== 'mock' || env.NODE_ENV === 'production') throw ApiError.forbidden('Mock payments are off')
     const c = C(req)
     if (!c.covered) throw ApiError.badRequest('jurisdiction_not_covered')
-    if (env.PAYMENT_BYPASS_ENABLED) {
-      return ApiResponse.ok(res, { paid: false, bypass: true, case: await fullView(c) }, 'Payment bypassed for testing')
-    }
     await paymentService.markPaid(c.id, 'mock', `mock_${c.id}`, env.REPORT_PRICE_CENTS, c.country === 'US' ? 'USD' : 'CAD')
     return ApiResponse.ok(res, { paid: true, case: await fullView(await caseService.get(c.id)) }, 'Marked as paid (mock)')
   },

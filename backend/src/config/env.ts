@@ -92,15 +92,6 @@ const envSchema = z.object({
   // Payments: $59 one-time (CAD in Canada, USD in the US), plus applicable tax
   PAYMENTS_MODE: z.enum(['live', 'mock']).default('mock'),
   REPORT_PRICE_CENTS: z.string().default('5900').transform((v) => parseInt(v, 10)),
-  /**
-   * Temporary payment bypass mode for testing without payment gateways.
-   * When true, authorized users can proceed through upload, reading, and report generation without payment.
-   * Server-side enforced. Set to false (or omit) before real payments go live.
-   */
-  PAYMENT_BYPASS_ENABLED: z
-    .string()
-    .default('false')
-    .transform((v) => ['true', '1', 'yes'].includes(v.trim().toLowerCase())),
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_AUTOMATIC_TAX: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),

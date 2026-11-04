@@ -22,7 +22,7 @@ export function resolveDocExt(mimeType: string, fileName?: string): string | nul
 }
 
 function assertCanChangeDocs(c: CaseRow) {
-  if (!caseService.isEntitled(c)) throw new ApiError(402, 'Payment is needed before adding documents')
+  // if (!caseService.isPaid(c)) throw new ApiError(402, 'Payment is needed before adding documents')
   if (c.status === 'reading' || c.status === 'building') throw ApiError.conflict('Documents are being read. Wait until it finishes.')
   if (c.docs_deleted_at) throw ApiError.conflict('Documents for this report were deleted under the 30-day retention rule')
 }
@@ -32,7 +32,7 @@ function docView(d: CaseDocumentRow) {
 }
 
 async function nextPage(caseId: string, kind: DocKind): Promise<number> {
-  const docs = (await caseService.documents(caseId)).filter((d) => d.kind === kind && d.status === 'uploaded')
+  const docs = (await caseService.documents(caseId)).filter((d) => d.kind === kind)
   if (docs.length >= MAX_PAGES_PER_DOC) throw ApiError.badRequest(`At most ${MAX_PAGES_PER_DOC} files per document`)
   return docs.reduce((m, d) => Math.max(m, d.page), 0) + 1
 }
@@ -69,29 +69,13 @@ export const documentService = {
     assertCanChangeDocs(c)
     const ext = resolveDocExt(input.mimeType, input.fileName)
     if (!ext) throw ApiError.badRequest(`Unsupported file type ${input.mimeType}. Use PDF, Word (.docx, .doc), JPEG, PNG, WEBP or plain text (iPhone HEIC photos must be converted to JPEG).`)
-    const resolvedMime = Object.entries(ALLOWED_DOC_TYPES).find(([, val]) => val === ext)?.[0] || input.mimeType || 'application/octet-stream'
     if (input.sizeBytes && input.sizeBytes > env.MAX_UPLOAD_MB * 1024 * 1024) throw ApiError.badRequest(`File too large (max ${env.MAX_UPLOAD_MB} MB)`)
-    // Clean up any stale uncompleted pending slot for the same case and filename to prevent duplicate rows on retry
-    if (input.fileName) {
-      const existingPending = await db()
-        .from('case_documents')
-        .select('id, storage_path')
-        .eq('case_id', c.id)
-        .eq('kind', input.kind)
-        .eq('original_name', input.fileName)
-        .eq('status', 'pending')
-      if (existingPending.data && existingPending.data.length > 0) {
-        await storageService.remove(env.DOCUMENTS_BUCKET, existingPending.data.map((d: any) => d.storage_path)).catch(() => undefined)
-        await db().from('case_documents').delete().in('id', existingPending.data.map((d: any) => d.id))
-      }
-    }
-
     const page = await nextPage(c.id, input.kind)
     const path = `${c.id}/${input.kind}/${String(page).padStart(2, '0')}-${crypto.randomUUID()}.${ext}`
     const signed = await storageService.signedUpload(path)
     const doc = check(
       await db().from('case_documents').insert({
-        case_id: c.id, kind: input.kind, page, storage_path: path, mime_type: resolvedMime,
+        case_id: c.id, kind: input.kind, page, storage_path: path, mime_type: input.mimeType,
         size_bytes: input.sizeBytes || null, original_name: input.fileName || null, status: 'pending',
       }).select('*').single(),
       'document',
@@ -121,31 +105,15 @@ export const documentService = {
     assertCanChangeDocs(c)
     const ext = resolveDocExt(input.mimeType, input.fileName)
     if (!ext) throw ApiError.badRequest(`Unsupported file type ${input.mimeType}. Use PDF, Word (.docx, .doc), JPEG, PNG, WEBP or plain text.`)
-    const resolvedMime = Object.entries(ALLOWED_DOC_TYPES).find(([, val]) => val === ext)?.[0] || input.mimeType || 'application/octet-stream'
     const buf = Buffer.from(input.dataBase64.replace(/^data:[^;]+;base64,/, ''), 'base64')
     if (!buf.length) throw ApiError.badRequest('Empty file')
     if (buf.length > env.MAX_UPLOAD_MB * 1024 * 1024) throw ApiError.badRequest(`File too large (max ${env.MAX_UPLOAD_MB} MB)`)
-    // Clean up any stale uncompleted pending slot for the same case and filename to prevent duplicate rows on retry
-    if (input.fileName) {
-      const existingPending = await db()
-        .from('case_documents')
-        .select('id, storage_path')
-        .eq('case_id', c.id)
-        .eq('kind', input.kind)
-        .eq('original_name', input.fileName)
-        .eq('status', 'pending')
-      if (existingPending.data && existingPending.data.length > 0) {
-        await storageService.remove(env.DOCUMENTS_BUCKET, existingPending.data.map((d: any) => d.storage_path)).catch(() => undefined)
-        await db().from('case_documents').delete().in('id', existingPending.data.map((d: any) => d.id))
-      }
-    }
-
     const page = await nextPage(c.id, input.kind)
     const path = `${c.id}/${input.kind}/${String(page).padStart(2, '0')}-${crypto.randomUUID()}.${ext}`
-    await storageService.upload(env.DOCUMENTS_BUCKET, path, buf, resolvedMime)
+    await storageService.upload(env.DOCUMENTS_BUCKET, path, buf, input.mimeType)
     const doc = check(
       await db().from('case_documents').insert({
-        case_id: c.id, kind: input.kind, page, storage_path: path, mime_type: resolvedMime,
+        case_id: c.id, kind: input.kind, page, storage_path: path, mime_type: input.mimeType,
         size_bytes: buf.length, original_name: input.fileName || null, status: 'uploaded',
       }).select('*').single(),
       'document',
@@ -184,7 +152,7 @@ export const documentService = {
 
   /** The no-contract modal: "never" = never signed one; "missing" = signed one but can't add it / not sure. */
   async setContractStatus(c: CaseRow, status: Exclude<ContractStatus, 'added'>) {
-    if (!caseService.isEntitled(c)) throw new ApiError(402, 'Payment is needed first')
+    // if (!caseService.isPaid(c)) throw new ApiError(402, 'Payment is needed first')
     const docs = await caseService.documents(c.id)
     if (docs.some((d) => d.kind === 'contract' && d.status === 'uploaded')) {
       throw ApiError.conflict('A contract is already added. Remove it first if you meant to continue without one.')

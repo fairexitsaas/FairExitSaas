@@ -6,12 +6,11 @@ const mocks = vi.hoisted(() => ({
   download: vi.fn(),
   update: vi.fn(),
   callB: vi.fn(),
-  isEntitled: vi.fn(),
 }))
 
 vi.mock('../../src/services/pdf.service', () => ({ renderReportPdf: mocks.renderPdf }))
 vi.mock('../../src/services/storage.service', () => ({ storageService: { upload: mocks.upload, download: mocks.download } }))
-vi.mock('../../src/services/case.service', () => ({ caseService: { update: mocks.update, isEntitled: mocks.isEntitled } }))
+vi.mock('../../src/services/case.service', () => ({ caseService: { update: mocks.update } }))
 vi.mock('../../src/services/ai.service', () => ({ aiService: { callB: mocks.callB }, assertDailyLimit: vi.fn() }))
 
 import { flowService } from '../../src/services/flow.service'
@@ -19,7 +18,6 @@ import { flowService } from '../../src/services/flow.service'
 describe('saved JSON PDF recovery', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    mocks.isEntitled.mockReturnValue(true)
     mocks.renderPdf.mockResolvedValue(Buffer.from('saved-json-pdf'))
     mocks.upload.mockRejectedValueOnce(new Error('temporary storage error')).mockResolvedValue(undefined)
     mocks.download.mockRejectedValue(new Error('no stored PDF'))

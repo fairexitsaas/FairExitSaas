@@ -111,7 +111,7 @@ export default function ReportSalesPage({
   const courtRangeFormatted = `${courtLowFormatted}–${courtHighFormatted}`;
   const payFormatted = data.salary ? `$${Math.round(Number(data.salary) / 1000)}k/yr` : "$110k/yr";
 
-  const handleCheckoutSubmit = async (e: React.FormEvent) => {
+  const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !/.+@.+\..+/.test(email)) {
       setPayError("Please enter a valid email address so we can send your report.");
@@ -129,11 +129,6 @@ export default function ReportSalesPage({
     }
 
     // Terms accepted -> open Secure Checkout dialog (Step 3)
-    const isBypass = cfg?.payments?.bypass === true || cs?.bypassEnabled === true || cs?.entitled === true;
-    if (isBypass) {
-      await proceedToPayment();
-      return;
-    }
     setCheckoutDialogOpen(true);
   };
 
@@ -149,7 +144,7 @@ export default function ReportSalesPage({
     try {
       const { fairexit } = await import("@/lib/api/fairexit");
       if (activeCaseId) {
-        if (email) await fairexit.prepareCheckout(activeCaseId, { email, remind: subscribeNews, termsAccepted: true }).catch(() => {});
+        fairexit.mockPay(activeCaseId).catch(() => {});
       }
     } catch {
       // Ignore background errors
@@ -994,15 +989,10 @@ export default function ReportSalesPage({
         isOpen={termsModalOpen}
         onClose={() => setTermsModalOpen(false)}
         country={data.country === "US" ? "US" : "CA"}
-        onAllAccepted={async () => {
+        onAllAccepted={() => {
           setTermsAccepted(true);
           setTermsModalOpen(false);
-          const isBypass = cfg?.payments?.bypass === true || cs?.bypassEnabled === true || cs?.entitled === true;
-    if (isBypass) {
-      await proceedToPayment();
-      return;
-    }
-    setCheckoutDialogOpen(true);
+          setCheckoutDialogOpen(true);
         }}
       />
 
