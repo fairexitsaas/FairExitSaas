@@ -563,6 +563,14 @@ export default function CanadaReviewPage({
               formatted = /full/i.test(formatted) ? "Yes, a full release" : /yes/i.test(formatted) ? "Yes" : /no/i.test(formatted) ? "No release required" : formatted;
             } else if (factKey === 'min_only_clause') {
               formatted = /yes/i.test(formatted) ? "Yes" : /no/i.test(formatted) ? "No" : formatted;
+            } else if (factKey === 'benefits_end') {
+              if (formatted.toLowerCase().includes('no date')) {
+                cit = cit || `"${fact.value}"`;
+                formatted = "No date given";
+              } else if (formatted.toLowerCase().includes('not mentioned')) {
+                cit = cit || `"${fact.value}"`;
+                formatted = "Not mentioned";
+              }
             }
             origVal = formatted;
             val = formatted;
@@ -586,6 +594,14 @@ export default function CanadaReviewPage({
             val = String(correction.user_value);
             userChangeAck = !!correction.change_ack;
             if (correction.status === 'confirmed') confirmed = true;
+          }
+
+          if (val && val.toLowerCase().includes('no date') && val.length > 25) {
+            if (!cit) cit = `"${val}"`;
+            val = "No date given";
+          }
+          if (origVal && origVal.toLowerCase().includes('no date') && origVal.length > 25) {
+            origVal = "No date given";
           }
 
           return {
@@ -1789,9 +1805,14 @@ function ItemCard({
 
   // 1. CONFIRMED ROW STATE (Matches Image 1)
   if (item.confirmed && !item.isEditingInline && !item.userChanged && !item.showSecondLook) {
+    const rawVal = item.value || "Yes";
+    const isLongVal = rawVal.length > 25;
+    const isNoDate = rawVal.toLowerCase().includes("no date");
+    const displayPillVal = isNoDate && isLongVal ? "No date given" : rawVal;
+
     return (
-      <div className="rounded-[10px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-3.5 sm:px-5 sm:py-3.5 flex items-center justify-between gap-3">
-        <div className="flex-1 min-w-0 pr-2">
+      <div className="rounded-[10px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-3.5 sm:px-5 sm:py-3.5 flex items-center justify-between gap-3 min-w-0">
+        <div className="flex-1 min-w-[150px] sm:min-w-[180px] pr-2">
           <div className="flex items-center gap-2">
             <span className="font-sans font-bold text-[14.5px] leading-[20px] text-[#062C55]">
               {item.label}:
@@ -1819,10 +1840,10 @@ function ItemCard({
           </div>
         </div>
 
-        <div className="flex flex-col items-end shrink-0">
+        <div className="flex flex-col items-end shrink-0 max-w-[55%] sm:max-w-[60%]">
           <div
             onClick={onToggleConfirm}
-            className="min-h-[34px] px-3.5 py-1.5 rounded-[6px] font-sans font-bold text-[13px] flex items-center gap-1.5 transition cursor-pointer bg-[#0EB28D] text-white shadow-xs"
+            className="min-h-[34px] max-w-full px-3.5 py-1.5 rounded-[6px] font-sans font-bold text-[13px] flex items-center gap-1.5 transition cursor-pointer bg-[#0EB28D] text-white shadow-xs"
           >
             <svg
               className="w-3.5 h-3.5 shrink-0 text-white"
@@ -1838,7 +1859,7 @@ function ItemCard({
                 strokeLinejoin="round"
               />
             </svg>
-            <span>{item.value || "Yes"}</span>
+            <span className="truncate max-w-[200px] sm:max-w-[340px]" title={rawVal}>{displayPillVal}</span>
           </div>
 
           <button
@@ -1869,7 +1890,9 @@ function ItemCard({
             )}
           </div>
           <div className="font-sans font-bold text-[16px] text-[#062C55] mt-0.5">
-            {item.value || "—"}
+            {item.value && item.value.toLowerCase().includes('no date') && item.value.length > 25
+              ? 'No date given'
+              : item.value || "—"}
           </div>
           <div className="font-sans text-[12.5px] text-[#5A6B78] mt-1 flex flex-wrap items-center gap-1.5">
             <span>{item.source}</span>
