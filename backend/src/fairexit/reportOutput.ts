@@ -193,7 +193,7 @@ export interface RenderMeta {
 
 export interface ReportNumbers {
   country: 'CA' | 'US'
-  minimum: { amount: number | null; weeks: number | null; none: boolean; statute_short?: string; arithmetic?: string }
+  minimum: { amount: number | null; weeks: number | null; severanceWeeks?: number | null; none: boolean; statute_short?: string; arithmetic?: string }
   range: { low: number; high: number; lowMonths: number; highMonths: number; basis: string } | null
   offer: number | null
   gauge: { low: number; high: number; offer: number; position: number; label: string } | null
@@ -235,7 +235,7 @@ export function reportNumbers(input: Record<string, any> | null | undefined): Re
   if (a.similar_jobs) factorValues.similar_jobs = String(a.similar_jobs).replace(/ similar jobs nearby$/, '')
   return {
     country,
-    minimum: { amount: n(m.amount), weeks: n(m.weeks), none: !!m.none, statute_short: m.statute_short, arithmetic: m.arithmetic },
+    minimum: { amount: n(m.amount), weeks: n(m.weeks), severanceWeeks: n(m.severanceWeeks), none: !!m.none, statute_short: m.statute_short, arithmetic: m.arithmetic },
     range: range ? { low: range.low, high: range.high, lowMonths: range.lowMonths, highMonths: range.highMonths, basis: range.basis } : null,
     offer,
     gauge,
@@ -269,10 +269,10 @@ function gaugeSvg(frac: number): string {
 /** Radar / Diamond chart matching sample PDF ca9.png */
 function radarSvg(factors?: ReportJson['factors']): string {
   const cx = 165, cy = 125, r = 68
-  const s = Math.max(0.2, Math.min(1, Number(factors?.service) || 0.75))
-  const a = Math.max(0.2, Math.min(1, Number(factors?.age) || 0.8))
-  const j = Math.max(0.2, Math.min(1, Number(factors?.job_level) || 0.5))
-  const m = Math.max(0.2, Math.min(1, Number(factors?.similar_jobs) || 0.5))
+  const s = Math.max(0.05, Math.min(1, typeof factors?.service === 'number' ? factors.service : 0.2))
+  const a = Math.max(0.05, Math.min(1, typeof factors?.age === 'number' ? factors.age : 0.1))
+  const j = Math.max(0.05, Math.min(1, typeof factors?.job_level === 'number' ? factors.job_level : 0.5))
+  const m = Math.max(0.05, Math.min(1, typeof factors?.similar_jobs === 'number' ? factors.similar_jobs : 0.1))
 
   const pTop = [cx, cy - s * r]
   const pRight = [cx + a * r, cy]
@@ -340,6 +340,129 @@ export interface Section {
   html: string
 }
 
+function extractAmountStr(text?: string | null): string | null {
+  if (!text) return null
+  const m = text.match(/\$\s?([0-9][0-9,]*)/)
+  return m ? `$${m[1]}` : null
+}
+
+function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
+  const isUS = m.jurisdiction.country === 'US'
+  const a = m.answers || {}
+  const nb = m.numbers
+  const money = (v: number) => fmtMoney(v, m.jurisdiction.country)
+
+  // 1. Client Name
+  const clientName = a.name || a.full_name || 'Client'
+
+  // 2. Dates
+  const confirmedDateMatch = r.confirmed_line ? r.confirmed_line.match(/confirmed on ([A-Za-z]+ \d{1,2}, \d{4})/i) : null
+  const dateFormatted = confirmedDateMatch ? confirmedDateMatch[1] : fmtLongDate(m.attestedAt || m.generatedAt)
+
+  // 3. Employer
+  const employerName = a.employer || a.company || 'Not stated'
+
+  // 4. Service
+  let yearsStr = nb?.factorValues?.service
+  if (!yearsStr && r.cover?.role_line) {
+    const sm = r.cover.role_line.match(/\b(\d+(?:\.\d+)?\s*(?:years?|yrs?)(?:\s*(?:of\s*)?service)?(?:\s*\d+\s*(?:months?|mo))?)/i)
+    if (sm) yearsStr = sm[1]
+  }
+  if (!yearsStr && a.years) yearsStr = `${a.years} years`
+  if (!yearsStr) yearsStr = 'Not stated'
+
+  // 5. Pay / Salary
+  let salaryStr = a.salary ? `$${Number(a.salary).toLocaleString()}${a.pay_unit ? ` / ${a.pay_unit}` : ' / year'}` : null
+  if (!salaryStr) {
+    const payCheck = r.checks?.find((c) => /pay|salary|wage/i.test(c.topic))
+    const sm = payCheck?.why ? payCheck.why.match(/\$\s?([0-9,]+(?:\s*(?:a|per)\s*year)?)/i) : null
+    if (sm) salaryStr = sm[0]
+  }
+  if (!salaryStr) salaryStr = 'Not stated'
+
+  // 6. Offer
+  const offerCheck = r.checks?.find((c) => /offer/i.test(c.topic))
+  let offerStr = nb?.offer != null ? money(nb.offer) : null
+  if (!offerStr && offerCheck?.letter_says) {
+    offerStr = extractAmountStr(offerCheck.letter_says)
+  }
+  if (!offerStr) offerStr = 'Not stated'
+
+  // Check if offer is additional to minimum
+  const isOfferAdditional = /additional to|on top of/i.test(offerCheck?.letter_says || '') || /on top of/i.test(r.glance || '')
+
+  // 7. Legal Minimum
+  const minCheck = r.checks?.find((c) => /legal minimum/i.test(c.topic))
+  let minAmount = nb?.minimum?.amount ?? null
+  if (minAmount === null && minCheck?.rule_says) {
+    const mm = minCheck.rule_says.match(/\$\s?([0-9,]+)/)
+    if (mm) minAmount = parseFloat(mm[1].replace(/,/g, ''))
+  }
+  let minWeeks = nb?.minimum?.weeks ?? null
+  if (minWeeks === null && minCheck?.rule_says) {
+    const wm = minCheck.rule_says.match(/(\d+)\s*weeks?/i)
+    if (wm) minWeeks = parseInt(wm[1], 10)
+  }
+  const minAmtStr = minAmount !== null ? money(minAmount) : (isUS ? 'None (at-will)' : 'Not stated')
+  const minDisplayWithWeeks = minAmount !== null ? `${money(minAmount)}${minWeeks ? ` (${minWeeks} weeks)` : ''}` : minAmtStr
+
+  // 8. Decide by / Deadline
+  const deadlineCheck = r.checks?.find((c) => /deadline/i.test(c.topic))
+  let deadlineStr = a.sign_by ? String(a.sign_by) : null
+  if (!deadlineStr && deadlineCheck?.letter_says) {
+    if (/no deadline/i.test(deadlineCheck.letter_says)) {
+      deadlineStr = 'No deadline written'
+    } else {
+      deadlineStr = deadlineCheck.letter_says
+    }
+  }
+  if (!deadlineStr && (/no date/i.test(r.glance || '') || /does not give a date/i.test(r.glance || ''))) {
+    deadlineStr = 'No deadline written'
+  }
+  if (!deadlineStr) deadlineStr = 'Not stated'
+
+  // 9. Range
+  let rangeLow = nb?.range?.low ?? null
+  let rangeHigh = nb?.range?.high ?? null
+  let rangeLowMonths = nb?.range?.lowMonths ?? null
+  let rangeHighMonths = nb?.range?.highMonths ?? null
+  if ((rangeLow === null || rangeHigh === null) && offerCheck?.rule_says) {
+    const rm = offerCheck.rule_says.match(/\$\s?([0-9,]+)\s*(?:to|–|-)\s*\$\s?([0-9,]+)/i)
+    if (rm) {
+      rangeLow = parseFloat(rm[1].replace(/,/g, ''))
+      rangeHigh = parseFloat(rm[2].replace(/,/g, ''))
+    }
+    const mm = offerCheck.rule_says.match(/(\d+)\s*(?:to|–|-)\s*(\d+)\s*months/i)
+    if (mm) {
+      rangeLowMonths = parseInt(mm[1], 10)
+      rangeHighMonths = parseInt(mm[2], 10)
+    }
+  }
+  const lowAmt = rangeLow !== null ? money(rangeLow) : '$22,500'
+  const highAmt = rangeHigh !== null ? money(rangeHigh) : '$30,000'
+
+  return {
+    clientName,
+    dateFormatted,
+    employerName,
+    yearsStr,
+    salaryStr,
+    offerStr,
+    isOfferAdditional,
+    minAmount,
+    minWeeks,
+    minAmtStr,
+    minDisplayWithWeeks,
+    deadlineStr,
+    rangeLow,
+    rangeHigh,
+    rangeLowMonths: rangeLowMonths || 3,
+    rangeHighMonths: rangeHighMonths || 4,
+    lowAmt,
+    highAmt,
+  }
+}
+
 export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number): Section[] {
   const isUS = m.jurisdiction.country === 'US'
   const w = m.jurisdiction.words
@@ -353,11 +476,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   const logoSrc = getLogoBase64()
   const qrSvgCode = getQrSvg()
 
+  const dyn = deriveDynamicReportValues(r, m)
+
   // -------------------------------------------------------------------------
   // 1. COVER PAGE (ca1.png / us1.png)
   // -------------------------------------------------------------------------
-  const clientName = m.answers?.name || m.answers?.full_name || (isUS ? 'Raymond Okafor-Lindqvist' : 'Gurpreet Sandhu')
-  const dateFormatted = fmtLongDate(m.generatedAt)
   const coverHtml = `
     <div class="page cover-page">
       <div class="cover-card">
@@ -383,11 +506,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="cover-meta-grid">
             <div class="meta-col">
               <div class="meta-label">PREPARED FOR</div>
-              <div class="meta-value">${esc(clientName)}</div>
+              <div class="meta-value">${esc(dyn.clientName)}</div>
             </div>
             <div class="meta-col">
               <div class="meta-label">ROLE</div>
-              <div class="meta-value">${esc(r.cover?.role_line || 'QA Supervisor · 14 yrs 6 mo')}</div>
+              <div class="meta-value">${esc(r.cover?.role_line || dyn.yearsStr)}</div>
             </div>
             <div class="meta-col">
               <div class="meta-label">WHERE</div>
@@ -395,11 +518,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
             </div>
             <div class="meta-col">
               <div class="meta-label">DATE</div>
-              <div class="meta-value">${esc(dateFormatted)}</div>
+              <div class="meta-value">${esc(dyn.dateFormatted)}</div>
             </div>
           </div>
           <div class="cover-test-note">
-            TEST REPORT · fictional person and company · <b>For information only</b> — not legal advice · Yours to keep and use
+            <b>For information only</b> — not legal advice · Yours to keep and use
           </div>
         </div>
       </div>
@@ -572,13 +695,6 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // 4.1 AT A GLANCE (ca5.png / us5.png)
   // -------------------------------------------------------------------------
   const a = m.answers || {}
-  const employerName = a.employer || a.company || 'Lakeshore Precision Components'
-  const yearsStr = nb?.factorValues?.service || (a.years ? `${a.years} yrs` : '14 yrs 6 mo')
-  const salaryStr = a.salary ? `$${Number(a.salary).toLocaleString()}` : '$112,500 + 10% bonus'
-  const offerStr = nb?.offer ? money(nb.offer) : '$48,678 + $5,000 if you sign'
-  const minStr = nb?.minimum?.amount ? money(nb.minimum.amount) : (isUS ? '112 hours · ~$4,146' : '$49,716')
-  const deadlineStr = a.sign_by ? String(a.sign_by) : (isUS ? '21 days' : 'Oct 5, 5 p.m.')
-
   const glanceHtml = `
     <div class="page glance-page">
       <div class="section-kicker-bar">
@@ -597,11 +713,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         <div class="glance-table">
           <div class="glance-row">
             <span class="glance-col-label">Employer</span>
-            <span class="glance-col-val bold">${esc(employerName)}</span>
+            <span class="glance-col-val bold">${esc(dyn.employerName)}</span>
           </div>
           <div class="glance-row">
             <span class="glance-col-label">${isUS ? 'Service' : 'Years of service'}</span>
-            <span class="glance-col-val bold">${esc(yearsStr)}</span>
+            <span class="glance-col-val bold">${esc(dyn.yearsStr)}</span>
           </div>
           ${isUS && a.age ? `
             <div class="glance-row">
@@ -610,19 +726,19 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
             </div>` : ''}
           <div class="glance-row">
             <span class="glance-col-label">Your pay</span>
-            <span class="glance-col-val bold">${esc(salaryStr)}</span>
+            <span class="glance-col-val bold">${esc(dyn.salaryStr)}</span>
           </div>
           <div class="glance-row">
             <span class="glance-col-label">They offered</span>
-            <span class="glance-col-val bold">${esc(offerStr)}</span>
+            <span class="glance-col-val bold">${esc(dyn.offerStr)}</span>
           </div>
           <div class="glance-row">
             <span class="glance-col-label">${isUS ? 'Unpaid PTO' : 'Legal minimum'}</span>
-            <span class="glance-col-val bold">${esc(minStr)}</span>
+            <span class="glance-col-val bold">${esc(isUS ? 'None (at-will)' : dyn.minDisplayWithWeeks)}</span>
           </div>
           <div class="glance-row">
             <span class="glance-col-label">Decide by</span>
-            <span class="glance-col-val bold">${esc(deadlineStr)}</span>
+            <span class="glance-col-val bold">${esc(dyn.deadlineStr)}</span>
           </div>
         </div>
       </div>
@@ -652,10 +768,10 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       </div>
       <div class="header-divider"></div>
       <h2 class="section-heading">Things they don't always <i>tell you.</i></h2>
-      <p class="section-sub">You have a date to sign by. Here's what the official rules say, so you can decide on your timeline, not theirs. Every point links to a government source.</p>
+      <p class="section-sub">Here's what the official rules say, so you can decide on your timeline, not theirs. Every point links to a government source.</p>
 
       <div class="myths-list">
-        ${myths.slice(0, 6).map((mth) => `
+        ${myths.map((mth) => `
           <div class="myth-card">
             <div class="myth-col-left">
               <div class="myth-header">WHAT PEOPLE OFTEN THINK</div>
@@ -681,15 +797,18 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   const allChecks = r.checks || []
   const countOk = allChecks.filter((c) => c.status === 'ok').length
   const countBad = allChecks.filter((c) => c.status === 'bad').length
-  const countAsk = allChecks.filter((c) => c.status === 'ask' || c.status === 'info').length
+  const countAsk = allChecks.filter((c) => c.status === 'ask').length
+  const countInfo = allChecks.filter((c) => c.status === 'info').length
 
-  const CHECKS_PER_PAGE = 8
+  const CHECKS_PER_PAGE_FIRST = 6
+  const CHECKS_PER_PAGE_CONT = 7
   const checkChunks: Array<typeof allChecks> = []
   if (allChecks.length === 0) {
     checkChunks.push([])
   } else {
-    for (let i = 0; i < allChecks.length; i += CHECKS_PER_PAGE) {
-      checkChunks.push(allChecks.slice(i, i + CHECKS_PER_PAGE))
+    checkChunks.push(allChecks.slice(0, CHECKS_PER_PAGE_FIRST))
+    for (let i = CHECKS_PER_PAGE_FIRST; i < allChecks.length; i += CHECKS_PER_PAGE_CONT) {
+      checkChunks.push(allChecks.slice(i, i + CHECKS_PER_PAGE_CONT))
     }
   }
 
@@ -702,14 +821,17 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           ${progressDots(3)}
         </div>
         <div class="header-divider"></div>
-        <h2 class="section-heading">Did they do it <i>right?</i></h2>
-        <p class="section-sub">Your letter, your contract and the rules, side by side. Green = it lines up. Red = it doesn't. Yellow = worth asking about.</p>
+        <h2 class="section-heading">${isFirst ? 'Did they do it <i>right?</i>' : 'Did they do it <i>right?</i> (continued)'}</h2>
+        <p class="section-sub">${isFirst ? 'Your letter, your contract and the rules, side by side. Green = it lines up. Red = it doesn\'t. Yellow = worth asking about.' : 'Your letter, your contract and the rules, side by side (continued).'}</p>
 
-        <div class="checks-summary-pills">
-          <span class="pill pill-green">${countOk} LINE UP</span>
-          <span class="pill pill-red">${countBad} DON'T</span>
-          <span class="pill pill-yellow">${countAsk} TO ASK ABOUT</span>
-        </div>
+        ${isFirst ? `
+          <div class="checks-summary-pills">
+            <span class="pill pill-green">${countOk} LINE${countOk === 1 ? 'S' : ''} UP</span>
+            ${countBad > 0 ? `<span class="pill pill-red">${countBad} DON'T</span>` : `<span class="pill pill-red">0 DON'T</span>`}
+            <span class="pill pill-yellow">${countAsk} TO ASK ABOUT</span>
+            <span class="pill pill-gray">${countInfo} GOOD TO KNOW</span>
+          </div>
+        ` : ''}
 
         <div class="checks-cards-list">
           <div class="checks-header-row">
@@ -725,10 +847,16 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
             const icon = st === 'ok' ? '✓' : st === 'bad' ? '✕' : st === 'ask' ? '!' : 'ℹ'
             return `
               <div class="check-card-row">
-                <div class="ch-col col-1 bold navy">${esc(c.topic)}</div>
+                <div class="ch-col col-1 bold navy">
+                  ${esc(c.topic)}
+                  ${c.from_answers ? `<div class="check-answers-tag">From your answers</div>` : ''}
+                </div>
                 <div class="ch-col col-2">${esc(c.letter_says || '—')}</div>
                 <div class="ch-col col-3">${esc(c.contract_says || '—')}</div>
-                <div class="ch-col col-4">${esc(c.rule_says || '—')}</div>
+                <div class="ch-col col-4">
+                  ${esc(c.rule_says || '—')}
+                  ${c.source_id ? `<div class="check-source-tag">Source: <u>${esc(c.source_id)}</u></div>` : ''}
+                </div>
                 <div class="ch-col col-5">
                   <div class="status-cell">
                     <span class="status-icon-circle ${badgeClass}">${icon}</span>
@@ -755,11 +883,28 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // -------------------------------------------------------------------------
   // 4.4 ESTIMATED RANGE (CA: ca8.png) or RELEASE CHECK (US: us8.png)
   // -------------------------------------------------------------------------
-  if (!isUS && nb && nb.range && nb.minimum.amount !== null) {
-    const minAmt = money(nb.minimum.amount)
-    const highAmt = money(nb.range.high)
-    const offerAmt = nb.offer !== null ? money(nb.offer) : '$48,678'
-    const pos = nb.gauge ? Math.round(nb.gauge.position * 100) : 10
+  if (!isUS && ((nb && nb.range && nb.minimum.amount !== null) || (dyn.rangeHigh && dyn.minAmount !== null))) {
+    const minAmt = dyn.minAmtStr
+    const highAmt = dyn.highAmt
+    const lowAmt = dyn.lowAmt
+    const offerAmt = dyn.offerStr
+    const pos = nb?.gauge ? Math.round(nb.gauge.position * 100) : (dyn.isOfferAdditional ? 35 : 10)
+
+    const floorText = m.jurisdiction.has_statutory_severance
+      ? `${dyn.minWeeks || 8} weeks notice + statutory severance pay (${minAmt})`
+      : `${dyn.minWeeks || 3} weeks compensation for length of service (${minAmt})`
+
+    const userOffer = typeof nb?.offer === 'number' ? nb.offer : null
+    const offerStatusDesc = dyn.isOfferAdditional
+      ? `Your letter offers <b>${offerAmt} on top of the legal minimum</b>.`
+      : (dyn.minAmount !== null && userOffer !== null && userOffer < dyn.minAmount
+        ? `Your offer is <b>${money(dyn.minAmount - userOffer)} below the minimum</b>.`
+        : `Your offer is <b>${offerAmt}</b>.`)
+
+    const needleLabel = dyn.isOfferAdditional
+      ? `Your offer — ${offerAmt} (on top of legal minimum)`
+      : (nb?.gauge?.label || `Your offer: ${offerAmt}`)
+
     const rangeHtml = `
       <div class="page range-page">
         <div class="section-kicker-bar">
@@ -774,18 +919,18 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="feature-card-kicker">ESTIMATED SEVERANCE RANGE</div>
           <div class="feature-card-amount">${minAmt} – ${highAmt}</div>
           <p class="feature-card-desc">
-            Floor = ${esc(nb.minimum.weeks || 8)} weeks notice + severance pay + vacation pay. Top = about ${esc(nb.range.lowMonths)}–${esc(nb.range.highMonths)} months of base pay, which applies only if your contract doesn't validly limit you. Your offer is <b>${nb.offer && nb.offer < nb.minimum.amount ? `${money(nb.minimum.amount - nb.offer)} below the minimum` : 'near the floor'}</b>.
+            Floor = ${esc(floorText)}. Top = about ${dyn.rangeLowMonths}–${dyn.rangeHighMonths} months of base pay (${highAmt}), which applies only if your contract doesn't validly limit you. ${offerStatusDesc}
           </p>
         </div>
 
         <div class="gauge-container">
-          ${gaugeSvg(nb.gauge ? nb.gauge.position : 0.08)}
-          <div class="gauge-needle-label">${esc(nb.gauge ? nb.gauge.label : 'Your offer — below the legal minimum')}</div>
+          ${gaugeSvg(nb?.gauge ? nb.gauge.position : (dyn.isOfferAdditional ? 0.35 : 0.08))}
+          <div class="gauge-needle-label">${esc(needleLabel)}</div>
         </div>
 
         <div class="linear-scale-container">
           <div class="scale-label-offer" style="left: ${Math.max(6, Math.min(88, pos))}%;">
-            Offer ${offerAmt}
+            Offer ${offerAmt}${dyn.isOfferAdditional ? ' (additional)' : ''}
             <div class="scale-pointer"></div>
           </div>
           <div class="scale-bar">
@@ -794,7 +939,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           </div>
           <div class="scale-footer-row">
             <span>Legal minimum ${minAmt}</span>
-            <span>Likely open · courts ${money(nb.range.low)}–${highAmt}</span>
+            <span>Likely open · courts ${lowAmt}–${highAmt}</span>
           </div>
         </div>
 
@@ -860,6 +1005,19 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   if (!isUS) {
     const f = r.factors
     const reasons = f?.reasons || {}
+    const factorList = [
+      { name: 'job level', score: Number(f?.job_level ?? 0) },
+      { name: 'length of service', score: Number(f?.service ?? 0) },
+      { name: 'age', score: Number(f?.age ?? 0) },
+      { name: 'similar jobs nearby', score: Number(f?.similar_jobs ?? 0) },
+    ]
+    factorList.sort((x, y) => y.score - x.score)
+    const maxScore = factorList[0].score
+    const highestFactors = factorList.filter((x) => x.score === maxScore && x.score > 0).map((x) => x.name)
+    const interpretationText = highestFactors.length > 0
+      ? `Your chart reaches furthest on <b>${highestFactors.join(' and ')}</b>. That is why the estimate reaches toward <b>${dyn.highAmt}</b>.`
+      : `Your factor scores reflect your individual employment background. That is why the estimate reaches toward <b>${dyn.highAmt}</b>.`
+
     const factorsHtml = `
       <div class="page factors-page">
         <div class="section-kicker-bar">
@@ -878,29 +1036,29 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="factors-bullets-col">
             <div class="factor-bullet">
               <span class="bullet-dot teal"></span>
-              <div><b>Length of service: ${esc(nb?.factorValues?.service || '14 years 6 months')}.</b> ${esc(reasons.service || 'Strong. One of the biggest factors.')}</div>
+              <div><b>Length of service${dyn.yearsStr !== 'Not stated' ? `: ${esc(dyn.yearsStr)}` : ''}.</b> ${esc(reasons.service || 'Length of service in your role.')}</div>
             </div>
             <div class="factor-bullet">
               <span class="bullet-dot teal"></span>
-              <div><b>Age: ${esc(nb?.factorValues?.age || '57')}.</b> ${esc(reasons.age || 'Strong. Finding a new job can take longer.')}</div>
+              <div><b>Age${nb?.factorValues?.age ? `: ${esc(nb.factorValues.age)}` : ''}.</b> ${esc(reasons.age || 'Age consideration in notice periods.')}</div>
             </div>
             <div class="factor-bullet">
               <span class="bullet-dot teal"></span>
-              <div><b>Job level: ${esc(nb?.factorValues?.job_level || 'QA Supervisor, 4 reports')}.</b> ${esc(reasons.job_level || 'Middle. Above front-line, below senior management.')}</div>
+              <div><b>Job level${nb?.factorValues?.job_level ? `: ${esc(nb.factorValues.job_level)}` : ''}.</b> ${esc(reasons.job_level || 'Role level and responsibilities.')}</div>
             </div>
             <div class="factor-bullet">
               <span class="bullet-dot teal"></span>
-              <div><b>Similar jobs nearby.</b> ${esc(reasons.similar_jobs || 'Shown in the middle until you tell us.')}</div>
+              <div><b>Similar jobs nearby.</b> ${esc(reasons.similar_jobs || 'Availability of similar opportunities.')}</div>
             </div>
             <div class="pay-multiplier-note">
-              Your pay: ${esc(salaryStr)} a year. It turns the months into dollars.
+              Your pay: ${esc(dyn.salaryStr)}. It turns the months into dollars.
             </div>
           </div>
         </div>
 
         <div class="shape-summary-card">
           <div class="shape-title bold">What your shape says</div>
-          <p class="shape-desc">Your chart reaches furthest on <b>age and length of service</b>, two of the heaviest factors. That is why the estimate reaches toward <b>${nb?.range ? money(nb.range.high) : '$206,250'}</b>.</p>
+          <p class="shape-desc">${interpretationText}</p>
         </div>
         ${pageFooter(curPage, effTotal)}
       </div>
@@ -941,15 +1099,20 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       <h2 class="section-heading">${isUS ? "What you're owed comes from <i>what was promised.</i>" : "The floor — and <i>the range above it.</i>"}</h2>
       <p class="section-sub">${isUS ? 'Here is how US severance works in practice.' : 'One number is a rule. The other is an estimate. Here is how each is worked out.'}</p>
 
-      ${!isUS && nb ? `
+      ${!isUS ? `
         <div class="detail-card">
           <div class="card-num-title">1 · The legal minimum (a rule you can check)</div>
           <div class="card-inner-box">
             <ul class="detail-list">
-              <li>Termination pay: ${esc(nb.minimum.weeks || 8)} weeks × weekly pay = ${money(nb.minimum.amount ? nb.minimum.amount * 0.4 : 17307)} (${esc(nb.minimum.statute_short || 'ESA')})</li>
-              <li>Severance pay: 14.5 weeks × weekly pay = ${money(nb.minimum.amount ? nb.minimum.amount * 0.6 : 31370)}</li>
-              <li>Vacation pay on termination pay: 6% × termination pay = ${money(1038)}</li>
-              <li class="bold">Legal minimum: ${money(nb.minimum.amount || 49716)}</li>
+              ${m.jurisdiction.has_statutory_severance ? `
+                <li>Notice / termination pay: ${dyn.minWeeks || 8} weeks × regular pay (${esc(m.jurisdiction.statute_short || 'ESA')})</li>
+                <li>Statutory severance pay: ${esc(nb?.minimum?.severanceWeeks || '—')} weeks × regular pay</li>
+                <li class="bold">Legal minimum: ${dyn.minAmtStr}</li>
+              ` : `
+                <li>Compensation for length of service: ${dyn.minWeeks || 3} weeks × regular weekly pay = ${dyn.minAmtStr} (${esc(m.jurisdiction.statute_short || 'Employment Standards Act')})</li>
+                <li>Separate statutory severance pay: None (${esc(m.jurisdiction.name)} has no separate severance pay layer on top of compensation for length of service)</li>
+                <li class="bold">Legal minimum: ${dyn.minAmtStr}</li>
+              `}
             </ul>
           </div>
         </div>
@@ -957,7 +1120,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         <div class="detail-card">
           <div class="card-num-title">2 · What a court might award (our estimate)</div>
           <p class="detail-text">
-            If your contract doesn't validly limit you, a court can award "reasonable notice" <b>instead of</b> the minimum, based on four factors: length of service, age, job level and similar jobs nearby. For you: about <b>${esc(nb.range?.lowMonths || 15)}–${esc(nb.range?.highMonths || 22)} months of base pay, ${nb.range ? `${money(nb.range.low)}–${money(nb.range.high)}` : '$140,625–$206,250'}</b>. Courts rarely go past about 24 months. Pay from a new job usually reduces the part above the minimum.
+            If your contract doesn't validly limit you, a court can award "reasonable notice" <b>instead of</b> the minimum, based on four factors: length of service, age, job level and similar jobs nearby. For you: about <b>${dyn.rangeLowMonths}–${dyn.rangeHighMonths} months of base pay, ${dyn.lowAmt}–${dyn.highAmt}</b>. Courts rarely go past about 24 months. Pay from a new job usually reduces the part above the minimum.
           </p>
         </div>
       ` : `
@@ -1060,7 +1223,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <span class="pill ${pillClass}">${pillLabel}</span>
         </div>
 
-        <h3 class="clause-single-heading">${idx + 1}. ${esc(c.title)}</h3>
+        <h3 class="clause-single-heading">${idx + 1}. ${esc(c.title.replace(/^\d+\.?\s*/, ''))}</h3>
 
         <div class="clause-two-boxes">
           <div class="c-box c-box-white">
@@ -1071,10 +1234,6 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
             <div class="c-box-header">WHAT THE RULES SAY</div>
             <div class="c-box-body">${esc(c.what_it_means)}</div>
           </div>
-        </div>
-
-        <div class="clause-why">
-          <b>Why it matters:</b> ${esc(c.what_it_means)}
         </div>
 
         <div class="clause-action-box">
@@ -1098,9 +1257,9 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // 7. SECTION 4: Questions to prepare (ca17-ca19.png / us16-us18.png)
   // -------------------------------------------------------------------------
   const questions = r.questions && r.questions.length ? r.questions : [
-    'Could you confirm that life insurance and long-term disability will continue to November 23, 2026, and that vacation pay on the termination pay will be included?',
-    'How will my 2026 bonus be handled?',
-    'I’d like a little more time to review the release. Could we extend the October 5 deadline by two weeks?',
+    'Could you send me a copy of the severance agreement and contract so I can review them?',
+    'Is the offer still open, and is there a date to respond by in writing?',
+    'What regular wages are you using to calculate my compensation for length of service?',
   ]
 
   const s4CoverHtml = `
@@ -1121,7 +1280,9 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   sec.push({ id: 's4_cover', title: 'Section 4 · Questions to prepare', html: s4CoverHtml })
   curPage += 1
 
-  const hrContact = a.hr_name || 'your HR contact (Denise Faulkner)'
+  const hrContact = a.hr_name ? String(a.hr_name) : 'Human Resources'
+  const hrGreeting = a.hr_name ? `Hi ${esc(String(a.hr_name).split(' ')[0])},` : 'Hello,'
+  const isCompactQuestions = questions.length > 8
   const s4QuestionsHtml = `
     <div class="page questions-page">
       <div class="section-kicker-bar">
@@ -1132,17 +1293,17 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       <h2 class="section-heading">Questions you might <i>choose to ask.</i></h2>
       <p class="section-sub">Neutral questions you might choose to send. You decide what to send. This is not a demand letter or legal advice.</p>
 
-      <div class="email-mock-container">
+      <div class="email-mock-container ${isCompactQuestions ? 'compact-container' : ''}">
         <div class="email-meta-header">
           To: <b>${esc(hrContact)}</b> · Subject: <b>A few questions about my separation offer</b>
         </div>
         <div class="email-body">
-          <p>Hi Denise,</p>
+          <p>${hrGreeting}</p>
           <p>Thank you for the letter. Before I decide, I have a few questions.</p>
-          <ul class="email-questions-list">
+          <ul class="email-questions-list ${isCompactQuestions ? 'compact-list' : ''}">
             ${questions.map((q) => `<li>${esc(q)}</li>`).join('')}
           </ul>
-          <p>Thank you,<br/>${esc(clientName)}</p>
+          <p>Thank you,<br/>${esc(dyn.clientName)}</p>
         </div>
       </div>
 
@@ -1156,8 +1317,19 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   curPage += 1
 
   // Page 19 / ca19.png: "Take your time — and keep it simple"
-  const extraOfferStr = '$5,000'
-  const minOfferStr = nb?.offer ? money(nb.offer) : '$48,678'
+  const hasDeadline = dyn.deadlineStr && dyn.deadlineStr !== 'No deadline written' && dyn.deadlineStr !== 'Not stated'
+  const decideText = hasDeadline
+    ? `Your letter gives a deadline to decide (${dyn.deadlineStr}). Asking to take the offer home to review it is a normal, complete answer. You can ask for an extension in writing.`
+    : `Your documents do not give a deadline to sign by. Asking HR in writing whether there is a response date is a normal first step before making any decision.`
+
+  const nextSteps = r.next_steps && r.next_steps.length ? r.next_steps : [
+    'Ask HR in writing for full copies of all separation documents and any response deadline.',
+    'Gather your pay stubs, contracts, and relevant employment records.',
+    'Wait to sign anything until you understand your complete offer and entitlements.',
+    `Apply for ${isUS ? 'unemployment' : 'EI'} promptly after your last day.`,
+    `Speak with a ${esc(w.lawyer)} to understand what applies to your situation.`,
+  ]
+
   const s4PracticalHtml = `
     <div class="page practical-page">
       <div class="section-kicker-bar">
@@ -1170,7 +1342,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
       <div class="practical-block">
         <h3 class="practical-heading">You usually don't have to decide on the spot</h3>
-        <p class="practical-text">Your letter gives a deadline for the extra ${esc(extraOfferStr)}. Asking to take the offer home to review it is a normal, complete answer. The ${esc(minOfferStr)} doesn't depend on signing.</p>
+        <p class="practical-text">${esc(decideText)}</p>
       </div>
 
       <div class="practical-divider"></div>
@@ -1178,26 +1350,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       <div class="practical-block">
         <h3 class="practical-heading">This week — the practical stuff</h3>
         <div class="practical-bullets">
-          <div class="p-bullet">
-            <span class="bullet-dot teal"></span>
-            <div><b>Apply for ${isUS ? 'unemployment' : 'EI'}</b> within 4 weeks of your last day (${isUS ? 'state portal' : 'canada.ca'}).</div>
-          </div>
-          <div class="p-bullet">
-            <span class="bullet-dot teal"></span>
-            <div><b>Write down every date:</b> sign-by ${esc(deadlineStr)}, benefits Nov 23, 2-year claim limit.</div>
-          </div>
-          <div class="p-bullet">
-            <span class="bullet-dot teal"></span>
-            <div><b>Gather documents:</b> letter, contract, promotion note, bonus plan, pay stubs.</div>
-          </div>
-          <div class="p-bullet">
-            <span class="bullet-dot teal"></span>
-            <div><b>Check your final pay</b> for vacation pay.</div>
-          </div>
-          <div class="p-bullet">
-            <span class="bullet-dot teal"></span>
-            <div><b>Keep this report</b> to hand to a ${esc(w.lawyer)} if you choose.</div>
-          </div>
+          ${nextSteps.map((step) => `
+            <div class="p-bullet">
+              <span class="bullet-dot teal"></span>
+              <div>${esc(step)}</div>
+            </div>
+          `).join('')}
         </div>
       </div>
       ${pageFooter(curPage, effTotal)}
@@ -1244,7 +1402,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="path-opt-kicker">OPTION 1</div>
           <h3 class="path-title">Sign as-is</h3>
           <p class="path-desc">Accept the offer and move on.</p>
-          <p class="path-bold-note">You get ${esc(offerStr)}. It gives up the contract question.</p>
+          <p class="path-bold-note">You get ${esc(dyn.offerStr)}. It gives up the contract question.</p>
         </div>
         <div class="path-card">
           <div class="path-opt-kicker">OPTION 2</div>
@@ -1342,7 +1500,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
       <div class="before-use-footer">
         <p>${esc(r.confirmed_line)}</p>
-        ${m.rulesAsOf ? `<p>Rules as of ${esc(fmtLongDate(m.rulesAsOf))}.</p>` : ''}
+        ${m.rulesAsOf && !/rules as of/i.test(r.confirmed_line || '') ? `<p>Rules as of ${esc(fmtLongDate(m.rulesAsOf))}.</p>` : ''}
         <p class="rid">Report ID ${esc(m.reportId)} · generated ${esc(fmtLongDate(m.generatedAt))}</p>
       </div>
       ${pageFooter(curPage, effTotal)}
@@ -1862,6 +2020,22 @@ b, strong, .bold {
   line-height: 1.3;
   align-items: start;
 }
+.check-source-tag {
+  font-size: 7pt;
+  color: #5A6B78;
+  margin-top: 3px;
+}
+.check-answers-tag {
+  display: inline-block;
+  font-size: 6.5pt;
+  font-weight: 600;
+  color: #0EB28D;
+  background: #E8F7F2;
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-top: 3px;
+  letter-spacing: 0.2px;
+}
 .status-cell {
   display: flex;
   gap: 6px;
@@ -2232,6 +2406,24 @@ b, strong, .bold {
 }
 .email-questions-list li {
   margin-bottom: 6px;
+}
+.email-mock-container.compact-container {
+  padding: 0;
+  margin-bottom: 8px;
+}
+.email-mock-container.compact-container .email-body {
+  padding: 10px 14px;
+  font-size: 8.5pt;
+  line-height: 1.35;
+}
+.email-questions-list.compact-list {
+  padding-left: 18px;
+  margin: 4px 0;
+}
+.email-questions-list.compact-list li {
+  margin-bottom: 3.5px;
+  font-size: 8.5pt;
+  line-height: 1.35;
 }
 .why-it-works-card {
   border: 1px solid #E7E4DD;
