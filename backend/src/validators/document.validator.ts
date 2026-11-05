@@ -50,8 +50,6 @@ export const updateReviewSchema = z.object({
       'not_sure',
       'not_in_docs',
       'answer',
-      'reset',
-      'confirm_all', // final agreement checkbox on the check page (sent by the frontend)
     ])
     .optional(),
   agreed: z.boolean().optional(),

@@ -3,8 +3,8 @@
  * Recreates the exact multi-page visual design, margins, page breaks, and footers
  * matching the Canada and US reference templates.
  *
- * Order: Browserless REST (/pdf, plain HTTPS) -> a browser from ./pdfBrowser
- * (remote WebSocket, @sparticuz/chromium on Vercel, Playwright locally).
+ * Chromium comes from ./pdfBrowser: @sparticuz/chromium + puppeteer-core on Vercel/Lambda,
+ * Playwright everywhere else.
  */
 import { logger } from '../utils/logger'
 import { renderReportHtml, reportSections, ReportJson, RenderMeta } from '../fairexit/reportOutput'
@@ -12,58 +12,7 @@ import { getPdfBrowser, releasePdfBrowser } from './pdfBrowser'
 
 type PdfLogContext = { caseId?: string; reportId?: string; generationId?: string; requestId?: string }
 
-/** One set of print options, used by every renderer so the PDF looks the same everywhere. */
-const PDF_OPTIONS = {
-  format: 'Letter',
-  printBackground: true,
-  preferCSSPageSize: true,
-  displayHeaderFooter: true,
-  headerTemplate: '<span></span>',
-  footerTemplate: `<div style="font-size:8.5px;color:#5a6b78;width:100%;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
-  margin: { top: '10mm', bottom: '14mm', left: '14mm', right: '14mm' },
-}
-
-/**
- * Browserless REST endpoint (https://<host>/pdf?token=...). A plain HTTPS call: no Puppeteer, no Chromium,
- * nothing to bundle. Set PDF_BROWSERLESS_URL, or it is derived from PDF_BROWSER_WS_ENDPOINT
- * (wss://production-sfo.browserless.io?token=X -> https://production-sfo.browserless.io/pdf?token=X).
- */
-function browserlessPdfUrl(): string | null {
-  const explicit = process.env.PDF_BROWSERLESS_URL
-  if (explicit) return explicit
-  const ws = process.env.PDF_BROWSER_WS_ENDPOINT
-  if (!ws || !/browserless\.io/i.test(ws)) return null
-  try {
-    const u = new URL(ws.replace(/^wss:/i, 'https:').replace(/^ws:/i, 'http:'))
-    const token = u.searchParams.get('token')
-    if (!token) return null
-    return `${u.protocol}//${u.host}/pdf?token=${encodeURIComponent(token)}&timeout=90000`
-  } catch {
-    return null
-  }
-}
-
-async function printViaBrowserlessRest(url: string, html: string): Promise<Buffer> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
-    body: JSON.stringify({
-      html,
-      options: PDF_OPTIONS,
-      gotoOptions: { waitUntil: 'networkidle0', timeout: 60000 }, // lets Google Fonts load
-    }),
-    signal: AbortSignal.timeout(100_000),
-  })
-  if (!res.ok) {
-    const text = await res.text().catch(() => '')
-    throw new Error(`Browserless /pdf returned ${res.status}: ${text.slice(0, 300)}`)
-  }
-  const buf = Buffer.from(await res.arrayBuffer())
-  if (buf.subarray(0, 5).toString() !== '%PDF-') throw new Error(`Browserless /pdf returned something that is not a PDF (${buf.length} bytes)`)
-  return buf
-}
-
-async function printViaBrowser(html: string): Promise<Buffer> {
+async function printPdf(html: string, context: PdfLogContext, startedAt: number): Promise<Buffer> {
   const b = await getPdfBrowser()
   const page = await b.newPage()
   try {
@@ -72,39 +21,28 @@ async function printViaBrowser(html: string): Promise<Buffer> {
     try {
       await page.evaluate('document.fonts.ready.then(() => true)')
     } catch { /* proceed if fonts offline */ }
-    return Buffer.from(await page.pdf(PDF_OPTIONS))
+    const buf = Buffer.from(await page.pdf({
+      format: 'Letter',
+      printBackground: true,
+      preferCSSPageSize: true,
+      displayHeaderFooter: true,
+      headerTemplate: '<span></span>',
+      footerTemplate: `<div style="font-size:8.5px;color:#5a6b78;width:100%;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
+      margin: {
+        top: '10mm',
+        bottom: '14mm',
+        left: '14mm',
+        right: '14mm',
+      },
+    }))
+    logger.info('[PDF][COMPLETE]', { ...context, durationMs: Date.now() - startedAt, bytes: buf.length })
+    return buf
+  } catch (err) {
+    logger.error('[PDF][ERROR]', { ...context, durationMs: Date.now() - startedAt, message: (err as Error).message })
+    throw err
   } finally {
     await page.close().catch(() => undefined)
     await releasePdfBrowser()
-  }
-}
-
-/** Browserless REST first (no packages), then a browser (remote WS / @sparticuz / Playwright). */
-async function printPdf(html: string, context: PdfLogContext, startedAt: number): Promise<Buffer> {
-  const errors: string[] = []
-  const restUrl = browserlessPdfUrl()
-  if (restUrl) {
-    const t = Date.now()
-    try {
-      const buf = await printViaBrowserlessRest(restUrl, html)
-      logger.info('[PDF][COMPLETE]', { ...context, renderer: 'browserless-rest', durationMs: Date.now() - startedAt, renderMs: Date.now() - t, bytes: buf.length })
-      return buf
-    } catch (err) {
-      errors.push(`browserless-rest: ${(err as Error).message}`)
-      logger.error('[PDF][RENDERER_FAILED]', { ...context, renderer: 'browserless-rest', durationMs: Date.now() - t, message: (err as Error).message })
-    }
-  } else {
-    logger.warn('[PDF][NO_BROWSERLESS] PDF_BROWSER_WS_ENDPOINT / PDF_BROWSERLESS_URL not set in this environment; using a local browser', { ...context })
-  }
-  const t = Date.now()
-  try {
-    const buf = await printViaBrowser(html)
-    logger.info('[PDF][COMPLETE]', { ...context, renderer: 'browser', durationMs: Date.now() - startedAt, renderMs: Date.now() - t, bytes: buf.length })
-    return buf
-  } catch (err) {
-    errors.push(`browser: ${(err as Error).message}`)
-    logger.error('[PDF][ERROR]', { ...context, durationMs: Date.now() - startedAt, errors })
-    throw new Error(`PDF could not be made. ${errors.join(' | ')}`)
   }
 }
 

@@ -100,18 +100,10 @@ async function streamOnce(body: Record<string, unknown>, context?: ClaudeLogCont
   let model = String(body.model)
   let stopReason: string | null = null
   const usage = { input_tokens: 0, output_tokens: 0 }
-  let firstTokenAt = 0
-  let lastBeatAt = Date.now()
-  const progress = () => ({ ...context, elapsedS: Math.round((Date.now() - responseStartedAt) / 1000), firstTokenS: firstTokenAt ? Math.round((firstTokenAt - responseStartedAt) / 1000) : null, outputChars: text.length, approxOutputTokens: Math.round(text.length / 4), maxTokens: body.max_tokens })
-  logger.info('[CLAUDE][STREAM_OPEN]', { ...context, status: res.status, requestId: res.headers.get('request-id'), timeoutS: timeoutMs / 1000 })
   try {
     for (;;) {
       const { value, done } = await reader.read()
       if (done) break
-      if (Date.now() - lastBeatAt > 20000) {
-        lastBeatAt = Date.now()
-        logger.info('[CLAUDE][STREAM_PROGRESS] still writing (if these stop with no END/ERROR, the platform killed the function)', progress())
-      }
       buf += decoder.decode(value, { stream: true })
       let idx: number
       while ((idx = buf.indexOf('\n\n')) >= 0) {
@@ -131,13 +123,7 @@ async function streamOnce(body: Record<string, unknown>, context?: ClaudeLogCont
             usage.input_tokens = evt.message?.usage?.input_tokens || 0
             break
           case 'content_block_delta':
-            if (evt.delta?.type === 'text_delta') {
-              if (!firstTokenAt) {
-                firstTokenAt = Date.now()
-                logger.info('[CLAUDE][STREAM_FIRST_TOKEN]', progress())
-              }
-              text += evt.delta.text
-            }
+            if (evt.delta?.type === 'text_delta') text += evt.delta.text
             break
           case 'message_delta':
             stopReason = evt.delta?.stop_reason ?? stopReason
@@ -152,7 +138,6 @@ async function streamOnce(body: Record<string, unknown>, context?: ClaudeLogCont
       }
     }
   } catch (streamErr: any) {
-    logger.error('[CLAUDE][STREAM_STOPPED]', { ...progress(), reason: streamErr?.name === 'AbortError' ? `our ${timeoutMs / 1000}s timeout` : streamErr?.message })
     if (streamErr?.name === 'AbortError') {
       const e = new Error(`Claude stream timed out after ${timeoutMs / 1000}s`) as Error & { status?: number; isTimeout?: boolean }
       e.status = 408
@@ -164,7 +149,6 @@ async function streamOnce(body: Record<string, unknown>, context?: ClaudeLogCont
     clearTimeout(timeoutHandle)
     reader.releaseLock()
   }
-  logger.info('[CLAUDE][STREAM_END]', { ...progress(), stopReason, inputTokens: usage.input_tokens, outputTokens: usage.output_tokens })
   return { text, model, stopReason, usage, responseDurationMs: Date.now() - responseStartedAt }
 }
 

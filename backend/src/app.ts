@@ -7,9 +7,6 @@ import { errorHandler } from './middleware/errorHandler'
 import { apiRateLimiter } from './middleware/rateLimiter'
 import routes from './routes'
 import webhookRoutes from './routes/webhook.routes'
-import { logBootOnce } from './utils/diagnostics'
-
-logBootOnce()
 
 const app: Application = express()
 
