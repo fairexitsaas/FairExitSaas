@@ -7,7 +7,8 @@ import { RULES_VERSION } from '../fairexit/severanceRules'
 import type { CaseRow, CaseDocumentRow, Platform, CaseStatus } from '../fairexit/types'
 
 
-const STALE_JOB_MS = 3.5 * 60 * 1000
+// Must be longer than a real Call B (Opus, 2-5 min) plus the PDF, or live jobs get marked failed.
+const STALE_JOB_MS = (Number(process.env.JOB_STALE_MINUTES) || 12) * 60 * 1000
 
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')

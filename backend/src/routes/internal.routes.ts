@@ -11,12 +11,16 @@ import { flowService } from '../services/flow.service'
 /** For an external scheduler (Vercel Cron, GitHub Actions, Supabase cron...). Header: X-Cron-Secret. */
 const router = Router()
 router.use((req: Request, _res: Response, next: NextFunction) => {
-  const got = String(req.headers['x-cron-secret'] || '')
+  // X-Cron-Secret, or Authorization: Bearer <CRON_SECRET> (what Vercel Cron sends)
+  const auth = String(req.headers.authorization || '')
+  const got = String(req.headers['x-cron-secret'] || (auth.startsWith('Bearer ') ? auth.slice(7) : ''))
   const want = env.CRON_SECRET || ''
   if (!want || got.length !== want.length || !crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want))) return next(ApiError.unauthorized('Bad cron secret'))
   next()
 })
-router.post('/jobs/run', h(async (_req, res) => ApiResponse.ok(res, await jobsService.runAll())))
+const runJobs = h(async (_req, res) => ApiResponse.ok(res, await jobsService.runAll()))
+router.post('/jobs/run', runJobs)
+router.get('/jobs/run', runJobs) // Vercel Cron uses GET
 router.post('/jobs/process-report', h(async (req, res) => {
   const { caseId } = req.body
   if (!caseId) throw ApiError.badRequest('caseId is required')
