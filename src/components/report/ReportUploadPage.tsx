@@ -11,7 +11,7 @@ import {
 } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
-import { notifySuccess, notifyError } from "@/lib/notifications";
+import { notifySuccess } from "@/lib/notifications";
 import NoContractModal from "@/components/dialogs/NoContractModal";
 
 export interface UploadedFileItem {
@@ -21,6 +21,8 @@ export interface UploadedFileItem {
   type: "contract" | "letter" | "other";
   file?: File;
   serverDocId?: string;
+  status: "uploading" | "uploaded" | "error";
+  error?: string;
 }
 
 interface ReportUploadPageProps {
@@ -57,36 +59,65 @@ export default function ReportUploadPage({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  // Upload and flow loading states
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadingStatusText, setUploadingStatusText] = useState("");
+  const [, setUploadingProgress] = useState<{ current: number; total: number } | null>(null);
+  const [isAutoProceeding, setIsAutoProceeding] = useState(false);
+  const [isLoadingExistingDocs, setIsLoadingExistingDocs] = useState(true);
+  const [updatingDocId, setUpdatingDocId] = useState<string | null>(null);
+  const [removingDocId, setRemovingDocId] = useState<string | null>(null);
+
+  const autoProceedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Uploaded files list starts empty initially
   const [files, setFiles] = useState<UploadedFileItem[]>([]);
+
+  // Cleanup auto-proceed timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoProceedTimeoutRef.current) {
+        clearTimeout(autoProceedTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      fairexit.documents(activeCaseId).then((res) => {
-        interface ServerDoc {
-          id: string;
-          status?: string;
-          fileName?: string;
-          kind?: string;
-        }
-        if (res?.documents && Array.isArray(res.documents) && res.documents.length > 0) {
-          const loaded: UploadedFileItem[] = (res.documents as ServerDoc[])
-            .filter((d) => d.status === "uploaded")
-            .map((d) => ({
-              id: d.id,
-              name: d.fileName || (d.kind === "contract" ? "Employment-Contract.pdf" : "Severance-Offer.pdf"),
-              type: d.kind === "contract" ? "contract" : "letter",
-              serverDocId: d.id,
-            }));
-          if (loaded.length > 0) {
-            setFiles(loaded);
+      setIsLoadingExistingDocs(true);
+      fairexit.documents(activeCaseId)
+        .then((res) => {
+          interface ServerDoc {
+            id: string;
+            status?: string;
+            fileName?: string;
+            kind?: string;
           }
-        }
-        if (res?.contractStatus && ["never", "missing"].includes(res.contractStatus)) {
-          setContractStatus(res.contractStatus);
-        }
-      }).catch(() => {});
+          if (res?.documents && Array.isArray(res.documents) && res.documents.length > 0) {
+            const loaded: UploadedFileItem[] = (res.documents as ServerDoc[])
+              .filter((d) => d.status === "uploaded")
+              .map((d) => ({
+                id: d.id,
+                name: d.fileName || (d.kind === "contract" ? "Employment-Contract.pdf" : "Severance-Offer.pdf"),
+                type: d.kind === "contract" ? "contract" : "letter",
+                serverDocId: d.id,
+                status: "uploaded",
+              }));
+            if (loaded.length > 0) {
+              setFiles(loaded);
+            }
+          }
+          if (res?.contractStatus && ["never", "missing"].includes(res.contractStatus)) {
+            setContractStatus(res.contractStatus);
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          setIsLoadingExistingDocs(false);
+        });
+    } else {
+      setIsLoadingExistingDocs(false);
     }
   }, [caseId, cs]);
 
@@ -94,8 +125,10 @@ export default function ReportUploadPage({
   const country = (isUS ? "US" : "CA") as "CA" | "US";
 
   // Compute status for the 2 checklist boxes
-  const hasContract = files.some((f) => f.type === "contract");
-  const hasLetter = files.some((f) => f.type === "letter");
+  const hasContract = files.some((f) => f.type === "contract" && f.status === "uploaded");
+  const hasLetter = files.some((f) => f.type === "letter" && f.status === "uploaded");
+  const isContractUploading = files.some((f) => f.type === "contract" && f.status === "uploading");
+  const isLetterUploading = files.some((f) => f.type === "letter" && f.status === "uploading");
   const bothAdded = hasContract && hasLetter;
   const isContractSatisfied = hasContract || contractStatus !== "none";
 
@@ -118,27 +151,43 @@ export default function ReportUploadPage({
   // Handle file uploads
   const handleFilesAdded = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;
+    if (isUploading || isSubmitting || isAutoProceeding) return;
+
     setErrorMessage("");
 
-    const newItems: UploadedFileItem[] = [];
-    const activeCaseId = caseId || cs?.id;
-
-    // Track current state including previously uploaded files and items in this batch
-    let currentHasContract = files.some((f) => f.type === "contract");
-    let currentHasLetter = files.some((f) => f.type === "letter");
-
+    const validFiles: File[] = [];
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
       if (/heic|heif/i.test(file.type) || /\.heic$/i.test(file.name)) {
         setErrorMessage("iPhone HEIC photos are not supported. Please export as JPEG or PDF.");
-        continue;
+      } else {
+        validFiles.push(file);
       }
+    }
+    if (validFiles.length === 0) return;
 
-      // Auto-classify based on filename
+    // Cancel any pending auto-proceed if adding new files
+    if (autoProceedTimeoutRef.current) {
+      clearTimeout(autoProceedTimeoutRef.current);
+      autoProceedTimeoutRef.current = null;
+    }
+    setIsAutoProceeding(false);
+    setIsUploading(true);
+
+    const activeCaseId = caseId || cs?.id;
+
+    // Track current state including previously uploaded files and items in this batch
+    let currentHasContract = files.some(
+      (f) => f.type === "contract" && (f.status === "uploaded" || f.status === "uploading")
+    );
+    let currentHasLetter = files.some(
+      (f) => f.type === "letter" && (f.status === "uploaded" || f.status === "uploading")
+    );
+
+    const pendingItems: UploadedFileItem[] = validFiles.map((file, i) => {
       const lower = file.name.toLowerCase();
       let detectedType: "contract" | "letter" | "other" = "other";
 
-      // 1. Severance / Separation is always a severance letter (even if named "Separation Agreement")
       if (
         lower.includes("severance") ||
         lower.includes("separation") ||
@@ -148,9 +197,7 @@ export default function ReportUploadPage({
         lower.includes("layoff")
       ) {
         detectedType = "letter";
-      }
-      // 2. Employment contract / offer letter
-      else if (
+      } else if (
         lower.includes("contract") ||
         lower.includes("offer") ||
         lower.includes("appointment") ||
@@ -159,9 +206,7 @@ export default function ReportUploadPage({
         lower.includes("employment")
       ) {
         detectedType = "contract";
-      }
-      // 3. Fallback based on what is currently missing
-      else {
+      } else {
         if (!currentHasContract) {
           detectedType = "contract";
         } else if (!currentHasLetter) {
@@ -174,27 +219,58 @@ export default function ReportUploadPage({
       if (detectedType === "contract") currentHasContract = true;
       if (detectedType === "letter") currentHasLetter = true;
 
-      const item: UploadedFileItem = {
-        id: `upload-${Date.now()}-${i}`,
+      return {
+        id: `upload-${Date.now()}-${i}-${Math.random().toString(36).slice(2, 6)}`,
         name: file.name,
         size: file.size,
         type: detectedType,
         file,
+        status: "uploading",
       };
+    });
 
-      // If backend case is available, upload to server
-      if (activeCaseId) {
+    // Immediately display the files in the list with loading indicators
+    setFiles((prev) => [...prev, ...pendingItems]);
+
+    let anyUploaded = false;
+
+    // Upload each pending file
+    for (let i = 0; i < pendingItems.length; i++) {
+      const item = pendingItems[i];
+      setUploadingStatusText(`Uploading ${item.name} (${i + 1} of ${pendingItems.length})…`);
+      setUploadingProgress({ current: i + 1, total: pendingItems.length });
+
+      if (activeCaseId && item.file) {
         try {
-          const kind = detectedType === "contract" ? "contract" : "letter";
-          const res = await fairexit.uploadFile(activeCaseId, kind, file);
-          if (res?.document?.id) {
-            item.serverDocId = res.document.id;
-          }
-          notifySuccess(`Uploaded ${file.name}`);
+          const kind = item.type === "contract" ? "contract" : "letter";
+          const res = await fairexit.uploadFile(activeCaseId, kind, item.file);
+          const serverDocId = res?.document?.id;
+
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === item.id
+                ? { ...f, status: "uploaded", serverDocId }
+                : f
+            )
+          );
+          anyUploaded = true;
+          notifySuccess(`Uploaded ${item.name}`);
         } catch (e: unknown) {
-          const apiErr = e instanceof FairExitApiError ? e : new FairExitApiError(0, e instanceof Error ? e.message : "Upload failed");
-          const msg = `Could not upload ${file.name}: ${apiErr.message}`;
+          const apiErr =
+            e instanceof FairExitApiError
+              ? e
+              : new FairExitApiError(0, e instanceof Error ? e.message : "Upload failed");
+          const msg = `Could not upload ${item.name}: ${apiErr.message}`;
           setErrorMessage(msg);
+
+          setFiles((prev) =>
+            prev.map((f) =>
+              f.id === item.id
+                ? { ...f, status: "error", error: apiErr.message }
+                : f
+            )
+          );
+
           showErrorModal({
             title: "Document Upload Failed",
             message: msg,
@@ -203,15 +279,56 @@ export default function ReportUploadPage({
             requestId: apiErr.requestId,
           });
         }
+      } else {
+        // Fallback for demo mode
+        setFiles((prev) =>
+          prev.map((f) => (f.id === item.id ? { ...f, status: "uploaded" } : f))
+        );
+        anyUploaded = true;
       }
-
-      newItems.push(item);
     }
 
-    setFiles((prev) => [...prev, ...newItems]);
+    setIsUploading(false);
+    setUploadingStatusText("");
+    setUploadingProgress(null);
+
+    // Reset file input so select files is ready again
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+
+    // Check if both documents are uploaded and trigger the loader flow
+    if (anyUploaded) {
+      setFiles((latestFiles) => {
+        const contractOk = latestFiles.some(
+          (f) => f.type === "contract" && f.status === "uploaded"
+        );
+        const letterOk = latestFiles.some(
+          (f) => f.type === "letter" && f.status === "uploaded"
+        );
+        const satisfied = (contractOk || contractStatus !== "none") && letterOk;
+
+        if (satisfied) {
+          setIsAutoProceeding(true);
+          if (autoProceedTimeoutRef.current) clearTimeout(autoProceedTimeoutRef.current);
+          autoProceedTimeoutRef.current = setTimeout(() => {
+            handleContinue();
+          }, 1100);
+        }
+        return latestFiles;
+      });
+    }
   };
 
   const handleTypeChange = async (id: string, newType: "contract" | "letter" | "other") => {
+    if (isUploading || isSubmitting) return;
+    if (autoProceedTimeoutRef.current) {
+      clearTimeout(autoProceedTimeoutRef.current);
+      autoProceedTimeoutRef.current = null;
+    }
+    setIsAutoProceeding(false);
+    setUpdatingDocId(id);
+
     setFiles((prev) =>
       prev.map((f) => (f.id === id ? { ...f, type: newType } : f))
     );
@@ -224,9 +341,18 @@ export default function ReportUploadPage({
         console.warn("Failed to update document type on server:", e);
       }
     }
+    setUpdatingDocId(null);
   };
 
   const handleRemoveFile = async (id: string) => {
+    if (isUploading || isSubmitting) return;
+    if (autoProceedTimeoutRef.current) {
+      clearTimeout(autoProceedTimeoutRef.current);
+      autoProceedTimeoutRef.current = null;
+    }
+    setIsAutoProceeding(false);
+    setRemovingDocId(id);
+
     const targetFile = files.find((f) => f.id === id);
     setFiles((prev) => prev.filter((f) => f.id !== id));
     const activeCaseId = caseId || cs?.id;
@@ -237,10 +363,12 @@ export default function ReportUploadPage({
         console.warn("Failed to remove document on server:", e);
       }
     }
+    setRemovingDocId(null);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    if (isUploading || isSubmitting || isAutoProceeding) return;
     setIsDragging(true);
   };
 
@@ -252,6 +380,7 @@ export default function ReportUploadPage({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    if (isUploading || isSubmitting || isAutoProceeding) return;
     if (e.dataTransfer.files) {
       handleFilesAdded(e.dataTransfer.files);
     }
@@ -295,8 +424,16 @@ export default function ReportUploadPage({
   };
 
   const handleContinue = async () => {
+    if (isSubmitting) return;
     if (!isContractSatisfied && files.length === 0) return;
+
+    if (autoProceedTimeoutRef.current) {
+      clearTimeout(autoProceedTimeoutRef.current);
+      autoProceedTimeoutRef.current = null;
+    }
+
     setIsSubmitting(true);
+    setIsAutoProceeding(true);
     setErrorMessage("");
 
     const activeCaseId = caseId || cs?.id;
@@ -307,7 +444,9 @@ export default function ReportUploadPage({
         if (serverDocData?.documents) {
           for (const f of files) {
             if (f.serverDocId && (f.type === "contract" || f.type === "letter")) {
-              const matched = (serverDocData.documents as Array<{ id: string; kind: string }>).find((d) => d.id === f.serverDocId);
+              const matched = (serverDocData.documents as Array<{ id: string; kind: string }>).find(
+                (d) => d.id === f.serverDocId
+              );
               if (matched && matched.kind !== f.type) {
                 await fairexit.updateDocumentKind(activeCaseId, f.serverDocId, f.type).catch(() => {});
               }
@@ -327,6 +466,7 @@ export default function ReportUploadPage({
         await fairexit.startRead(activeCaseId);
 
         setIsSubmitting(false);
+        setIsAutoProceeding(false);
         if (onContinue) {
           onContinue();
         } else {
@@ -334,7 +474,16 @@ export default function ReportUploadPage({
         }
       } catch (err: unknown) {
         setIsSubmitting(false);
-        const apiErr = err instanceof FairExitApiError ? err : new FairExitApiError(0, err instanceof Error ? err.message : "Failed to start reading documents. Please check your files.");
+        setIsAutoProceeding(false);
+        const apiErr =
+          err instanceof FairExitApiError
+            ? err
+            : new FairExitApiError(
+                0,
+                err instanceof Error
+                  ? err.message
+                  : "Failed to start reading documents. Please check your files."
+              );
         setErrorMessage(apiErr.message);
         showErrorModal({
           title: "Document Reading Failed",
@@ -349,6 +498,7 @@ export default function ReportUploadPage({
       }
     } else {
       setIsSubmitting(false);
+      setIsAutoProceeding(false);
       showErrorModal({
         title: "Case Identifier Required",
         message: "No active case found to start reading documents. Please start from the beginning or reload.",
@@ -616,6 +766,8 @@ export default function ReportUploadPage({
               className={`rounded-[10px] p-[12px_16px] sm:p-[14px_18px] transition-all flex items-center justify-between gap-3 border mb-[12px] ${
                 hasContract || contractStatus !== "none"
                   ? "bg-[#F3FAF6] border-[#0EB28D]"
+                  : isContractUploading
+                  ? "bg-[#F0F8FF] border-[#BDE0FE]"
                   : "bg-white border-[#E7E4DD]"
               }`}
             >
@@ -624,10 +776,16 @@ export default function ReportUploadPage({
                   className={`w-[26px] h-[26px] rounded-[7px] text-white font-sans font-[800] text-[12px] leading-[18px] flex items-center justify-center shrink-0 ${
                     hasContract || contractStatus !== "none"
                       ? "bg-[#0EB28D]"
+                      : isContractUploading
+                      ? "bg-[#0284C7]"
                       : "bg-[#062C55]"
                   }`}
                 >
-                  1
+                  {isContractUploading ? (
+                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    1
+                  )}
                 </div>
                 <div>
                   <h4 className="font-sans font-[700] text-[14px] leading-[22px] text-[#062C55]">
@@ -641,10 +799,21 @@ export default function ReportUploadPage({
                 </div>
               </div>
               <div className="shrink-0">
-                {hasContract || contractStatus !== "none" ? (
+                {isLoadingExistingDocs ? (
+                  <div className="w-[69.5px] h-[25px] rounded-[6px] bg-[#F1F3F5] border border-[#E2E6E9] flex items-center justify-center">
+                    <span className="w-3 h-3 rounded-full border-2 border-[#8E9CA8] border-t-transparent animate-spin" />
+                  </div>
+                ) : hasContract || contractStatus !== "none" ? (
                   <div className="w-[69.5px] h-[25px] rounded-[6px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center">
                     <span className="font-sans font-[800] text-[11px] leading-[17px] tracking-[0.5px] text-[#0C8F72]">
                       ✓ ADDED
+                    </span>
+                  </div>
+                ) : isContractUploading ? (
+                  <div className="min-w-[85px] h-[25px] px-2 rounded-[6px] bg-[#E0F2FE] border border-[#BAE6FD] flex items-center justify-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full border-2 border-[#0284C7] border-t-transparent animate-spin shrink-0" />
+                    <span className="font-sans font-[800] text-[10px] leading-[17px] tracking-[0.5px] text-[#0284C7]">
+                      UPLOADING
                     </span>
                   </div>
                 ) : (
@@ -662,16 +831,26 @@ export default function ReportUploadPage({
               className={`rounded-[10px] p-[12px_16px] sm:p-[14px_18px] transition-all flex items-center justify-between gap-3 border mb-[14px] ${
                 hasLetter
                   ? "bg-[#F3FAF6] border-[#0EB28D]"
+                  : isLetterUploading
+                  ? "bg-[#F0F8FF] border-[#BDE0FE]"
                   : "bg-white border-[#E7E4DD]"
               }`}
             >
               <div className="flex items-center gap-[12px]">
                 <div
                   className={`w-[26px] h-[26px] rounded-[7px] text-white font-sans font-[800] text-[12px] leading-[18px] flex items-center justify-center shrink-0 ${
-                    hasLetter ? "bg-[#0EB28D]" : "bg-[#062C55]"
+                    hasLetter
+                      ? "bg-[#0EB28D]"
+                      : isLetterUploading
+                      ? "bg-[#0284C7]"
+                      : "bg-[#062C55]"
                   }`}
                 >
-                  2
+                  {isLetterUploading ? (
+                    <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    2
+                  )}
                 </div>
                 <div>
                   <h4 className="font-sans font-[700] text-[14px] leading-[22px] text-[#062C55]">
@@ -685,10 +864,21 @@ export default function ReportUploadPage({
                 </div>
               </div>
               <div className="shrink-0">
-                {hasLetter ? (
+                {isLoadingExistingDocs ? (
+                  <div className="w-[69.5px] h-[25px] rounded-[6px] bg-[#F1F3F5] border border-[#E2E6E9] flex items-center justify-center">
+                    <span className="w-3 h-3 rounded-full border-2 border-[#8E9CA8] border-t-transparent animate-spin" />
+                  </div>
+                ) : hasLetter ? (
                   <div className="w-[69.5px] h-[25px] rounded-[6px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center">
                     <span className="font-sans font-[800] text-[11px] leading-[17px] tracking-[0.5px] text-[#0C8F72]">
                       ✓ ADDED
+                    </span>
+                  </div>
+                ) : isLetterUploading ? (
+                  <div className="min-w-[85px] h-[25px] px-2 rounded-[6px] bg-[#E0F2FE] border border-[#BAE6FD] flex items-center justify-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full border-2 border-[#0284C7] border-t-transparent animate-spin shrink-0" />
+                    <span className="font-sans font-[800] text-[10px] leading-[17px] tracking-[0.5px] text-[#0284C7]">
+                      UPLOADING
                     </span>
                   </div>
                 ) : (
@@ -701,32 +891,74 @@ export default function ReportUploadPage({
               </div>
             </div>
 
-            {/* Dropzone */}
+            {/* Dropzone / Select Files */}
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`w-full h-[109.5px] rounded-[9px] cursor-pointer transition-all border-2 border-dashed flex flex-col items-center justify-center mb-[12px] ${
-                isDragging
-                  ? "bg-[#EBF7F2] border-[#0EB28D] scale-[1.01]"
-                  : "bg-[#FAFCFB] border-[#C7E6D6] hover:bg-[#F2F9F5] hover:border-[#0EB28D]"
+              onClick={() => {
+                if (isUploading || isSubmitting || isAutoProceeding) return;
+                fileInputRef.current?.click();
+              }}
+              className={`w-full min-h-[110px] rounded-[9px] transition-all border-2 border-dashed flex flex-col items-center justify-center p-4 mb-[12px] ${
+                isUploading || isSubmitting || isAutoProceeding
+                  ? "bg-[#F7FAF8] border-[#B8DDD0] cursor-not-allowed opacity-85"
+                  : isDragging
+                  ? "bg-[#EBF7F2] border-[#0EB28D] scale-[1.01] cursor-pointer"
+                  : "bg-[#FAFCFB] border-[#C7E6D6] hover:bg-[#F2F9F5] hover:border-[#0EB28D] cursor-pointer"
               }`}
             >
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
+                disabled={isUploading || isSubmitting || isAutoProceeding}
                 accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
                 className="hidden"
                 onChange={(e) => handleFilesAdded(e.target.files)}
               />
-              <h4 className="font-sans font-[700] text-[15.5px] leading-[24px] text-[#062C55]">
-                {isUS ? "Drop your two documents here, or tap to add" : "Drop files here, or tap to add"}
-              </h4>
-              <p className="font-sans font-normal text-[12.5px] leading-[20px] text-[#5A6B78] mt-[2px]">
-                PDF, Word or photos
-              </p>
+              {isUploading ? (
+                <div className="flex flex-col items-center justify-center text-center py-2 animate-fadeIn">
+                  <div className="w-6 h-6 border-2 border-[#0EB28D] border-t-transparent rounded-full animate-spin mb-2" />
+                  <h4 className="font-sans font-[700] text-[14.5px] text-[#062C55]">
+                    {uploadingStatusText || "Uploading documents…"}
+                  </h4>
+                  <p className="font-sans text-[12px] text-[#5A6B78] mt-1">
+                    Please wait while your files are uploaded. Selecting files is temporarily disabled.
+                  </p>
+                </div>
+              ) : isSubmitting || isAutoProceeding ? (
+                <div className="flex flex-col items-center justify-center text-center py-2 animate-fadeIn">
+                  <div className="w-6 h-6 border-2 border-[#0EB28D] border-t-transparent rounded-full animate-spin mb-2" />
+                  <h4 className="font-sans font-[700] text-[14.5px] text-[#062C55]">
+                    Reading your documents…
+                  </h4>
+                  <p className="font-sans text-[12px] text-[#0C8F72] mt-1">
+                    Analyzing clauses and preparing your report
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <h4 className="font-sans font-[700] text-[15.5px] leading-[24px] text-[#062C55] text-center">
+                    {bothAdded
+                      ? "Add another document or replacement file"
+                      : files.length === 1
+                      ? files[0].type === "contract"
+                        ? isUS
+                          ? "Now add your separation agreement, or tap to select"
+                          : "Now add your severance letter, or tap to select"
+                        : isUS
+                        ? "Now add your offer letter or contract, or tap to select"
+                        : "Now add your employment contract, or tap to select"
+                      : isUS
+                      ? "Drop your two documents here, or tap to add"
+                      : "Drop files here, or tap to add"}
+                  </h4>
+                  <p className="font-sans font-normal text-[12.5px] leading-[20px] text-[#5A6B78] mt-[2px]">
+                    PDF, Word or photos
+                  </p>
+                </>
+              )}
             </div>
 
             {/* AI Reading Explanation Box */}
@@ -763,44 +995,86 @@ export default function ReportUploadPage({
                 {files.map((file) => (
                   <div
                     key={file.id}
-                    className="w-full bg-[#EEF8F3] border border-[#C7E6D6] rounded-[10px] p-[12px_16px]"
+                    className={`w-full rounded-[10px] p-[12px_16px] transition-all border ${
+                      file.status === "uploading"
+                        ? "bg-[#F7FAFD] border-[#BDE0FE]"
+                        : file.status === "error"
+                        ? "bg-[#FDF3F2] border-[#F5C2C0]"
+                        : "bg-[#EEF8F3] border-[#C7E6D6]"
+                    }`}
                   >
                     <div className="flex items-center justify-between mb-[8px]">
                       <div className="flex items-center gap-[10px] overflow-hidden">
-                        <span className="text-[13.5px] text-[#17242F]" aria-hidden>
-                          ✅
-                        </span>
+                        {file.status === "uploading" ? (
+                          <span className="w-4 h-4 rounded-full border-2 border-[#0284C7] border-t-transparent animate-spin shrink-0" />
+                        ) : file.status === "error" ? (
+                          <span className="text-[13.5px] text-[#A3231F]" aria-hidden>
+                            ⚠️
+                          </span>
+                        ) : (
+                          <span className="text-[13.5px] text-[#17242F]" aria-hidden>
+                            ✅
+                          </span>
+                        )}
                         <span className="font-sans font-[600] text-[13.5px] leading-[21px] text-[#062C55] truncate">
                           {file.name}
                         </span>
+                        {file.status === "uploading" && (
+                          <span className="font-sans font-[700] text-[11px] leading-[16px] text-[#0284C7] bg-[#E0F2FE] px-2 py-0.5 rounded-[5px] shrink-0">
+                            Uploading…
+                          </span>
+                        )}
+                        {file.status === "error" && (
+                          <span className="font-sans font-[700] text-[11px] leading-[16px] text-[#A3231F] bg-[#FBECEB] px-2 py-0.5 rounded-[5px] shrink-0">
+                            Failed
+                          </span>
+                        )}
                       </div>
                       <button
                         type="button"
                         aria-label={`Remove ${file.name}`}
+                        disabled={isUploading || isSubmitting || isAutoProceeding || removingDocId === file.id}
                         onClick={() => handleRemoveFile(file.id)}
-                        className="text-[#9AA7B2] hover:text-[#D42E2B] p-1 rounded-md transition text-[13px] font-bold cursor-pointer"
+                        className="text-[#9AA7B2] hover:text-[#D42E2B] disabled:opacity-40 disabled:cursor-not-allowed p-1 rounded-md transition text-[13px] font-bold cursor-pointer"
                       >
-                        ✕
+                        {removingDocId === file.id ? (
+                          <span className="inline-block w-3.5 h-3.5 rounded-full border-2 border-[#9AA7B2] border-t-transparent animate-spin" />
+                        ) : (
+                          "✕"
+                        )}
                       </button>
                     </div>
 
+                    {file.status === "error" && file.error && (
+                      <p className="text-[12px] text-[#A3231F] mb-2">{file.error}</p>
+                    )}
+
                     <div>
-                      <label
-                        htmlFor={`select-${file.id}`}
-                        className="block font-sans font-[600] text-[12px] leading-[18px] text-[#5A6B78] mb-[6px]"
-                      >
-                        Document type
-                      </label>
+                      <div className="flex items-center justify-between mb-[6px]">
+                        <label
+                          htmlFor={`select-${file.id}`}
+                          className="block font-sans font-[600] text-[12px] leading-[18px] text-[#5A6B78]"
+                        >
+                          Document type
+                        </label>
+                        {updatingDocId === file.id && (
+                          <span className="flex items-center gap-1 text-[11px] text-[#0C8F72] font-[600]">
+                            <span className="w-2.5 h-2.5 rounded-full border-2 border-[#0C8F72] border-t-transparent animate-spin" />
+                            Updating…
+                          </span>
+                        )}
+                      </div>
                       <select
                         id={`select-${file.id}`}
                         value={file.type}
+                        disabled={file.status === "uploading" || isUploading || isSubmitting || isAutoProceeding || updatingDocId === file.id}
                         onChange={(e) =>
                           handleTypeChange(
                             file.id,
                             e.target.value as "contract" | "letter" | "other"
                           )
                         }
-                        className="w-full h-[32px] bg-white border border-[#CDD3D8] rounded-[9px] px-[10px] font-sans font-[600] text-[12.5px] leading-[18px] text-[#062C55] focus:outline-none focus:border-[#0EB28D] transition"
+                        className="w-full h-[32px] bg-white border border-[#CDD3D8] disabled:bg-[#F2F4F7] disabled:text-[#8896A0] disabled:cursor-not-allowed rounded-[9px] px-[10px] font-sans font-[600] text-[12.5px] leading-[18px] text-[#062C55] focus:outline-none focus:border-[#0EB28D] transition"
                       >
                         <option value="contract">
                           {isUS ? "Offer letter / employment agreement" : "Employment contract"}
@@ -816,22 +1090,56 @@ export default function ReportUploadPage({
               </div>
             )}
 
+            {/* ── Active Loader Card When Both Documents Are Uploaded ── */}
+            {(bothAdded || (hasLetter && contractStatus !== "none")) && (isAutoProceeding || isSubmitting) && (
+              <div className="w-full bg-[#E5F5EE] border border-[#0EB28D] rounded-[10px] p-[14px_18px] flex items-center justify-between gap-3 mb-[14px] animate-fadeIn shadow-xs">
+                <div className="flex items-center gap-3">
+                  <span className="w-5 h-5 rounded-full border-2 border-[#0EB28D] border-t-transparent animate-spin shrink-0" />
+                  <div>
+                    <h4 className="font-sans font-[700] text-[14px] text-[#062C55]">
+                      Both documents uploaded successfully!
+                    </h4>
+                    <p className="font-sans text-[12.5px] text-[#0C8F72]">
+                      Reading and analyzing your documents…
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[12px] font-[700] text-[#0C8F72] bg-white px-2.5 py-1 rounded-md border border-[#C7E6D6] shrink-0">
+                  Reading…
+                </span>
+              </div>
+            )}
+
             {/* Continue CTA Button & Centered Footnote */}
             <div>
               <button
                 type="button"
                 onClick={handleContinue}
-                disabled={isSubmitting || (!bothAdded && contractStatus === "none")}
+                disabled={
+                  isSubmitting ||
+                  isAutoProceeding ||
+                  isUploading ||
+                  (!bothAdded && contractStatus === "none")
+                }
                 className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] leading-[22px] transition duration-150 flex items-center justify-center gap-2 ${
-                  bothAdded || contractStatus !== "none"
+                  isSubmitting || isAutoProceeding
+                    ? "bg-[#0EB28D] text-white cursor-wait opacity-95 shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)]"
+                    : isUploading
+                    ? "bg-[#96DAC9] text-white cursor-not-allowed opacity-90 shadow-none"
+                    : bothAdded || contractStatus !== "none"
                     ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
                     : "bg-[#96DAC9] text-white cursor-not-allowed opacity-90 shadow-none"
                 }`}
               >
-                {isSubmitting ? (
+                {isSubmitting || isAutoProceeding ? (
                   <>
                     <span className="inline-block w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
                     Reading your documents…
+                  </>
+                ) : isUploading ? (
+                  <>
+                    <span className="inline-block w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+                    Uploading documents…
                   </>
                 ) : bothAdded ? (
                   "Continue — both added →"

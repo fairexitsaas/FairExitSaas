@@ -383,9 +383,9 @@ function UploadStep({ cs, words, onRead }: { cs: any; words: any; onRead: () => 
           <button className="text-[#a3231f] underline text-[12.5px]" onClick={() => remove(d.id)}>Remove</button>
         </div>
       ))}
-      <label className="inline-flex mt-2 min-h-[44px] items-center px-4 rounded-xl border border-[#d5dde4] font-bold text-[14px] text-[#062c55] cursor-pointer hover:border-[#0eb28d]">
+      <label className={`inline-flex mt-2 min-h-[44px] items-center px-4 rounded-xl border border-[#d5dde4] font-bold text-[14px] text-[#062c55] ${busy ? "opacity-60 cursor-not-allowed pointer-events-none" : "cursor-pointer hover:border-[#0eb28d]"}`}>
         {list(kind).length ? "Add another page" : "Add a file or photo"}
-        <input type="file" className="hidden" multiple accept="application/pdf,image/jpeg,image/png,image/webp,text/plain" onChange={(e) => { add(kind, e.target.files); e.target.value = ""; }} />
+        <input type="file" disabled={!!busy} className="hidden" multiple accept="application/pdf,image/jpeg,image/png,image/webp,text/plain" onChange={(e) => { add(kind, e.target.files); e.target.value = ""; }} />
       </label>
     </Card>
   );
