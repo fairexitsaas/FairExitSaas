@@ -80,7 +80,7 @@ const US_STATES = [
   },
   {
     name: "New York",
-    desc: "90 days' notice · 50+ employees · 25 laid off triggers it",
+    desc: "90 days' notice · 50+ employees · 25+ laid off (a third of the site) triggers it",
     href: "/us/new-york",
     action: "Read the rules →",
   },
@@ -108,7 +108,10 @@ export default function JurisdictionRules({ country }: JurisdictionRulesProps) {
   const isCanada = country === "CA";
 
   return (
-    <section className="py-20 bg-[#F6F4EF] dark:bg-[#062C55] transition-colors" id="states">
+    <section
+      className="py-20 bg-[#F6F4EF] dark:bg-[#062C55] transition-colors"
+      id="states"
+    >
       <div className="max-w-[1200px] mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="mb-6 sm:mb-8 text-left max-w-3xl">
@@ -155,7 +158,8 @@ export default function JurisdictionRules({ country }: JurisdictionRulesProps) {
 
             {/* Footnote for Canada */}
             <p className="text-[12px] text-[#5A6B7D] dark:text-[#8EA5B8] leading-relaxed">
-              Every province page is checked against the official source. FairExit does not cover Quebec or the territories.
+              Every province page is checked against the official source.
+              FairExit does not cover Quebec or the territories.
             </p>
           </>
         ) : (

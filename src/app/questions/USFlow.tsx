@@ -540,7 +540,7 @@ export default function USFlow() {
       state.empsize === "big"
     ) {
       list.push(
-        "50+ people lost their job at your site and the employer has 100+ staff — that's the fact pattern where WARN's advance-notice rules can apply",
+        "(for a layoff, also at least a third of the site) — that's the fact pattern where WARN's advance-notice rules can apply",
       );
     }
 
@@ -1953,8 +1953,7 @@ export default function USFlow() {
                   How did it happen?
                 </h1>
                 <p className="text-[13.5px] sm:text-sm text-[#5a6b78] mt-2 mb-6 leading-[1.55]">
-                  This tells us whether the advance-notice rules (the federal
-                  WARN Act) applied to your layoff.
+                  A union contract changes who gets the layoff notice and how disputes are raised to your layoff.
                 </p>
 
                 {/* ── QUESTION 1 OF 5: UNION CONTRACT ── */}
@@ -3179,18 +3178,18 @@ export default function USFlow() {
 
                   {/* Official Government Source Card (srcbadge) */}
                   <a
-                    href="https://www.eeoc.gov/laws/guidance/understanding-waivers-discrimination-claims-employee-severance-agreements"
+                    href="https://www.dol.gov/agencies/eta/layoffs/warn"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="border border-[#cbdcee] bg-white hover:border-[#0c8f72] rounded-[11px] p-[9px_12px_9px_14px] flex items-center justify-between transition-all group text-left cursor-pointer shadow-[0_6px_16px_-12px_rgba(11,46,79,0.4)] max-w-[440px] mx-auto mt-4"
                   >
                     <div>
-                      <div className="font-sans font-[800] uppercase text-[11px] leading-[15px] tracking-[0.5px] text-[#062c55] mb-0.5">
+                      <div className="font-sans font-[700] text-[12px] leading-[16px] text-[#062c55] mb-0.5">
                         Official government source
                       </div>
                       <div className="font-sans font-[600] text-[12px] leading-[16px] text-[#5a6b78] group-hover:text-[#0c8f72] transition-colors">
-                        EEOC — severance &amp; age-claim waivers · eeoc.gov ·{" "}
-                        <i className="italic">last reviewed Sept 2026</i>
+                        U.S. Department of Labor — WARN Act · dol.gov ·{" "}
+                        <i className="italic">last reviewed Oct 2026</i>
                       </div>
                     </div>
                     <span className="text-[#0c8f72] font-[800] text-[15px] group-hover:translate-x-1 transition-transform ml-3">

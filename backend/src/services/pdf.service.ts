@@ -17,10 +17,8 @@ const PDF_OPTIONS = {
   format: 'Letter',
   printBackground: true,
   preferCSSPageSize: true,
-  displayHeaderFooter: true,
-  headerTemplate: '<span></span>',
-  footerTemplate: `<div style="font-size:8.5px;color:#5a6b78;width:100%;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>`,
-  margin: { top: '10mm', bottom: '14mm', left: '14mm', right: '14mm' },
+  displayHeaderFooter: false,
+  margin: { top: '0', bottom: '0', left: '0', right: '0' },
 }
 
 /**
@@ -150,13 +148,15 @@ export async function renderReportPdf(report: ReportJson, meta: RenderMeta, cont
   const startedAt = Date.now()
   logger.info('[PDF][START]', { ...context, reportId: context.reportId || meta.reportId })
   const layoutStartedAt = Date.now()
-  const sections = reportSections(report, meta)
+  const initialSections = reportSections(report, meta)
+  const totalPages = initialSections.length
   const pages: Record<string, number> = {}
   let cur = 1
-  for (const s of sections) {
+  for (const s of initialSections) {
     pages[s.id] = cur
     cur += 1
   }
-  logger.info('[PDF][LAYOUT_COMPLETE]', { ...context, reportId: meta.reportId, pages, durationMs: Date.now() - layoutStartedAt })
-  return printPdf(renderReportHtml(report, { ...meta, pages }), { ...context, reportId: meta.reportId }, startedAt)
+  logger.info('[PDF][LAYOUT_COMPLETE]', { ...context, reportId: meta.reportId, pages, totalPages, durationMs: Date.now() - layoutStartedAt })
+  const html = renderReportHtml(report, { ...meta, pages }, totalPages)
+  return printPdf(html, { ...context, reportId: meta.reportId }, startedAt)
 }

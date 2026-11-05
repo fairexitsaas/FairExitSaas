@@ -36,11 +36,21 @@ export interface PdfBrowser {
 
 export const isServerless = () => !!(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT)
 
-<<<<<<< HEAD
+export type Driver = 'remote' | 'sparticuz' | 'playwright' | 'puppeteer'
+
 export function pickDriver(): 'sparticuz' | 'playwright' | 'puppeteer' {
   const forced = (process.env.PDF_BROWSER || '').toLowerCase()
   if (forced === 'sparticuz' || forced === 'playwright' || forced === 'puppeteer') return forced
   return isServerless() ? 'sparticuz' : 'playwright'
+}
+
+/** Drivers to try, in order. */
+export function driverOrder(): Driver[] {
+  const forced = (process.env.PDF_BROWSER || '').toLowerCase() as Driver
+  const local: Driver = isServerless() ? 'sparticuz' : 'playwright'
+  if (forced === 'remote') return ['remote']
+  if (forced === 'sparticuz' || forced === 'playwright' || forced === 'puppeteer') return [forced]
+  return process.env.PDF_BROWSER_WS_ENDPOINT ? ['remote', local] : [local]
 }
 
 // Native dynamic import helper that survives CommonJS transpilation in TypeScript
@@ -66,43 +76,6 @@ export function resolveSparticuzBinPath(): string | undefined {
     } catch {
       /* ignore lookup errors */
     }
-=======
-type Driver = 'remote' | 'sparticuz' | 'playwright' | 'puppeteer'
-
-/** Drivers to try, in order. */
-function driverOrder(): Driver[] {
-  const forced = (process.env.PDF_BROWSER || '').toLowerCase() as Driver
-  const local: Driver = isServerless() ? 'sparticuz' : 'playwright'
-  if (forced === 'remote') return ['remote']
-  if (forced === 'sparticuz' || forced === 'playwright' || forced === 'puppeteer') return [forced]
-  return process.env.PDF_BROWSER_WS_ENDPOINT ? ['remote', local] : [local]
-}
-
-/* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any */
-/**
- * puppeteer-core and @sparticuz/chromium are ES modules. This backend compiles to CommonJS, where
- * `require()` of an ES module fails on Vercel ("require() of ES Module ... not supported") and TypeScript
- * would turn `import()` into `require()`. So we call the real dynamic import() at runtime.
- */
-const nativeImport = new Function('specifier', 'return import(specifier)') as (s: string) => Promise<any>
-async function loadModule(name: string): Promise<any> {
-  const m = await nativeImport(name)
-  return m?.default ?? m
-}
-// Never runs. It only tells Vercel's file tracer to ship these packages with the function.
-if (process.env.__FAIREXIT_TRACE_ONLY__ === '1') {
-  require('puppeteer-core')
-  require('@sparticuz/chromium')
-}
-
-async function launchSparticuz(): Promise<PdfBrowser> {
-  let chromium: any, puppeteer: any
-  try {
-    chromium = await loadModule('@sparticuz/chromium')
-    puppeteer = await loadModule('puppeteer-core')
-  } catch (err) {
-    throw new ApiError(501, `Could not load puppeteer-core / @sparticuz/chromium: ${(err as Error).message}`)
->>>>>>> 8c0ac84d8f5bd2164a5507e758b62a2c22a447e1
   }
   return undefined
 }
@@ -201,16 +174,37 @@ async function launchSparticuz(): Promise<PdfBrowser> {
   logger.info('[PDF][SPARTICUZ_BIN_LOCATION]', { binDir: binDir || 'package_default' })
 
   let executablePath: string
-  try {
-    executablePath = binDir ? await chromium.executablePath(binDir) : await chromium.executablePath()
-  } catch (execErr: any) {
-    logger.error('[PDF][SPARTICUZ_EXECUTABLE_ERROR]', {
-      binDir,
-      message: execErr?.message,
-      code: execErr?.code,
-      stack: execErr?.stack,
-    })
-    throw new ApiError(500, `Failed to resolve serverless Chromium executable: ${execErr?.message}`)
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+    executablePath = process.env.PUPPETEER_EXECUTABLE_PATH
+  } else if (!isServerless() && process.platform === 'win32') {
+    const winCandidates = [
+      'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+      'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
+      'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe',
+    ]
+    const found = winCandidates.find((p) => fs.existsSync(p))
+    if (found) {
+      executablePath = found
+    } else {
+      try {
+        executablePath = binDir ? await chromium.executablePath(binDir) : await chromium.executablePath()
+      } catch (execErr: any) {
+        throw new ApiError(500, `Failed to resolve serverless Chromium executable: ${execErr?.message}`)
+      }
+    }
+  } else {
+    try {
+      executablePath = binDir ? await chromium.executablePath(binDir) : await chromium.executablePath()
+    } catch (execErr: any) {
+      logger.error('[PDF][SPARTICUZ_EXECUTABLE_ERROR]', {
+        binDir,
+        message: execErr?.message,
+        code: execErr?.code,
+        stack: execErr?.stack,
+      })
+      throw new ApiError(500, `Failed to resolve serverless Chromium executable: ${execErr?.message}`)
+    }
   }
 
   const exists = fs.existsSync(executablePath)
@@ -262,7 +256,7 @@ async function connectRemote(): Promise<PdfBrowser> {
   if (!endpoint) throw new ApiError(501, 'PDF_BROWSER_WS_ENDPOINT is not set')
   let puppeteer: any
   try {
-    puppeteer = await loadModule('puppeteer-core')
+    puppeteer = await loadPuppeteerCore()
   } catch (err) {
     throw new ApiError(501, `Could not load puppeteer-core: ${(err as Error).message}`)
   }
@@ -282,11 +276,7 @@ async function launchPuppeteer(): Promise<PdfBrowser> {
   return wrapPuppeteer(await (puppeteer.default || puppeteer).launch({ headless: true, args: ['--no-sandbox', '--disable-dev-shm-usage'] }))
 }
 
-<<<<<<< HEAD
-export function wrapPuppeteer(browser: any): PdfBrowser {
-=======
-function wrapPuppeteer(browser: any, remote = false): PdfBrowser {
->>>>>>> 8c0ac84d8f5bd2164a5507e758b62a2c22a447e1
+export function wrapPuppeteer(browser: any, remote = false): PdfBrowser {
   return {
     isConnected: () => browser.connected ?? browser.isConnected?.() ?? true,
     close: () => (remote ? browser.disconnect() : browser.close()),

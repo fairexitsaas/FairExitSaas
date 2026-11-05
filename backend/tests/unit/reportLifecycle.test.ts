@@ -170,8 +170,8 @@ describe('Report Lifecycle, Interruption, Stale Jobs, and Recovery', () => {
     // We test the real healStale logic
     const { caseService: realCaseService } = await vi.importActual<any>('../../src/services/case.service')
 
-    // Stale timestamp 5 minutes ago (> 3.5 minutes STALE_JOB_MS)
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+    // Stale timestamp 15 minutes ago (> 12 minutes STALE_JOB_MS)
+    const fiveMinutesAgo = new Date(Date.now() - 15 * 60 * 1000).toISOString()
     const updateSpy = vi.fn().mockImplementation((_id, patch) => ({ ...patch }))
     realCaseService.update = updateSpy
 

@@ -4026,9 +4026,8 @@ function QuestionsContent() {
                               Official government source
                             </b>
                             <span>
-                              Ontario ESA — termination &amp; severance ·
-                              ontario.ca ·{" "}
-                              <i className="italic">last reviewed Sept 2026</i>
+                              Ontario ESA — termination · ontario.ca ·{" "}
+                              <i className="italic">last reviewed Oct 2026</i>
                             </span>
                           </div>
                           <span className="text-[#0c8f72] font-extrabold text-sm ml-2 group-hover:translate-x-0.5 transition-transform">

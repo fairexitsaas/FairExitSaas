@@ -126,6 +126,18 @@ function getAssetPath(filename: string): string {
 let cachedHeroBand = ''
 let cachedLogo = ''
 let cachedQrSvg = ''
+let cachedFontsCss = ''
+
+function getFontsCss(): string {
+  if (cachedFontsCss) return cachedFontsCss
+  const p = getAssetPath('fonts.css')
+  if (p) {
+    try {
+      cachedFontsCss = fs.readFileSync(p, 'utf8')
+    } catch { /* empty */ }
+  }
+  return cachedFontsCss
+}
 
 function getHeroBandBase64(): string {
   if (cachedHeroBand) return cachedHeroBand
@@ -233,7 +245,7 @@ export function reportNumbers(input: Record<string, any> | null | undefined): Re
 
 /** Semicircle gauge matching sample PDF ca8.png */
 function gaugeSvg(frac: number): string {
-  const cx = 110, cy = 96, r = 74, sw = 16
+  const cx = 120, cy = 100, r = 76, sw = 16
   const pt = (f: number, rad: number) => {
     const t = Math.PI * (1 - f)
     return [cx + rad * Math.cos(t), cy - rad * Math.sin(t)]
@@ -249,14 +261,14 @@ function gaugeSvg(frac: number): string {
   })
   const clamped = Math.max(0.12, Math.min(0.88, frac))
   const nd = pt(clamped, r - 22)
-  h += `<line x1="${cx}" y1="${cy}" x2="${nd[0].toFixed(2)}" y2="${nd[1].toFixed(2)}" stroke="#062C55" stroke-width="4" stroke-linecap="round"/>`
-  h += `<circle cx="${cx}" cy="${cy}" r="8" fill="#062C55"/><circle cx="${cx}" cy="${cy}" r="3" fill="#FFFFFF"/>`
-  return `<svg class="gauge" width="220" height="110" viewBox="0 0 220 110">${h}</svg>`
+  h += `<line x1="${cx}" y1="${cy}" x2="${nd[0].toFixed(2)}" y2="${nd[1].toFixed(2)}" stroke="#062C55" stroke-width="4.5" stroke-linecap="round"/>`
+  h += `<circle cx="${cx}" cy="${cy}" r="8.5" fill="#062C55"/><circle cx="${cx}" cy="${cy}" r="3.5" fill="#FFFFFF"/>`
+  return `<svg class="gauge" width="240" height="120" viewBox="0 0 240 120">${h}</svg>`
 }
 
 /** Radar / Diamond chart matching sample PDF ca9.png */
 function radarSvg(factors?: ReportJson['factors']): string {
-  const cx = 110, cy = 110, r = 75
+  const cx = 140, cy = 130, r = 75
   const s = Math.max(0.2, Math.min(1, Number(factors?.service) || 0.75))
   const a = Math.max(0.2, Math.min(1, Number(factors?.age) || 0.8))
   const j = Math.max(0.2, Math.min(1, Number(factors?.job_level) || 0.5))
@@ -277,19 +289,19 @@ function radarSvg(factors?: ReportJson['factors']): string {
   `
 
   const poly = `<polygon points="${pTop[0]},${pTop[1]} ${pRight[0]},${pRight[1]} ${pBottom[0]},${pBottom[1]} ${pLeft[0]},${pLeft[1]}" fill="#0EB28D" fill-opacity="0.22" stroke="#0EB28D" stroke-width="2.5"/>`
-  const centerDot = `<circle cx="${cx}" cy="${cy}" r="3" fill="#062C55"/>`
+  const centerDot = `<circle cx="${cx}" cy="${cy}" r="3.5" fill="#062C55"/>`
 
   return `
     <div class="radar-box">
-      <div class="radar-axis-label top">Length of service</div>
-      <div class="radar-axis-label right">Age</div>
-      <div class="radar-axis-label bottom">Job level</div>
-      <div class="radar-axis-label left">Similar jobs</div>
-      <svg width="220" height="220" viewBox="0 0 220 220">
+      <svg width="280" height="260" viewBox="0 0 280 260">
         ${gridDiamonds}
         ${axes}
         ${poly}
         ${centerDot}
+        <text x="${cx}" y="${cy - r - 12}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Length of service</text>
+        <text x="${cx + r + 12}" y="${cy + 4}" text-anchor="start" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Age</text>
+        <text x="${cx}" y="${cy + r + 20}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Job level</text>
+        <text x="${cx - r - 12}" y="${cy + 4}" text-anchor="end" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Similar jobs</text>
       </svg>
     </div>
   `
@@ -303,8 +315,15 @@ function progressDots(active: number, total = 5): string {
   return `<div class="p-dots">${dots}</div>`
 }
 
-function footerPill(): string {
-  return `<div class="page-footer-pill">General information, not legal advice. We've done our best to make this clear and accurate, but please check the details before you act. If anything feels unclear, a professional can help.</div>`
+function pageFooter(curPage: number, totalPages: number): string {
+  return `
+    <div class="page-footer">
+      <div class="page-footer-pill">
+        <b>General information, not legal advice.</b> We've done our best to make this clear and accurate, but please check the details before you act. If anything feels unclear, a professional can help.
+      </div>
+      <div class="page-footer-num">Page ${curPage} of ${totalPages}</div>
+    </div>
+  `
 }
 
 export interface Section {
@@ -313,12 +332,14 @@ export interface Section {
   html: string
 }
 
-export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
+export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number): Section[] {
   const isUS = m.jurisdiction.country === 'US'
   const w = m.jurisdiction.words
   const nb = m.numbers
   const money = (v: number) => fmtMoney(v, m.jurisdiction.country)
   const sec: Section[] = []
+  const effTotal = totalPages || (isUS ? 22 : 23)
+  let curPage = 1
 
   const heroBandSrc = getHeroBandBase64()
   const logoSrc = getLogoBase64()
@@ -331,51 +352,54 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
   const dateFormatted = fmtLongDate(m.generatedAt)
   const coverHtml = `
     <div class="page cover-page">
-      <div class="cover-hero-band">
-        ${heroBandSrc ? `<img class="hero-img" src="${heroBandSrc}" alt="FairExit Illustration"/>` : '<div class="hero-placeholder"></div>'}
-        <div class="hero-logo-box">
-          ${logoSrc ? `<img src="${logoSrc}" class="hero-logo" alt="FairExit"/>` : '<div class="hero-logo-text">FairExit</div>'}
-          <div class="hero-tagline">Challenge your severance offer.</div>
+      <div class="cover-card">
+        <div class="cover-hero-band">
+          ${heroBandSrc ? `<img class="hero-img" src="${heroBandSrc}" alt="FairExit Illustration"/>` : '<div class="hero-placeholder"></div>'}
+          <div class="hero-logo-box">
+            ${logoSrc ? `<img src="${logoSrc}" class="hero-logo" alt="FairExit"/>` : '<div class="hero-logo-text">FairExit</div>'}
+            <div class="hero-tagline">Challenge your severance offer.</div>
+          </div>
+        </div>
+        <div class="cover-content">
+          <div class="kicker-teal">YOUR SEVERANCE REPORT</div>
+          <h1 class="cover-title">Your offer, organized.</h1>
+          <p class="cover-lead">
+            ${isUS
+              ? `We read your letter and your contract, checked them against the rules, and checked the release you're being asked to sign. Use it to understand your offer and prepare. Only an attorney can tell you what applies to you.`
+              : `We read your letter and your contract, checked them against the law, and estimated the range a case like yours can reach. Use it to understand your offer and prepare. <b>It's an estimate, not a promise</b>; only a lawyer can confirm your exact number.`}
+          </p>
+          <div class="cover-tags-pill">
+            <span>DO-IT-YOURSELF</span> · <span class="teal-bold">NOT LEGAL ADVICE</span> · <span>YOU'RE IN CONTROL</span>
+          </div>
+          <div class="cover-divider"></div>
+          <div class="cover-meta-grid">
+            <div class="meta-col">
+              <div class="meta-label">PREPARED FOR</div>
+              <div class="meta-value">${esc(clientName)}</div>
+            </div>
+            <div class="meta-col">
+              <div class="meta-label">ROLE</div>
+              <div class="meta-value">${esc(r.cover?.role_line || 'QA Supervisor · 14 yrs 6 mo')}</div>
+            </div>
+            <div class="meta-col">
+              <div class="meta-label">WHERE</div>
+              <div class="meta-value">${esc(r.cover?.place_line || m.jurisdiction.name)}</div>
+            </div>
+            <div class="meta-col">
+              <div class="meta-label">DATE</div>
+              <div class="meta-value">${esc(dateFormatted)}</div>
+            </div>
+          </div>
+          <div class="cover-test-note">
+            TEST REPORT · fictional person and company · <b>For information only</b> — not legal advice · Yours to keep and use
+          </div>
         </div>
       </div>
-      <div class="cover-content">
-        <div class="kicker-teal">YOUR SEVERANCE REPORT</div>
-        <h1 class="cover-title">Your offer, organized.</h1>
-        <p class="cover-lead">
-          ${isUS
-            ? `We read your letter and your contract, checked them against the rules, and checked the release you're being asked to sign. Use it to understand your offer and prepare. Only an attorney can tell you what applies to you.`
-            : `We read your letter and your contract, checked them against the law, and estimated the range a case like yours can reach. Use it to understand your offer and prepare. <b>It's an estimate, not a promise</b>; only a lawyer can confirm your exact number.`}
-        </p>
-        <div class="cover-tags-pill">
-          <span>DO-IT-YOURSELF</span> · <span class="teal-bold">NOT LEGAL ADVICE</span> · <span>YOU'RE IN CONTROL</span>
-        </div>
-        <div class="cover-divider"></div>
-        <div class="cover-meta-grid">
-          <div class="meta-col">
-            <div class="meta-label">PREPARED FOR</div>
-            <div class="meta-value">${esc(clientName)}</div>
-          </div>
-          <div class="meta-col">
-            <div class="meta-label">ROLE</div>
-            <div class="meta-value">${esc(r.cover?.role_line || 'QA Supervisor · 14 yrs 6 mo')}</div>
-          </div>
-          <div class="meta-col">
-            <div class="meta-label">WHERE</div>
-            <div class="meta-value">${esc(r.cover?.place_line || m.jurisdiction.name)}</div>
-          </div>
-          <div class="meta-col">
-            <div class="meta-label">DATE</div>
-            <div class="meta-value">${esc(dateFormatted)}</div>
-          </div>
-        </div>
-        <div class="cover-test-note">
-          TEST REPORT · fictional person and company · <b>For information only</b> — not legal advice · Yours to keep and use
-        </div>
-      </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 'cover', title: 'Cover', html: coverHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 2. CONTENTS PAGE ("What's in this report" - ca2.png / us2.png)
@@ -471,10 +495,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
             : `This report checks your offer against ${esc(m.jurisdiction.name)}'s rules and gives you an <b>estimated range</b>: the legal minimum (a fixed rule) up to what courts often award for someone like you (an estimate). It doesn't promise an amount or tell you what to do.`}
         </p>
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 'toc', title: "What's in this report", html: tocHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 3. BEFORE YOU USE THIS ("The important stuff — please read" - ca3.png / us3.png)
@@ -503,16 +528,17 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
           </div>
         `).join('')}
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 'before', title: 'Before you use this', html: beforeHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 4. SECTION 1 COVER: Where you stand (ca4.png / us4.png)
   // -------------------------------------------------------------------------
   const s1CoverHtml = `
-    <div class="page section-cover-page">
+    <div class="page section-cover-page s1-cover">
       <div class="section-kicker">SECTION 1 OF 5 · WHERE YOU STAND</div>
       <div class="huge-section-digit">1</div>
       <h2 class="huge-section-title">Where you stand</h2>
@@ -528,10 +554,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
         <div class="its-item">${isUS ? 'Your release check' : 'Your estimated range'}</div>
         ${!isUS ? '<div class="its-item">What lifts your range</div>' : ''}
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's1_cover', title: 'Section 1 · Where you stand', html: s1CoverHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 4.1 AT A GLANCE (ca5.png / us5.png)
@@ -591,10 +618,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
           </div>
         </div>
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's1_glance', title: 'Your offer, at a glance', html: glanceHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 4.2 MYTHS: "Things they don't always tell you" (ca6.png / us6.png)
@@ -633,72 +661,88 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
           </div>
         `).join('')}
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's1_myths', title: "Things they don't always tell you", html: mythsHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 4.3 CHECKS TABLE: "Did they do it right?" (ca7.png / us7.png)
   // -------------------------------------------------------------------------
-  const checks = r.checks || []
-  const countOk = checks.filter((c) => c.status === 'ok').length
-  const countBad = checks.filter((c) => c.status === 'bad').length
-  const countAsk = checks.filter((c) => c.status === 'ask' || c.status === 'info').length
+  const allChecks = r.checks || []
+  const countOk = allChecks.filter((c) => c.status === 'ok').length
+  const countBad = allChecks.filter((c) => c.status === 'bad').length
+  const countAsk = allChecks.filter((c) => c.status === 'ask' || c.status === 'info').length
 
-  const checksHtml = `
-    <div class="page checks-page">
-      <div class="section-kicker-bar">
-        <span>SECTION 1 OF 5 · WHERE YOU STAND</span>
-        ${progressDots(3)}
-      </div>
-      <div class="header-divider"></div>
-      <h2 class="section-heading">Did they do it <i>right?</i></h2>
-      <p class="section-sub">Your letter, your contract and the rules, side by side. Green = it lines up. Red = it doesn't. Yellow = worth asking about.</p>
+  const CHECKS_PER_PAGE = 7
+  const checkChunks: Array<typeof allChecks> = []
+  if (allChecks.length === 0) {
+    checkChunks.push([])
+  } else {
+    for (let i = 0; i < allChecks.length; i += CHECKS_PER_PAGE) {
+      checkChunks.push(allChecks.slice(i, i + CHECKS_PER_PAGE))
+    }
+  }
 
-      <div class="checks-summary-pills">
-        <span class="pill pill-green">${countOk} LINE UP</span>
-        <span class="pill pill-red">${countBad} DON'T</span>
-        <span class="pill pill-yellow">${countAsk} TO ASK ABOUT</span>
-      </div>
-
-      <div class="checks-cards-list">
-        <div class="checks-header-row">
-          <div class="ch-col col-1">WHAT WE CHECKED</div>
-          <div class="ch-col col-2">YOUR ${esc(w.letter).toUpperCase()} SAYS</div>
-          <div class="ch-col col-3">YOUR ${esc(w.contract).toUpperCase()} SAYS</div>
-          <div class="ch-col col-4">THE RULES SAY</div>
-          <div class="ch-col col-5">DOES IT LINE UP?</div>
+  checkChunks.forEach((chunk, chunkIdx) => {
+    const isFirst = chunkIdx === 0
+    const checksHtml = `
+      <div class="page checks-page">
+        <div class="section-kicker-bar">
+          <span>SECTION 1 OF 5 · WHERE YOU STAND</span>
+          ${progressDots(3)}
         </div>
-        ${checks.map((c) => {
-          const st = c.status || 'info'
-          const badgeClass = st === 'ok' ? 'badge-ok' : st === 'bad' ? 'badge-bad' : st === 'ask' ? 'badge-ask' : 'badge-info'
-          const icon = st === 'ok' ? '✓' : st === 'bad' ? '✕' : st === 'ask' ? '!' : 'ℹ'
-          return `
-            <div class="check-card-row">
-              <div class="ch-col col-1 bold navy">${esc(c.topic)}</div>
-              <div class="ch-col col-2">${esc(c.letter_says || '—')}</div>
-              <div class="ch-col col-3">${esc(c.contract_says || '—')}</div>
-              <div class="ch-col col-4">${esc(c.rule_says || '—')}</div>
-              <div class="ch-col col-5">
-                <div class="status-cell">
-                  <span class="status-icon-circle ${badgeClass}">${icon}</span>
-                  <div class="status-text-box">
-                    <span class="status-title ${badgeClass}">${esc(STATUS_LABEL[st] || st)}</span>
-                    ${c.why ? `<span class="status-why">${esc(c.why)}</span>` : ''}
+        <div class="header-divider"></div>
+        <h2 class="section-heading">Did they do it <i>right?</i></h2>
+        <p class="section-sub">Your letter, your contract and the rules, side by side. Green = it lines up. Red = it doesn't. Yellow = worth asking about.</p>
+
+        <div class="checks-summary-pills">
+          <span class="pill pill-green">${countOk} LINE UP</span>
+          <span class="pill pill-red">${countBad} DON'T</span>
+          <span class="pill pill-yellow">${countAsk} TO ASK ABOUT</span>
+        </div>
+
+        <div class="checks-cards-list">
+          <div class="checks-header-row">
+            <div class="ch-col col-1">WHAT WE CHECKED</div>
+            <div class="ch-col col-2">YOUR ${esc(w.letter).toUpperCase()} SAYS</div>
+            <div class="ch-col col-3">YOUR ${esc(w.contract).toUpperCase()} SAYS</div>
+            <div class="ch-col col-4">THE RULES SAY</div>
+            <div class="ch-col col-5">DOES IT LINE UP?</div>
+          </div>
+          ${chunk.map((c) => {
+            const st = c.status || 'info'
+            const badgeClass = st === 'ok' ? 'badge-ok' : st === 'bad' ? 'badge-bad' : st === 'ask' ? 'badge-ask' : 'badge-info'
+            const icon = st === 'ok' ? '✓' : st === 'bad' ? '✕' : st === 'ask' ? '!' : 'ℹ'
+            return `
+              <div class="check-card-row">
+                <div class="ch-col col-1 bold navy">${esc(c.topic)}</div>
+                <div class="ch-col col-2">${esc(c.letter_says || '—')}</div>
+                <div class="ch-col col-3">${esc(c.contract_says || '—')}</div>
+                <div class="ch-col col-4">${esc(c.rule_says || '—')}</div>
+                <div class="ch-col col-5">
+                  <div class="status-cell">
+                    <span class="status-icon-circle ${badgeClass}">${icon}</span>
+                    <div class="status-text-box">
+                      <span class="status-title ${badgeClass}">${esc(STATUS_LABEL[st] || st)}</span>
+                      ${c.why ? `<span class="status-why">${esc(c.why)}</span>` : ''}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          `
-        }).join('')}
+            `
+          }).join('')}
+        </div>
+        <div class="checks-dashed-rule"></div>
+        <div class="checks-footer-note">Checked against ${esc(m.jurisdiction.name)}'s ${esc(m.jurisdiction.statute_short || 'rules')} and court decisions. Sources are on the Sources page.</div>
+        ${pageFooter(curPage, effTotal)}
       </div>
-      <div class="checks-dashed-rule"></div>
-      <div class="checks-footer-note">Checked against ${esc(m.jurisdiction.name)}'s ${esc(m.jurisdiction.statute_short || 'rules')} and court decisions. Sources are on the Sources page.</div>
-      ${footerPill()}
-    </div>
-  `
-  sec.push({ id: 's1_checks', title: 'Did they do it right?', html: checksHtml })
+    `
+    const chunkId = isFirst ? 's1_checks' : `s1_checks_${chunkIdx}`
+    sec.push({ id: chunkId, title: 'Did they do it right?', html: checksHtml })
+    curPage += 1
+  })
 
   // -------------------------------------------------------------------------
   // 4.4 ESTIMATED RANGE (CA: ca8.png) or RELEASE CHECK (US: us8.png)
@@ -749,10 +793,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
         <div class="estimate-disclaimer-card">
           <b>This is an estimate, not a promise.</b> Base pay only: a bonus and benefits during the notice period could add to it. Pay from a new job usually reduces the part above the minimum. Only a lawyer can confirm your number.
         </div>
-        ${footerPill()}
+        ${pageFooter(curPage, effTotal)}
       </div>
     `
     sec.push({ id: 's1_range', title: 'Your estimated range', html: rangeHtml })
+    curPage += 1
   } else if (isUS) {
     const rc = r.release_check && r.release_check.length ? r.release_check : [
       { status: 'bad', point: 'At least 45 days to consider (group layoff)', detail: 'You were given 21 days.' },
@@ -794,10 +839,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
             `
           }).join('')}
         </div>
-        ${footerPill()}
+        ${pageFooter(curPage, effTotal)}
       </div>
     `
     sec.push({ id: 's1_release', title: 'Your release check', html: releaseHtml })
+    curPage += 1
   }
 
   // -------------------------------------------------------------------------
@@ -848,10 +894,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
           <div class="shape-title bold">What your shape says</div>
           <p class="shape-desc">Your chart reaches furthest on <b>age and length of service</b>, two of the heaviest factors. That is why the estimate reaches toward <b>${nb?.range ? money(nb.range.high) : '$206,250'}</b>.</p>
         </div>
-        ${footerPill()}
+        ${pageFooter(curPage, effTotal)}
       </div>
     `
     sec.push({ id: 's1_factors', title: 'What lifts your range', html: factorsHtml })
+    curPage += 1
   }
 
   // -------------------------------------------------------------------------
@@ -859,7 +906,7 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
   // -------------------------------------------------------------------------
   const s2Title = isUS ? "Why there's no minimum" : 'Two numbers to understand'
   const s2CoverHtml = `
-    <div class="page section-cover-page">
+    <div class="page section-cover-page s2-cover">
       <div class="section-kicker">SECTION 2 OF 5 · ${s2Title.toUpperCase()}</div>
       <div class="huge-section-digit">2</div>
       <h2 class="huge-section-title">${esc(s2Title)}</h2>
@@ -873,10 +920,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
         <div class="its-kicker">IN THIS SECTION</div>
         <div class="its-item">${isUS ? 'The rules that govern US severance' : 'The floor, and the range above it'}</div>
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's2_cover', title: `Section 2 · ${s2Title}`, html: s2CoverHtml })
+  curPage += 1
 
   const s2DetailHtml = `
     <div class="page section-detail-page">
@@ -918,10 +966,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
           </p>
         </div>
       `}
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's2_numbers', title: s2Title, html: s2DetailHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 6. SECTION 3: What's in your letter and contract (ca12-ca16.png / us11-us15.png)
@@ -962,7 +1011,7 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
   ]
 
   const s3CoverHtml = `
-    <div class="page section-cover-page">
+    <div class="page section-cover-page s3-cover">
       <div class="section-kicker">SECTION 3 OF 5 · WHAT'S IN YOUR LETTER AND CONTRACT</div>
       <div class="huge-section-digit">3</div>
       <h2 class="huge-section-title">What's in your letter and contract</h2>
@@ -972,10 +1021,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
         <div class="its-kicker">IN THIS SECTION</div>
         ${clauses.map((c) => `<div class="its-item">${esc(c.title)}</div>`).join('')}
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's3_cover', title: "Section 3 · What's in your letter and contract", html: s3CoverHtml })
+  curPage += 1
 
   // Each clause gets its own dedicated page matching ca13-ca16.png
   clauses.forEach((c, idx) => {
@@ -1028,11 +1078,12 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
           <div class="clause-dashed-rule"></div>
           <div class="clause-source-line">Where this comes from: <u>${esc(c.source_id)}</u></div>
         ` : ''}
-        ${footerPill()}
+        ${pageFooter(curPage, effTotal)}
       </div>
     `
     const clauseId = idx === clauses.length - 1 ? 's3_clause_last' : `s3_clause_${idx}`
     sec.push({ id: clauseId, title: c.title, html: clauseHtml })
+    curPage += 1
   })
 
   // -------------------------------------------------------------------------
@@ -1045,7 +1096,7 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
   ]
 
   const s4CoverHtml = `
-    <div class="page section-cover-page">
+    <div class="page section-cover-page s4-cover">
       <div class="section-kicker">SECTION 4 OF 5 · QUESTIONS TO PREPARE</div>
       <div class="huge-section-digit">4</div>
       <h2 class="huge-section-title">Questions to prepare</h2>
@@ -1056,10 +1107,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
         <div class="its-item">Questions you might choose to ask</div>
         <div class="its-item">Take your time, and keep it simple</div>
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's4_cover', title: 'Section 4 · Questions to prepare', html: s4CoverHtml })
+  curPage += 1
 
   const hrContact = a.hr_name || 'your HR contact (Denise Faulkner)'
   const s4QuestionsHtml = `
@@ -1089,10 +1141,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
       <div class="why-it-works-card">
         <b>Why this works:</b> it asks clear questions instead of making claims, and asks for time to understand the offer.
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's4_questions', title: 'Questions you might choose to ask', html: s4QuestionsHtml })
+  curPage += 1
 
   // Page 19 / ca19.png: "Take your time — and keep it simple"
   const extraOfferStr = '$5,000'
@@ -1139,16 +1192,17 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
           </div>
         </div>
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's4_practical', title: 'Take your time — and keep it simple', html: s4PracticalHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 8. SECTION 5: Your next step (ca20-ca21.png / us19-us20.png)
   // -------------------------------------------------------------------------
   const s5CoverHtml = `
-    <div class="page section-cover-page">
+    <div class="page section-cover-page s5-cover">
       <div class="section-kicker">SECTION 5 OF 5 · YOUR NEXT STEP</div>
       <div class="huge-section-digit">5</div>
       <h2 class="huge-section-title">Your next step</h2>
@@ -1160,10 +1214,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
         <div class="its-item">Where every number comes from</div>
         <div class="its-item">Talking to a ${esc(w.lawyer)}</div>
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's5_cover', title: 'Section 5 · Your next step', html: s5CoverHtml })
+  curPage += 1
 
   // Page 21 / ca21.png: "You don't have to sign today" (Three paths)
   const s5ThreePathsHtml = `
@@ -1200,10 +1255,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
       <div class="honest-note-card">
         <b>Honest note:</b> this report helps you ask the right questions. The contract question in Section 3 is one a ${esc(w.lawyer)} needs to read your contract to answer.
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's5_three_paths', title: "You don't have to sign today", html: s5ThreePathsHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 9. SECTION 6: Sources (ca22.png / us21.png)
@@ -1240,10 +1296,11 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
           `).join('')}
         </tbody>
       </table>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's6_sources', title: 'Where every number comes from', html: s6Html })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 10. SECTION 7: Talking to a lawyer / attorney (ca23.png / us22.png)
@@ -1280,18 +1337,19 @@ export function reportSections(r: ReportJson, m: RenderMeta): Section[] {
         ${m.rulesAsOf ? `<p>Rules as of ${esc(fmtLongDate(m.rulesAsOf))}.</p>` : ''}
         <p class="rid">Report ID ${esc(m.reportId)} · generated ${esc(fmtLongDate(m.generatedAt))}</p>
       </div>
-      ${footerPill()}
+      ${pageFooter(curPage, effTotal)}
     </div>
   `
   sec.push({ id: 's7_lawyer', title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', html: s7Html })
+  curPage += 1
 
   return sec
 }
 
 const CSS = `
 @page {
-  size: Letter;
-  margin: 10mm 14mm 14mm 14mm;
+  size: letter;
+  margin: 0;
 }
 * {
   box-sizing: border-box;
@@ -1304,19 +1362,32 @@ body {
   margin: 0;
   padding: 0;
   background: #FFFFFF;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 .page {
-  page-break-before: always;
-  break-before: page;
-  position: relative;
-  min-height: 98%;
+  width: 8.5in;
+  height: 11in;
+  max-height: 11in;
+  padding: 61.5pt 67.5pt 15.5pt 67.5pt;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  page-break-after: always;
+  break-after: page;
+  position: relative;
+  background: #FFFFFF;
 }
-.page:first-child {
-  page-break-before: avoid;
-  break-before: avoid;
+.page:last-child {
+  page-break-after: auto;
+  break-after: auto;
 }
+.section-cover-page.s1-cover { padding-top: 119.5pt; }
+.section-cover-page.s2-cover { padding-top: 182.5pt; }
+.section-cover-page.s3-cover { padding-top: 128.5pt; }
+.section-cover-page.s4-cover { padding-top: 177pt; }
+.section-cover-page.s5-cover { padding-top: 160.5pt; }
 h1, h2, .huge-section-title, .cover-title, .section-heading {
   font-family: "Newsreader", Georgia, serif;
   color: #062C55;
@@ -1327,6 +1398,9 @@ i {
 }
 b, strong, .bold {
   font-weight: 700;
+}
+.navy {
+  color: #062C55;
 }
 
 /* Header Kickers and Dividers */
@@ -1361,35 +1435,53 @@ b, strong, .bold {
   line-height: 1.2;
 }
 .section-sub {
-  font-size: 10.5pt;
+  font-size: 10pt;
   color: #5A6B78;
   margin: 0 0 16px 0;
   line-height: 1.4;
 }
 
 /* Cover Page */
-.cover-hero-band {
-  width: 100%;
-  height: 190px;
+.cover-page {
+  padding: 19.5pt 22.5pt;
+}
+.cover-card {
+  border: 1px solid #E7E4DD;
   border-radius: 8px;
   overflow: hidden;
+  background: #F5F4EF;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  box-sizing: border-box;
+}
+.cover-hero-band {
+  width: 100%;
+  height: 220px;
   position: relative;
+  overflow: hidden;
   background: #EEF8F3;
-  margin-bottom: 20px;
 }
 .hero-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
+}
+.hero-placeholder {
+  width: 100%;
+  height: 100%;
+  background: #EEF8F3;
 }
 .hero-logo-box {
   position: absolute;
-  top: 14px;
-  left: 18px;
+  top: 18px;
+  left: 24px;
 }
 .hero-logo {
   height: 28px;
   width: auto;
+  display: block;
 }
 .hero-logo-text {
   font-family: "Newsreader", Georgia, serif;
@@ -1403,8 +1495,16 @@ b, strong, .bold {
   font-weight: 700;
   margin-top: 2px;
 }
+.cover-content {
+  padding: 24pt 43.5pt 18pt 43.5pt;
+  display: flex;
+  flex-direction: column;
+}
+.cover-page .page-footer {
+  padding: 0 43.5pt;
+}
 .kicker-teal {
-  font-size: 9pt;
+  font-size: 8.5pt;
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: #0EB28D;
@@ -1417,15 +1517,15 @@ b, strong, .bold {
   line-height: 1.1;
 }
 .cover-lead {
-  font-size: 12pt;
-  color: #5A6B78;
+  font-size: 11.5pt;
+  color: #3A4B58;
   line-height: 1.45;
   margin: 0 0 14px 0;
 }
 .cover-tags-pill {
   display: inline-block;
   padding: 6px 14px;
-  background: #F4F2EC;
+  background: #FFFFFF;
   border: 1px solid #E7E4DD;
   border-radius: 6px;
   font-size: 8pt;
@@ -1433,6 +1533,7 @@ b, strong, .bold {
   letter-spacing: 0.8px;
   color: #5A6B78;
   margin-bottom: 18px;
+  align-self: flex-start;
 }
 .teal-bold {
   color: #0EB28D;
@@ -1459,52 +1560,51 @@ b, strong, .bold {
   margin-bottom: 2px;
 }
 .meta-value {
-  font-size: 13pt;
+  font-size: 12.5pt;
   font-weight: 700;
   color: #062C55;
 }
 .cover-test-note {
   font-size: 8.5pt;
   color: #7A8B98;
-  margin-top: auto;
-  margin-bottom: 12px;
+  margin-top: 10px;
 }
 
 /* Contents Page */
 .toc-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 11px;
+  margin-bottom: 18px;
 }
 .toc-row {
   display: flex;
   align-items: baseline;
-  padding-bottom: 8px;
+  padding-bottom: 7px;
   border-bottom: 1px solid #EFECE6;
 }
 .toc-num {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 16pt;
+  font-size: 15pt;
   font-weight: 700;
   color: #062C55;
   width: 28px;
-  shrink: 0;
+  flex-shrink: 0;
 }
 .toc-body {
   flex: 1;
 }
 .toc-title {
-  font-size: 11pt;
+  font-size: 10.5pt;
   font-weight: 700;
   color: #062C55;
 }
 .toc-desc {
-  font-size: 9pt;
+  font-size: 8.5pt;
   color: #5A6B78;
 }
 .toc-range {
-  font-size: 9.5pt;
+  font-size: 9pt;
   font-weight: 700;
   color: #062C55;
 }
@@ -1516,10 +1616,10 @@ b, strong, .bold {
   border-radius: 8px;
   padding: 12px 14px;
   margin-top: auto;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .legend-header {
-  font-size: 9.5pt;
+  font-size: 9pt;
   color: #17242F;
   margin-bottom: 8px;
 }
@@ -1527,7 +1627,7 @@ b, strong, .bold {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 .pill {
   font-size: 7.5pt;
@@ -1552,26 +1652,26 @@ b, strong, .bold {
 .before-cards-grid {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 9px;
 }
 .before-card {
   border: 1px solid #E7E4DD;
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 9px 14px;
   background: #FFFFFF;
 }
 .before-card.alert-card {
-  background: #FFFBF0;
-  border-color: #EEB33C;
+  background: #FDF5E6;
+  border-color: #E6B044;
 }
 .card-num-title {
-  font-size: 10.5pt;
+  font-size: 10pt;
   font-weight: 700;
   color: #062C55;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 .card-body-text {
-  font-size: 9pt;
+  font-size: 8.5pt;
   color: #3A4B58;
   line-height: 1.4;
 }
@@ -1582,11 +1682,12 @@ b, strong, .bold {
   font-size: 64pt;
   color: #062C55;
   line-height: 1;
-  margin: 20px 0 10px 0;
+  margin: 16px 0 8px 0;
 }
 .huge-section-title {
   font-size: 32pt;
   margin: 0 0 14px 0;
+  line-height: 1.1;
 }
 .heavy-divider {
   width: 100%;
@@ -1595,10 +1696,10 @@ b, strong, .bold {
   margin-bottom: 18px;
 }
 .section-cover-desc {
-  font-size: 13pt;
+  font-size: 12pt;
   color: #3A4B58;
   line-height: 1.45;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 .in-this-section-box {
   border-top: 1px solid #E7E4DD;
@@ -1615,7 +1716,7 @@ b, strong, .bold {
   margin-bottom: 4px;
 }
 .its-item {
-  font-size: 11pt;
+  font-size: 10.5pt;
   color: #062C55;
   padding: 4px 0;
   border-bottom: 1px solid #F0ECE6;
@@ -1646,13 +1747,13 @@ b, strong, .bold {
   gap: 20px;
 }
 .glance-lead {
-  font-size: 11pt;
+  font-size: 10.5pt;
   line-height: 1.5;
   color: #17242F;
   margin: 0 0 10px 0;
 }
 .glance-contract-note {
-  font-size: 9.5pt;
+  font-size: 9pt;
   background: #FFFBF0;
   border: 1px solid #EEB33C;
   border-radius: 6px;
@@ -1666,7 +1767,7 @@ b, strong, .bold {
 .glance-row {
   display: flex;
   justify-content: space-between;
-  padding: 7px 0;
+  padding: 6px 0;
   border-bottom: 1px solid #EFECE6;
   font-size: 9.5pt;
 }
@@ -1685,12 +1786,12 @@ b, strong, .bold {
 .myths-list {
   display: flex;
   flex-direction: column;
-  gap: 9px;
+  gap: 8px;
 }
 .myth-card {
   border: 1px solid #E7E4DD;
   border-radius: 8px;
-  padding: 10px 14px;
+  padding: 9px 14px;
   display: grid;
   grid-template-columns: 1fr 1.3fr;
   gap: 16px;
@@ -1700,49 +1801,57 @@ b, strong, .bold {
   font-weight: 700;
   letter-spacing: 0.8px;
   color: #5A6B78;
-  margin-bottom: 4px;
+  margin-bottom: 3px;
 }
 .myth-text {
-  font-size: 9.5pt;
+  font-size: 9pt;
   font-weight: 700;
   color: #062C55;
   line-height: 1.35;
 }
 .rule-text {
-  font-size: 9pt;
+  font-size: 8.5pt;
   color: #27343F;
   line-height: 1.35;
 }
 .myth-source {
   font-size: 7.5pt;
   color: #0EB28D;
-  margin-top: 4px;
+  margin-top: 3px;
 }
 
-/* Checks Table */
+/* Checks Cards List (ca7.png / us7.png) */
 .checks-summary-pills {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
-.checks-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 8.5pt;
+.checks-cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
-.checks-table th {
-  text-align: left;
+.checks-header-row {
+  display: grid;
+  grid-template-columns: 1.5fr 2.1fr 2fr 1.9fr 2.5fr;
+  gap: 8px;
+  padding: 4px 10px;
   font-size: 7.5pt;
+  font-weight: 700;
   letter-spacing: 0.8px;
   color: #5A6B78;
-  padding: 6px 8px;
-  border-bottom: 1px solid #062C55;
 }
-.checks-table td {
-  padding: 7px 8px;
-  border-bottom: 1px solid #EFECE6;
-  vertical-align: top;
-  line-height: 1.35;
+.check-card-row {
+  display: grid;
+  grid-template-columns: 1.5fr 2.1fr 2fr 1.9fr 2.5fr;
+  gap: 8px;
+  padding: 6px 10px;
+  background: #FFFFFF;
+  border: 1px solid #E7E4DD;
+  border-radius: 6px;
+  font-size: 8pt;
+  line-height: 1.3;
+  align-items: start;
 }
 .status-cell {
   display: flex;
@@ -1750,17 +1859,17 @@ b, strong, .bold {
   align-items: flex-start;
 }
 .status-icon-circle {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 8pt;
+  font-size: 7.5pt;
   font-weight: 700;
   color: #FFFFFF;
-  shrink: 0;
-  margin-top: 2px;
+  flex-shrink: 0;
+  margin-top: 1px;
 }
 .status-title.badge-ok { background: transparent; color: #0C8F72; }
 .status-title.badge-bad { background: transparent; color: #D42E2B; }
@@ -1779,11 +1888,16 @@ b, strong, .bold {
   font-size: 7.5pt;
   color: #5A6B78;
   display: block;
+  line-height: 1.25;
+}
+.checks-dashed-rule {
+  border-top: 1px dashed #D8D4CA;
+  margin: 10px 0 4px 0;
 }
 .checks-footer-note {
   font-size: 8pt;
   color: #5A6B78;
-  margin-top: 10px;
+  margin-top: 4px;
 }
 
 /* Navy Feature Cards */
@@ -1791,9 +1905,9 @@ b, strong, .bold {
   background: #062C55;
   color: #FFFFFF;
   border-radius: 8px;
-  padding: 18px 24px;
+  padding: 16px 22px;
   text-align: center;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 .feature-card-kicker {
   font-size: 8pt;
@@ -1804,20 +1918,20 @@ b, strong, .bold {
 }
 .feature-card-amount {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 28pt;
+  font-size: 26pt;
   font-weight: 700;
   letter-spacing: -0.5px;
   margin-bottom: 6px;
 }
 .feature-card-desc {
-  font-size: 9.5pt;
+  font-size: 9pt;
   color: #E2EBF2;
   line-height: 1.4;
   margin: 0;
 }
 .gauge-container {
   text-align: center;
-  margin: 12px 0;
+  margin: 10px 0;
 }
 .gauge {
   display: block;
@@ -1832,7 +1946,7 @@ b, strong, .bold {
 }
 .linear-scale-container {
   width: 90%;
-  margin: 20px auto 16px;
+  margin: 16px auto 12px;
   position: relative;
 }
 .scale-label-offer {
@@ -1857,13 +1971,19 @@ b, strong, .bold {
   display: flex;
   overflow: hidden;
 }
-.scale-segment-min {
-  width: 35%;
-  background: #E0574A;
+.scale-segment-gradient {
+  width: 60%;
+  background: linear-gradient(to right, #D84C3E 0%, #EEB33C 45%, #24B07D 100%);
 }
-.scale-segment-range {
-  width: 65%;
-  background: linear-gradient(to right, #EEB33C, #1FB487);
+.scale-segment-hatch {
+  width: 40%;
+  background: repeating-linear-gradient(
+    45deg,
+    #E8E4DA,
+    #E8E4DA 6px,
+    #DCD6CA 6px,
+    #DCD6CA 12px
+  );
 }
 .scale-footer-row {
   display: flex;
@@ -1880,34 +2000,24 @@ b, strong, .bold {
   color: #3A4B58;
   line-height: 1.4;
   margin-top: auto;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 /* Radar & Factors */
 .factors-split-layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 280px 1fr;
   gap: 20px;
   align-items: center;
   margin-bottom: 16px;
 }
 .radar-box {
-  position: relative;
-  width: 220px;
-  height: 220px;
-  margin: 0 auto;
+  width: 280px;
+  height: 260px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
-.radar-axis-label {
-  position: absolute;
-  font-size: 7.5pt;
-  font-weight: 700;
-  color: #062C55;
-  white-space: nowrap;
-}
-.radar-axis-label.top { top: 0; left: 50%; transform: translateX(-50%); }
-.radar-axis-label.right { top: 50%; right: -15px; transform: translateY(-50%); }
-.radar-axis-label.bottom { bottom: 0; left: 50%; transform: translateX(-50%); }
-.radar-axis-label.left { top: 50%; left: -20px; transform: translateY(-50%); }
 .chart-caption {
   font-size: 7.5pt;
   color: #7A8B98;
@@ -1931,7 +2041,7 @@ b, strong, .bold {
   height: 6px;
   border-radius: 50%;
   background: #0EB28D;
-  shrink: 0;
+  flex-shrink: 0;
 }
 .pay-multiplier-note {
   font-size: 8.5pt;
@@ -1943,10 +2053,10 @@ b, strong, .bold {
   border-radius: 8px;
   padding: 12px 14px;
   margin-top: auto;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 .shape-title {
-  font-size: 11pt;
+  font-size: 10.5pt;
   color: #062C55;
   margin-bottom: 4px;
 }
@@ -1978,36 +2088,66 @@ b, strong, .bold {
   color: #5A6B78;
 }
 
-/* Clauses */
-.clauses-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-.clause-block {
+/* Section 2 Details */
+.detail-card {
   border: 1px solid #E7E4DD;
   border-radius: 8px;
-  padding: 14px;
-  page-break-inside: avoid;
+  padding: 14px 16px;
+  background: #FFFFFF;
+  margin-bottom: 14px;
 }
-.clause-heading {
+.detail-text {
+  font-size: 9pt;
+  color: #27343F;
+  line-height: 1.45;
+  margin: 0;
+}
+.card-inner-box {
+  background: #FAFAF7;
+  border: 1px solid #EAE7DF;
+  border-radius: 6px;
+  padding: 10px 14px;
+  margin-top: 8px;
+}
+.detail-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 9pt;
+  line-height: 1.45;
+  color: #27343F;
+}
+.detail-list li {
+  margin-bottom: 4px;
+}
+
+/* Clauses */
+.clause-pill-badge {
+  margin-bottom: 8px;
+}
+.clause-single-heading {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 14pt;
+  font-size: 16pt;
   font-weight: 700;
   color: #062C55;
-  margin: 6px 0 10px 0;
+  margin: 0 0 14px 0;
 }
 .clause-two-boxes {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
-.c-box {
-  background: #FAFAF7;
-  border: 1px solid #EAE7DF;
-  border-radius: 6px;
-  padding: 10px;
+.c-box-white {
+  background: #FFFFFF;
+  border: 1px solid #E7E4DD;
+  border-radius: 8px;
+  padding: 14px 16px;
+}
+.c-box-beige {
+  background: #FAF8F5;
+  border: 1px solid #E7E4DD;
+  border-radius: 8px;
+  padding: 14px 16px;
 }
 .c-box-header {
   font-size: 7.5pt;
@@ -2024,7 +2164,7 @@ b, strong, .bold {
 .clause-why {
   font-size: 8.5pt;
   color: #27343F;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .clause-action-box {
   background: #FFFFFF;
@@ -2043,9 +2183,17 @@ b, strong, .bold {
   color: #0EB28D;
   font-weight: 700;
 }
-.clause-source {
-  font-size: 7.5pt;
-  color: #0EB28D;
+.clause-dashed-rule {
+  border-top: 1px dashed #D8D4CA;
+  margin: 16px 0 8px 0;
+}
+.clause-source-line {
+  font-size: 8.5pt;
+  color: #5A6B78;
+}
+.clause-source-line u {
+  color: #062C55;
+  text-decoration: underline;
 }
 
 /* Email Mock Container */
@@ -2084,36 +2232,91 @@ b, strong, .bold {
   color: #3A4B58;
 }
 
-/* Steps */
-.steps-list {
+/* Practical Page */
+.practical-block {
+  margin-bottom: 16px;
+}
+.practical-heading {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 14pt;
+  font-weight: 700;
+  color: #062C55;
+  margin: 0 0 8px 0;
+}
+.practical-text {
+  font-size: 9.5pt;
+  line-height: 1.5;
+  color: #27343F;
+  margin: 0;
+}
+.practical-divider {
+  width: 100%;
+  height: 1px;
+  background: #E7E4DD;
+  margin: 16px 0;
+}
+.practical-bullets {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-}
-.step-card {
-  display: flex;
   gap: 12px;
-  align-items: center;
+}
+.p-bullet {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 9.5pt;
+  line-height: 1.45;
+  color: #27343F;
+}
+
+/* Three Paths Page (ca21.png) */
+.three-paths-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.path-card {
   border: 1px solid #E7E4DD;
   border-radius: 8px;
-  padding: 12px 14px;
-}
-.step-badge {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: #062C55;
-  color: #FFFFFF;
+  padding: 16px;
+  background: #FFFFFF;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9pt;
-  font-weight: 700;
-  shrink: 0;
+  flex-direction: column;
 }
-.step-text {
-  font-size: 9.5pt;
-  color: #27343F;
+.path-opt-kicker {
+  font-size: 8pt;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  color: #5A6B78;
+  margin-bottom: 6px;
+}
+.path-title {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 14pt;
+  color: #062C55;
+  margin: 0 0 10px 0;
+}
+.path-desc {
+  font-size: 9pt;
+  color: #5A6B78;
+  line-height: 1.4;
+  margin: 0 0 14px 0;
+}
+.path-bold-note {
+  font-size: 9pt;
+  color: #062C55;
+  line-height: 1.4;
+  margin-top: auto;
+}
+.honest-note-card {
+  border: 1px solid #E7E4DD;
+  border-radius: 8px;
+  padding: 14px 18px;
+  font-size: 9pt;
+  color: #0C8F72;
+  background: #FFFFFF;
+  line-height: 1.45;
 }
 
 /* Sources */
@@ -2135,6 +2338,10 @@ b, strong, .bold {
   border-bottom: 1px solid #EFECE6;
   vertical-align: top;
   line-height: 1.35;
+}
+.src-id-title {
+  font-weight: 700;
+  color: #062C55;
 }
 .src-url {
   font-size: 7.5pt;
@@ -2196,11 +2403,20 @@ b, strong, .bold {
   color: #9AA7B2;
 }
 
-/* Page Footer Pill */
-.page-footer-pill {
+/* Page Footer */
+.page-footer {
   margin-top: auto;
   margin-bottom: 0;
-  padding: 6px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+.page-footer-pill {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 14px;
   background: #F4F2EC;
   border: 1px solid #E7E4DD;
   border-radius: 6px;
@@ -2209,188 +2425,20 @@ b, strong, .bold {
   text-align: center;
   line-height: 1.35;
 }
-
-/* Checks Cards List (ca7.png / us7.png) */
-.checks-cards-list {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-.checks-header-row {
-  display: grid;
-  grid-template-columns: 120px 145px 135px 150px 1fr;
-  gap: 10px;
-  padding: 4px 12px;
-  font-size: 7.5pt;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  color: #5A6B78;
-}
-.check-card-row {
-  display: grid;
-  grid-template-columns: 120px 145px 135px 150px 1fr;
-  gap: 10px;
-  padding: 9px 12px;
-  background: #FFFFFF;
-  border: 1px solid #E7E4DD;
-  border-radius: 8px;
+.page-footer-num {
   font-size: 8.5pt;
-  line-height: 1.35;
-  align-items: start;
-}
-.status-info {
-  display: flex;
-  flex-direction: column;
-}
-.checks-dashed-rule {
-  border-top: 1px dashed #D8D4CA;
-  margin: 14px 0 6px 0;
-}
-
-/* Linear Scale Bar (ca8.png) */
-.scale-segment-gradient {
-  width: 60%;
-  background: linear-gradient(to right, #D84C3E 0%, #EEB33C 45%, #24B07D 100%);
-}
-.scale-segment-hatch {
-  width: 40%;
-  background: repeating-linear-gradient(
-    45deg,
-    #E8E4DA,
-    #E8E4DA 6px,
-    #DCD6CA 6px,
-    #DCD6CA 12px
-  );
-}
-
-/* Individual Clause Page (ca13-ca16.png) */
-.clause-pill-badge {
-  margin-bottom: 8px;
-}
-.clause-single-heading {
-  font-family: "Newsreader", Georgia, serif;
-  font-size: 16pt;
-  font-weight: 700;
   color: #062C55;
-  margin: 0 0 14px 0;
+  font-weight: 500;
+  text-align: center;
 }
-.c-box-white {
-  background: #FFFFFF;
-  border: 1px solid #E7E4DD;
-  border-radius: 8px;
-  padding: 14px 16px;
-}
-.c-box-beige {
-  background: #FAF8F5;
-  border: 1px solid #E7E4DD;
-  border-radius: 8px;
-  padding: 14px 16px;
-}
-.clause-dashed-rule {
-  border-top: 1px dashed #D8D4CA;
-  margin: 16px 0 8px 0;
-}
-.clause-source-line {
-  font-size: 8.5pt;
-  color: #5A6B78;
-}
-.clause-source-line u {
-  color: #062C55;
-  text-decoration: underline;
-}
-
-/* Practical Page (ca19.png) */
-.practical-block {
-  margin-bottom: 16px;
-}
-.practical-heading {
-  font-family: "Newsreader", Georgia, serif;
-  font-size: 14pt;
-  font-weight: 700;
-  color: #062C55;
-  margin: 0 0 8px 0;
-}
-.practical-text {
-  font-size: 10pt;
-  line-height: 1.5;
-  color: #27343F;
-  margin: 0;
-}
-.practical-divider {
-  width: 100%;
-  height: 1px;
-  background: #E7E4DD;
-  margin: 16px 0;
-}
-.practical-bullets {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.p-bullet {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-  font-size: 9.5pt;
-  line-height: 1.45;
-  color: #27343F;
-}
-
-/* Three Paths Page (ca21.png) */
-.three-paths-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 20px;
-}
-.path-card {
-  border: 1px solid #E7E4DD;
-  border-radius: 8px;
-  padding: 16px;
-  background: #FFFFFF;
-  display: flex;
-  flex-direction: column;
-}
-.path-opt-kicker {
-  font-size: 8pt;
-  font-weight: 700;
-  letter-spacing: 0.8px;
-  color: #5A6B78;
-  margin-bottom: 6px;
-}
-.path-title {
-  font-family: "Newsreader", Georgia, serif;
-  font-size: 14pt;
-  color: #062C55;
-  margin: 0 0 10px 0;
-}
-.path-desc {
-  font-size: 9pt;
-  color: #5A6B78;
-  line-height: 1.4;
-  margin: 0 0 14px 0;
-}
-.path-bold-note {
-  font-size: 9pt;
-  color: #062C55;
-  line-height: 1.4;
-  margin-top: auto;
-}
-.honest-note-card {
-  border: 1px solid #E7E4DD;
-  border-radius: 8px;
-  padding: 14px 18px;
-  font-size: 9pt;
-  color: #0C8F72;
-  background: #FFFFFF;
-  line-height: 1.45;
-}
-
 `
 
-export function renderReportHtml(r: ReportJson, m: RenderMeta, upTo?: number): string {
-  const all = reportSections(r, m)
+export function renderReportHtml(r: ReportJson, m: RenderMeta, totalPages?: number, upTo?: number): string {
+  const initial = reportSections(r, m)
+  const effTotal = totalPages || initial.length
+  const all = totalPages !== undefined ? reportSections(r, m, effTotal) : initial
   const secs = upTo === undefined ? all : all.slice(0, upTo)
+  const fontsCss = getFontsCss()
   return `<!doctype html>
 <html lang="en">
   <head>
@@ -2399,7 +2447,10 @@ export function renderReportHtml(r: ReportJson, m: RenderMeta, upTo?: number): s
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400;1,9..40,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,600&display=swap" rel="stylesheet">
-    <style>${CSS}</style>
+    <style>
+${fontsCss}
+${CSS}
+    </style>
   </head>
   <body>
     ${secs.map((s) => s.html).join('\n')}
