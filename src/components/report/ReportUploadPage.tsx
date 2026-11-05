@@ -1101,7 +1101,7 @@ export default function ReportUploadPage({
                     key={file.id}
                     className={`w-full rounded-[10px] p-[12px_16px] transition-all border ${
                       file.status === "uploading"
-                        ? "bg-[#F7FAFD] border-[#BDE0FE]"
+                        ? "bg-[#F3FAF6] border-[#0EB28D]"
                         : file.status === "error"
                           ? "bg-[#FDF3F2] border-[#F5C2C0]"
                           : "bg-[#EEF8F3] border-[#C7E6D6]"
@@ -1110,7 +1110,7 @@ export default function ReportUploadPage({
                     <div className="flex items-center justify-between mb-[8px]">
                       <div className="flex items-center gap-[10px] overflow-hidden">
                         {file.status === "uploading" ? (
-                          <span className="w-4 h-4 rounded-full border-2 border-[#0284C7] border-t-transparent animate-spin shrink-0" />
+                          <span className="w-4 h-4 rounded-full border-2 border-[#0EB28D] border-t-transparent animate-spin shrink-0" />
                         ) : file.status === "error" ? (
                           <span
                             className="text-[13.5px] text-[#A3231F]"
@@ -1130,7 +1130,7 @@ export default function ReportUploadPage({
                           {file.name}
                         </span>
                         {file.status === "uploading" && (
-                          <span className="font-sans font-[700] text-[11px] leading-[16px] text-[#0284C7] bg-[#E0F2FE] px-2 py-0.5 rounded-[5px] shrink-0">
+                          <span className="font-sans font-[700] text-[11px] leading-[16px] text-[#0C8F72] bg-[#E5F5EE] border border-[#C7E6D6] px-2 py-0.5 rounded-[5px] shrink-0">
                             Uploading…
                           </span>
                         )}
@@ -1250,13 +1250,11 @@ export default function ReportUploadPage({
                   (!bothAdded && contractStatus === "none")
                 }
                 className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] leading-[22px] transition duration-150 flex items-center justify-center gap-2 ${
-                  isSubmitting
+                  isSubmitting || isUploading
                     ? "bg-[#0EB28D] text-white cursor-wait opacity-95 shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)]"
-                    : isUploading
-                      ? "bg-[#96DAC9] text-white cursor-not-allowed opacity-90 shadow-none"
-                      : bothAdded || contractStatus !== "none"
-                        ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
-                        : "bg-[#96DAC9] text-white cursor-not-allowed opacity-90 shadow-none"
+                    : bothAdded || contractStatus !== "none"
+                      ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
+                      : "bg-[#96DAC9] text-white cursor-not-allowed opacity-90 shadow-none"
                 }`}
               >
                 {isSubmitting ? (

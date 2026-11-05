@@ -207,6 +207,17 @@ export default function USReviewPage({
   // ══════════════════════════════════════════════════════════
   // Section 1: Conflict resolution ("Check these first")
   // ══════════════════════════════════════════════════════════
+  // Offer conflict
+  const [hasOfferConflict, setHasOfferConflict] = useState<boolean>(false);
+  const [docOfferDisplay, setDocOfferDisplay] = useState<string>("");
+  const [docOfferQuote, setDocOfferQuote] = useState<string>("");
+  const [docOfferWhere, setDocOfferWhere] = useState<string>("");
+  const [intakeOfferDisplay, setIntakeOfferDisplay] = useState<string>(intakeOfferNum ? `${intakeOfferNum.toLocaleString()}` : "");
+  const [offerConflictChoice, setOfferConflictChoice] = useState<"agreement" | "told" | "custom" | null>(null);
+  const [showOfferConflictCustom, setShowOfferConflictCustom] = useState(false);
+  const [offerConflictCustomVal, setOfferConflictCustomVal] = useState("");
+
+  // Notice conflict
   const [hasNoticeConflict, setHasNoticeConflict] = useState<boolean>(false);
   const [docNoticeVal, setDocNoticeVal] = useState<string>("");
   const [docNoticeQuote, setDocNoticeQuote] = useState<string>("");
@@ -365,7 +376,30 @@ export default function USReviewPage({
       const checkRows: Record<string, any> = res.checkState?.rows || {};
       const conflicts: any[] = res.reviewModel?.conflicts || [];
 
-      // 1. Process Notice Conflict
+      // 1. Process Offer Conflict
+      const confOffer = conflicts.find((c: any) => c.key === 'offer_amount');
+      const fOffer = facts.find((f: any) => f.key === 'offer_amount');
+      let docOffVal = "";
+      if (confOffer) {
+        docOffVal = confOffer.document.display || (fOffer?.value ? `${Number(fOffer.value).toLocaleString()}` : "");
+        setDocOfferQuote(confOffer.document.quote || fOffer?.quote || "");
+        setDocOfferWhere(confOffer.document.where || fOffer?.where || "");
+      } else if (fOffer?.value) {
+        docOffVal = `${Number(fOffer.value).toLocaleString()}`;
+        setDocOfferQuote(fOffer.quote || "");
+        setDocOfferWhere(fOffer.where || "");
+      }
+      setDocOfferDisplay(docOffVal);
+
+      if (confOffer) {
+        setHasOfferConflict(true);
+      } else if (intakeOfferNum && fOffer?.value && Math.abs(Number(fOffer.value) - intakeOfferNum) > 100) {
+        setHasOfferConflict(true);
+      } else {
+        setHasOfferConflict(false);
+      }
+
+      // 2. Process Notice Conflict
       const confNotice = conflicts.find((c: any) => c.key === 'advance_notice');
       const fNotice = facts.find((f: any) => f.key === 'advance_notice');
       const intakeNotice = answers.advanceNotice || data.userAnswers?.advanceNotice || (data.flagged ? "None, or the same day" : "");
@@ -519,13 +553,15 @@ export default function USReviewPage({
     return i.confirmed === true;
   }).length;
 
-  const conflictConfirmed = !hasNoticeConflict || noticeConflictChoice !== null ? 1 : 0;
+  const conflict1Confirmed = !hasOfferConflict || offerConflictChoice !== null ? 1 : 0;
+  const conflict2Confirmed = !hasNoticeConflict || noticeConflictChoice !== null ? 1 : 0;
   const missingLastDayConfirmed = lastDayWorkSaved ? 1 : 0;
 
   const confirmedCount = Math.min(
     totalCount,
     confirmedItemsCount +
-      (hasNoticeConflict && conflictConfirmed > 0 && !items.find((i) => i.id === "advanceNotice")?.confirmed ? 1 : 0) +
+      (hasOfferConflict && conflict1Confirmed > 0 && !items.find((i) => i.id === "offerMoney")?.confirmed ? 1 : 0) +
+      (hasNoticeConflict && conflict2Confirmed > 0 && !items.find((i) => i.id === "advanceNotice")?.confirmed ? 1 : 0) +
       (missingLastDayConfirmed > 0 && !items.find((i) => i.id === "lastDayAgreement")?.confirmed ? 1 : 0)
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
@@ -534,11 +570,30 @@ export default function USReviewPage({
   const changedItemsCount = items.filter((i) => i.userChanged).length;
 
   // ── Handlers ──
+  const handleChooseOfferConflict = (choice: "agreement" | "told" | "custom", customVal?: string) => {
+    setOfferConflictChoice(choice);
+    setShowOfferConflictCustom(false);
+    let chosenVal = docOfferDisplay;
+    if (choice === "told") {
+      chosenVal = intakeOfferDisplay;
+    } else if (choice === "custom" && customVal) {
+      const cleanNum = Number(customVal.replace(/[^0-9]/g, ""));
+      chosenVal = cleanNum ? `${cleanNum.toLocaleString()}` : customVal;
+    }
+    setItems((prev) =>
+      prev.map((i) => (i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true, userChanged: false, showSecondLook: false } : i))
+    );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { key: 'offer_amount', action: 'conflict_choice', value: chosenVal }).catch(() => {});
+    }
+  };
+
   const toggleConfirm = (id: string) => {
     const item = items.find((i) => i.id === id);
     const newConfirmed = !item?.confirmed;
     setItems((prev) =>
-      prev.map((i) => (i.id === id ? { ...i, confirmed: newConfirmed } : i))
+      prev.map((i) => (i.id === id ? { ...i, confirmed: newConfirmed, userChanged: false, showSecondLook: false } : i))
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId && newConfirmed) {
@@ -566,6 +621,7 @@ export default function USReviewPage({
         userChangeAck: item.userChanged ? true : item.userChangeAck,
       }))
     );
+    if (hasOfferConflict) setOfferConflictChoice("agreement");
     if (hasNoticeConflict) setNoticeConflictChoice("agreement");
     setLastDayWork((prev) => prev || items.find(i => i.id === "lastDayAgreement")?.value || "");
     setLastDayWorkSaved(true);
@@ -698,20 +754,19 @@ export default function USReviewPage({
       setItems((prev) =>
         prev.map((i) =>
           i.id === id
-            ? { ...i, inlineInputValue: formattedVal, showPlausibilityAlert: false, isReReading: true }
+            ? {
+                ...i,
+                value: formattedVal,
+                inlineInputValue: formattedVal,
+                isEditingInline: false,
+                userChanged: true,
+                showSecondLook: true,
+                showPlausibilityAlert: false,
+                confirmed: false,
+              }
             : i
         )
       );
-
-      setTimeout(() => {
-        setItems((prev) =>
-          prev.map((i) =>
-            i.id === id
-              ? { ...i, isReReading: false, showSecondLook: true }
-              : i
-          )
-        );
-      }, 1200);
     } else {
       setItems((prev) =>
         prev.map((i) =>
@@ -722,6 +777,7 @@ export default function USReviewPage({
                 isEditingInline: false,
                 confirmed: true,
                 userChanged: false,
+                showSecondLook: false,
                 userChangeAck: false,
               }
             : i
@@ -730,12 +786,12 @@ export default function USReviewPage({
       const activeCaseId = caseId || cs?.id;
       if (activeCaseId) {
         const keyMap: Record<string, string> = {
-        state: 'state', age: 'age', years: 'years', salary: 'pay',
-        offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
-        revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
-        nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
-      };
-      fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
+          state: 'state', age: 'age', years: 'years', salary: 'pay',
+          offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
+          revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
+          nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
+        };
+        fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
       }
     }
   };
@@ -761,6 +817,18 @@ export default function USReviewPage({
         };
       })
     );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      const keyMap: Record<string, string> = {
+        state: 'state', age: 'age', years: 'years', salary: 'pay',
+        offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
+        revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
+        nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
+      };
+      const factKey = keyMap[id] || id;
+      const currentItem = items.find((i) => i.id === id);
+      fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: currentItem?.originalDocumentValue }).catch(() => {});
+    }
   };
 
   const handleKeepUserValue = (id: string) => {
@@ -778,14 +846,26 @@ export default function USReviewPage({
         return {
           ...item,
           value: formattedVal,
-          userChanged: true,
-          userChangeAck: false,
-          confirmed: false,
+          userChanged: false,
+          userChangeAck: true,
+          confirmed: true,
           isEditingInline: false,
           showSecondLook: false,
         };
       })
     );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      const keyMap: Record<string, string> = {
+        state: 'state', age: 'age', years: 'years', salary: 'pay',
+        offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
+        revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
+        nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
+      };
+      const factKey = keyMap[id] || id;
+      const currentItem = items.find((i) => i.id === id);
+      fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'change', value: currentItem?.inlineInputValue || currentItem?.value }).catch(() => {});
+    }
   };
 
   const toggleUserChangeAck = (id: string) => {
@@ -1445,123 +1525,83 @@ function USItemCard({
 }) {
   const cfg = US_FIELD_CONFIGS[item.id];
 
-  // 1. Changed Row with Required Acknowledgement
-  if (item.userChanged && !item.isEditingInline) {
+  // 1. CONFIRMED ROW STATE (Matches Image 1)
+  if (item.confirmed && !item.isEditingInline && !item.userChanged && !item.showSecondLook) {
     return (
-      <div className="rounded-[12px] border border-[#D8C6FA] bg-[#FAF7FD] border-l-4 border-l-[#8A50EE] p-4 sm:p-5 transition">
-        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-          <div className="flex-1 pr-2">
-            <span className="font-sans font-normal text-[13px] text-[#5A6B78] block">
-              {item.label}
-            </span>
-
-            <div className="flex items-center gap-2 mt-0.5">
-              <span className="font-sans font-bold text-[18px] text-[#062C55]">
-                {item.value}
-              </span>
-              <span className="px-2 py-0.5 rounded-[4px] bg-[#F1EAFF] text-[#7A3CE3] text-[11px] font-bold">
-                You changed this
-              </span>
-            </div>
-
-            {/* Comparison line */}
-            <div className="text-[12.5px] text-[#7A3CE3] font-semibold mt-1">
-              {item.source}: {item.originalDocumentValue || "Original"} → Your value: {item.value}
-            </div>
-
-            {/* Source and citation */}
-            <div className="font-sans text-[12.5px] text-[#5A6B78] mt-1 flex flex-wrap items-center gap-1.5">
-              <span>{item.source}</span>
-              {item.citation && (
-                <>
-                  <span>·</span>
-                  <button
-                    type="button"
-                    onClick={() => onViewCitation(item.citation!)}
-                    className="text-[#0C8F72] underline hover:opacity-80 font-medium cursor-pointer"
-                  >
-                    See the words
-                  </button>
-                </>
-              )}
-            </div>
+      <div className="rounded-[10px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-3.5 sm:px-5 sm:py-3.5 flex items-center justify-between gap-3">
+        <div className="flex-1 min-w-0 pr-2">
+          <div className="font-sans font-bold text-[14.5px] leading-[20px] text-[#062C55]">
+            {item.label}:
           </div>
+          <div className="font-sans text-[12.5px] leading-[18px] text-[#5A6B78] mt-0.5">
+            {item.source}
+            {item.citation && (
+              <>
+                <span className="mx-1">·</span>
+                <button
+                  type="button"
+                  onClick={() => onViewCitation(item.citation!)}
+                  className="text-[#0C8F72] underline hover:opacity-80 font-medium cursor-pointer"
+                >
+                  See the words
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end shrink-0">
+          {item.id === "agesTitlesList" && (item.value.toLowerCase().includes("missing") || item.value.toLowerCase().includes("not found")) ? (
+            <div
+              onClick={onToggleConfirm}
+              className="min-h-[34px] px-3.5 py-1.5 rounded-[6px] font-sans font-bold text-[13px] flex items-center gap-1.5 transition cursor-pointer bg-[#0EB28D] text-white shadow-xs"
+            >
+              <span className="bg-[#FFE4E6] text-[#E11D48] px-1.5 py-0.5 rounded-[4px] text-[10px] font-extrabold tracking-wider">
+                C-52
+              </span>
+              <span>{item.value || "Missing"}</span>
+            </div>
+          ) : (
+            <div
+              onClick={onToggleConfirm}
+              className="min-h-[34px] px-3.5 py-1.5 rounded-[6px] font-sans font-bold text-[13px] flex items-center gap-1.5 transition cursor-pointer bg-[#0EB28D] text-white shadow-xs"
+            >
+              <svg
+                className="w-3.5 h-3.5 shrink-0 text-white"
+                viewBox="0 0 16 16"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path
+                  d="M3.5 8.5L6.5 11.5L12.5 4.5"
+                  stroke="currentColor"
+                  strokeWidth="2.2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>{item.value || "Yes"}</span>
+            </div>
+          )}
 
           <button
             type="button"
             onClick={onStartInlineEdit}
-            className="w-[88px] h-[40px] rounded-[10px] bg-white border border-[#D8D3C8] text-[#062C55] font-sans font-[700] text-[14px] hover:bg-[#F6F4EF] transition cursor-pointer self-start flex items-center justify-center"
+            className="font-sans font-[600] text-[12px] leading-[18px] text-[#5A6B78] underline hover:text-[#062C55] transition cursor-pointer mt-1"
           >
             Change
           </button>
         </div>
-
-        {/* Required Acknowledgement Checkbox Box */}
-        <div
-          onClick={onToggleUserChangeAck}
-          className="bg-white border border-[#E5DCF9] rounded-[8px] p-3.5 mt-3.5 flex items-start gap-3 cursor-pointer hover:border-[#D8C6FA] transition"
-        >
-          <input
-            type="checkbox"
-            checked={!!item.userChangeAck}
-            onChange={onToggleUserChangeAck}
-            onClick={(e) => e.stopPropagation()}
-            className="w-[18px] h-[18px] mt-0.5 rounded-[3px] border-[1.5px] border-[#8A96A0] text-[#7A3CE3] focus:ring-[#7A3CE3] cursor-pointer"
-          />
-          <p className="font-sans text-[13px] leading-[19px] text-[#17242F]">
-            <strong className="font-bold text-[#062C55]">Required.</strong> I confirm my change is correct. I understand my report will use my value instead of what my document says, and FairExit isn&apos;t responsible for results based on information I changed.
-          </p>
-        </div>
       </div>
     );
   }
 
-  // 2. CONFIRMED ROW STATE
-  if (item.confirmed && !item.isEditingInline) {
-    return (
-      <div className="rounded-[12px] bg-[#EEF8F3] border border-[#C7E6D6] p-3.5 sm:px-5 sm:py-3.5 transition flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <svg
-              className="w-4 h-4 shrink-0 text-[#0C8F72]"
-              viewBox="0 0 16 16"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-            >
-              <path
-                d="M3.5 8.5L6.5 11.5L12.5 4.5"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <span className="font-sans font-[600] text-[15.5px] leading-[21px] text-[#062C55]">
-              {item.label} :
-            </span>
-          </div>
-          <div className="font-sans font-[600] text-[15px] leading-[24px] text-[#17242F] pl-[24px] mt-0.5">
-            {item.value}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={onStartInlineEdit}
-          className="font-sans font-[700] text-[13px] leading-[20px] text-[#5A6B78] underline hover:text-[#062C55] transition cursor-pointer self-start sm:self-center ml-[24px] sm:ml-0 shrink-0"
-        >
-          Change
-        </button>
-      </div>
-    );
-  }
-
-  // 3. NORMAL OR EDITING STATE
+  // 2. NORMAL OR USER-CHANGED ROW STATE (Matches Image 3)
   return (
-    <div className="rounded-[12px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-4 sm:px-5 sm:py-4">
+    <div className="rounded-[10px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-4 sm:px-5 sm:py-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1 pr-2">
-          <div className="font-sans font-normal text-[13px] text-[#5A6B78]">
+          <div className="font-sans font-bold text-[14.5px] text-[#062C55]">
             {item.label}
           </div>
           <div className="font-sans font-bold text-[16px] text-[#062C55] mt-0.5">
@@ -1594,7 +1634,7 @@ function USItemCard({
             <button
               type="button"
               onClick={onToggleConfirm}
-              className="h-[40px] px-5 rounded-[10px] font-sans font-[700] text-[14px] transition cursor-pointer flex items-center justify-center gap-1.5 bg-white border border-[#0C8F72] text-[#0C8F72] hover:bg-[#0C8F72]/5"
+              className="h-[38px] px-5 rounded-[8px] font-sans font-bold text-[13.5px] transition cursor-pointer flex items-center justify-center gap-1.5 bg-white border border-[#0C8F72] text-[#0C8F72] hover:bg-[#0C8F72]/5"
             >
               Yes
             </button>
@@ -1602,12 +1642,50 @@ function USItemCard({
           <button
             type="button"
             onClick={onStartInlineEdit}
-            className="w-[88px] h-[40px] rounded-[10px] bg-white border border-[#D8D3C8] text-[#062C55] font-sans font-[700] text-[14px] hover:bg-[#F6F4EF] transition cursor-pointer flex items-center justify-center"
+            className="h-[38px] px-4 rounded-[8px] bg-white border border-[#D8D3C8] text-[#062C55] font-sans font-bold text-[13.5px] hover:bg-[#F6F4EF] transition cursor-pointer flex items-center justify-center"
           >
             Change
           </button>
         </div>
       </div>
+
+      {/* Amber "We looked again" banner if user changed value (Image 3) */}
+      {(item.userChanged || item.showSecondLook) && !item.isEditingInline && (
+        <div className="bg-[#FAF9F5] border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[8px] p-3.5 sm:p-4 mt-3.5 animate-in fade-in duration-200">
+          <p className="font-sans text-[13.5px] text-[#062C55] mb-3">
+            We looked again. {item.source ? `${item.source} says:` : "Your agreement says:"}{" "}
+            <span className="font-semibold">{item.originalDocumentValue || "original"}</span>
+            {item.citation && (
+              <span className="block font-serif italic font-medium mt-1 text-[#17242F]">
+                &ldquo;{item.citation.replace(/^"|"$/g, "")}&rdquo;
+              </span>
+            )}
+          </p>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={onUseDocumentValue}
+              className="h-[36px] px-4 rounded-[7px] bg-[#062C55] hover:bg-[#041D38] text-white font-[700] text-[13px] transition cursor-pointer"
+            >
+              Use {item.originalDocumentValue || "document value"}
+            </button>
+            <button
+              type="button"
+              onClick={onKeepUserValue}
+              className="h-[36px] px-4 rounded-[7px] bg-white border border-[#D8D3C8] text-[#062C55] font-[700] text-[13px] hover:bg-[#F6F4EF] transition cursor-pointer"
+            >
+              Keep {item.value}
+            </button>
+            <button
+              type="button"
+              onClick={onAddClearerCopy}
+              className="text-[12.5px] font-[600] text-[#0C8F72] hover:underline cursor-pointer ml-1"
+            >
+              Add a clearer copy
+            </button>
+          </div>
+        </div>
+      )}
 
       {item.isEditingInline && (
         <div className="mt-4 pt-3.5 border-t border-[#F0EFEA]">
@@ -1825,41 +1903,7 @@ function USItemCardInlineEditor({
         </div>
       )}
 
-      {item.showSecondLook && (
-        <div className="bg-[#FAF9F5] border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[10px] p-4 mt-3 animate-in fade-in duration-200">
-          <p className="font-sans text-[13.5px] text-[#062C55] mb-3">
-            We looked again. {item.source ? `${item.source} says:` : `Your agreement says: ${item.originalDocumentValue}`}
-            {item.citation && (
-              <em className="block font-serif italic font-medium mt-1 text-[#17242F]">
-                &ldquo;{item.citation.replace(/^"|"$/g, "")}&rdquo;
-              </em>
-            )}
-          </p>
-          <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={onUseDocumentValue}
-              className="h-[36px] px-4 rounded-[7px] bg-[#062C55] hover:bg-[#041D38] text-white font-[700] text-[13px] transition cursor-pointer"
-            >
-              Use {item.originalDocumentValue || "document value"}
-            </button>
-            <button
-              type="button"
-              onClick={onKeepUserValue}
-              className="h-[36px] px-4 rounded-[7px] bg-white border border-[#D8D3C8] text-[#062C55] font-[700] text-[13px] hover:bg-[#F6F4EF] transition cursor-pointer"
-            >
-              Keep {displayVal}
-            </button>
-            <button
-              type="button"
-              onClick={onAddClearerCopy}
-              className="font-sans text-[13px] font-[700] text-[#0C8F72] underline hover:opacity-80 ml-1 cursor-pointer"
-            >
-              Add a clearer copy
-            </button>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 }
