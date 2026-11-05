@@ -107,6 +107,8 @@ async function executeReportBuildJob(
   try {
     await caseService.update(c.id, { status_detail: 'claude' })
     const raw = await aiService.callB(c, input, { requestId, caseId: c.id, reportId, generationId })
+    console.log('=== CLAUDE CALL B FINISHED - RAW JSON RESPONSE ===')
+    console.log(JSON.stringify(raw, null, 2))
 
     stage = 'validation'
     const validationStartedAt = Date.now()

@@ -215,6 +215,10 @@ export async function callClaudeJson<T = unknown>(opts: {
       })
       const parseStartedAt = Date.now()
       const json = parseJsonOutput<T>(out.text)
+      if (opts.label === 'Call B') {
+        console.log('=== CLAUDE CALL B GENERATED JSON RESPONSE ===')
+        console.log(JSON.stringify(json, null, 2))
+      }
       const parseDurationMs = Date.now() - parseStartedAt
       const durationMs = Date.now() - started
       logger.info(`[CLAUDE][${callName}_JSON_PARSE]`, { ...opts.context, durationMs: parseDurationMs, validJson: true })

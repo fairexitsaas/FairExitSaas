@@ -177,6 +177,8 @@ export const aiService = {
         const durationMs = Date.now() - started
         await record(c.id, 'B', { status: 'ok', model: 'mock', durationMs })
         logger.info('[CLAUDE][CALL_B_SUCCESS]', { ...context, model: 'mock', durationMs, tokens: { input: 0, output: 0 } })
+        console.log('=== CLAUDE CALL B (MOCK) FINISHED - GENERATED JSON RESPONSE ===')
+        console.log(JSON.stringify(out, null, 2))
         return out
       }
       const r = await callClaudeJson<Record<string, unknown>>({
@@ -187,6 +189,9 @@ export const aiService = {
         context,
       })
       await record(c.id, 'B', { status: 'ok', model: r.model, usage: r.usage, durationMs: r.durationMs })
+      console.log('=== CLAUDE CALL B FINISHED - GENERATED JSON RESPONSE ===')
+      console.log(JSON.stringify(r.json, null, 2))
+      logger.info('[CLAUDE][CALL_B_RESPONSE_JSON]', { ...context, response: r.json })
       return r.json
     } catch (err) {
       await record(c.id, 'B', { status: 'error', error: (err as Error).message, durationMs: Date.now() - started })
