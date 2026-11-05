@@ -13,6 +13,27 @@ async function resolveCase(caseOrDocId: string): Promise<CaseRow> {
   return caseService.get(caseId)
 }
 
+function isPlaceholderValue(v: unknown): boolean {
+  if (v === null || v === undefined) return true;
+  if (typeof v !== 'string') return false;
+  const s = v.trim().toLowerCase();
+  return (
+    s === '' ||
+    s === '—' ||
+    s === '-' ||
+    s === 'not answered' ||
+    s === 'not in your documents yet' ||
+    s === 'not in your documents' ||
+    s === 'not in your agreement' ||
+    s === 'not in your contract' ||
+    s === 'not mentioned' ||
+    s === 'not specified' ||
+    s === 'not added' ||
+    s === 'null' ||
+    s === 'undefined'
+  );
+}
+
 function normalizeReviewKey(key: string, country?: string): string {
   const map: Record<string, string> = {
     salary: 'pay',
@@ -155,21 +176,26 @@ export const reviewService = {
       } catch (err: any) {
         // If user attempted 'confirm' on a row where the document didn't have a value:
         if (action === 'confirm' && (err?.message?.includes('no value to confirm') || err?.statusCode === 422)) {
-          if (input.value !== undefined && input.value !== null && input.value !== '' && input.value !== 'Not in your documents yet') {
+          const isPlaceholder = isPlaceholderValue(input.value);
+          if (!isPlaceholder) {
             try {
               rowResult = await flowService.rowAction(c, targetKey, {
                 action: 'change',
                 value: input.value,
                 agreed: input.agreed,
-              })
-            } catch {
-              logger.warn('Fallback to change also skipped', { targetKey })
+              });
+            } catch (fallbackErr: any) {
+              logger.info('Could not apply fallback change for unextracted row', {
+                targetKey,
+                value: input.value,
+                reason: fallbackErr?.message,
+              });
             }
           } else {
-            logger.info('Skipping confirm for empty document row', { targetKey })
+            logger.info('Skipping confirm for empty document row', { targetKey });
           }
         } else {
-          logger.warn('rowAction warning', { targetKey, action, error: err?.message })
+          logger.warn('rowAction warning', { targetKey, action, error: err?.message });
         }
       }
 
@@ -180,12 +206,14 @@ export const reviewService = {
         if (rowState) {
           const status = rowState.status || (rowState.pending ? 'corrected' : 'confirmed')
           const val = rowState.pending ? rowState.pending.value : (rowState.user_value ?? rowState.value ?? input.value)
-          await factsRepository.saveCorrectedFact(c.id, targetKey, {
-            userValue: val,
-            status,
-            changeAck: rowState.change_ack,
-            changeAckAt: rowState.change_ack_at,
-          })
+          if (!isPlaceholderValue(val)) {
+            await factsRepository.saveCorrectedFact(c.id, targetKey, {
+              userValue: val,
+              status,
+              changeAck: rowState.change_ack,
+              changeAckAt: rowState.change_ack_at,
+            })
+          }
         }
       } catch (repoErr) {
         logger.warn('factsRepository.saveCorrectedFact failed', { message: (repoErr as Error).message })

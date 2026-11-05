@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import React from 'react'
-import { useAdmin, LawyerRequestRecord } from '../AdminContext'
+import React from "react";
+import { useAdmin, LawyerRequestRecord } from "../AdminContext";
 
 export default function LawyerRequestsPage() {
   const {
@@ -13,12 +13,23 @@ export default function LawyerRequestsPage() {
     setSummaryModalReq,
     handleExportCSV,
     handleExportPDF,
-  } = useAdmin()
+  } = useAdmin();
 
   const onExportCSV = () => {
     handleExportCSV(
-      'lawyer-requests',
-      ['Request', 'Days Ago', 'Region', 'Name', 'Email', 'Phone', 'Status', 'Lawyer', 'Date sent', 'Notes'],
+      "lawyer-requests",
+      [
+        "Request",
+        "Days Ago",
+        "Region",
+        "Name",
+        "Email",
+        "Phone",
+        "Status",
+        "Lawyer",
+        "Date sent",
+        "Notes",
+      ],
       lawyerRequests.map((r) => [
         r.id,
         r.daysAgo,
@@ -30,9 +41,9 @@ export default function LawyerRequestsPage() {
         r.lawyer,
         r.dateSent,
         r.notes,
-      ])
-    )
-  }
+      ]),
+    );
+  };
 
   return (
     <section>
@@ -43,7 +54,11 @@ export default function LawyerRequestsPage() {
             Lawyer requests
           </h1>
           <p className="text-[#5a6b78] text-[13.5px] mt-1 max-w-[70ch]">
-            People who used &quot;Ask a lawyer to contact me&quot;. The team emails or calls a lawyer from the Lawyers list, then updates the status here by hand. Promise: a lawyer contacts them within 3 business days. Contact details are kept only to route the request and are deleted 12 months after it closes.
+            People who used &quot;Ask a lawyer to contact me&quot;. The team
+            emails or calls a lawyer from the Lawyers list, then updates the
+            status here by hand. Promise: a lawyer contacts them usually within
+            2 business days. Contact details are kept only to route the request
+            and are deleted 12 months after it closes.
           </p>
         </div>
         <div className="flex-1" />
@@ -108,7 +123,9 @@ export default function LawyerRequestsPage() {
                 <tr
                   key={req.id}
                   className={`hover:bg-[#f7fbf9] transition-colors ${
-                    idx < lawyerRequests.length - 1 ? 'border-b border-[#f0ede6]' : ''
+                    idx < lawyerRequests.length - 1
+                      ? "border-b border-[#f0ede6]"
+                      : ""
                   }`}
                 >
                   {/* Request ID + Days Ago */}
@@ -116,7 +133,9 @@ export default function LawyerRequestsPage() {
                     <span className="tabular-nums font-bold text-[#062c55] block">
                       {req.id}
                     </span>
-                    <span className="text-[#5a6b78] text-[12px]">{req.daysAgo}</span>
+                    <span className="text-[#5a6b78] text-[12px]">
+                      {req.daysAgo}
+                    </span>
                   </td>
 
                   {/* Region */}
@@ -132,7 +151,9 @@ export default function LawyerRequestsPage() {
                   {/* Email · Phone */}
                   <td className="p-[10px_12px] text-[#5a6b78] whitespace-nowrap leading-tight">
                     <div>{req.email}</div>
-                    <div className="text-[12px] text-[#5a6b78]">{req.phone}</div>
+                    <div className="text-[12px] text-[#5a6b78]">
+                      {req.phone}
+                    </div>
                   </td>
 
                   {/* Status Dropdown */}
@@ -143,7 +164,7 @@ export default function LawyerRequestsPage() {
                       onChange={(e) =>
                         handleStatusChange(
                           req.id,
-                          e.target.value as LawyerRequestRecord['status']
+                          e.target.value as LawyerRequestRecord["status"],
                         )
                       }
                       className="border border-[#d6dbe0] rounded-[7px] py-1 px-2 text-[13px] bg-white text-[#17242f] max-w-[200px] focus:outline-none focus:border-[#0eb28d]"
@@ -152,7 +173,9 @@ export default function LawyerRequestsPage() {
                       <option value="Sent to lawyer">Sent to lawyer</option>
                       <option value="Call happened">Call happened</option>
                       <option value="Retained">Retained</option>
-                      <option value="Closed · no response">Closed · no response</option>
+                      <option value="Closed · no response">
+                        Closed · no response
+                      </option>
                     </select>
                   </td>
 
@@ -161,7 +184,9 @@ export default function LawyerRequestsPage() {
                     <select
                       value={req.lawyer}
                       aria-label={`Lawyer ${req.id}`}
-                      onChange={(e) => handleLawyerChange(req.id, e.target.value)}
+                      onChange={(e) =>
+                        handleLawyerChange(req.id, e.target.value)
+                      }
                       className="border border-[#d6dbe0] rounded-[7px] py-1 px-2 text-[13px] bg-white text-[#17242f] max-w-[220px] focus:outline-none focus:border-[#0eb28d]"
                     >
                       <option value="Choose…">Choose…</option>
@@ -170,9 +195,11 @@ export default function LawyerRequestsPage() {
                           {l.name} · {l.firm}
                         </option>
                       ))}
-                      {!lawyers.some((l) => `${l.name} · ${l.firm}` === req.lawyer) &&
+                      {!lawyers.some(
+                        (l) => `${l.name} · ${l.firm}` === req.lawyer,
+                      ) &&
                         req.lawyer &&
-                        req.lawyer !== 'Choose…' && (
+                        req.lawyer !== "Choose…" && (
                           <option value={req.lawyer}>{req.lawyer}</option>
                         )}
                     </select>
@@ -188,7 +215,9 @@ export default function LawyerRequestsPage() {
                     {req.howBy ? (
                       <>
                         <div>{req.howBy.method}</div>
-                        <span className="text-[#5a6b78] text-[12px]">{req.howBy.agent}</span>
+                        <span className="text-[#5a6b78] text-[12px]">
+                          {req.howBy.agent}
+                        </span>
                       </>
                     ) : (
                       <span className="text-[#5a6b78]">—</span>
@@ -234,19 +263,31 @@ export default function LawyerRequestsPage() {
 
         {/* Note below table */}
         <p className="text-[12.5px] text-[#5a6b78] mt-3.5">
-          Statuses: New → Sent to lawyer → Call happened → Retained, or Closed · no response. Everything here is entered by the team; nothing is sent to lawyers automatically. Matching, booking and lawyer accounts are phase 2.
+          Statuses: New → Sent to lawyer → Call happened → Retained, or Closed ·
+          no response. Everything here is entered by the team; nothing is sent
+          to lawyers automatically. Matching, booking and lawyer accounts are
+          phase 2.
         </p>
 
         {/* What "Summary" means Callout Box */}
-        <div id="sent" className="bg-[#faf9f6] border border-[#e7e4dd] rounded-[10px] p-3.5 text-[13px] mt-4">
+        <div
+          id="sent"
+          className="bg-[#faf9f6] border border-[#e7e4dd] rounded-[10px] p-3.5 text-[13px] mt-4"
+        >
           <b className="text-[#062c55] font-bold">
-            What &quot;Summary&quot; means · the only things we share with a lawyer
+            What &quot;Summary&quot; means · the only things we share with a
+            lawyer
           </b>
           <p className="text-[12.5px] text-[#5a6b78] mt-1.5 leading-relaxed">
-            Name, email, phone, province or state. Then a short summary of their answers: role level, years with the employer, age range, how the job ended, amount offered, deadline to sign, and anything the free check flagged. Never the uploaded documents or the report. The person ticked a consent box before we sent anything. Lawyers pay a flat advertising fee, never per case.
+            Name, email, phone, province or state. Then a short summary of their
+            answers: role level, years with the employer, age range, how the job
+            ended, amount offered, deadline to sign, and anything the free check
+            flagged. Never the uploaded documents or the report. The person
+            ticked a consent box before we sent anything. Lawyers pay a flat
+            advertising fee, never per case.
           </p>
         </div>
       </div>
     </section>
-  )
+  );
 }

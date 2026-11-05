@@ -5,10 +5,7 @@ import Link from "next/link";
 import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import {
-  getReportInputs,
-  ReportInputs,
-} from "@/lib/report-storage";
+import { getReportInputs, ReportInputs } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifySuccess } from "@/lib/notifications";
@@ -31,8 +28,15 @@ interface ReportUploadPageProps {
   onContinue?: () => void;
 }
 
-function formatDollars(val: number | string | undefined, defaultVal = 0): string {
-  const num = typeof val === "number" ? val : parseFloat(String(val || defaultVal).replace(/[^0-9.-]/g, "")) || defaultVal;
+function formatDollars(
+  val: number | string | undefined,
+  defaultVal = 0,
+): string {
+  const num =
+    typeof val === "number"
+      ? val
+      : parseFloat(String(val || defaultVal).replace(/[^0-9.-]/g, "")) ||
+        defaultVal;
   if (num >= 1000) {
     const k = Math.round(num / 1000);
     return `$${k}k`;
@@ -54,7 +58,9 @@ export default function ReportUploadPage({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dataPrivacyOpen, setDataPrivacyOpen] = useState(false);
   const [noContractModalOpen, setNoContractModalOpen] = useState(false);
-  const [contractStatus, setContractStatus] = useState<"none" | "never" | "missing" | "later">("none");
+  const [contractStatus, setContractStatus] = useState<
+    "none" | "never" | "missing" | "later"
+  >("none");
   const [isDragging, setIsDragging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -62,7 +68,10 @@ export default function ReportUploadPage({
   // Upload and flow loading states
   const [isUploading, setIsUploading] = useState(false);
   const [uploadingStatusText, setUploadingStatusText] = useState("");
-  const [, setUploadingProgress] = useState<{ current: number; total: number } | null>(null);
+  const [, setUploadingProgress] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
   const [isLoadingExistingDocs, setIsLoadingExistingDocs] = useState(true);
   const [updatingDocId, setUpdatingDocId] = useState<string | null>(null);
   const [removingDocId, setRemovingDocId] = useState<string | null>(null);
@@ -96,7 +105,8 @@ export default function ReportUploadPage({
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
       setIsLoadingExistingDocs(true);
-      fairexit.documents(activeCaseId)
+      fairexit
+        .documents(activeCaseId)
         .then((res) => {
           interface ServerDoc {
             id: string;
@@ -104,12 +114,20 @@ export default function ReportUploadPage({
             fileName?: string;
             kind?: string;
           }
-          if (res?.documents && Array.isArray(res.documents) && res.documents.length > 0) {
+          if (
+            res?.documents &&
+            Array.isArray(res.documents) &&
+            res.documents.length > 0
+          ) {
             const loaded: UploadedFileItem[] = (res.documents as ServerDoc[])
               .filter((d) => d.status === "uploaded")
               .map((d) => ({
                 id: d.id,
-                name: d.fileName || (d.kind === "contract" ? "Employment-Contract.pdf" : "Severance-Offer.pdf"),
+                name:
+                  d.fileName ||
+                  (d.kind === "contract"
+                    ? "Employment-Contract.pdf"
+                    : "Severance-Offer.pdf"),
                 type: d.kind === "contract" ? "contract" : "letter",
                 serverDocId: d.id,
                 status: "uploaded",
@@ -118,7 +136,10 @@ export default function ReportUploadPage({
               setFiles(loaded);
             }
           }
-          if (res?.contractStatus && ["never", "missing"].includes(res.contractStatus)) {
+          if (
+            res?.contractStatus &&
+            ["never", "missing"].includes(res.contractStatus)
+          ) {
             setContractStatus(res.contractStatus);
           }
         })
@@ -135,10 +156,18 @@ export default function ReportUploadPage({
   const country = (isUS ? "US" : "CA") as "CA" | "US";
 
   // Compute status for the 2 checklist boxes
-  const hasContract = files.some((f) => f.type === "contract" && f.status === "uploaded");
-  const hasLetter = files.some((f) => f.type === "letter" && f.status === "uploaded");
-  const isContractUploading = files.some((f) => f.type === "contract" && f.status === "uploading");
-  const isLetterUploading = files.some((f) => f.type === "letter" && f.status === "uploading");
+  const hasContract = files.some(
+    (f) => f.type === "contract" && f.status === "uploaded",
+  );
+  const hasLetter = files.some(
+    (f) => f.type === "letter" && f.status === "uploaded",
+  );
+  const isContractUploading = files.some(
+    (f) => f.type === "contract" && f.status === "uploading",
+  );
+  const isLetterUploading = files.some(
+    (f) => f.type === "letter" && f.status === "uploading",
+  );
   const bothAdded = hasContract && hasLetter;
   const isContractSatisfied = hasContract || contractStatus !== "none";
 
@@ -169,7 +198,9 @@ export default function ReportUploadPage({
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
       if (/heic|heif/i.test(file.type) || /\.heic$/i.test(file.name)) {
-        setErrorMessage("iPhone HEIC photos are not supported. Please export as JPEG or PDF.");
+        setErrorMessage(
+          "iPhone HEIC photos are not supported. Please export as JPEG or PDF.",
+        );
       } else {
         validFiles.push(file);
       }
@@ -187,10 +218,14 @@ export default function ReportUploadPage({
 
     // Track current state including previously uploaded files and items in this batch
     let currentHasContract = files.some(
-      (f) => f.type === "contract" && (f.status === "uploaded" || f.status === "uploading")
+      (f) =>
+        f.type === "contract" &&
+        (f.status === "uploaded" || f.status === "uploading"),
     );
     let currentHasLetter = files.some(
-      (f) => f.type === "letter" && (f.status === "uploaded" || f.status === "uploading")
+      (f) =>
+        f.type === "letter" &&
+        (f.status === "uploaded" || f.status === "uploading"),
     );
 
     const pendingItems: UploadedFileItem[] = validFiles.map((file, i) => {
@@ -246,7 +281,9 @@ export default function ReportUploadPage({
     // Upload each pending file
     for (let i = 0; i < pendingItems.length; i++) {
       const item = pendingItems[i];
-      setUploadingStatusText(`Uploading ${item.name} (${i + 1} of ${pendingItems.length})…`);
+      setUploadingStatusText(
+        `Uploading ${item.name} (${i + 1} of ${pendingItems.length})…`,
+      );
       setUploadingProgress({ current: i + 1, total: pendingItems.length });
 
       if (activeCaseId && item.file) {
@@ -257,10 +294,8 @@ export default function ReportUploadPage({
 
           setFiles((prev) =>
             prev.map((f) =>
-              f.id === item.id
-                ? { ...f, status: "uploaded", serverDocId }
-                : f
-            )
+              f.id === item.id ? { ...f, status: "uploaded", serverDocId } : f,
+            ),
           );
           anyUploaded = true;
           notifySuccess(`Uploaded ${item.name}`);
@@ -268,7 +303,10 @@ export default function ReportUploadPage({
           const apiErr =
             e instanceof FairExitApiError
               ? e
-              : new FairExitApiError(0, e instanceof Error ? e.message : "Upload failed");
+              : new FairExitApiError(
+                  0,
+                  e instanceof Error ? e.message : "Upload failed",
+                );
           const msg = `Could not upload ${item.name}: ${apiErr.message}`;
           setErrorMessage(msg);
 
@@ -276,8 +314,8 @@ export default function ReportUploadPage({
             prev.map((f) =>
               f.id === item.id
                 ? { ...f, status: "error", error: apiErr.message }
-                : f
-            )
+                : f,
+            ),
           );
 
           showErrorModal({
@@ -291,7 +329,9 @@ export default function ReportUploadPage({
       } else {
         // Fallback for demo mode
         setFiles((prev) =>
-          prev.map((f) => (f.id === item.id ? { ...f, status: "uploaded" } : f))
+          prev.map((f) =>
+            f.id === item.id ? { ...f, status: "uploaded" } : f,
+          ),
         );
         anyUploaded = true;
       }
@@ -306,30 +346,13 @@ export default function ReportUploadPage({
       fileInputRef.current.value = "";
     }
 
-    // Check if both documents are uploaded and trigger the proceed flow
-    if (anyUploaded) {
-      setTimeout(() => {
-        const currentFiles = filesRef.current;
-        const currentContractStatus = contractStatusRef.current;
-        const contractOk = currentFiles.some(
-          (f) => f.type === "contract" && f.status === "uploaded"
-        );
-        const letterOk = currentFiles.some(
-          (f) => f.type === "letter" && f.status === "uploaded"
-        );
-        const satisfied = (contractOk || currentContractStatus !== "none") && letterOk;
-
-        if (satisfied) {
-          if (autoProceedTimeoutRef.current) clearTimeout(autoProceedTimeoutRef.current);
-          autoProceedTimeoutRef.current = setTimeout(() => {
-            handleContinueRef.current();
-          }, 1200);
-        }
-      }, 50);
-    }
+    // Uploads complete - do not auto-start; wait for user to click Generate Report button
   };
 
-  const handleTypeChange = async (id: string, newType: "contract" | "letter" | "other") => {
+  const handleTypeChange = async (
+    id: string,
+    newType: "contract" | "letter" | "other",
+  ) => {
     if (isUploading || isSubmitting) return;
     if (autoProceedTimeoutRef.current) {
       clearTimeout(autoProceedTimeoutRef.current);
@@ -338,13 +361,21 @@ export default function ReportUploadPage({
     setUpdatingDocId(id);
 
     setFiles((prev) =>
-      prev.map((f) => (f.id === id ? { ...f, type: newType } : f))
+      prev.map((f) => (f.id === id ? { ...f, type: newType } : f)),
     );
     const activeCaseId = caseId || cs?.id;
     const targetFile = files.find((f) => f.id === id);
-    if (activeCaseId && targetFile?.serverDocId && (newType === "contract" || newType === "letter")) {
+    if (
+      activeCaseId &&
+      targetFile?.serverDocId &&
+      (newType === "contract" || newType === "letter")
+    ) {
       try {
-        await fairexit.updateDocumentKind(activeCaseId, targetFile.serverDocId, newType);
+        await fairexit.updateDocumentKind(
+          activeCaseId,
+          targetFile.serverDocId,
+          newType,
+        );
       } catch (e) {
         console.warn("Failed to update document type on server:", e);
       }
@@ -441,13 +472,14 @@ export default function ReportUploadPage({
     const currentFiles = filesRef.current;
     const currentContractStatus = contractStatusRef.current;
     const currentHasContract = currentFiles.some(
-      (f) => f.type === "contract" && f.status === "uploaded"
+      (f) => f.type === "contract" && f.status === "uploaded",
     );
     const currentHasLetter = currentFiles.some(
-      (f) => f.type === "letter" && f.status === "uploaded"
+      (f) => f.type === "letter" && f.status === "uploaded",
     );
     const currentSatisfied =
-      (currentHasContract || currentContractStatus !== "none") && currentHasLetter;
+      (currentHasContract || currentContractStatus !== "none") &&
+      currentHasLetter;
 
     if (!currentSatisfied && currentFiles.length === 0) return;
 
@@ -458,15 +490,22 @@ export default function ReportUploadPage({
     if (activeCaseId) {
       try {
         // Sync document kinds with the server first if any kinds changed
-        const serverDocData = await fairexit.documents(activeCaseId).catch(() => null);
+        const serverDocData = await fairexit
+          .documents(activeCaseId)
+          .catch(() => null);
         if (serverDocData?.documents) {
           for (const f of currentFiles) {
-            if (f.serverDocId && (f.type === "contract" || f.type === "letter")) {
-              const matched = (serverDocData.documents as Array<{ id: string; kind: string }>).find(
-                (d) => d.id === f.serverDocId
-              );
+            if (
+              f.serverDocId &&
+              (f.type === "contract" || f.type === "letter")
+            ) {
+              const matched = (
+                serverDocData.documents as Array<{ id: string; kind: string }>
+              ).find((d) => d.id === f.serverDocId);
               if (matched && matched.kind !== f.type) {
-                await fairexit.updateDocumentKind(activeCaseId, f.serverDocId, f.type).catch(() => {});
+                await fairexit
+                  .updateDocumentKind(activeCaseId, f.serverDocId, f.type)
+                  .catch(() => {});
               }
             }
           }
@@ -476,7 +515,10 @@ export default function ReportUploadPage({
         if (!currentHasContract) {
           if (currentContractStatus === "never") {
             await fairexit.setContractStatus(activeCaseId, "never");
-          } else if (currentContractStatus === "missing" || currentContractStatus === "later") {
+          } else if (
+            currentContractStatus === "missing" ||
+            currentContractStatus === "later"
+          ) {
             await fairexit.setContractStatus(activeCaseId, "missing");
           }
         }
@@ -498,7 +540,7 @@ export default function ReportUploadPage({
                 0,
                 err instanceof Error
                   ? err.message
-                  : "Failed to start reading documents. Please check your files."
+                  : "Failed to start reading documents. Please check your files.",
               );
         setErrorMessage(apiErr.message);
         showErrorModal({
@@ -750,18 +792,38 @@ export default function ReportUploadPage({
             {/* Explanation paragraph */}
             {isUS ? (
               <p className="font-sans font-normal text-[15px] leading-[24px] text-[#5A6B78] mb-[15px]">
-                An attorney reads them <strong className="font-[700] text-[#5A6B78]">together</strong>: your{" "}
-                <strong className="font-[700] text-[#5A6B78]">separation agreement</strong> shows the release they want you to
-                sign, and your <strong className="font-[700] text-[#5A6B78]">offer letter or contract</strong> shows what was promised
-                when you started and whether a non-compete lives. Your free check used your answers; the report uses the paper.
+                An attorney reads them{" "}
+                <strong className="font-[700] text-[#5A6B78]">together</strong>:
+                your{" "}
+                <strong className="font-[700] text-[#5A6B78]">
+                  separation agreement
+                </strong>{" "}
+                shows the release they want you to sign, and your{" "}
+                <strong className="font-[700] text-[#5A6B78]">
+                  offer letter or contract
+                </strong>{" "}
+                shows what was promised when you started and whether a
+                non-compete lives. Your free check used your answers; the report
+                uses the paper.
               </p>
             ) : (
               <p className="font-sans font-normal text-[15px] leading-[24px] text-[#5A6B78] mb-[15px]">
-                A lawyer reads them <strong className="font-[700] text-[#5A6B78]">together</strong>: your{" "}
-                <strong className="font-[700] text-[#5A6B78]">employment contract</strong> decides whether the clause that
-                caps you is valid <em className="italic font-normal text-[#5A6B78]">for the job you had</em>, and your{" "}
-                <strong className="font-[700] text-[#5A6B78]">severance letter</strong> shows what they&apos;re offering. Your free
-                check used your answers; the report uses the paper.
+                A lawyer reads them{" "}
+                <strong className="font-[700] text-[#5A6B78]">together</strong>:
+                your{" "}
+                <strong className="font-[700] text-[#5A6B78]">
+                  employment contract
+                </strong>{" "}
+                decides whether the clause that caps you is valid{" "}
+                <em className="italic font-normal text-[#5A6B78]">
+                  for the job you had
+                </em>
+                , and your{" "}
+                <strong className="font-[700] text-[#5A6B78]">
+                  severance letter
+                </strong>{" "}
+                shows what they&apos;re offering. Your free check used your
+                answers; the report uses the paper.
               </p>
             )}
 
@@ -774,9 +836,21 @@ export default function ReportUploadPage({
               </h3>
               <p className="font-sans font-normal text-[13.5px] leading-[20px] text-[#5A4A12]">
                 {isUS ? (
-                  <>US law sets no severance amount, so a written contract is what sets your terms: a severance plan, a policy, an offer-letter clause, or a handbook promise. Even when employers say at-will, whether that&apos;s enforceable depends on what you signed.</>
+                  <>
+                    US law sets no severance amount, so a written contract is
+                    what sets your terms: a severance plan, a policy, an
+                    offer-letter clause, or a handbook promise. Even when
+                    employers say at-will, whether that&apos;s enforceable
+                    depends on what you signed.
+                  </>
                 ) : (
-                  <>If it has a termination clause, whether that clause is <em className="italic">valid</em> is what sets your range: a valid one can hold you at the minimum; an invalid one (and many are, under recent case law) reopens the full range. Upload it first.</>
+                  <>
+                    If it has a termination clause, whether that clause is{" "}
+                    <em className="italic">valid</em> is what sets your range: a
+                    valid one can hold you at the minimum; an invalid one
+                    (recent Ontario court decisions have struck down many)
+                    reopens the full range. Upload it first.
+                  </>
                 )}
               </p>
             </div>
@@ -786,8 +860,6 @@ export default function ReportUploadPage({
               className={`rounded-[10px] p-[12px_16px] sm:p-[14px_18px] transition-all flex items-center justify-between gap-3 border mb-[12px] ${
                 hasContract || contractStatus !== "none"
                   ? "bg-[#F3FAF6] border-[#0EB28D]"
-                  : isContractUploading
-                  ? "bg-[#F0F8FF] border-[#BDE0FE]"
                   : "bg-white border-[#E7E4DD]"
               }`}
             >
@@ -796,8 +868,6 @@ export default function ReportUploadPage({
                   className={`w-[26px] h-[26px] rounded-[7px] text-white font-sans font-[800] text-[12px] leading-[18px] flex items-center justify-center shrink-0 ${
                     hasContract || contractStatus !== "none"
                       ? "bg-[#0EB28D]"
-                      : isContractUploading
-                      ? "bg-[#0284C7]"
                       : "bg-[#062C55]"
                   }`}
                 >
@@ -809,7 +879,9 @@ export default function ReportUploadPage({
                 </div>
                 <div>
                   <h4 className="font-sans font-[700] text-[14px] leading-[22px] text-[#062C55]">
-                    {isUS ? "Offer letter / employment contract" : "Employment contract"}
+                    {isUS
+                      ? "Offer letter / employment contract"
+                      : "Employment contract"}
                   </h4>
                   <p className="font-sans font-normal text-[12px] leading-[17px] text-[#5A6B78]">
                     {isUS
@@ -830,9 +902,9 @@ export default function ReportUploadPage({
                     </span>
                   </div>
                 ) : isContractUploading ? (
-                  <div className="min-w-[85px] h-[25px] px-2 rounded-[6px] bg-[#E0F2FE] border border-[#BAE6FD] flex items-center justify-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full border-2 border-[#0284C7] border-t-transparent animate-spin shrink-0" />
-                    <span className="font-sans font-[800] text-[10px] leading-[17px] tracking-[0.5px] text-[#0284C7]">
+                  <div className="min-w-[85px] h-[25px] px-2 rounded-[6px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full border-2 border-[#0EB28D] border-t-transparent animate-spin shrink-0" />
+                    <span className="font-sans font-[800] text-[10px] leading-[17px] tracking-[0.5px] text-[#0C8F72]">
                       UPLOADING
                     </span>
                   </div>
@@ -851,8 +923,6 @@ export default function ReportUploadPage({
               className={`rounded-[10px] p-[12px_16px] sm:p-[14px_18px] transition-all flex items-center justify-between gap-3 border mb-[14px] ${
                 hasLetter
                   ? "bg-[#F3FAF6] border-[#0EB28D]"
-                  : isLetterUploading
-                  ? "bg-[#F0F8FF] border-[#BDE0FE]"
                   : "bg-white border-[#E7E4DD]"
               }`}
             >
@@ -861,8 +931,6 @@ export default function ReportUploadPage({
                   className={`w-[26px] h-[26px] rounded-[7px] text-white font-sans font-[800] text-[12px] leading-[18px] flex items-center justify-center shrink-0 ${
                     hasLetter
                       ? "bg-[#0EB28D]"
-                      : isLetterUploading
-                      ? "bg-[#0284C7]"
                       : "bg-[#062C55]"
                   }`}
                 >
@@ -895,9 +963,9 @@ export default function ReportUploadPage({
                     </span>
                   </div>
                 ) : isLetterUploading ? (
-                  <div className="min-w-[85px] h-[25px] px-2 rounded-[6px] bg-[#E0F2FE] border border-[#BAE6FD] flex items-center justify-center gap-1.5">
-                    <span className="w-3 h-3 rounded-full border-2 border-[#0284C7] border-t-transparent animate-spin shrink-0" />
-                    <span className="font-sans font-[800] text-[10px] leading-[17px] tracking-[0.5px] text-[#0284C7]">
+                  <div className="min-w-[85px] h-[25px] px-2 rounded-[6px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full border-2 border-[#0EB28D] border-t-transparent animate-spin shrink-0" />
+                    <span className="font-sans font-[800] text-[10px] leading-[17px] tracking-[0.5px] text-[#0C8F72]">
                       UPLOADING
                     </span>
                   </div>
@@ -922,10 +990,10 @@ export default function ReportUploadPage({
               }}
               className={`w-full min-h-[110px] rounded-[9px] transition-all border-2 border-dashed flex flex-col items-center justify-center p-4 mb-[12px] ${
                 isUploading || isSubmitting
-                  ? "bg-[#F7FAF8] border-[#B8DDD0] cursor-not-allowed opacity-85"
+                  ? "bg-[#FAFCFB] border-[#C7E6D6] cursor-not-allowed"
                   : isDragging
-                  ? "bg-[#EBF7F2] border-[#0EB28D] scale-[1.01] cursor-pointer"
-                  : "bg-[#FAFCFB] border-[#C7E6D6] hover:bg-[#F2F9F5] hover:border-[#0EB28D] cursor-pointer"
+                    ? "bg-[#EBF7F2] border-[#0EB28D] scale-[1.01] cursor-pointer"
+                    : "bg-[#FAFCFB] border-[#C7E6D6] hover:bg-[#F2F9F5] hover:border-[#0EB28D] cursor-pointer"
               }`}
             >
               <input
@@ -944,7 +1012,8 @@ export default function ReportUploadPage({
                     {uploadingStatusText || "Uploading documents…"}
                   </h4>
                   <p className="font-sans text-[12px] text-[#5A6B78] mt-1">
-                    Please wait while your files are uploaded. Selecting files is temporarily disabled.
+                    Please wait while your files are uploaded. Selecting files
+                    is temporarily disabled.
                   </p>
                 </div>
               ) : isSubmitting ? (
@@ -963,16 +1032,16 @@ export default function ReportUploadPage({
                     {bothAdded
                       ? "Add another document or replacement file"
                       : files.length === 1
-                      ? files[0].type === "contract"
-                        ? isUS
-                          ? "Now add your separation agreement, or tap to select"
-                          : "Now add your severance letter, or tap to select"
+                        ? files[0].type === "contract"
+                          ? isUS
+                            ? "Now add your separation agreement, or tap to select"
+                            : "Now add your severance letter, or tap to select"
+                          : isUS
+                            ? "Now add your offer letter or contract, or tap to select"
+                            : "Now add your employment contract, or tap to select"
                         : isUS
-                        ? "Now add your offer letter or contract, or tap to select"
-                        : "Now add your employment contract, or tap to select"
-                      : isUS
-                      ? "Drop your two documents here, or tap to add"
-                      : "Drop files here, or tap to add"}
+                          ? "Drop your two documents here, or tap to add"
+                          : "Drop files here, or tap to add"}
                   </h4>
                   <p className="font-sans font-normal text-[12.5px] leading-[20px] text-[#5A6B78] mt-[2px]">
                     PDF, Word or photos
@@ -984,14 +1053,29 @@ export default function ReportUploadPage({
             {/* AI Reading Explanation Box */}
             <div className="w-full min-h-[80.5px] bg-[#F7F9FB] border border-[#D9E2EA] rounded-[10px] p-[13px_15px] flex items-start gap-[12px] mb-[14px]">
               <div className="w-[18px] h-[18px] shrink-0 mt-[2px] text-[#0C8F72]">
-                <svg className="w-[18px] h-[18px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+                <svg
+                  className="w-[18px] h-[18px]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z"
+                  />
                 </svg>
               </div>
               <div className="font-sans font-normal text-[12.5px] leading-[19px] text-[#3B4B59]">
-                <strong className="font-[700] text-[#062C55]">How we read these:</strong> AI pulls out the key terms and
-                we check them against official {isUS ? "federal and state" : "provincial"} rules. It can misread things, so you&apos;ll review
-                everything we found on the next screen. Documents are deleted 30 days after your report is ready.{" "}
+                <strong className="font-[700] text-[#062C55]">
+                  How we read these:
+                </strong>{" "}
+                AI pulls out the key terms and we check them against official{" "}
+                {isUS ? "federal and state" : "provincial"} rules. It can
+                misread things, so you&apos;ll review everything we found on the
+                next screen. Documents are deleted 30 days after your report is
+                ready.{" "}
                 <button
                   type="button"
                   onClick={() => setDataPrivacyOpen(true)}
@@ -1019,8 +1103,8 @@ export default function ReportUploadPage({
                       file.status === "uploading"
                         ? "bg-[#F7FAFD] border-[#BDE0FE]"
                         : file.status === "error"
-                        ? "bg-[#FDF3F2] border-[#F5C2C0]"
-                        : "bg-[#EEF8F3] border-[#C7E6D6]"
+                          ? "bg-[#FDF3F2] border-[#F5C2C0]"
+                          : "bg-[#EEF8F3] border-[#C7E6D6]"
                     }`}
                   >
                     <div className="flex items-center justify-between mb-[8px]">
@@ -1028,11 +1112,17 @@ export default function ReportUploadPage({
                         {file.status === "uploading" ? (
                           <span className="w-4 h-4 rounded-full border-2 border-[#0284C7] border-t-transparent animate-spin shrink-0" />
                         ) : file.status === "error" ? (
-                          <span className="text-[13.5px] text-[#A3231F]" aria-hidden>
+                          <span
+                            className="text-[13.5px] text-[#A3231F]"
+                            aria-hidden
+                          >
                             ⚠️
                           </span>
                         ) : (
-                          <span className="text-[13.5px] text-[#17242F]" aria-hidden>
+                          <span
+                            className="text-[13.5px] text-[#17242F]"
+                            aria-hidden
+                          >
                             ✅
                           </span>
                         )}
@@ -1053,7 +1143,11 @@ export default function ReportUploadPage({
                       <button
                         type="button"
                         aria-label={`Remove ${file.name}`}
-                        disabled={isUploading || isSubmitting || removingDocId === file.id}
+                        disabled={
+                          isUploading ||
+                          isSubmitting ||
+                          removingDocId === file.id
+                        }
                         onClick={() => handleRemoveFile(file.id)}
                         className="text-[#9AA7B2] hover:text-[#D42E2B] disabled:opacity-40 disabled:cursor-not-allowed p-1 rounded-md transition text-[13px] font-bold cursor-pointer"
                       >
@@ -1066,7 +1160,9 @@ export default function ReportUploadPage({
                     </div>
 
                     {file.status === "error" && file.error && (
-                      <p className="text-[12px] text-[#A3231F] mb-2">{file.error}</p>
+                      <p className="text-[12px] text-[#A3231F] mb-2">
+                        {file.error}
+                      </p>
                     )}
 
                     <div>
@@ -1087,22 +1183,33 @@ export default function ReportUploadPage({
                       <select
                         id={`select-${file.id}`}
                         value={file.type}
-                        disabled={file.status === "uploading" || isUploading || isSubmitting || updatingDocId === file.id}
+                        disabled={
+                          file.status === "uploading" ||
+                          isUploading ||
+                          isSubmitting ||
+                          updatingDocId === file.id
+                        }
                         onChange={(e) =>
                           handleTypeChange(
                             file.id,
-                            e.target.value as "contract" | "letter" | "other"
+                            e.target.value as "contract" | "letter" | "other",
                           )
                         }
                         className="w-full h-[32px] bg-white border border-[#CDD3D8] disabled:bg-[#F2F4F7] disabled:text-[#8896A0] disabled:cursor-not-allowed rounded-[9px] px-[10px] font-sans font-[600] text-[12.5px] leading-[18px] text-[#062C55] focus:outline-none focus:border-[#0EB28D] transition"
                       >
                         <option value="contract">
-                          {isUS ? "Offer letter / employment agreement" : "Employment contract"}
+                          {isUS
+                            ? "Offer letter / employment agreement"
+                            : "Employment contract"}
                         </option>
                         <option value="letter">
-                          {isUS ? "Separation agreement / release" : "Severance offer / agreement"}
+                          {isUS
+                            ? "Separation agreement / release"
+                            : "Severance offer / agreement"}
                         </option>
-                        <option value="other">Other / supporting document</option>
+                        <option value="other">
+                          Other / supporting document
+                        </option>
                       </select>
                     </div>
                   </div>
@@ -1122,7 +1229,7 @@ export default function ReportUploadPage({
                       Both documents uploaded successfully!
                     </h4>
                     <p className="font-sans text-[12.5px] text-[#0C8F72]">
-                      Your documents are ready. Click below to get your report.
+                      Your documents are ready. Click generate report below to continue.
                     </p>
                   </div>
                 </div>
@@ -1146,16 +1253,16 @@ export default function ReportUploadPage({
                   isSubmitting
                     ? "bg-[#0EB28D] text-white cursor-wait opacity-95 shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)]"
                     : isUploading
-                    ? "bg-[#96DAC9] text-white cursor-not-allowed opacity-90 shadow-none"
-                    : bothAdded || contractStatus !== "none"
-                    ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
-                    : "bg-[#96DAC9] text-white cursor-not-allowed opacity-90 shadow-none"
+                      ? "bg-[#96DAC9] text-white cursor-not-allowed opacity-90 shadow-none"
+                      : bothAdded || contractStatus !== "none"
+                        ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
+                        : "bg-[#96DAC9] text-white cursor-not-allowed opacity-90 shadow-none"
                 }`}
               >
                 {isSubmitting ? (
                   <>
                     <span className="inline-block w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                    Reading your documents…
+                    Generating report…
                   </>
                 ) : isUploading ? (
                   <>
@@ -1163,13 +1270,15 @@ export default function ReportUploadPage({
                     Uploading documents…
                   </>
                 ) : bothAdded ? (
-                  "Get my report →"
+                  "Generate report →"
                 ) : hasLetter && contractStatus === "never" ? (
-                  "Get my report without a contract →"
-                ) : hasLetter && (contractStatus === "missing" || contractStatus === "later") ? (
-                  "Get my report without it →"
+                  "Generate report without a contract →"
+                ) : hasLetter &&
+                  (contractStatus === "missing" ||
+                    contractStatus === "later") ? (
+                  "Generate report without it →"
                 ) : (
-                  "Get my report →"
+                  "Generate report →"
                 )}
               </button>
 
@@ -1203,87 +1312,149 @@ export default function ReportUploadPage({
             {/* Key-Value Summary List */}
             <div className="text-[13px] divide-y divide-[#D3DAE1]">
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Union member</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.union || "No"}</span>
-              </div>
-
-              <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Employment</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.employment || "Regular employee"}</span>
-              </div>
-
-              <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">{isUS ? "State" : "Province"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Union member
+                </span>
                 <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
-                  {isUS ? data.state || "California" : data.provinceName || "Ontario"}
+                  {data.union || "No"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Age</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.age || "52"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Employment
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.employment || "Regular employee"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Years of service</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.years || (isUS ? 9 : 14)} yrs</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  {isUS ? "State" : "Province"}
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {isUS
+                    ? data.state || "California"
+                    : data.provinceName || "Ontario"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Pay</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{payFormatted}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Age
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.age || "52"}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-[7px]">
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Years of service
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.years || (isUS ? 9 : 14)} yrs
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between py-[7px]">
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Pay
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {payFormatted}
+                </span>
               </div>
 
               <div className="flex items-start justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Occupation</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Occupation
+                </span>
                 <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55] text-right max-w-[150px]">
                   {data.role || "Middle management / Senior / Director"}
                 </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Employer payroll ≥ $2.5M</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.payroll || "Not sure"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Employer payroll ≥ $2.5M
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.payroll || "Not sure"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Other pay</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.otherPay || "None"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Other pay
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.otherPay || "None"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">New job yet?</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.newJob || "Not yet"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  New job yet?
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.newJob || "Not yet"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Min-only clause</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.minClause || "No"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Min-only clause
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.minClause || "No"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Contract</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.contract || "Signed · role changed"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Contract
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.contract || "Signed · role changed"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">How it ended</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.howEnded || "Laid off"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  How it ended
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.howEnded || "Laid off"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Similar jobs nearby</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.market || "Some"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Similar jobs nearby
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.market || "Some"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Anything flagged</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.flagged || "Nothing unusual"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Anything flagged
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.flagged || "Nothing unusual"}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Offer</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{offerFormatted}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  Offer
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {offerFormatted}
+                </span>
               </div>
             </div>
 
@@ -1296,10 +1467,12 @@ export default function ReportUploadPage({
                 {minFormatted} – {courtHighFormatted}
               </div>
               <div className="font-sans font-normal text-[11.5px] leading-[16px] text-[#5A6B78] mb-[2px]">
-                {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
+                {data.noticeWeeks || 8} wks notice · court-awarded{" "}
+                {data.courtMonths || "15–21 mo"}
               </div>
               <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-[12px]">
-                <span className="font-[700]">Your offer {offerFormatted}</span> — near the floor
+                <span className="font-[700]">Your offer {offerFormatted}</span>{" "}
+                — near the floor
               </div>
 
               {/* Status pill */}
@@ -1339,16 +1512,25 @@ export default function ReportUploadPage({
             </div>
             <div className="text-[13.5px] leading-relaxed text-[#5A6B78] space-y-3">
               <p>
-                <strong>Encrypted in transit and at rest:</strong> All documents you upload are encrypted using industry-standard AES-256 encryption.
+                <strong>Encrypted in transit and at rest:</strong> All documents
+                you upload are encrypted using industry-standard AES-256
+                encryption.
               </p>
               <p>
-                <strong>Automated 30-day deletion:</strong> Your files are stored strictly to generate and display your report. Exactly 30 days after your report is ready, all uploaded documents are permanently deleted from our servers.
+                <strong>Automated 30-day deletion:</strong> Your files are
+                stored strictly to generate and display your report. Exactly 30
+                days after your report is ready, all uploaded documents are
+                permanently deleted from our servers.
               </p>
               <p>
-                <strong>Never used for model training:</strong> Your documents and personal information are never used to train public AI models or sold to any third party.
+                <strong>Never used for model training:</strong> Your documents
+                and personal information are never used to train public AI
+                models or sold to any third party.
               </p>
               <p>
-                <strong>Confidential legal collaboration:</strong> If you choose to share your report with a lawyer through FairExit, only the verified lawyer receives access with your explicit consent.
+                <strong>Confidential legal collaboration:</strong> If you choose
+                to share your report with a lawyer through FairExit, only the
+                verified lawyer receives access with your explicit consent.
               </p>
             </div>
             <div className="pt-2 flex justify-end">

@@ -268,7 +268,7 @@ function gaugeSvg(frac: number): string {
 
 /** Radar / Diamond chart matching sample PDF ca9.png */
 function radarSvg(factors?: ReportJson['factors']): string {
-  const cx = 140, cy = 130, r = 75
+  const cx = 165, cy = 125, r = 68
   const s = Math.max(0.2, Math.min(1, Number(factors?.service) || 0.75))
   const a = Math.max(0.2, Math.min(1, Number(factors?.age) || 0.8))
   const j = Math.max(0.2, Math.min(1, Number(factors?.job_level) || 0.5))
@@ -293,15 +293,15 @@ function radarSvg(factors?: ReportJson['factors']): string {
 
   return `
     <div class="radar-box">
-      <svg width="280" height="260" viewBox="0 0 280 260">
+      <svg width="280" height="250" viewBox="0 0 280 250">
         ${gridDiamonds}
         ${axes}
         ${poly}
         ${centerDot}
-        <text x="${cx}" y="${cy - r - 12}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Length of service</text>
-        <text x="${cx + r + 12}" y="${cy + 4}" text-anchor="start" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Age</text>
-        <text x="${cx}" y="${cy + r + 20}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Job level</text>
-        <text x="${cx - r - 12}" y="${cy + 4}" text-anchor="end" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Similar jobs</text>
+        <text x="${cx}" y="${cy - r - 10}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Length of service</text>
+        <text x="${cx + r + 8}" y="${cy + 4}" text-anchor="start" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Age</text>
+        <text x="${cx}" y="${cy + r + 18}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Job level</text>
+        <text x="${cx - r - 8}" y="${cy + 4}" text-anchor="end" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Similar jobs</text>
       </svg>
     </div>
   `
@@ -321,6 +321,14 @@ function pageFooter(curPage: number, totalPages: number): string {
       <div class="page-footer-pill">
         <b>General information, not legal advice.</b> We've done our best to make this clear and accurate, but please check the details before you act. If anything feels unclear, a professional can help.
       </div>
+      <div class="page-footer-num">Page ${curPage} of ${totalPages}</div>
+    </div>
+  `
+}
+
+function sectionCoverFooter(curPage: number, totalPages: number): string {
+  return `
+    <div class="page-footer page-footer-slim">
       <div class="page-footer-num">Page ${curPage} of ${totalPages}</div>
     </div>
   `
@@ -675,7 +683,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   const countBad = allChecks.filter((c) => c.status === 'bad').length
   const countAsk = allChecks.filter((c) => c.status === 'ask' || c.status === 'info').length
 
-  const CHECKS_PER_PAGE = 7
+  const CHECKS_PER_PAGE = 8
   const checkChunks: Array<typeof allChecks> = []
   if (allChecks.length === 0) {
     checkChunks.push([])
@@ -1369,7 +1377,7 @@ body {
   width: 8.5in;
   height: 11in;
   max-height: 11in;
-  padding: 61.5pt 67.5pt 15.5pt 67.5pt;
+  padding: 54pt 67.5pt 14pt 67.5pt;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1383,11 +1391,11 @@ body {
   page-break-after: auto;
   break-after: auto;
 }
-.section-cover-page.s1-cover { padding-top: 119.5pt; }
-.section-cover-page.s2-cover { padding-top: 182.5pt; }
-.section-cover-page.s3-cover { padding-top: 128.5pt; }
-.section-cover-page.s4-cover { padding-top: 177pt; }
-.section-cover-page.s5-cover { padding-top: 160.5pt; }
+.section-cover-page.s1-cover { padding-top: 126pt; }
+.section-cover-page.s2-cover { padding-top: 133pt; }
+.section-cover-page.s3-cover { padding-top: 115pt; }
+.section-cover-page.s4-cover { padding-top: 126pt; }
+.section-cover-page.s5-cover { padding-top: 126pt; }
 h1, h2, .huge-section-title, .cover-title, .section-heading {
   font-family: "Newsreader", Georgia, serif;
   color: #062C55;
@@ -1430,9 +1438,9 @@ b, strong, .bold {
   margin-bottom: 12px;
 }
 .section-heading {
-  font-size: 22pt;
-  margin: 0 0 6px 0;
-  line-height: 1.2;
+  font-size: 24pt;
+  margin: 0 0 8px 0;
+  line-height: 1.15;
 }
 .section-sub {
   font-size: 10pt;
@@ -1457,7 +1465,7 @@ b, strong, .bold {
 }
 .cover-hero-band {
   width: 100%;
-  height: 220px;
+  height: 285px;
   position: relative;
   overflow: hidden;
   background: #EEF8F3;
@@ -1479,7 +1487,7 @@ b, strong, .bold {
   left: 24px;
 }
 .hero-logo {
-  height: 28px;
+  height: 42px;
   width: auto;
   display: block;
 }
@@ -1496,9 +1504,10 @@ b, strong, .bold {
   margin-top: 2px;
 }
 .cover-content {
-  padding: 24pt 43.5pt 18pt 43.5pt;
+  padding: 22pt 36pt 16pt 36pt;
   display: flex;
   flex-direction: column;
+  flex: 1;
 }
 .cover-page .page-footer {
   padding: 0 43.5pt;
@@ -1512,8 +1521,8 @@ b, strong, .bold {
   margin-bottom: 6px;
 }
 .cover-title {
-  font-size: 32pt;
-  margin: 0 0 10px 0;
+  font-size: 36pt;
+  margin: 0 0 12px 0;
   line-height: 1.1;
 }
 .cover-lead {
@@ -1560,7 +1569,7 @@ b, strong, .bold {
   margin-bottom: 2px;
 }
 .meta-value {
-  font-size: 12.5pt;
+  font-size: 13pt;
   font-weight: 700;
   color: #062C55;
 }
@@ -1596,7 +1605,7 @@ b, strong, .bold {
 }
 .toc-title {
   font-size: 10.5pt;
-  font-weight: 700;
+  font-weight: 600;
   color: #062C55;
 }
 .toc-desc {
@@ -1679,14 +1688,14 @@ b, strong, .bold {
 /* Section Covers */
 .huge-section-digit {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 64pt;
+  font-size: 80pt;
   color: #062C55;
   line-height: 1;
-  margin: 16px 0 8px 0;
+  margin: 14px 0 6px 0;
 }
 .huge-section-title {
-  font-size: 32pt;
-  margin: 0 0 14px 0;
+  font-size: 30pt;
+  margin: 0 0 16px 0;
   line-height: 1.1;
 }
 .heavy-divider {
@@ -1741,16 +1750,16 @@ b, strong, .bold {
 .glance-card {
   border: 1px solid #E7E4DD;
   border-radius: 8px;
-  padding: 16px;
+  padding: 20px 18px;
   display: grid;
   grid-template-columns: 1.1fr 1fr;
-  gap: 20px;
+  gap: 24px;
 }
 .glance-lead {
-  font-size: 10.5pt;
-  line-height: 1.5;
+  font-size: 11pt;
+  line-height: 1.55;
   color: #17242F;
-  margin: 0 0 10px 0;
+  margin: 0 0 12px 0;
 }
 .glance-contract-note {
   font-size: 9pt;
@@ -1786,15 +1795,15 @@ b, strong, .bold {
 .myths-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 .myth-card {
   border: 1px solid #E7E4DD;
   border-radius: 8px;
-  padding: 9px 14px;
+  padding: 12px 16px;
   display: grid;
   grid-template-columns: 1fr 1.3fr;
-  gap: 16px;
+  gap: 18px;
 }
 .myth-header {
   font-size: 7.5pt;
@@ -1804,15 +1813,15 @@ b, strong, .bold {
   margin-bottom: 3px;
 }
 .myth-text {
-  font-size: 9pt;
+  font-size: 10pt;
   font-weight: 700;
   color: #062C55;
   line-height: 1.35;
 }
 .rule-text {
-  font-size: 8.5pt;
+  font-size: 9pt;
   color: #27343F;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 .myth-source {
   font-size: 7.5pt;
@@ -1845,7 +1854,7 @@ b, strong, .bold {
   display: grid;
   grid-template-columns: 1.5fr 2.1fr 2fr 1.9fr 2.5fr;
   gap: 8px;
-  padding: 6px 10px;
+  padding: 5px 10px;
   background: #FFFFFF;
   border: 1px solid #E7E4DD;
   border-radius: 6px;
@@ -1904,10 +1913,10 @@ b, strong, .bold {
 .navy-feature-card {
   background: #062C55;
   color: #FFFFFF;
-  border-radius: 8px;
-  padding: 16px 22px;
+  border-radius: 10px;
+  padding: 22px 28px;
   text-align: center;
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 .feature-card-kicker {
   font-size: 8pt;
@@ -1918,10 +1927,10 @@ b, strong, .bold {
 }
 .feature-card-amount {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 26pt;
+  font-size: 36pt;
   font-weight: 700;
-  letter-spacing: -0.5px;
-  margin-bottom: 6px;
+  letter-spacing: -1px;
+  margin-bottom: 8px;
 }
 .feature-card-desc {
   font-size: 9pt;
@@ -2273,13 +2282,13 @@ b, strong, .bold {
 .three-paths-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 18px;
+  gap: 16px;
+  margin-bottom: 20px;
 }
 .path-card {
   border: 1px solid #E7E4DD;
   border-radius: 8px;
-  padding: 16px;
+  padding: 20px 18px;
   background: #FFFFFF;
   display: flex;
   flex-direction: column;
@@ -2293,18 +2302,20 @@ b, strong, .bold {
 }
 .path-title {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 14pt;
+  font-size: 15pt;
   color: #062C55;
   margin: 0 0 10px 0;
+  font-weight: 600;
 }
 .path-desc {
-  font-size: 9pt;
+  font-size: 10pt;
   color: #5A6B78;
-  line-height: 1.4;
-  margin: 0 0 14px 0;
+  line-height: 1.45;
+  margin: 0 0 16px 0;
 }
 .path-bold-note {
-  font-size: 9pt;
+  font-size: 10pt;
+  font-weight: 700;
   color: #062C55;
   line-height: 1.4;
   margin-top: auto;
@@ -2430,6 +2441,14 @@ b, strong, .bold {
   color: #062C55;
   font-weight: 500;
   text-align: center;
+}
+.page-footer-slim {
+  margin-top: auto;
+  margin-bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
 }
 `
 

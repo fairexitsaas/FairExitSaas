@@ -164,7 +164,7 @@ export const US_FIELD_CONFIGS: Record<string, USFieldConfig> = {
   agesTitlesList: {
     type: "select",
     label: "Choose one",
-    options: ["Missing", "Provided", "Not applicable"],
+    options: ["Not found", "Provided", "Not applicable"],
   },
   nonCompete: {
     type: "select",
