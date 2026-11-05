@@ -58,7 +58,14 @@ export function errorHandler(
   const route = req.originalUrl.split('?')[0]
   const logDetails = { requestId, statusCode, message, errors, method: req.method, route }
   if (statusCode === 429) logger.warn('[HTTP][RATE_LIMITED]', logDetails)
-  else logger.error(`Error processing request [${req.method} ${route}]`, { ...logDetails, stack: err instanceof Error ? err.stack : undefined })
+  else {
+    // Put the status and reason on the visible line, so it can be read without expanding `details`
+    const first = Array.isArray(errors) && errors.length ? errors[0] as { field?: string; message?: string } : null
+    const reason = first ? `${first.field ? first.field + ': ' : ''}${first.message || ''}` : ''
+    const line = `[HTTP][${statusCode}] ${req.method} ${route} — ${message}${reason ? ` (${reason})` : ''}`
+    if (statusCode >= 500) logger.error(line, { ...logDetails, stack: err instanceof Error ? err.stack : undefined })
+    else logger.warn(line, logDetails)
+  }
 
   // Prevent duplicate responses if headers already sent
   if (res.headersSent) {
