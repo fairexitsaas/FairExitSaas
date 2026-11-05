@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { logger } from '../utils/logger'
 import { db, check } from '../config/db'
 import { ApiError } from '../utils/ApiError'
 import { computeFreeResult } from '../fairexit/freeCheck'
@@ -7,7 +8,8 @@ import { RULES_VERSION } from '../fairexit/severanceRules'
 import type { CaseRow, CaseDocumentRow, Platform, CaseStatus } from '../fairexit/types'
 
 
-const STALE_JOB_MS = 3.5 * 60 * 1000
+// Must be longer than a real Call B (Opus, 2-5 min) plus the PDF, or live jobs get marked failed.
+const STALE_JOB_MS = (Number(process.env.JOB_STALE_MINUTES) || 12) * 60 * 1000
 
 export function hashToken(token: string): string {
   return crypto.createHash('sha256').update(token).digest('hex')
@@ -54,6 +56,11 @@ export const caseService = {
   /** A job that died with the server or timed out (> 3.5 min) becomes "failed" so the person can retry. */
   async healStale(row: CaseRow): Promise<CaseRow> {
     if ((row.status === 'reading' || row.status === 'building') && row.job_started_at && Date.now() - new Date(row.job_started_at).getTime() > STALE_JOB_MS) {
+      logger.warn('[JOB][MARKED_STALE] Job ran longer than JOB_STALE_MINUTES with no result: it was most likely killed by the platform (check [CLAUDE][STREAM_PROGRESS] / [JOB][END] for this case)', {
+        caseId: row.id, status: row.status, stage: row.status_detail, startedAt: row.job_started_at,
+        elapsedS: Math.round((Date.now() - new Date(row.job_started_at).getTime()) / 1000), thresholdS: STALE_JOB_MS / 1000,
+        reportJsonSaved: !!row.report,
+      })
       // Once Call B JSON is saved, a stale job only needs its PDF/storage step resumed.
       if (
         row.status === 'building' && row.report &&

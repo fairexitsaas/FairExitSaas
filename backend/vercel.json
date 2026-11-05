@@ -9,8 +9,14 @@
   "functions": {
     "api/index.ts": {
       "memory": 2048,
-      "maxDuration": 120,
+      "maxDuration": 300,
       "includeFiles": "node_modules/@sparticuz/chromium/**"
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/v1/internal/jobs/run",
+      "schedule": "30 3 * * *"
+    }
+  ]
 }
