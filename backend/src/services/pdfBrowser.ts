@@ -46,13 +46,27 @@ function driverOrder(): Driver[] {
 }
 
 /* eslint-disable @typescript-eslint/no-var-requires, @typescript-eslint/no-explicit-any */
+/**
+ * puppeteer-core and @sparticuz/chromium are ES modules. This backend compiles to CommonJS, where
+ * `require()` of an ES module fails on Vercel ("require() of ES Module ... not supported") and TypeScript
+ * would turn `import()` into `require()`. So we call the real dynamic import() at runtime.
+ */
+const nativeImport = new Function('specifier', 'return import(specifier)') as (s: string) => Promise<any>
+async function loadModule(name: string): Promise<any> {
+  const m = await nativeImport(name)
+  return m?.default ?? m
+}
+// Never runs. It only tells Vercel's file tracer to ship these packages with the function.
+if (process.env.__FAIREXIT_TRACE_ONLY__ === '1') {
+  require('puppeteer-core')
+  require('@sparticuz/chromium')
+}
+
 async function launchSparticuz(): Promise<PdfBrowser> {
   let chromium: any, puppeteer: any
   try {
-    chromium = require('@sparticuz/chromium')
-    chromium = chromium.default || chromium
-    puppeteer = require('puppeteer-core')
-    puppeteer = puppeteer.default || puppeteer
+    chromium = await loadModule('@sparticuz/chromium')
+    puppeteer = await loadModule('puppeteer-core')
   } catch (err) {
     throw new ApiError(501, `Could not load puppeteer-core / @sparticuz/chromium: ${(err as Error).message}`)
   }
@@ -74,8 +88,7 @@ async function connectRemote(): Promise<PdfBrowser> {
   if (!endpoint) throw new ApiError(501, 'PDF_BROWSER_WS_ENDPOINT is not set')
   let puppeteer: any
   try {
-    puppeteer = require('puppeteer-core')
-    puppeteer = puppeteer.default || puppeteer
+    puppeteer = await loadModule('puppeteer-core')
   } catch (err) {
     throw new ApiError(501, `Could not load puppeteer-core: ${(err as Error).message}`)
   }

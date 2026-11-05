@@ -43,24 +43,62 @@ function browserlessPdfUrl(): string | null {
   }
 }
 
-async function printViaBrowserlessRest(url: string, html: string): Promise<Buffer> {
+/**
+ * Browserless /pdf. The report is ~1 MB of HTML (images inlined) plus Google Fonts.
+ * "networkidle0" timed out at 60 s on Browserless (408 "waiting for page content"), so we wait for the
+ * normal "load" event, give fonts up to 8 s, and set bestAttempt so a slow resource never fails the PDF.
+ * Retries: 408/429/5xx -> lighter settings; 400 (option not accepted) -> the minimal body that curl used.
+ */
+async function postBrowserless(url: string, body: Record<string, unknown>, timeoutMs: number) {
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'cache-control': 'no-cache' },
-    body: JSON.stringify({
-      html,
-      options: PDF_OPTIONS,
-      gotoOptions: { waitUntil: 'networkidle0', timeout: 60000 }, // lets Google Fonts load
-    }),
-    signal: AbortSignal.timeout(100_000),
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs),
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`Browserless /pdf returned ${res.status}: ${text.slice(0, 300)}`)
+    const e = new Error(`Browserless /pdf returned ${res.status}: ${text.slice(0, 300)}`) as Error & { status?: number }
+    e.status = res.status
+    throw e
   }
   const buf = Buffer.from(await res.arrayBuffer())
   if (buf.subarray(0, 5).toString() !== '%PDF-') throw new Error(`Browserless /pdf returned something that is not a PDF (${buf.length} bytes)`)
   return buf
+}
+
+async function printViaBrowserlessRest(url: string, html: string, context: PdfLogContext): Promise<Buffer> {
+  const attempts: Array<{ name: string; body: Record<string, unknown> }> = [
+    {
+      name: 'load+fonts',
+      body: {
+        html,
+        options: PDF_OPTIONS,
+        gotoOptions: { waitUntil: 'load', timeout: 45000 },
+        waitForFunction: { fn: "() => document.fonts.status === 'loaded'", timeout: 8000 },
+        bestAttempt: true,
+      },
+    },
+    { name: 'domcontentloaded', body: { html, options: PDF_OPTIONS, gotoOptions: { waitUntil: 'domcontentloaded', timeout: 30000 }, bestAttempt: true } },
+    { name: 'minimal', body: { html, options: PDF_OPTIONS } },
+  ]
+  let lastErr: unknown
+  for (let i = 0; i < attempts.length; i++) {
+    const a = attempts[i]
+    const t = Date.now()
+    try {
+      const buf = await postBrowserless(url, a.body, 90_000)
+      if (i > 0) logger.info('[PDF][BROWSERLESS_RETRY_OK]', { ...context, attempt: a.name, durationMs: Date.now() - t })
+      return buf
+    } catch (err) {
+      lastErr = err
+      const status = (err as { status?: number }).status
+      logger.warn('[PDF][BROWSERLESS_ATTEMPT_FAILED]', { ...context, attempt: a.name, status, durationMs: Date.now() - t, message: (err as Error).message })
+      // 401/403 = bad token: retrying won't help
+      if (status === 401 || status === 403) break
+    }
+  }
+  throw lastErr
 }
 
 async function printViaBrowser(html: string): Promise<Buffer> {
@@ -86,7 +124,7 @@ async function printPdf(html: string, context: PdfLogContext, startedAt: number)
   if (restUrl) {
     const t = Date.now()
     try {
-      const buf = await printViaBrowserlessRest(restUrl, html)
+      const buf = await printViaBrowserlessRest(restUrl, html, context)
       logger.info('[PDF][COMPLETE]', { ...context, renderer: 'browserless-rest', durationMs: Date.now() - startedAt, renderMs: Date.now() - t, bytes: buf.length })
       return buf
     } catch (err) {
