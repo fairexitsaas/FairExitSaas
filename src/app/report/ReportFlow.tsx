@@ -192,6 +192,11 @@ export default function ReportFlow() {
         cs={cs}
         onContinue={async () => {
           setView("reading");
+          if (caseId) {
+            router.push(`/report?step=reading&case=${caseId}`);
+          } else {
+            router.push(`/report?step=reading`);
+          }
         }}
       />
     );
