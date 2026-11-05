@@ -17,6 +17,7 @@
  */
 import { logger } from '../utils/logger'
 import { ApiError } from '../utils/ApiError'
+import { maskUrl } from '../utils/diagnostics'
 
 export interface PdfPage {
   setDefaultTimeout(ms: number): void
@@ -52,8 +53,8 @@ async function launchSparticuz(): Promise<PdfBrowser> {
     chromium = chromium.default || chromium
     puppeteer = require('puppeteer-core')
     puppeteer = puppeteer.default || puppeteer
-  } catch {
-    throw new ApiError(501, 'PDF on serverless needs: npm i puppeteer-core @sparticuz/chromium')
+  } catch (err) {
+    throw new ApiError(501, `Could not load puppeteer-core / @sparticuz/chromium: ${(err as Error).message}`)
   }
   // No GPU / no WebGL on Lambda; keeps start-up fast.
   if (typeof chromium.setGraphicsMode !== 'undefined') chromium.setGraphicsMode = false
@@ -75,8 +76,8 @@ async function connectRemote(): Promise<PdfBrowser> {
   try {
     puppeteer = require('puppeteer-core')
     puppeteer = puppeteer.default || puppeteer
-  } catch {
-    throw new ApiError(501, 'Remote PDF needs: npm i puppeteer-core')
+  } catch (err) {
+    throw new ApiError(501, `Could not load puppeteer-core: ${(err as Error).message}`)
   }
   const browser = await puppeteer.connect({ browserWSEndpoint: endpoint, protocolTimeout: 120_000 })
   // disconnect (not close): Browserless ends the session on disconnect, and a shared Chrome stays up
@@ -153,7 +154,9 @@ export async function getPdfBrowser(): Promise<PdfBrowser> {
   }
   browserPromise = (async () => {
     let lastErr: unknown
-    for (const driver of driverOrder()) {
+    const order = driverOrder()
+    logger.info('[PDF][BROWSER_LAUNCH]', { order, remoteEndpoint: maskUrl(process.env.PDF_BROWSER_WS_ENDPOINT), serverless: isServerless() })
+    for (const driver of order) {
       const started = Date.now()
       try {
         const b = await launch[driver]()

@@ -1,4 +1,5 @@
 import { logger } from './logger'
+import { instanceAgeS } from './diagnostics'
 
 /**
  * Runs long AI work (Call A, Call B) after the HTTP response has gone out.
@@ -13,14 +14,17 @@ const running = new Set<string>()
  * ("Report generation timed out"). waitUntil() from @vercel/functions keeps the invocation alive
  * until the job finishes (up to maxDuration in vercel.json). On a normal server this is a no-op.
  */
-function keepAlive(job: Promise<void>, label: string) {
-  if (!process.env.VERCEL) return
+/** Returns true when the job is protected by waitUntil. checkOnly: just report, don't register. */
+function keepAlive(job: Promise<void> | null, label: string, checkOnly = false): boolean {
+  if (!process.env.VERCEL) return false
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { waitUntil } = require('@vercel/functions') as { waitUntil: (p: Promise<unknown>) => void }
-    waitUntil(job)
+    if (!checkOnly && job) waitUntil(job)
+    return true
   } catch {
-    logger.error('[JOB][NO_WAIT_UNTIL] Install @vercel/functions, or Vercel will stop this job early', { label })
+    if (!checkOnly) logger.error('[JOB][NO_WAIT_UNTIL] Install @vercel/functions, or Vercel will stop this job early', { label })
+    return false
   }
 }
 
@@ -37,10 +41,14 @@ export function releaseBackground(key: string) {
 /** Schedule a task whose key was reserved synchronously before asynchronous DB work. */
 export function runReservedBackground(key: string, label: string, fn: () => Promise<void>): boolean {
   if (!running.has(key)) return false
+  const startedAt = Date.now()
+  const kept = keepAlive(null, label, true)
+  logger.info('[JOB][START]', { key, label, platform: process.env.VERCEL ? 'vercel' : 'server', waitUntil: kept, instanceAgeS: instanceAgeS() })
   const job = new Promise<void>((resolve) => {
     setImmediate(() => {
       fn()
-        .catch((err) => logger.error(`Background job failed: ${label}`, { key, message: (err as Error).message, stack: (err as Error).stack }))
+        .then(() => logger.info('[JOB][END]', { key, label, ok: true, durationMs: Date.now() - startedAt }))
+        .catch((err) => logger.error('[JOB][END]', { key, label, ok: false, durationMs: Date.now() - startedAt, message: (err as Error).message, stack: (err as Error).stack }))
         .finally(() => {
           running.delete(key)
           resolve()
