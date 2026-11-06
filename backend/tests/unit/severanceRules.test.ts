@@ -4,6 +4,7 @@ import path from 'path'
 import vm from 'vm'
 import { estimate, getRule, commonLawMonths, marketAdjust, RULES } from '../../src/fairexit/severanceRules'
 import { estimate as clientEstimate, FairExitRules as ClientRules } from '../../../src/lib/severance-rules'
+import { computeFreeResult } from '../../src/fairexit/freeCheck'
 
 const ORIGINAL_JS = path.resolve(__dirname, '../../../codebase/resource-hub-v2/severance-rules.js')
 
@@ -271,6 +272,288 @@ describe('FairExitRules — Specification & Parity Tests', () => {
       expect(hard.statutory?.amount).toBe(originalMin)
       expect(hard.commonLaw?.lowMonths).toBe(Math.round(8 * 1.15))
       expect(hard.commonLaw?.highMonths).toBe(Math.round(12 * 1.15))
+    })
+
+    it('enforces 24-month cap after market factor application (Test Case D)', () => {
+      const res = marketAdjust(estimate('CA-AB', {
+        age: 56,
+        years: 15,
+        salary: 120000,
+        roleFactor: 1.25,
+      }), 'hard')
+
+      expect(res.weekly).toBeCloseTo(120000 / 52, 2)
+      expect(res.monthly).toBe(10000)
+      expect(res.statutory?.amount).toBe(18462)
+      expect(res.commonLaw?.lowMonths).toBe(21)
+      expect(res.commonLaw?.highMonths).toBe(24)
+      expect(res.commonLaw?.highAmount).toBe(240000)
+      expect(res.commonLaw?.highAmount).toBeLessThanOrEqual(24 * 10000)
+      const range = `$${res.statutory!.amount.toLocaleString('en-CA')}–$${res.commonLaw!.highAmount.toLocaleString('en-CA')}`
+      expect(range).toBe('$18,462–$240,000')
+    })
+  })
+
+  describe('Spec v0.4.0 Worked Examples A through H', () => {
+    it('calculates Example A (Ontario): $27,692–$90,000', () => {
+      const res = marketAdjust(estimate('CA-ON', {
+        age: 45, years: 8, salary: 90000, roleFactor: 1.15, payrollGlobal: 3000000
+      }), 'mid')
+      expect(res.statutory?.terminationWeeks).toBe(8)
+      expect(res.statutory?.severanceWeeks).toBe(8)
+      expect(res.statutory?.amount).toBe(27692)
+      expect(res.commonLaw?.lowMonths).toBe(8)
+      expect(res.commonLaw?.highMonths).toBe(12)
+      expect(res.commonLaw?.highAmount).toBe(90000)
+      expect(`$${res.statutory!.amount.toLocaleString('en-CA')}–$${res.commonLaw!.highAmount.toLocaleString('en-CA')}`).toBe('$27,692–$90,000')
+    })
+
+    it('calculates Example B (Ontario Payroll Unknown): $8,077–$40,833', () => {
+      const res = marketAdjust(estimate('CA-ON', {
+        age: 38, years: 6, salary: 70000, roleFactor: 1.0, payrollUnknown: true
+      }), 'mid')
+      expect(res.statutory?.terminationWeeks).toBe(6)
+      expect(res.statutory?.severanceWeeks).toBe(0)
+      expect(res.statutory?.amount).toBe(8077)
+      expect(res.statutory?.potentialSeveranceWeeks).toBe(6)
+      expect(res.statutory?.potentialSeveranceAmount).toBe(8077)
+      expect(res.statutory?.potentialSeveranceMessage).toBe('may apply, up to 6 wks ($8,077)')
+      expect(res.commonLaw?.lowMonths).toBe(5)
+      expect(res.commonLaw?.highMonths).toBe(7)
+      expect(res.commonLaw?.highAmount).toBe(40833)
+      expect(`$${res.statutory!.amount.toLocaleString('en-CA')}–$${res.commonLaw!.highAmount.toLocaleString('en-CA')}`).toBe('$8,077–$40,833')
+    })
+
+    it('calculates Example C (British Columbia): $3,462–$13,500', () => {
+      const res = marketAdjust(estimate('CA-BC', {
+        age: 30, years: 3, salary: 60000, roleFactor: 1.0
+      }), 'easy')
+      expect(res.statutory?.terminationWeeks).toBe(3)
+      expect(res.statutory?.amount).toBe(3462)
+      expect(res.commonLaw?.lowMonths).toBe(2)
+      expect(res.commonLaw?.highMonths).toBe(3)
+      expect(res.commonLaw?.highAmount).toBe(13500)
+      expect(`$${res.statutory!.amount.toLocaleString('en-CA')}–$${res.commonLaw!.highAmount.toLocaleString('en-CA')}`).toBe('$3,462–$13,500')
+    })
+
+    it('calculates Example D (Alberta): $18,462–$240,000 with 24-month cap', () => {
+      const res = marketAdjust(estimate('CA-AB', {
+        age: 56, years: 15, salary: 120000, roleFactor: 1.25
+      }), 'hard')
+      expect(res.statutory?.terminationWeeks).toBe(8)
+      expect(res.statutory?.amount).toBe(18462)
+      expect(res.commonLaw?.lowMonths).toBe(21)
+      expect(res.commonLaw?.highMonths).toBe(24)
+      expect(res.commonLaw?.highAmount).toBe(240000)
+      expect(`$${res.statutory!.amount.toLocaleString('en-CA')}–$${res.commonLaw!.highAmount.toLocaleString('en-CA')}`).toBe('$18,462–$240,000')
+    })
+
+    it('calculates Example E (Nova Scotia Group Layoff): $12,692–$22,917', () => {
+      const res = marketAdjust(estimate('CA-NS', {
+        age: 40, years: 4, salary: 55000, roleFactor: 1.08, groupLayoff: true, groupSize: 100, workforceQuarter: 'yes'
+      }), 'mid')
+      expect(res.statutory?.individualNoticeWeeks).toBe(2)
+      expect(res.statutory?.groupWeeks).toBe(12)
+      expect(res.statutory?.appliedNoticeWeeks).toBe(12)
+      expect(res.statutory?.terminationWeeks).toBe(12)
+      expect(res.statutory?.amount).toBe(12692)
+      expect(res.commonLaw?.lowMonths).toBe(3)
+      expect(res.commonLaw?.highMonths).toBe(5)
+      expect(res.commonLaw?.highAmount).toBe(22917)
+      expect(`$${res.statutory!.amount.toLocaleString('en-CA')}–$${res.commonLaw!.highAmount.toLocaleString('en-CA')}`).toBe('$12,692–$22,917')
+    })
+
+    it('calculates Example F (Federal Canada): $18,462–$100,000', () => {
+      const res = marketAdjust(estimate('CA-FED', {
+        age: 50, years: 10, salary: 80000, roleFactor: 1.12
+      }), 'mid')
+      expect(res.statutory?.terminationWeeks).toBe(8)
+      expect(res.statutory?.severanceWeeks).toBe(4)
+      expect(res.statutory?.weeks).toBe(12)
+      expect(res.statutory?.amount).toBe(18462)
+      expect(res.commonLaw?.lowMonths).toBe(11)
+      expect(res.commonLaw?.highMonths).toBe(15)
+      expect(res.commonLaw?.highAmount).toBe(100000)
+      expect(`$${res.statutory!.amount.toLocaleString('en-CA')}–$${res.commonLaw!.highAmount.toLocaleString('en-CA')}`).toBe('$18,462–$100,000')
+    })
+
+    it('calculates Example G (Saskatchewan Group Conditional): $1,923–$8,333', () => {
+      const res = marketAdjust(estimate('CA-SK', {
+        age: 35, years: 2, salary: 50000, roleFactor: 1.0, groupLayoff: true, groupSize: 50
+      }), 'mid')
+      expect(res.statutory?.individualNoticeWeeks).toBe(2)
+      expect(res.statutory?.terminationWeeks).toBe(2)
+      expect(res.statutory?.amount).toBe(1923)
+      expect(res.statutory?.conditionalGroupNoticeWeeks).toBe(6)
+      expect(res.statutory?.conditionalGroupNoticeAmount).toBe(5769)
+      expect(res.statutory?.conditionalGroupMessage).toBe('may add 6 wks ($5,769), ask a lawyer')
+      expect(res.commonLaw?.lowMonths).toBe(2)
+      expect(res.commonLaw?.highMonths).toBe(2)
+      expect(res.commonLaw?.highAmount).toBe(8333)
+      expect(`$${res.statutory!.amount.toLocaleString('en-CA')}–$${res.commonLaw!.highAmount.toLocaleString('en-CA')}`).toBe('$1,923–$8,333')
+    })
+
+    it('calculates Example H (PEI Group Layoff): $5,192 (min only)', () => {
+      const res = marketAdjust(estimate('CA-PE', {
+        age: 28, years: 1, salary: 45000, roleFactor: 1.0, groupLayoff: true, groupSize: 25, workforceQuarter: 'yes'
+      }), 'mid')
+      expect(res.statutory?.individualNoticeWeeks).toBe(2)
+      expect(res.statutory?.groupWeeks).toBe(6)
+      expect(res.statutory?.appliedNoticeWeeks).toBe(6)
+      expect(res.statutory?.terminationWeeks).toBe(6)
+      expect(res.statutory?.amount).toBe(5192)
+
+      const clauseHolds = true
+      const lowAmt = res.statutory!.amount
+      const highAmt = clauseHolds ? res.statutory!.amount : res.commonLaw!.highAmount
+      expect(lowAmt).toBe(5192)
+      expect(highAmt).toBe(5192)
+    })
+  })
+
+  describe('Province-Specific Group Layoff Rules Coverage', () => {
+    it('applies Ontario mass termination thresholds (50+: 8, 200+: 12, 500+: 16)', () => {
+      const res50 = estimate('CA-ON', { years: 2, salary: 52000, groupLayoff: true, groupSize: 50 })
+      expect(res50.statutory?.individualNoticeWeeks).toBe(2)
+      expect(res50.statutory?.groupWeeks).toBe(8)
+      expect(res50.statutory?.appliedNoticeWeeks).toBe(8)
+
+      const res200 = estimate('CA-ON', { years: 2, salary: 52000, groupLayoff: true, groupSize: 200 })
+      expect(res200.statutory?.groupWeeks).toBe(12)
+      expect(res200.statutory?.appliedNoticeWeeks).toBe(12)
+
+      const res500 = estimate('CA-ON', { years: 2, salary: 52000, groupLayoff: true, groupSize: 500 })
+      expect(res500.statutory?.groupWeeks).toBe(16)
+      expect(res500.statutory?.appliedNoticeWeeks).toBe(16)
+    })
+
+    it('adds BC group notice on top of individual notice', () => {
+      // Individual: 4 yrs -> 4 wks. Group: 50 -> 8 wks. Total = 12 wks.
+      const resBC = estimate('CA-BC', { years: 4, salary: 52000, groupLayoff: true, groupSize: 50 })
+      expect(resBC.statutory?.individualNoticeWeeks).toBe(4)
+      expect(resBC.statutory?.groupWeeks).toBe(8)
+      expect(resBC.statutory?.appliedNoticeWeeks).toBe(12)
+      expect(resBC.statutory?.weeks).toBe(12)
+      expect(resBC.statutory?.amount).toBe(12000)
+    })
+
+    it('applies Manitoba group notice thresholds (50+: 10, 101+: 14, 300+: 18)', () => {
+      const res50 = estimate('CA-MB', { years: 1, salary: 52000, groupLayoff: true, groupSize: 50 })
+      expect(res50.statutory?.groupWeeks).toBe(10)
+      expect(res50.statutory?.appliedNoticeWeeks).toBe(10)
+
+      const res101 = estimate('CA-MB', { years: 1, salary: 52000, groupLayoff: true, groupSize: 150 })
+      expect(res101.statutory?.groupWeeks).toBe(14)
+      expect(res101.statutory?.appliedNoticeWeeks).toBe(14)
+
+      const res300 = estimate('CA-MB', { years: 1, salary: 52000, groupLayoff: true, groupSize: 300 })
+      expect(res300.statutory?.groupWeeks).toBe(18)
+      expect(res300.statutory?.appliedNoticeWeeks).toBe(18)
+    })
+
+    it('applies Newfoundland group notice thresholds (50+: 8, 200+: 12, 500+: 16)', () => {
+      const resNL = estimate('CA-NL', { years: 2, salary: 52000, groupLayoff: true, groupSize: 50 })
+      expect(resNL.statutory?.groupWeeks).toBe(8)
+      expect(resNL.statutory?.appliedNoticeWeeks).toBe(8)
+    })
+
+    it('handles New Brunswick conditional group notice (11+ & 25%+ workforce: 6 wks)', () => {
+      const resNB = estimate('CA-NB', { years: 2, salary: 52000, groupLayoff: true, groupSize: 25, workforceQuarter: 'yes' })
+      expect(resNB.statutory?.individualNoticeWeeks).toBe(2)
+      expect(resNB.statutory?.appliedNoticeWeeks).toBe(2)
+      expect(resNB.statutory?.conditionalGroupNoticeWeeks).toBe(4) // 6 - 2 = 4
+      expect(resNB.statutory?.conditionalGroupMessage).toContain('may add 4 wks')
+
+      // Without 25% of workforce, no group notice
+      const resNBNoQ = estimate('CA-NB', { years: 2, salary: 52000, groupLayoff: true, groupSize: 25, workforceQuarter: 'no' })
+      expect(resNBNoQ.statutory?.groupWeeks).toBe(0)
+    })
+
+    it('confirms Alberta and Federal treat group layoff as notice to Minister only', () => {
+      const resAB = estimate('CA-AB', { years: 2, salary: 52000, groupLayoff: true, groupSize: 100 })
+      expect(resAB.statutory?.groupWeeks).toBe(0)
+      expect(resAB.statutory?.appliedNoticeWeeks).toBe(2)
+
+      const resFED = estimate('CA-FED', { years: 2, salary: 52000, groupLayoff: true, groupSize: 100 })
+      expect(resFED.statutory?.groupWeeks).toBe(0)
+    })
+  })
+
+  describe('computeFreeResult — Free Check API & Payload Integration', () => {
+    it('computes Free Check Test Case B (Ontario Payroll Unsure)', () => {
+      const res = computeFreeResult('CA', {
+        province: 'ON',
+        age: 38,
+        years: 6,
+        salary: 70000,
+        payroll: 'unsure',
+        roleF: 1.0,
+        market: 'mid',
+      })
+      expect(res.covered).toBe(true)
+      expect(res.minimum?.amount).toBe(8077)
+      expect(res.minimum?.potentialSeveranceWeeks).toBe(6)
+      expect(res.minimum?.potentialSeveranceAmount).toBe(8077)
+      expect(res.range?.low).toBe(8077)
+      expect(res.range?.high).toBe(40833)
+    })
+
+    it('computes Free Check Test Case E (Nova Scotia Group Layoff)', () => {
+      const res = computeFreeResult('CA', {
+        province: 'NS',
+        age: 40,
+        years: 4,
+        salary: 55000,
+        roleFactor: 1.08,
+        reason: 'mass',
+        groupBand: '100-199',
+        quarter: 'yes',
+        market: 'mid',
+      })
+      expect(res.covered).toBe(true)
+      expect(res.minimum?.amount).toBe(12692)
+      expect(res.range?.low).toBe(12692)
+      expect(res.range?.high).toBe(22917)
+    })
+
+    it('computes Free Check Test Case G (Saskatchewan Conditional Group Notice)', () => {
+      const res = computeFreeResult('CA', {
+        province: 'SK',
+        age: 35,
+        years: 2,
+        salary: 50000,
+        roleFactor: 1.0,
+        reason: 'mass',
+        groupBand: '50-99',
+        market: 'mid',
+      })
+      expect(res.covered).toBe(true)
+      expect(res.minimum?.amount).toBe(1923)
+      expect(res.minimum?.conditionalGroupNoticeWeeks).toBe(6)
+      expect(res.minimum?.conditionalGroupNoticeAmount).toBe(5769)
+      expect(res.range?.low).toBe(1923)
+      expect(res.range?.high).toBe(8333)
+    })
+
+    it('computes Free Check Test Case H (PEI Min Only Clause Cap)', () => {
+      const res = computeFreeResult('CA', {
+        province: 'PE',
+        age: 28,
+        years: 1,
+        salary: 45000,
+        roleFactor: 1.0,
+        reason: 'mass',
+        groupBand: '25-49',
+        quarter: 'yes',
+        clause: 'yes',
+        contract: 'current',
+        market: 'mid',
+      })
+      expect(res.covered).toBe(true)
+      expect(res.minimum?.amount).toBe(5192)
+      expect(res.range?.clause_caps_range).toBe(true)
+      expect(res.range?.low).toBe(5192)
+      expect(res.range?.high).toBe(5192)
     })
   })
 })

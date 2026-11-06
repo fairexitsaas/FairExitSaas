@@ -1,11 +1,11 @@
 /* ============================================================================
    FairExit — Severance Rulebook + Engine (Canada + US)
    Ported for Next.js TypeScript support
-   Matches resource-hub-v2/severance-rules.js v0.2.0 (LAST_UPDATED 2026-10-23)
+   Matches resource-hub-v2/severance-rules.js v0.4.0 (LAST_UPDATED 2026-11-06)
    ========================================================================== */
 
-export const RULES_VERSION = "0.2.0";
-export const RULES_LAST_UPDATED = "2026-10-23";
+export const RULES_VERSION = "0.4.0";
+export const RULES_LAST_UPDATED = "2026-11-06";
 
 export interface TerminationTableRow {
   minYears: number;
@@ -41,6 +41,15 @@ export interface StrategyResult {
   weeks: number;
   exact: boolean;
   none?: boolean;
+  individualNoticeWeeks?: number;
+  groupWeeks?: number;
+  appliedNoticeWeeks?: number;
+  potentialSeveranceWeeks?: number;
+  potentialSeveranceAmount?: number;
+  potentialSeveranceMessage?: string;
+  conditionalGroupNoticeWeeks?: number;
+  conditionalGroupNoticeAmount?: number;
+  conditionalGroupMessage?: string;
 }
 
 export interface EstimateInput {
@@ -49,6 +58,11 @@ export interface EstimateInput {
   salary?: number;
   roleFactor?: number;
   payrollGlobal?: number;
+  payrollUnknown?: boolean;
+  groupLayoff?: boolean;
+  groupSize?: number;
+  workforceQuarter?: "yes" | "no" | "unsure" | boolean;
+  workforce?: number;
   offered?: number;
 }
 
@@ -68,6 +82,15 @@ export interface EstimateResult {
     amount: number;
     exact: boolean;
     none?: boolean;
+    individualNoticeWeeks?: number;
+    groupWeeks?: number;
+    appliedNoticeWeeks?: number;
+    potentialSeveranceWeeks?: number;
+    potentialSeveranceAmount?: number;
+    potentialSeveranceMessage?: string;
+    conditionalGroupNoticeWeeks?: number;
+    conditionalGroupNoticeAmount?: number;
+    conditionalGroupMessage?: string;
   } | null;
   commonLaw: {
     lowMonths: number;
@@ -79,7 +102,7 @@ export interface EstimateResult {
 }
 export type Estimate = EstimateResult;
 
-function weeksFromTable(table: TerminationTableRow[] = [], years: number): number {
+export function weeksFromTable(table: TerminationTableRow[] = [], years: number): number {
   let w = 0;
   for (let i = 0; i < table.length; i++) {
     if (years >= table[i].minYears) w = table[i].weeks;
@@ -87,34 +110,180 @@ function weeksFromTable(table: TerminationTableRow[] = [], years: number): numbe
   return w;
 }
 
+function groupNoticeWeeks(
+  code: string,
+  groupSize: number,
+  quarter?: string | boolean,
+  workforce?: number
+): { weeks: number; conditional: boolean; addedOnTop: boolean; ministerOnly: boolean } {
+  const isQuarter = quarter === "yes" || quarter === true || (workforce && groupSize && (groupSize / workforce) >= 0.25);
+  switch (code) {
+    case "CA-ON": {
+      let w = 0;
+      if (groupSize >= 500) w = 16;
+      else if (groupSize >= 200) w = 12;
+      else if (groupSize >= 50) w = 8;
+      return { weeks: w, conditional: false, addedOnTop: false, ministerOnly: false };
+    }
+    case "CA-BC": {
+      let w = 0;
+      if (groupSize >= 301) w = 16;
+      else if (groupSize >= 101) w = 12;
+      else if (groupSize >= 50) w = 8;
+      return { weeks: w, conditional: false, addedOnTop: true, ministerOnly: false };
+    }
+    case "CA-AB": {
+      return { weeks: 0, conditional: false, addedOnTop: false, ministerOnly: true };
+    }
+    case "CA-SK": {
+      let w = 0;
+      if (groupSize >= 100) w = 12;
+      else if (groupSize >= 50) w = 8;
+      else if (groupSize >= 25) w = 4;
+      return { weeks: w, conditional: true, addedOnTop: false, ministerOnly: false };
+    }
+    case "CA-MB": {
+      let w = 0;
+      if (groupSize >= 300) w = 18;
+      else if (groupSize >= 101) w = 14;
+      else if (groupSize >= 50) w = 10;
+      return { weeks: w, conditional: false, addedOnTop: false, ministerOnly: false };
+    }
+    case "CA-NS": {
+      let w = 0;
+      if (groupSize >= 300) w = 16;
+      else if (groupSize >= 100) w = 12;
+      else if (groupSize >= 10) w = 8;
+      return { weeks: w, conditional: false, addedOnTop: false, ministerOnly: false };
+    }
+    case "CA-NB": {
+      let w = 0;
+      if (groupSize >= 10 && isQuarter) w = 6;
+      return { weeks: w, conditional: true, addedOnTop: false, ministerOnly: false };
+    }
+    case "CA-PE": {
+      let w = 0;
+      if (groupSize >= 10 && isQuarter) w = 6;
+      return { weeks: w, conditional: false, addedOnTop: false, ministerOnly: false };
+    }
+    case "CA-NL": {
+      let w = 0;
+      if (groupSize >= 500) w = 16;
+      else if (groupSize >= 200) w = 12;
+      else if (groupSize >= 50) w = 8;
+      return { weeks: w, conditional: false, addedOnTop: false, ministerOnly: false };
+    }
+    case "CA-FED": {
+      return { weeks: 0, conditional: false, addedOnTop: false, ministerOnly: true };
+    }
+    default:
+      return { weeks: 0, conditional: false, addedOnTop: false, ministerOnly: false };
+  }
+}
+
 const STRATEGIES = {
-  ontario: (rule: JurisdictionRule, inp: { years: number; payrollGlobal: number }): StrategyResult => {
-    const term = weeksFromTable(rule.terminationTable, inp.years);
+  ontario: (rule: JurisdictionRule, inp: EstimateInput, weekly: number): StrategyResult => {
+    const ind = weeksFromTable(rule.terminationTable, inp.years || 0);
+    const gn = inp.groupLayoff ? groupNoticeWeeks(rule.code, inp.groupSize || 0, inp.workforceQuarter, inp.workforce) : { weeks: 0, conditional: false, addedOnTop: false, ministerOnly: false };
+    const appliedNotice = Math.max(ind, gn.weeks || 0);
+
     let sev = 0;
+    let potSevWeeks = 0;
     const s = rule.severance;
-    // CRITICAL: payroll test is GLOBAL (Hawkes v. Max Aicher)
-    if (s && inp.years >= s.minYears && inp.payrollGlobal >= s.minPayrollGlobal) {
-      sev = Math.min(s.maxWeeks, inp.years * s.perYearWeeks);
+    const years = inp.years || 0;
+    // CRITICAL: payroll test is GLOBAL (parent/related entities) — Hawkes v. Max Aicher
+    if (s && years >= s.minYears) {
+      if ((inp.payrollGlobal || 0) >= s.minPayrollGlobal) {
+        sev = Math.min(s.maxWeeks, years * s.perYearWeeks);
+      } else if (inp.payrollUnknown) {
+        potSevWeeks = Math.min(s.maxWeeks, years * s.perYearWeeks);
+      }
     }
-    return { terminationWeeks: term, severanceWeeks: sev, weeks: term + sev, exact: true };
+
+    const potSevAmount = potSevWeeks > 0 ? Math.round(weekly * potSevWeeks) : undefined;
+    const potSevMsg = potSevWeeks > 0 ? `may apply, up to ${potSevWeeks} wks ($${potSevAmount!.toLocaleString("en-CA")})` : undefined;
+
+    const res: StrategyResult = {
+      individualNoticeWeeks: ind,
+      groupWeeks: gn.weeks || 0,
+      appliedNoticeWeeks: appliedNotice,
+      terminationWeeks: appliedNotice,
+      severanceWeeks: sev,
+      weeks: appliedNotice + sev,
+      exact: true,
+    };
+    if (potSevWeeks > 0) {
+      res.potentialSeveranceWeeks = potSevWeeks;
+      res.potentialSeveranceAmount = potSevAmount;
+      res.potentialSeveranceMessage = potSevMsg;
+    }
+    return res;
   },
-  weeksTable: (rule: JurisdictionRule, inp: { years: number }): StrategyResult => {
-    const w = weeksFromTable(rule.terminationTable, inp.years);
-    return { terminationWeeks: w, severanceWeeks: 0, weeks: w, exact: true };
+
+  weeksTable: (rule: JurisdictionRule, inp: EstimateInput, weekly: number): StrategyResult => {
+    const ind = weeksFromTable(rule.terminationTable, inp.years || 0);
+    const gn = inp.groupLayoff ? groupNoticeWeeks(rule.code, inp.groupSize || 0, inp.workforceQuarter, inp.workforce) : { weeks: 0, conditional: false, addedOnTop: false, ministerOnly: false };
+    let appliedNotice = ind;
+    let condWeeks: number | undefined;
+    let condAmount: number | undefined;
+    let condMsg: string | undefined;
+
+    if (gn.weeks > 0) {
+      if (gn.addedOnTop) {
+        appliedNotice = ind + gn.weeks;
+      } else if (gn.conditional) {
+        appliedNotice = ind;
+        if (gn.weeks > ind) {
+          condWeeks = gn.weeks - ind;
+          condAmount = Math.round(weekly * condWeeks);
+          condMsg = `may add ${condWeeks} wks ($${condAmount.toLocaleString("en-CA")}), ask a lawyer`;
+        }
+      } else {
+        appliedNotice = Math.max(ind, gn.weeks);
+      }
+    }
+
+    const res: StrategyResult = {
+      individualNoticeWeeks: ind,
+      groupWeeks: gn.weeks || 0,
+      appliedNoticeWeeks: appliedNotice,
+      terminationWeeks: appliedNotice,
+      severanceWeeks: 0,
+      weeks: appliedNotice,
+      exact: true,
+    };
+    if (condWeeks !== undefined) {
+      res.conditionalGroupNoticeWeeks = condWeeks;
+      res.conditionalGroupNoticeAmount = condAmount;
+      res.conditionalGroupMessage = condMsg;
+    }
+    return res;
   },
-  federalCA: (rule: JurisdictionRule, inp: { years: number }): StrategyResult => {
-    const term = weeksFromTable(rule.terminationTable, inp.years);
+
+  federalCA: (rule: JurisdictionRule, inp: EstimateInput): StrategyResult => {
+    const ind = weeksFromTable(rule.terminationTable, inp.years || 0);
     let sev = 0;
-    if (inp.years >= 1) {
-      sev = Math.max(5, 2 * Math.floor(inp.years)) / 5;
+    const years = inp.years || 0;
+    if (years >= 1) {
+      sev = Math.max(5, 2 * Math.floor(years)) / 5;
     }
-    return { terminationWeeks: term, severanceWeeks: sev, weeks: term + sev, exact: true };
+    return {
+      individualNoticeWeeks: ind,
+      groupWeeks: 0,
+      appliedNoticeWeeks: ind,
+      terminationWeeks: ind,
+      severanceWeeks: sev,
+      weeks: ind + sev,
+      exact: true,
+    };
   },
+
   usNone: (): StrategyResult => {
     return { terminationWeeks: 0, severanceWeeks: 0, weeks: 0, exact: true, none: true };
   },
-  usPerYear: (rule: JurisdictionRule, inp: { years: number }): StrategyResult => {
-    const w = Math.floor(inp.years) * (rule.perYearWeeks || 1);
+
+  usPerYear: (rule: JurisdictionRule, inp: EstimateInput): StrategyResult => {
+    const w = Math.floor(inp.years || 0) * (rule.perYearWeeks || 1);
     return { terminationWeeks: 0, severanceWeeks: w, weeks: w, exact: true };
   },
 };
@@ -435,11 +604,8 @@ export function estimate(code: string, inp: EstimateInput = {}): EstimateResult 
   };
 
   if (rule.strategy && STRATEGIES[rule.strategy]) {
-    const st = STRATEGIES[rule.strategy](rule, {
-      years,
-      payrollGlobal: +inp.payrollGlobal! || 0,
-    });
-    out.statutory = {
+    const st = STRATEGIES[rule.strategy](rule, inp, weekly);
+    const outStatutory: any = {
       weeks: st.weeks,
       terminationWeeks: st.terminationWeeks,
       severanceWeeks: st.severanceWeeks,
@@ -447,6 +613,16 @@ export function estimate(code: string, inp: EstimateInput = {}): EstimateResult 
       exact: !!st.exact,
       none: !!st.none,
     };
+    if (st.individualNoticeWeeks !== undefined) outStatutory.individualNoticeWeeks = st.individualNoticeWeeks;
+    if (st.groupWeeks !== undefined) outStatutory.groupWeeks = st.groupWeeks;
+    if (st.appliedNoticeWeeks !== undefined) outStatutory.appliedNoticeWeeks = st.appliedNoticeWeeks;
+    if (st.potentialSeveranceWeeks !== undefined) outStatutory.potentialSeveranceWeeks = st.potentialSeveranceWeeks;
+    if (st.potentialSeveranceAmount !== undefined) outStatutory.potentialSeveranceAmount = st.potentialSeveranceAmount;
+    if (st.potentialSeveranceMessage !== undefined) outStatutory.potentialSeveranceMessage = st.potentialSeveranceMessage;
+    if (st.conditionalGroupNoticeWeeks !== undefined) outStatutory.conditionalGroupNoticeWeeks = st.conditionalGroupNoticeWeeks;
+    if (st.conditionalGroupNoticeAmount !== undefined) outStatutory.conditionalGroupNoticeAmount = st.conditionalGroupNoticeAmount;
+    if (st.conditionalGroupMessage !== undefined) outStatutory.conditionalGroupMessage = st.conditionalGroupMessage;
+    out.statutory = outStatutory;
   }
 
   if (rule.commonLaw) {
@@ -471,11 +647,24 @@ export const MARKET_FACTOR: Record<string, number> = { easy: 0.9, mid: 1, hard: 
 export function marketAdjust(e: EstimateResult, market?: string): EstimateResult {
   if (e && e.commonLaw) {
     const f = MARKET_FACTOR[market || ""] || 1;
+    const monthly = e.monthly || (e.weekly ? (e.weekly * 52) / 12 : 0);
+    const lowMonths = Math.min(24, Math.max(1, Math.round(e.commonLaw.lowMonths * f)));
+    let highMonths = Math.min(24, Math.max(1, Math.round(e.commonLaw.highMonths * f)));
+    if (highMonths < lowMonths) highMonths = lowMonths;
+
+    let lowAmount = Math.min(Math.round(monthly * 24), Math.round(e.commonLaw.lowAmount * f));
+    let highAmount = Math.min(Math.round(monthly * 24), Math.round(e.commonLaw.highAmount * f));
+
+    if (e.statutory && e.statutory.amount) {
+      if (lowAmount < e.statutory.amount) lowAmount = e.statutory.amount;
+      if (highAmount < e.statutory.amount) highAmount = e.statutory.amount;
+    }
+
     e.commonLaw = {
-      lowMonths: Math.round(e.commonLaw.lowMonths * f),
-      highMonths: Math.round(e.commonLaw.highMonths * f),
-      lowAmount: Math.round(e.commonLaw.lowAmount * f),
-      highAmount: Math.round(e.commonLaw.highAmount * f),
+      lowMonths,
+      highMonths,
+      lowAmount,
+      highAmount,
     };
   }
   return e;
@@ -489,5 +678,6 @@ export const FairExitRules = {
   list,
   estimate,
   commonLawMonths,
+  MARKET_FACTOR,
   marketAdjust,
 };

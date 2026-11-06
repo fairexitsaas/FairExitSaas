@@ -13,12 +13,34 @@ const num = (v: unknown): number => {
 
 /** Engine inputs from the free-check answers (field names match the web flow's state). */
 export function engineInputs(answers: Record<string, any>) {
+  const payrollStr = String(answers.payroll || '').toLowerCase()
+  const isPayrollUnknown = answers.payrollUnknown ?? (payrollStr === 'unsure' || payrollStr === 'not_sure')
+  const isGroup = answers.groupLayoff === true || answers.groupLayoff === 'yes' || answers.reason === 'mass'
+  let groupSize = num(answers.groupSize)
+  if (!groupSize && answers.groupBand) {
+    const bandMap: Record<string, number> = {
+      '10-24': 10,
+      '25-49': 25,
+      '50-99': 50,
+      '100-199': 100,
+      '200-499': 200,
+      '500+': 500,
+    }
+    groupSize = bandMap[answers.groupBand] || 0
+  }
+  const workforceQuarter = answers.workforceQuarter ?? (answers.quarter === 'yes' ? 'yes' : undefined)
+
   return {
     age: num(answers.age),
     years: num(answers.years),
     salary: num(answers.salary ?? answers.pay),
     roleFactor: num(answers.roleFactor ?? answers.roleF) || 1,
-    payrollGlobal: String(answers.payroll) === 'yes' ? 3000000 : 0,
+    payrollGlobal: payrollStr === 'yes' ? 3000000 : 0,
+    payrollUnknown: isPayrollUnknown,
+    groupLayoff: isGroup,
+    groupSize,
+    workforceQuarter,
+    workforce: num(answers.workforce),
   }
 }
 

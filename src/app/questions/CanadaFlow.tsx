@@ -575,6 +575,17 @@ function QuestionsContent() {
         s.clause === "no" ? "No" : s.clause === "yes" ? "Yes" : "Not sure",
       contract: contractMap[s.contract] || "Signed - role changed",
       reason: reasonMap[s.reason] || "Laid off",
+      ...(s.reason === "mass"
+        ? {
+            groupBand: s.groupBand || "Not sure",
+            workforceQuarter:
+              s.workforceQuarter === "yes"
+                ? "Yes (≥25%)"
+                : s.workforceQuarter === "no"
+                  ? "No (<25%)"
+                  : "Not sure",
+          }
+        : {}),
       market: marketMap[s.market] || "Some",
       redflag: redflagMap[s.redflag] || "Nothing unusual",
       offer: s.offer ? kMoney(s.offer) : "—",
@@ -613,6 +624,9 @@ function QuestionsContent() {
     market: "",
     redflag: "",
     groupLayoff: "",
+    groupSize: 0,
+    groupBand: "",
+    workforceQuarter: "",
   });
 
   const hasPrefilledBasics = Boolean(
@@ -628,12 +642,15 @@ function QuestionsContent() {
     const s = searchParams.get("s") || searchParams.get("salary");
     const a = searchParams.get("age");
     const grp = searchParams.get("group");
+    const grpSize = searchParams.get("groupSize");
+    const grpBand = searchParams.get("groupBand");
+    const qtr = searchParams.get("quarter") || searchParams.get("workforceQuarter");
     const r = searchParams.get("role");
     const off = searchParams.get("offer");
     const signedParam = searchParams.get("signed");
     const fedParam = searchParams.get("fed") || searchParams.get("federal");
 
-    if (p || st || y || s || a || grp || r || off || signedParam || fedParam) {
+    if (p || st || y || s || a || grp || grpSize || grpBand || qtr || r || off || signedParam || fedParam) {
       setState((prev) => ({
         ...prev,
         ...(p ? { province: p } : {}),
@@ -643,7 +660,10 @@ function QuestionsContent() {
         ...(a ? { age: a.replace(/\D/g, "") } : {}),
         ...(r ? { roleFactor: parseFloat(r) } : {}),
         ...(off ? { offer: parseInt(off.replace(/\D/g, ""), 10) } : {}),
-        ...(grp ? { groupLayoff: grp } : {}),
+        ...(grp ? { groupLayoff: grp, reason: grp === "yes" ? "mass" : prev.reason } : {}),
+        ...(grpSize ? { groupSize: parseInt(grpSize, 10) } : {}),
+        ...(grpBand ? { groupBand: grpBand } : {}),
+        ...(qtr ? { workforceQuarter: qtr } : {}),
         ...(signedParam ? { signed: signedParam } : {}),
         ...(fedParam ? { federal: fedParam } : {}),
       }));
@@ -711,12 +731,33 @@ function QuestionsContent() {
 
     try {
       const code = state.federal === "yes" ? "CA-FED" : "CA-" + (state.province || "ON");
+      const isGroup = state.reason === "mass" || state.groupLayoff === "yes";
+      const bandMap: Record<string, number> = {
+        "10-24": 10,
+        "10–24": 10,
+        "25-49": 25,
+        "25–49": 25,
+        "50-99": 50,
+        "50–99": 50,
+        "100-199": 100,
+        "100–199": 100,
+        "200-499": 200,
+        "200–499": 200,
+        "500+": 500,
+      };
+      const grpSize = isGroup ? (state.groupSize || (state.groupBand ? bandMap[state.groupBand] : 0) || 0) : 0;
+      const isPayrollUnknown = state.payroll === "unsure" || state.payroll === "not_sure";
+
       const e = estimate(code, {
         age: ageNum,
         years: yrsNum,
         salary: salNum,
         roleFactor: state.roleFactor || 1,
         payrollGlobal: state.payroll === "yes" ? 3000000 : 0,
+        payrollUnknown: isPayrollUnknown,
+        groupLayoff: isGroup,
+        groupSize: grpSize,
+        workforceQuarter: isGroup ? (state.workforceQuarter as any) : undefined,
       });
 
       return marketAdjust(e, state.market);
@@ -731,6 +772,11 @@ function QuestionsContent() {
     state.federal,
     state.roleFactor,
     state.payroll,
+    state.reason,
+    state.groupLayoff,
+    state.groupSize,
+    state.groupBand,
+    state.workforceQuarter,
     state.market,
   ]);
 
@@ -3810,7 +3856,12 @@ function QuestionsContent() {
                           key={item.k}
                           type="button"
                           onClick={() => {
-                            setState({ ...state, reason: item.k });
+                            const isMass = item.k === "mass";
+                            setState((prev) => ({
+                              ...prev,
+                              reason: item.k,
+                              groupLayoff: isMass ? "yes" : "no",
+                            }));
                             saveAnswer("reason", item.summary);
                           }}
                           className={`px-4 py-2.5 rounded-xl text-xs sm:text-[13px] font-bold transition-all cursor-pointer ${
@@ -3824,6 +3875,85 @@ function QuestionsContent() {
                       );
                     })}
                   </div>
+
+                  {state.reason === "mass" && (
+                    <div className="mt-5 p-4 sm:p-5 rounded-2xl bg-[#f8faf9] border border-[#d6e7df] space-y-5 animate-fade">
+                      <div>
+                        <div className="font-bold text-[14px] sm:text-[14.5px] text-[#062c55] mb-2.5">
+                          How many people were let go in the same few weeks?
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          {[
+                            { band: "10–24", size: 10 },
+                            { band: "25–49", size: 25 },
+                            { band: "50–99", size: 50 },
+                            { band: "100–199", size: 100 },
+                            { band: "200–499", size: 200 },
+                            { band: "500+", size: 500 },
+                            { band: "Not sure", size: 0 },
+                          ].map((grp) => {
+                            const selected = state.groupBand === grp.band;
+                            return (
+                              <button
+                                key={grp.band}
+                                type="button"
+                                onClick={() => {
+                                  setState((prev) => ({
+                                    ...prev,
+                                    groupBand: grp.band,
+                                    groupSize: grp.size,
+                                  }));
+                                  saveAnswer("groupSize", grp.band);
+                                }}
+                                className={`px-3.5 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all cursor-pointer ${
+                                  selected
+                                    ? "bg-[#062c55] text-white border border-[#062c55] shadow-xs"
+                                    : "border border-[#e0ddd4] bg-white text-[#17242f] hover:border-[#c3ccd3] hover:bg-[#fafbfc]"
+                                }`}
+                              >
+                                {grp.band}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="font-bold text-[14px] sm:text-[14.5px] text-[#062c55] mb-2.5">
+                          Did the affected employees represent at least 25% of the employer&apos;s workforce?
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          {[
+                            { k: "yes", label: "Yes — at least 25%" },
+                            { k: "no", label: "No — less than 25%" },
+                            { k: "unsure", label: "Not sure" },
+                          ].map((qtr) => {
+                            const selected = state.workforceQuarter === qtr.k;
+                            return (
+                              <button
+                                key={qtr.k}
+                                type="button"
+                                onClick={() => {
+                                  setState((prev) => ({
+                                    ...prev,
+                                    workforceQuarter: qtr.k,
+                                  }));
+                                  saveAnswer("workforceQuarter", qtr.label);
+                                }}
+                                className={`px-3.5 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all cursor-pointer ${
+                                  selected
+                                    ? "bg-[#062c55] text-white border border-[#062c55] shadow-xs"
+                                    : "border border-[#e0ddd4] bg-white text-[#17242f] hover:border-[#c3ccd3] hover:bg-[#fafbfc]"
+                                }`}
+                              >
+                                {qtr.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Navigation Row */}
@@ -4137,15 +4267,15 @@ function QuestionsContent() {
                 const termWeeks = st.terminationWeeks;
                 const sevWeeks = st.severanceWeeks || 0;
                 const sevLine =
-                  sevWeeks > 0
-                    ? `${sevWeeks} wks severance pay`
-                    : state.province === "ON"
-                      ? (parseFloat(state.years) >= 5
-                          ? (state.payroll === "unsure"
-                              ? "severance pay — depends on employer payroll (≥ $2.5M)"
-                              : "no ESA severance pay (payroll under $2.5M)")
-                          : "no ESA severance pay (needs 5+ years)")
-                      : "see provincial rules";
+                  st.potentialSeveranceMessage
+                    ? st.potentialSeveranceMessage
+                    : sevWeeks > 0
+                      ? `${sevWeeks} wks severance pay`
+                      : state.province === "ON"
+                        ? (parseFloat(state.years) >= 5
+                            ? "no ESA severance pay (payroll under $2.5M)"
+                            : "no ESA severance pay (needs 5+ years)")
+                        : "see provincial rules";
                 const clMonths =
                   cl && !clauseHolds
                     ? `${cl.lowMonths}–${cl.highMonths} months`
@@ -4221,7 +4351,7 @@ function QuestionsContent() {
                           Estimated range
                         </div>
                         <div className="font-serif font-bold text-3xl sm:text-[34px] text-[#0c8f72] my-1 tracking-tight leading-tight">
-                          {highAmt > lowAmt ? `${money(lowAmt)} – ${money(highAmt)}` : money(lowAmt)}
+                          {highAmt > lowAmt ? `${money(lowAmt)} – ${money(highAmt)}` : (clauseHolds ? `${money(lowAmt)} (min only)` : money(lowAmt))}
                         </div>
                         <p className="text-xs sm:text-[13px] text-[#17242f] max-w-[500px] mx-auto leading-relaxed">
                           {highAmt > lowAmt
@@ -4248,7 +4378,11 @@ function QuestionsContent() {
                               1 · Notice pay
                             </b>
                             <span>
-                              {termWeeks} wks · the minimum everyone gets
+                              {st.conditionalGroupMessage
+                                ? `${termWeeks} wks + ${st.conditionalGroupMessage}`
+                                : st.groupWeeks && st.groupWeeks > 0
+                                  ? `${termWeeks} wks (group)`
+                                  : `${termWeeks} wks · the minimum everyone gets`}
                             </span>
                           </div>
                           <div className="border border-[#e7e4dd] rounded-[10px] p-2.5 sm:p-3 bg-[#fafcfb] text-xs text-[#5a6b78]">
@@ -4268,6 +4402,17 @@ function QuestionsContent() {
                             </span>
                           </div>
                         </div>
+
+                        {st.potentialSeveranceMessage && (
+                          <div className="mt-3.5 p-3 rounded-lg border-l-[3px] border-[#0eb28d] bg-[#f3faf6] border border-[#cfe8dd] text-left text-xs text-[#2b3a45] leading-relaxed max-w-[540px] mx-auto">
+                            <b className="text-[#062c55] font-bold">Ontario statutory severance:</b> Employer payroll is unconfirmed. Additional severance ({st.potentialSeveranceMessage}) may apply if global payroll exceeds $2.5M. This potential amount is not included in the confirmed minimum above.
+                          </div>
+                        )}
+                        {st.conditionalGroupMessage && (
+                          <div className="mt-3.5 p-3 rounded-lg border-l-[3px] border-[#8a6400] bg-[#fffdf6] border border-[#f0dca8] text-left text-xs text-[#8a6400] leading-relaxed max-w-[540px] mx-auto">
+                            <b className="font-bold">Group notice:</b> Group rules {st.conditionalGroupMessage}. This conditional notice is not included in the confirmed minimum above.
+                          </div>
+                        )}
 
                         {/* Visual Range Bar Gauge (.rbar) */}
                         {highAmt > lowAmt && (
