@@ -621,6 +621,8 @@ export default function PaidReportReadyPage({
               {[
                 { label: "Union member", value: data.union || "No" },
                 { label: "Employment", value: data.employment || "Regular employee" },
+                ...(data.signed ? [{ label: "Signed yet?", value: data.signed }] : []),
+                ...(data.federal ? [{ label: "Federally regulated", value: data.federal }] : []),
                 { label: isCanada ? "Province" : "State", value: provinceOrState },
                 { label: "Age", value: ageVal },
                 { label: "Years of service", value: yearsVal },

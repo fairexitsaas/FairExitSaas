@@ -10,6 +10,8 @@ export interface ReportInputs {
   role?: string;
   union?: string;
   employment?: string;
+  signed?: string;
+  federal?: string;
   payroll?: string;
   otherPay?: string;
   newJob?: string;
@@ -45,6 +47,8 @@ export const defaultMockReportInputs: ReportInputs = {
   role: "Middle management / Senior / Director",
   union: "No",
   employment: "Regular employee",
+  signed: "No",
+  federal: "No",
   payroll: "Not sure",
   otherPay: "None",
   newJob: "Not yet",

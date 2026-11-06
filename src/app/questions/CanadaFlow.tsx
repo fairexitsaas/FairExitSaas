@@ -236,6 +236,8 @@ const EMP_TYPE_LABELS: Record<string, string> = {
 const SUMMARY_FIELDS = [
   { key: "union", label: "Union member" },
   { key: "emptype", label: "Employment" },
+  { key: "signed", label: "Signed yet?" },
+  { key: "federal", label: "Federally regulated" },
   { key: "province", label: "Province" },
   { key: "age", label: "Age" },
   { key: "years", label: "Years of service" },
@@ -428,6 +430,8 @@ function QuestionsContent() {
         role: userAnswers.role || "Middle management / Senior / Director",
         union: state.union === "yes" ? "Yes" : "No",
         employment: state.emptype || "Regular employee",
+        signed: state.signed === "yes" ? "Yes" : "No",
+        federal: state.federal === "yes" ? "Yes" : "No",
         payroll: state.payroll === "yes" ? "Yes (≥ $2.5M)" : state.payroll === "no" ? "No" : "Not sure",
         otherPay: Object.entries(state.pay || {}).filter(([, v]) => v).map(([k]) => k).join(", ") || "None",
         newJob: state.reemployed === "yes" ? "Yes" : state.reemployed === "no" ? "No" : "Not yet",
@@ -549,6 +553,8 @@ function QuestionsContent() {
     const newAnswers: Record<string, string> = {
       union: s.union === "yes" ? "Yes" : s.union === "no" ? "No" : "Not sure",
       emptype: EMP_TYPE_LABELS[s.emptype] || "Regular employee",
+      signed: s.signed === "yes" ? "Yes" : s.signed === "no" ? "No" : s.signed || "",
+      federal: s.federal === "yes" ? "Yes" : s.federal === "no" ? "No" : s.federal || "",
       province: PROVINCE_NAMES[s.province] || s.province || "—",
       age: s.age || "—",
       years: s.years ? `${s.years} yrs` : "—",
@@ -624,8 +630,10 @@ function QuestionsContent() {
     const grp = searchParams.get("group");
     const r = searchParams.get("role");
     const off = searchParams.get("offer");
+    const signedParam = searchParams.get("signed");
+    const fedParam = searchParams.get("fed") || searchParams.get("federal");
 
-    if (p || st || y || s || a || grp || r || off) {
+    if (p || st || y || s || a || grp || r || off || signedParam || fedParam) {
       setState((prev) => ({
         ...prev,
         ...(p ? { province: p } : {}),
@@ -636,7 +644,11 @@ function QuestionsContent() {
         ...(r ? { roleFactor: parseFloat(r) } : {}),
         ...(off ? { offer: parseInt(off.replace(/\D/g, ""), 10) } : {}),
         ...(grp ? { groupLayoff: grp } : {}),
+        ...(signedParam ? { signed: signedParam } : {}),
+        ...(fedParam ? { federal: fedParam } : {}),
       }));
+      if (signedParam) saveAnswer("signed", signedParam === "yes" ? "Yes" : "No");
+      if (fedParam) saveAnswer("federal", fedParam === "yes" ? "Yes" : "No");
     }
 
     const stepParam = searchParams.get("step");
@@ -903,9 +915,7 @@ function QuestionsContent() {
 
   const handleContinueFromQ4 = () => {
     if (!state.agreed || !state.federal) return;
-    if (!userAnswers.federal) {
-      saveAnswer("federal", state.federal === "yes" ? "Yes" : "No");
-    }
+    saveAnswer("federal", state.federal === "yes" ? "Yes" : "No");
     if (state.union === "yes") {
       setCurrentStep("union");
     } else {
@@ -919,6 +929,7 @@ function QuestionsContent() {
       country: "CA",
       province: state.province,
       federal: state.federal,
+      signed: state.signed,
       age: state.age,
       years: state.years,
       salary: state.salary,
@@ -1788,7 +1799,10 @@ function QuestionsContent() {
                 {/* Big Pills */}
                 <div className="space-y-2.5">
                   <div
-                    onClick={() => setState({ ...state, signed: "no" })}
+                    onClick={() => {
+                      setState({ ...state, signed: "no" });
+                      saveAnswer("signed", "No");
+                    }}
                     className={`flex items-center gap-3 p-3.5 px-4 rounded-[14px] border-[1.5px] cursor-pointer transition-all ${
                       state.signed === "no"
                         ? "border-[#062c55] bg-[#f0f4f8] shadow-sm"
@@ -1808,7 +1822,10 @@ function QuestionsContent() {
                   </div>
 
                   <div
-                    onClick={() => setState({ ...state, signed: "yes" })}
+                    onClick={() => {
+                      setState({ ...state, signed: "yes" });
+                      saveAnswer("signed", "Yes");
+                    }}
                     className={`flex items-start gap-3 p-3.5 px-4 rounded-[14px] border-[1.5px] cursor-pointer transition-all ${
                       state.signed === "yes"
                         ? "border-[#062c55] bg-[#f0f4f8] shadow-sm"
@@ -1840,9 +1857,7 @@ function QuestionsContent() {
                   <QuestionNextButton
                     onClick={() => {
                       if (!state.signed) return;
-                      if (!userAnswers.signed) {
-                        saveAnswer("signed", state.signed === "yes" ? "Yes" : "No");
-                      }
+                      saveAnswer("signed", state.signed === "yes" ? "Yes" : "No");
                       goToQ4();
                     }}
                   />
@@ -1933,7 +1948,10 @@ function QuestionsContent() {
                 {/* Big Pills */}
                 <div className="space-y-2.5">
                   <div
-                    onClick={() => setState({ ...state, federal: "no" })}
+                    onClick={() => {
+                      setState({ ...state, federal: "no" });
+                      saveAnswer("federal", "No");
+                    }}
                     className={`flex items-start gap-3 p-3.5 px-4 rounded-[14px] border-[1.5px] cursor-pointer transition-all ${
                       state.federal === "no"
                         ? "border-[#062c55] bg-[#f0f4f8] shadow-sm"
@@ -1958,7 +1976,10 @@ function QuestionsContent() {
                   </div>
 
                   <div
-                    onClick={() => setState({ ...state, federal: "yes" })}
+                    onClick={() => {
+                      setState({ ...state, federal: "yes" });
+                      saveAnswer("federal", "Yes");
+                    }}
                     className={`flex items-start gap-3 p-3.5 px-4 rounded-[14px] border-[1.5px] cursor-pointer transition-all ${
                       state.federal === "yes"
                         ? "border-[#062c55] bg-[#f0f4f8] shadow-sm"
@@ -4756,6 +4777,24 @@ function QuestionsContent() {
                       label: "Employment type",
                       value:
                         EMP_TYPE_LABELS[state.emptype] || "Regular employee",
+                    },
+                    {
+                      label: "Signed yet",
+                      value:
+                        state.signed === "yes"
+                          ? "Yes"
+                          : state.signed === "no"
+                            ? "No"
+                            : "Unsure",
+                    },
+                    {
+                      label: "Federally regulated",
+                      value:
+                        state.federal === "yes"
+                          ? "Yes"
+                          : state.federal === "no"
+                            ? "No"
+                            : "Unsure",
                     },
                     {
                       label: "Age",

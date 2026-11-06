@@ -1,0 +1,206 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FairExit Calculator Spec (Copy)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,600&family=JetBrains+Mono&display=swap">
+<style>
+:root{--bg:#f4f2ed;--card:#fff;--ink:#17242f;--muted:#5a6b78;--navy:#062c55;--line:#e2ddd2;--codebg:#efece4;--teal:#0c8f72;--red:#b23a2e;--blue:#2f6fd6;--hl:#eaf6f1;
+--serif:"Newsreader",Georgia,serif;--sans:"DM Sans",system-ui,sans-serif;--mono:"JetBrains Mono",Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1620;--card:#15212d;--ink:#e6edf2;--muted:#9fb1bf;--navy:#cfe0f0;--line:#253444;--codebg:#1d2b38;--teal:#3fd1a8;--red:#ff8a7c;--blue:#7aa8f5;--hl:#14302a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1620;--card:#15212d;--ink:#e6edf2;--muted:#9fb1bf;--navy:#cfe0f0;--line:#253444;--codebg:#1d2b38;--teal:#3fd1a8;--red:#ff8a7c;--blue:#7aa8f5;--hl:#14302a;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.6 var(--sans)}
+.wrap{max-width:980px;margin:0 auto;padding:40px 16px 80px}
+.eyebrow{font-size:12px;letter-spacing:1.4px;text-transform:uppercase;color:var(--teal);font-weight:700}
+h1{font:600 clamp(30px,5vw,44px)/1.1 var(--serif);color:var(--navy);margin:8px 0 12px}
+h2{font:600 28px/1.2 var(--serif);color:var(--navy);margin:56px 0 6px;padding-top:14px;border-top:4px solid var(--teal)}
+h3{margin:22px 0 8px;font:600 17px var(--sans)}
+.lede{max-width:68ch;color:var(--muted);margin:0}
+.box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-top:16px}
+.box ol,ol.plain{margin:8px 0 0;padding-left:22px;display:grid;gap:6px}
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+nav.toc a{color:var(--navy);text-decoration:none;border:1px solid var(--line);background:var(--card);padding:6px 12px;border-radius:999px;font-size:14px;font-weight:600}
+a{color:var(--blue)}a:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+code{font:13px var(--mono);background:var(--codebg);padding:1px 5px;border-radius:4px;overflow-wrap:anywhere}
+pre{font:13px/1.5 var(--mono);background:var(--codebg);padding:14px 16px;border-radius:10px;overflow-x:auto;margin:10px 0}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--line);border-radius:12px;margin-top:10px}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px;border-bottom:1px solid var(--line)}
+th{font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);white-space:nowrap}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}
+@media (max-width:720px){.flow{grid-template-columns:1fr 1fr}}
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.step b{display:block;color:var(--navy)}
+.step span{font-size:14px;color:var(--muted)}
+.warn{border-left:4px solid var(--red);background:var(--card);padding:12px 16px;border-radius:8px;margin:14px 0}
+.ok{border-left:4px solid var(--teal);background:var(--card);padding:12px 16px;border-radius:8px;margin:14px 0}
+.foot{margin-top:48px;color:var(--muted);font-size:14px}
+</style></head><body><div class="wrap">
+
+<header>
+<div class="eyebrow">FairExit · free calculator · logic spec v1 · Nov 4, 2026</div>
+<h1>How the free calculator works</h1>
+<p class="lede">Jainil, this answers your question: what happens after the user answers the free calculator, which rules and official sources apply, how the estimate is worked out, and what the result looks like. Every number here comes from the rules engine <code>severance-rules.js</code> v0.4.0, and the worked examples were run through it.</p>
+<div class="box"><b>Watch first (2.5 min)</b><video controls preload="metadata" style="width:100%;border-radius:8px;margin-top:10px;background:#000" src="/_blob/6f4f34977d17111c1c5698113a0de556"></video></div>
+<div class="box"><b>All links</b><ol>
+<li>Live free calculator: <a href="https://sevapp-opal.vercel.app/resource-hub-v2/demo-v3.html">Canada</a> · <a href="https://sevapp-opal.vercel.app/resource-hub-us/demo-v3.html">US</a> (same password as before)</li>
+<li>Figma, free calculator screens: <a href="https://www.figma.com/design/wp5MfAx014k1F0OppJAPMW/FairExit?node-id=921-1916">Phase 1 screens</a>. Look for the green "CALCULATOR LOGIC 2026-11-04" notes beside the calculator screens.</li>
+<li>The engine file: <code>resource-hub-v2/severance-rules.js</code> and <code>severance-rules.test.js</code> in the code pack <code>FairExit-Phase1-Code-2026-11-03.zip</code></li>
+<li>Sign-in: none for Phase 1. Pay $59, then "Your payment is confirmed. Enter your name and email so we can send you your report." Open the report in the browser and also email it. No accounts, no lawyer pop-up after payment. Figma: teal "NO SIGN-IN" notes beside the report purchase screens.</li>
+</ol></div>
+<nav class="toc" aria-label="Sections">
+<a href="#overview">1 · Overview</a><a href="#ca-inputs">2 · Canada questions</a><a href="#ca-calc">3 · Canada calculation</a><a href="#ca-regions">4 · Province rules + sources</a><a href="#ca-examples">5 · Worked examples</a><a href="#ca-verdict">6 · Result message</a><a href="#us">7 · US</a><a href="#build">8 · Build notes</a>
+</nav>
+</header>
+
+<h2 id="overview">1 · Overview</h2>
+<div class="flow">
+<div class="step"><b>1. User answers</b><span>Region, age, years, pay, role, and a few taps.</span></div>
+<div class="step"><b>2. Map answers to inputs</b><span>Each answer becomes a number or flag (section 2).</span></div>
+<div class="step"><b>3. Call the engine</b><span><code>FairExitRules.estimate(region, inputs)</code></span></div>
+<div class="step"><b>4. Show the result</b><span>Estimate range, the 3 parts, a message, a source link.</span></div>
+</div>
+<div class="box"><b>Key points</b><ol>
+<li><b>Canada shows dollars.</b> A range from the legal minimum up to what courts may award.</li>
+<li><b>US shows no dollars.</b> It's a checklist of federal and state rules that may apply (section 7).</li>
+<li><b>The engine is pure JavaScript with no dependencies.</b> It runs the same in the browser or on a Node backend. You can call it as-is or port the tables below to your language.</li>
+<li><b>Every result carries the label</b> "Rough estimate from public rules, not legal advice."</li>
+</ol></div>
+
+<h2 id="ca-inputs">2 · Canada: questions and what each one feeds</h2>
+<p class="lede">Questions as they appear on the free check (<a href="https://sevapp-opal.vercel.app/resource-hub-v2/demo-v3.html">live</a>). Left: the question. Right: the engine input it sets.</p>
+<div class="tw"><table>
+<tr><th>#</th><th>Question</th><th>Answers</th><th>Engine input</th></tr>
+<tr><td>1</td><td>Where were you employed?</td><td>9 provinces; "Quebec, a territory, or a U.S. state" stops the flow</td><td>region code <code>CA-ON</code>, <code>CA-BC</code>…</td></tr>
+<tr><td>2</td><td>Federally regulated? (banks, telecom, air, rail)</td><td>Yes / No</td><td>Yes overrides region to <code>CA-FED</code></td></tr>
+<tr><td>3</td><td>Your age</td><td>number</td><td><code>age</code></td></tr>
+<tr><td>4</td><td>Years on the job</td><td>number (decimals ok)</td><td><code>years</code></td></tr>
+<tr><td>5</td><td>Pay per year, before tax</td><td>number</td><td><code>salary</code></td></tr>
+<tr><td>6</td><td>Payroll over $2.5M, counting all locations and parent companies? (Ontario only matters)</td><td>Yes / No / Not sure</td><td>Yes → <code>payrollGlobal: 3000000</code> · No → 0 · Not sure → <code>payrollUnknown: true</code></td></tr>
+<tr><td>7</td><td>Role</td><td>Upper mgmt 1.25 · Middle mgmt 1.15 · Professional 1.12 · Lower mgmt 1.10 · Technical/trade 1.08 · Sales 1.08 · Clerical 1.00 · Labourer 1.00</td><td><code>roleFactor</code></td></tr>
+<tr><td>8</td><td>How did your job end?</td><td>Laid off · For cause · Forced out · "Temporary layoff" · Part of a group layoff</td><td>Group layoff → <code>groupLayoff: true</code>. Others only change the message (section 6).</td></tr>
+<tr><td>8a</td><td>If group: how many let go in the same few weeks?</td><td>10–24 · 25–49 · 50–99 · 100–199 · 200–499 · 500+ · Not sure</td><td><code>groupSize</code> = low end of band (10, 25, 50, 100, 200, 500). Not sure → 0</td></tr>
+<tr><td>8b</td><td>If group: at least a quarter of all staff?</td><td>Yes / No / Not sure</td><td><code>workforce</code> = groupSize×3 (Yes) · groupSize×10 (No) · 0 (Not sure)</td></tr>
+<tr><td>9</td><td>How hard to find a similar job?</td><td>Plenty · Some · Very few</td><td>Market factor 0.90 · 1.00 · 1.15 (applied after the engine, section 3)</td></tr>
+<tr><td>10</td><td>Does your letter limit you to the minimum?</td><td>Yes / No / Not sure</td><td>Result display (section 3, step 5)</td></tr>
+<tr><td>11</td><td>Did you sign an employment contract?</td><td>Same role · Promoted since · None · Not sure</td><td>Result display (section 3, step 5)</td></tr>
+<tr><td>12</td><td>Bonus / stock / benefits / commission; offer amount; new job; anything else</td><td>various</td><td>Message only. Offer amount is shown as a marker on the range bar.</td></tr>
+</table></div>
+
+<h2 id="ca-calc">3 · Canada: how the estimate is calculated</h2>
+<p class="lede">The result has three parts. Weekly pay = salary ÷ 52. Monthly pay = salary ÷ 12.</p>
+<h3>Step 1 · Notice pay (legal minimum)</h3>
+<p>Look up the province's table (section 4) by years of service. Use the highest row the person qualifies for. Example, Ontario: 8 years → 8 weeks.</p>
+<h3>Step 2 · Severance pay (only Ontario and federal)</h3>
+<ol class="plain">
+<li><b>Ontario:</b> 1 week per year of service, prorated, max 26 weeks. Only if 5+ years AND payroll is Yes (or 50+ let go in 6 months from a closure). Payroll "Not sure" → show "may apply, up to X weeks", never $0.</li>
+<li><b>Federal:</b> the greater of 2 days per full year or 5 days, after 1 year. Days ÷ 5 = weeks.</li>
+<li>All other provinces: none.</li>
+</ol>
+<h3>Step 3 · Group layoff (raises the minimum)</h3>
+<p>If <code>groupLayoff</code> and the province has group rules, look up group weeks by <code>groupSize</code>. The person gets the higher of individual and group notice (BC adds them). Some provinces show it as "may apply" only. Table in section 4.</p>
+<p><b>Legal minimum ($)</b> = (notice weeks + severance weeks) × weekly pay.</p>
+<h3>Step 4 · What courts may award (the top of the range)</h3>
+<pre>months = years × 1.0
+if age ≥ 55: months + 3   else if age ≥ 50: + 2   else if age ≥ 45: + 1
+months = months × roleFactor
+months = min(months, 24)
+low  = max(1, round(months × 0.80))
+high = min(24, round(months × 1.15))
+then × market factor (0.90 / 1.00 / 1.15), rounded
+$ = months × monthly pay, never below the legal minimum</pre>
+<div class="warn"><b>Fix needed (found while writing this):</b> the market factor is applied after the 24-month cap, so "Very few jobs" can push it to 28 months (example D). Cap at 24 again after the market factor.</div>
+<h3>Step 5 · The range shown</h3>
+<ol class="plain">
+<li><b>Low end</b> = legal minimum $.</li>
+<li><b>High end</b> = court-award high $.</li>
+<li><b>Exception:</b> if the letter limits them to the minimum (Q10 = Yes) AND the contract is for the same role (Q11), show only the legal minimum and grey out part 3 with: "may not apply — your answers say a valid clause caps you".</li>
+</ol>
+
+<h2 id="ca-regions">4 · Canada: rules and official source per region</h2>
+<p class="lede">Notice table: years of service → weeks. Group layoff: people let go → weeks.</p>
+<div class="tw"><table>
+<tr><th>Region</th><th>Individual notice (years → weeks)</th><th>Group layoff</th><th>Official source</th></tr>
+<tr><td><b>Ontario</b></td><td>3 mo→1 · 1→2 · 3→3 · 4→4 · 5→5 · 6→6 · 7→7 · 8+→8. Plus severance pay (section 3).</td><td>50+ in 4 wks: 8 · 200+: 12 · 500+: 16</td><td><a href="https://www.ontario.ca/document/your-guide-employment-standards-act-0/termination-employment">ontario.ca termination</a> · <a href="https://www.ontario.ca/document/your-guide-employment-standards-act-0/severance-pay">ontario.ca severance</a></td></tr>
+<tr><td><b>British Columbia</b></td><td>3 mo→1 · 1→2 · 3→3 · then +1/yr to 8 (max)</td><td>Added on top: 50+ in 2 mo: 8 · 101+: 12 · 301+: 16</td><td><a href="https://www.bclaws.gov.bc.ca/civix/document/id/complete/statreg/96113_01">BC ESA</a></td></tr>
+<tr><td><b>Alberta</b></td><td>3 mo→1 · 2→2 · 4→4 · 6→5 · 8→6 · 10+→8</td><td>Notice to Minister only, show note</td><td><a href="https://www.alberta.ca/group-terminations">alberta.ca</a></td></tr>
+<tr><td><b>Saskatchewan</b></td><td>&gt;13 wks→1 · &gt;1→2 · &gt;3→4 · &gt;5→6 · &gt;10→8</td><td>"May apply": 25+: 4 · 50+: 8 · 100+: 12</td><td><a href="https://saskatchewan.ca/business/employment-standards/layoffs-and-termination/group-layoff-or-termination">saskatchewan.ca</a></td></tr>
+<tr><td><b>Manitoba</b></td><td>30 days→1 · 1→2 · 3→4 · 5→6 · 10+→8</td><td>50+ in 4 wks: 10 · 101+: 14 · 300+: 18</td><td><a href="https://web2.gov.mb.ca/laws/statutes/ccsm/e110.php">MB ESC</a></td></tr>
+<tr><td><b>Nova Scotia</b></td><td>3 mo→1 · 2→2 · 5→4 · 10+→8</td><td>10+ in 4 wks: 8 · 100+: 12 · 300+: 16</td><td><a href="https://novascotia.ca/lae/employmentrights/employernowork.asp">novascotia.ca</a></td></tr>
+<tr><td><b>New Brunswick</b></td><td>6 mo→2 · 5+→4</td><td>"May apply": 11+ AND 25%+ of staff: 6</td><td><a href="https://laws.gnb.ca/en/document/cs/E-7.2">NB ESA</a></td></tr>
+<tr><td><b>Prince Edward Island</b></td><td>90 days→1 · 1→2 · 5→4 · 10→6 · 15+→8</td><td>10+ AND 25%+ of staff in 2 mo: 6</td><td>New ESA in force June 30, 2026 (law-firm summaries; Act text to confirm)</td></tr>
+<tr><td><b>Newfoundland</b></td><td>3 mo→1 · 2→2 · 5→3 · 10→4 · 15+→6</td><td>50+ in 4 wks: 8 · 200+: 12 · 500+: 16</td><td><a href="https://www.assembly.nl.ca/legislation/sr/statutes/l02.htm">NL LSA</a></td></tr>
+<tr><td><b>Federal</b></td><td>3 mo→2 · 3→3 · then +1/yr to 8. Plus severance (section 3).</td><td>Notice to Minister only, show note</td><td><a href="https://www.canada.ca/en/employment-social-development/services/labour-standards/reports/termination.html">canada.ca</a></td></tr>
+</table></div>
+<p style="color:var(--muted);font-size:14px">Not covered: Quebec (different legal system) and the territories. These show the "We don't cover your area" screen.</p>
+
+<h2 id="ca-examples">5 · Canada: worked examples (run through the engine)</h2>
+<p class="lede">Use these as test cases. Your build should give the same numbers.</p>
+<div class="tw"><table>
+<tr><th>#</th><th>Inputs</th><th class="num">Notice</th><th class="num">Severance</th><th class="num">Legal min</th><th class="num">Court months</th><th class="num">Range shown</th></tr>
+<tr><td>A</td><td>Ontario · 45 · 8 yrs · $90k · middle mgmt · payroll Yes · some jobs</td><td class="num">8 wks</td><td class="num">8 wks</td><td class="num">$27,692</td><td class="num">8–12</td><td class="num">$27,692 – $90,000</td></tr>
+<tr><td>B</td><td>Ontario · 38 · 6 yrs · $70k · clerical · payroll Not sure</td><td class="num">6 wks</td><td class="num">may apply, up to 6 wks ($8,077)</td><td class="num">$8,077</td><td class="num">5–7</td><td class="num">$8,077 – $40,833</td></tr>
+<tr><td>C</td><td>BC · 30 · 3 yrs · $60k · clerical · plenty of jobs</td><td class="num">3 wks</td><td class="num">—</td><td class="num">$3,462</td><td class="num">2–3</td><td class="num">$3,462 – $13,500</td></tr>
+<tr><td>D</td><td>Alberta · 56 · 15 yrs · $120k · upper mgmt · very few jobs</td><td class="num">8 wks</td><td class="num">—</td><td class="num">$18,462</td><td class="num">21–24*</td><td class="num">$18,462 – $240,000*</td></tr>
+<tr><td>E</td><td>Nova Scotia · 40 · 4 yrs · $55k · trade · group 100–199, quarter Yes</td><td class="num">12 wks (group)</td><td class="num">—</td><td class="num">$12,692</td><td class="num">3–5</td><td class="num">$12,692 – $22,917</td></tr>
+<tr><td>F</td><td>Federal · 50 · 10 yrs · $80k · professional</td><td class="num">8 wks</td><td class="num">4 wks</td><td class="num">$18,462</td><td class="num">11–15</td><td class="num">$18,462 – $100,000</td></tr>
+<tr><td>G</td><td>Saskatchewan · 35 · 2 yrs · $50k · clerical · group 50–99</td><td class="num">2 wks + "may add 6 wks ($5,769), ask a lawyer"</td><td class="num">—</td><td class="num">$1,923</td><td class="num">2</td><td class="num">$1,923 – $8,333</td></tr>
+<tr><td>H</td><td>PEI · 28 · 1 yr · $45k · clerical · group 25–49, quarter Yes</td><td class="num">6 wks (group)</td><td class="num">—</td><td class="num">$5,192</td><td class="num">1</td><td class="num">$5,192 (min only)</td></tr>
+</table></div>
+<p style="font-size:14px;color:var(--muted)">* Example D with the cap fix. The engine today gives 21–28 months ($276,000) because of the bug in section 3.</p>
+
+<h2 id="ca-verdict">6 · Canada: the result message</h2>
+<p class="lede">Above the range, a short message based on a score. It never says "fair" or "unfair".</p>
+<div class="tw"><table>
+<tr><th>Answer</th><th class="num">Score</th></tr>
+<tr><td>Salary $150k+ / $90k+ / $60k+</td><td class="num">+3 / +2 / +1</td></tr>
+<tr><td>Years 10+ / 5+ / 2+</td><td class="num">+3 / +2 / +1</td></tr>
+<tr><td>Role factor ≥1.25 / ≥1.15</td><td class="num">+2 / +1</td></tr>
+<tr><td>Minimum clause: No / Not sure / Yes</td><td class="num">+2 / +1 / −3</td></tr>
+<tr><td>Contract: none / promoted since</td><td class="num">+3 / +2</td></tr>
+<tr><td>Ontario, 5+ yrs, payroll Yes</td><td class="num">+1</td></tr>
+<tr><td>Mistreatment / unpaid wages</td><td class="num">+3 / +1</td></tr>
+<tr><td>Forced out / temporary layoff / group layoff</td><td class="num">+1 / +2 / +1</td></tr>
+<tr><td>Jobs: very few / plenty</td><td class="num">+2 / −1</td></tr>
+<tr><td>New job: started / looking</td><td class="num">−4 / −1</td></tr>
+<tr><td>Any bonus, stock, benefits or commission</td><td class="num">+1</td></tr>
+</table></div>
+<ol class="plain">
+<li><b>6+:</b> "This is the kind of offer people often review with a lawyer."</li>
+<li><b>3–5:</b> "A few things here are worth understanding better."</li>
+<li><b>Under 3</b> (or clause Yes with a low score): "We didn't spot the things we check for."</li>
+<li>Show the top 4 reasons behind the score as ticks or warnings. The exact wording is on the live page.</li>
+</ol>
+
+<h2 id="us">7 · US: what the free check shows (no dollars)</h2>
+<div class="ok">The US has no legal minimum severance, so the US free check shows <b>no dollar amount</b>. It lists the federal and state rules the person's answers point to, with an official source link.</div>
+<h3>Questions</h3>
+<p>State · age 40+ · how it ended (laid off / site closed / big group / for cause) · employer size (under 100 / 100+ / not sure) · how many let go (just me / a handful / 50+ / not sure) · notice given (none / 1–2 wks / 3–8 wks / 8+ wks) · release to sign · severance promised in writing · time to decide (under 21 / 21–44 / 45+ days) · 7-day take-back · union · non-compete · anything else.</p>
+<h3>Rules checked</h3>
+<div class="tw"><table>
+<tr><th>Rule</th><th>When it shows</th><th>Source</th></tr>
+<tr><td>Age 40+ release: time to decide</td><td>Age 40+, release Yes, and under 21 days (alone) or under 45 days (group)</td><td><a href="https://www.eeoc.gov/laws/guidance/qa-understanding-waivers-discrimination-claims-employee-severance-agreements">EEOC</a></td></tr>
+<tr><td>Age 40+ release: 7-day take-back</td><td>Age 40+, release Yes, take-back No</td><td>EEOC</td></tr>
+<tr><td>Age 40+ release: advised to see an attorney</td><td>Age 40+, release Yes, advised No</td><td>EEOC</td></tr>
+<tr><td>Age 40+ group: ages and titles list</td><td>Age 40+, group layoff, list No</td><td>EEOC</td></tr>
+<tr><td>WARN advance notice</td><td>Employer 100+ AND 50+ let go AND notice under 60 days</td><td><a href="https://www.dol.gov/agencies/eta/layoffs/warn">DOL WARN</a></td></tr>
+<tr><td>Written severance promise</td><td>Promise Yes</td><td>—</td></tr>
+<tr><td>State note</td><td>California, New York, New Jersey, Illinois (their own WARN laws; NJ mandatory severance)</td><td>state page</td></tr>
+<tr><td>Union / non-compete / discrimination / unpaid pay</td><td>When answered Yes</td><td>—</td></tr>
+</table></div>
+<p>Result message: score starts at 100 and drops per flag (e.g. −25 WARN, −18 short time to decide). Show the top 5 flags. The engine's US WARN fields (<code>warn.applies</code>, <code>warn.noticeDays</code>) can drive the WARN line. Never show <code>backPayMaxAmount</code> or US severance dollars.</p>
+
+<h2 id="build">8 · Build notes</h2>
+<ol class="plain">
+<li><b>Simplest path:</b> load <code>severance-rules.js</code> on the server (Node) or in the browser, and call <code>FairExitRules.estimate(region, inputs)</code>. Read <code>statutory</code>, <code>commonLaw</code>, <code>massWarning</code> from the result.</li>
+<li>Apply the market factor and the clause rule (section 3, steps 4–5) after the call.</li>
+<li>Run <code>node severance-rules.test.js</code> (83 tests) plus examples A–H above to check your build.</li>
+<li>Save the inputs and result with the user's session so the paid report can reuse them.</li>
+<li>All numbers are pending employment-lawyer sign-off before launch. The tables won't change shape, only values if a lawyer corrects them.</li>
+</ol>
+<p class="foot">Questions: tell Sundeep the section number and line. Rules engine v0.4.0, Nov 2, 2026.</p>
+</div></body></html>
+
+</body></html>

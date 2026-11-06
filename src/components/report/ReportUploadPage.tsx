@@ -1327,6 +1327,28 @@ export default function ReportUploadPage({
                 </span>
               </div>
 
+              {Boolean(data.signed) && (
+                <div className="flex items-center justify-between py-[7px]">
+                  <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                    Signed yet?
+                  </span>
+                  <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                    {data.signed}
+                  </span>
+                </div>
+              )}
+
+              {Boolean(data.federal) && (
+                <div className="flex items-center justify-between py-[7px]">
+                  <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                    Federally regulated
+                  </span>
+                  <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                    {data.federal}
+                  </span>
+                </div>
+              )}
+
               <div className="flex items-center justify-between py-[7px]">
                 <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
                   {isUS ? "State" : "Province"}
