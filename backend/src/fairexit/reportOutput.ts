@@ -175,7 +175,7 @@ function getQrSvg(): string {
 const STATUS_LABEL: Record<string, string> = {
   ok: 'Lines up',
   bad: "Doesn't line up",
-  ask: 'Ask about this',
+  ask: 'Ask about it',
   info: 'Good to know',
 }
 
@@ -193,7 +193,7 @@ export interface RenderMeta {
 
 export interface ReportNumbers {
   country: 'CA' | 'US'
-  minimum: { amount: number | null; weeks: number | null; severanceWeeks?: number | null; none: boolean; statute_short?: string; arithmetic?: string }
+  minimum: { amount: number | null; weeks: number | null; terminationWeeks?: number | null; severanceWeeks?: number | null; weeklyPay?: number | null; none: boolean; statute_short?: string; arithmetic?: string }
   range: { low: number; high: number; lowMonths: number; highMonths: number; basis: string } | null
   offer: number | null
   gauge: { low: number; high: number; offer: number; position: number; label: string } | null
@@ -235,7 +235,7 @@ export function reportNumbers(input: Record<string, any> | null | undefined): Re
   if (a.similar_jobs) factorValues.similar_jobs = String(a.similar_jobs).replace(/ similar jobs nearby$/, '')
   return {
     country,
-    minimum: { amount: n(m.amount), weeks: n(m.weeks), severanceWeeks: n(m.severanceWeeks), none: !!m.none, statute_short: m.statute_short, arithmetic: m.arithmetic },
+    minimum: { amount: n(m.amount), weeks: n(m.weeks), terminationWeeks: n(m.terminationWeeks), severanceWeeks: n(m.severanceWeeks), weeklyPay: n(m.weekly_pay), none: !!m.none, statute_short: m.statute_short, arithmetic: m.arithmetic },
     range: range ? { low: range.low, high: range.high, lowMonths: range.lowMonths, highMonths: range.highMonths, basis: range.basis } : null,
     offer,
     gauge,
@@ -263,7 +263,7 @@ function gaugeSvg(frac: number): string {
   const nd = pt(clamped, r - 22)
   h += `<line x1="${cx}" y1="${cy}" x2="${nd[0].toFixed(2)}" y2="${nd[1].toFixed(2)}" stroke="#062C55" stroke-width="4.5" stroke-linecap="round"/>`
   h += `<circle cx="${cx}" cy="${cy}" r="8.5" fill="#062C55"/><circle cx="${cx}" cy="${cy}" r="3.5" fill="#FFFFFF"/>`
-  return `<svg class="gauge" width="240" height="120" viewBox="0 0 240 120">${h}</svg>`
+  return `<svg class="gauge" width="380" height="190" viewBox="0 0 240 120">${h}</svg>`
 }
 
 /** Radar / Diamond chart matching sample PDF ca9.png */
@@ -293,15 +293,15 @@ function radarSvg(factors?: ReportJson['factors']): string {
 
   return `
     <div class="radar-box">
-      <svg width="280" height="250" viewBox="0 0 280 250">
+      <svg width="240" height="214" viewBox="0 0 280 250">
         ${gridDiamonds}
         ${axes}
         ${poly}
         ${centerDot}
-        <text x="${cx}" y="${cy - r - 10}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Length of service</text>
-        <text x="${cx + r + 8}" y="${cy + 4}" text-anchor="start" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Age</text>
-        <text x="${cx}" y="${cy + r + 18}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Job level</text>
-        <text x="${cx - r - 8}" y="${cy + 4}" text-anchor="end" font-family="'DM Sans', sans-serif" font-size="9.5pt" font-weight="700" fill="#062C55">Similar jobs</text>
+        <text x="${cx}" y="${cy - r - 10}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="7.5pt" font-weight="700" fill="#062C55">Length of service</text>
+        <text x="${cx + r + 8}" y="${cy + 4}" text-anchor="start" font-family="'DM Sans', sans-serif" font-size="7.5pt" font-weight="700" fill="#062C55">Age</text>
+        <text x="${cx}" y="${cy + r + 18}" text-anchor="middle" font-family="'DM Sans', sans-serif" font-size="7.5pt" font-weight="700" fill="#062C55">Job level</text>
+        <text x="${cx - r - 8}" y="${cy + 4}" text-anchor="end" font-family="'DM Sans', sans-serif" font-size="7.5pt" font-weight="700" fill="#062C55">Similar jobs</text>
       </svg>
     </div>
   `
@@ -310,7 +310,7 @@ function radarSvg(factors?: ReportJson['factors']): string {
 function progressDots(active: number, total = 5): string {
   let dots = ''
   for (let i = 1; i <= total; i++) {
-    dots += `<span class="p-dot ${i === active ? 'active' : ''}"></span>`
+    dots += `<span class="p-dot ${i === active ? 'active' : i < active ? 'done' : ''}"></span>`
   }
   return `<div class="p-dots">${dots}</div>`
 }
@@ -332,6 +332,36 @@ function sectionCoverFooter(curPage: number, totalPages: number): string {
       <div class="page-footer-num">Page ${curPage} of ${totalPages}</div>
     </div>
   `
+}
+
+/** "ontario.ca · Your guide to the ESA, Termination of employment" style label for a source row. */
+function sourceLabel(s: SourceRow): string {
+  let host = ''
+  try { host = new URL(s.url).hostname.replace(/^www\./, '') } catch { /* no url */ }
+  const section = String(s.section || '').split(' (')[0].replace(/^Your guide to the [A-Z]+,\s*/i, '').trim()
+  const short = section.length > 60 ? `${section.slice(0, 57).trim()}…` : section
+  return [host || s.rule, short].filter(Boolean).join(' · ')
+}
+
+function sourceLink(id: string | null | undefined, m: RenderMeta): string {
+  if (!id) return ''
+  const s = m.sources.find((x) => x.id === id)
+  if (!s) return ''
+  return s.url
+    ? `<a class="src-link" href="${esc(s.url)}">${esc(sourceLabel(s))}</a>`
+    : `<b>${esc(sourceLabel(s))}</b>`
+}
+
+function displayUrl(u: string): string {
+  return String(u || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
+}
+
+/** Rough height (px) of one row in the checks table, so pages are split before they overflow. */
+function checkRowHeight(c: ReportJson['checks'][number]): number {
+  const lines = (t: string | null | undefined, perLine: number) => Math.max(1, Math.ceil(String(t || '—').length / perLine))
+  const why = lines(c.why, 30) + 1
+  const n = Math.max(lines(c.topic, 16), lines(c.letter_says, 21), lines(c.contract_says, 19), lines(c.rule_says, 19), why)
+  return 22 + n * 14.5
 }
 
 export interface Section {
@@ -438,8 +468,8 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
       rangeHighMonths = parseInt(mm[2], 10)
     }
   }
-  const lowAmt = rangeLow !== null ? money(rangeLow) : '$22,500'
-  const highAmt = rangeHigh !== null ? money(rangeHigh) : '$30,000'
+  const lowAmt = rangeLow !== null ? money(rangeLow) : ''
+  const highAmt = rangeHigh !== null ? money(rangeHigh) : ''
 
   return {
     clientName,
@@ -456,8 +486,8 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
     deadlineStr,
     rangeLow,
     rangeHigh,
-    rangeLowMonths: rangeLowMonths || 3,
-    rangeHighMonths: rangeHighMonths || 4,
+    rangeLowMonths,
+    rangeHighMonths,
     lowAmt,
     highAmt,
   }
@@ -536,59 +566,16 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // 2. CONTENTS PAGE ("What's in this report" - ca2.png / us2.png)
   // -------------------------------------------------------------------------
   const p = m.pages || {}
+  const pr = (from?: number, to?: number) => (!from ? '' : !to || to <= from ? `page ${from}` : `pages ${from}–${to}`)
+  const before = (id: string) => (p[id] ? p[id] - 1 : undefined)
   const tocItems = [
-    {
-      num: '1',
-      title: 'Where you stand',
-      desc: 'Your offer checked against the rules, and what lines up.',
-      range: p['s1_cover'] && (p['s1_factors'] || p['s1_release'])
-        ? `pages ${p['s1_cover']}–${p['s1_factors'] || p['s1_release']}`
-        : 'pages 4–9',
-    },
-    {
-      num: '2',
-      title: isUS ? "Why there's no minimum" : 'Two numbers to understand',
-      desc: isUS ? "What you're owed comes from what was promised." : 'The legal minimum, and what a court might award.',
-      range: p['s2_cover'] && p['s2_numbers']
-        ? `pages ${p['s2_cover']}–${p['s2_numbers']}`
-        : (isUS ? 'pages 9–10' : 'pages 10–11'),
-    },
-    {
-      num: '3',
-      title: "What's in your letter and contract",
-      desc: 'Clause by clause, with sources.',
-      range: p['s3_cover'] && (p['s3_clause_last'] || p['s3_clause_3'] || p['s3_clauses'])
-        ? `pages ${p['s3_cover']}–${p['s3_clause_last'] || p['s3_clause_3'] || p['s3_clauses']}`
-        : (isUS ? 'pages 11–15' : 'pages 12–16'),
-    },
-    {
-      num: '4',
-      title: 'Questions to prepare',
-      desc: "Calm questions for HR, and this week's steps.",
-      range: p['s4_cover'] && p['s4_practical']
-        ? `pages ${p['s4_cover']}–${p['s4_practical']}`
-        : (isUS ? 'pages 16–18' : 'pages 17–19'),
-    },
-    {
-      num: '5',
-      title: 'Your next step',
-      desc: 'The three paths, side by side.',
-      range: p['s5_cover'] && p['s5_three_paths']
-        ? `pages ${p['s5_cover']}–${p['s5_three_paths']}`
-        : (isUS ? 'pages 19–20' : 'pages 20–21'),
-    },
-    {
-      num: '6',
-      title: 'Where every number comes from',
-      desc: 'Every number and rule, with its official source.',
-      range: p['s6_sources'] ? `page ${p['s6_sources']}` : (isUS ? 'page 21' : 'page 22'),
-    },
-    {
-      num: '7',
-      title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer',
-      desc: 'How to hand this report over, and your report ID.',
-      range: p['s7_lawyer'] ? `page ${p['s7_lawyer']}` : (isUS ? 'page 22' : 'page 23'),
-    },
+    { num: '1', title: 'Where you stand', desc: 'Your offer checked against the rules, and what lines up.', range: pr(p['s1_cover'], before('s2_cover')) },
+    { num: '2', title: isUS ? "Why there's no minimum" : 'Two numbers to understand', desc: isUS ? "What you're owed comes from what was promised." : 'The legal minimum, and what a court might award.', range: pr(p['s2_cover'], before('s3_cover')) },
+    { num: '3', title: "What's in your letter and contract", desc: 'Clause by clause, with sources.', range: pr(p['s3_cover'], before('s4_cover')) },
+    { num: '4', title: 'Questions to prepare', desc: "Calm questions for HR, and this week's steps.", range: pr(p['s4_cover'], before('s5_cover')) },
+    { num: '5', title: 'Your next step', desc: 'The three paths, side by side.', range: pr(p['s5_cover'], before('s6_sources')) },
+    { num: '6', title: 'Where every number comes from', desc: 'Every number and rule, with its official source.', range: pr(p['s6_sources']) },
+    { num: '7', title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', desc: 'How to hand this report over, and your report ID.', range: pr(p['s7_lawyer']) },
   ]
 
   const tocHtml = `
@@ -680,9 +667,9 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       <div class="in-this-section-box">
         <div class="its-kicker">IN THIS SECTION</div>
         <div class="its-item">Your offer at a glance</div>
-        <div class="its-item">Things they don't always tell you</div>
+        ${r.myths && r.myths.length ? `<div class="its-item">Things they don't always tell you</div>` : ''}
         <div class="its-item">Did they do it right?</div>
-        <div class="its-item">${isUS ? 'Your release check' : 'Your estimated range'}</div>
+        ${isUS ? (r.release_check && r.release_check.length ? '<div class="its-item">Your release check</div>' : '') : '<div class="its-item">Your estimated range</div>'}
         ${!isUS ? '<div class="its-item">What lifts your range</div>' : ''}
       </div>
       ${pageFooter(curPage, effTotal)}
@@ -707,7 +694,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
       <div class="glance-card">
         <div class="glance-narrative">
-          <p class="glance-lead">${esc(r.glance)}</p>
+          <p class="glance-lead">${esc(r.glance).replace(/(\$[0-9][0-9,]*(?:\.\d+)?)/g, '<b>$1</b>')}</p>
           ${r.contract_note ? `<p class="glance-contract-note">${esc(r.contract_note)}</p>` : ''}
         </div>
         <div class="glance-table">
@@ -732,10 +719,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
             <span class="glance-col-label">They offered</span>
             <span class="glance-col-val bold">${esc(dyn.offerStr)}</span>
           </div>
+          ${isUS ? '' : `
           <div class="glance-row">
-            <span class="glance-col-label">${isUS ? 'Unpaid PTO' : 'Legal minimum'}</span>
-            <span class="glance-col-val bold">${esc(isUS ? 'None (at-will)' : dyn.minDisplayWithWeeks)}</span>
-          </div>
+            <span class="glance-col-label">Legal minimum</span>
+            <span class="glance-col-val bold">${esc(dyn.minDisplayWithWeeks)}</span>
+          </div>`}
           <div class="glance-row">
             <span class="glance-col-label">Decide by</span>
             <span class="glance-col-val bold">${esc(dyn.deadlineStr)}</span>
@@ -751,21 +739,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // -------------------------------------------------------------------------
   // 4.2 MYTHS: "Things they don't always tell you" (ca6.png / us6.png)
   // -------------------------------------------------------------------------
-  const myths = r.myths && r.myths.length ? r.myths : [
-    { myth: 'I have to sign by their date or I get nothing.', fact: 'The legal minimum money cannot be signed away. Your letter says that is paid either way; only the extra depends on signing.', source_id: 'statute.s5' },
-    { myth: 'They can pay me whenever they want.', fact: 'Termination and severance pay are due by the later of 7 days after your last day or your next regular pay day.', source_id: 'guidance.termination' },
-    { myth: 'My benefits end on my last day.', fact: 'During the notice period, the employer must keep paying into your benefit plans.', source_id: 'statute.benefits' },
-    { myth: 'Vacation pay is already in there.', fact: 'Vacation pay is owed on termination pay in addition to regular wages.', source_id: 'guidance.vacation' },
-    { myth: "If I don't act this week, I lose my rights.", fact: 'You generally have up to 2 years to file an employment standards claim. The deadline in the letter is for their extra offer.', source_id: 'guidance.claims' },
-    { myth: "I can't get unemployment / EI because I got severance.", fact: 'Apply promptly after your last day. Severance may spread out payments, but you do not forfeit entitlements.', source_id: 'guidance.ei' },
-  ]
+  const myths = r.myths || []
 
   const mythsHtml = `
     <div class="page myths-page">
-      <div class="section-kicker-bar">
-        <span>BEFORE YOU DECIDE</span>
-        ${progressDots(2)}
-      </div>
+      <div class="section-kicker">BEFORE YOU DECIDE</div>
       <div class="header-divider"></div>
       <h2 class="section-heading">Things they don't always <i>tell you.</i></h2>
       <p class="section-sub">Here's what the official rules say, so you can decide on your timeline, not theirs. Every point links to a government source.</p>
@@ -775,12 +753,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="myth-card">
             <div class="myth-col-left">
               <div class="myth-header">WHAT PEOPLE OFTEN THINK</div>
-              <div class="myth-text">"${esc(mth.myth)}"</div>
+              <div class="myth-text">“${esc(mth.myth).replace(/^["“]|["”]$/g, '')}”</div>
             </div>
             <div class="myth-col-right">
               <div class="myth-header">WHAT THE OFFICIAL RULES SAY</div>
               <div class="rule-text">${esc(mth.fact)}</div>
-              ${mth.source_id ? `<div class="myth-source">Source: <u>${esc(mth.source_id)}</u></div>` : ''}
+              ${sourceLink(mth.source_id, m) ? `<div class="myth-source">Source: ${sourceLink(mth.source_id, m)}</div>` : ''}
             </div>
           </div>
         `).join('')}
@@ -788,8 +766,10 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       ${pageFooter(curPage, effTotal)}
     </div>
   `
-  sec.push({ id: 's1_myths', title: "Things they don't always tell you", html: mythsHtml })
-  curPage += 1
+  if (myths.length) {
+    sec.push({ id: 's1_myths', title: "Things they don't always tell you", html: mythsHtml })
+    curPage += 1
+  }
 
   // -------------------------------------------------------------------------
   // 4.3 CHECKS TABLE: "Did they do it right?" (ca7.png / us7.png)
@@ -800,16 +780,20 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   const countAsk = allChecks.filter((c) => c.status === 'ask').length
   const countInfo = allChecks.filter((c) => c.status === 'info').length
 
-  const CHECKS_PER_PAGE_FIRST = 6
-  const CHECKS_PER_PAGE_CONT = 7
-  const checkChunks: Array<typeof allChecks> = []
-  if (allChecks.length === 0) {
-    checkChunks.push([])
-  } else {
-    checkChunks.push(allChecks.slice(0, CHECKS_PER_PAGE_FIRST))
-    for (let i = CHECKS_PER_PAGE_FIRST; i < allChecks.length; i += CHECKS_PER_PAGE_CONT) {
-      checkChunks.push(allChecks.slice(i, i + CHECKS_PER_PAGE_CONT))
+  // Fill each page by estimated height (first page has the summary pills).
+  const CHECKS_BUDGET_FIRST = 560
+  const CHECKS_BUDGET_CONT = 640
+  const checkChunks: Array<typeof allChecks> = [[]]
+  let used = 0
+  for (const c of allChecks) {
+    const h = checkRowHeight(c)
+    const budget = checkChunks.length === 1 ? CHECKS_BUDGET_FIRST : CHECKS_BUDGET_CONT
+    if (checkChunks[checkChunks.length - 1].length && used + h > budget) {
+      checkChunks.push([])
+      used = 0
     }
+    checkChunks[checkChunks.length - 1].push(c)
+    used += h
   }
 
   checkChunks.forEach((chunk, chunkIdx) => {
@@ -818,7 +802,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       <div class="page checks-page">
         <div class="section-kicker-bar">
           <span>SECTION 1 OF 5 · WHERE YOU STAND</span>
-          ${progressDots(3)}
+          ${progressDots(1)}
         </div>
         <div class="header-divider"></div>
         <h2 class="section-heading">${isFirst ? 'Did they do it <i>right?</i>' : 'Did they do it <i>right?</i> (continued)'}</h2>
@@ -826,18 +810,18 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
         ${isFirst ? `
           <div class="checks-summary-pills">
-            <span class="pill pill-green">${countOk} LINE${countOk === 1 ? 'S' : ''} UP</span>
-            ${countBad > 0 ? `<span class="pill pill-red">${countBad} DON'T</span>` : `<span class="pill pill-red">0 DON'T</span>`}
-            <span class="pill pill-yellow">${countAsk} TO ASK ABOUT</span>
-            <span class="pill pill-gray">${countInfo} GOOD TO KNOW</span>
+            ${countOk ? `<span class="pill pill-green">${countOk} LINE UP</span>` : ''}
+            ${countBad ? `<span class="pill pill-red">${countBad} DON'T</span>` : ''}
+            ${countAsk ? `<span class="pill pill-yellow">${countAsk} TO ASK ABOUT</span>` : ''}
+            ${countInfo && !countOk && !countBad && !countAsk ? `<span class="pill pill-gray">${countInfo} GOOD TO KNOW</span>` : ''}
           </div>
         ` : ''}
 
         <div class="checks-cards-list">
           <div class="checks-header-row">
             <div class="ch-col col-1">WHAT WE CHECKED</div>
-            <div class="ch-col col-2">YOUR ${esc(w.letter).toUpperCase()} SAYS</div>
-            <div class="ch-col col-3">YOUR ${esc(w.contract).toUpperCase()} SAYS</div>
+            <div class="ch-col col-2">YOUR LETTER SAYS</div>
+            <div class="ch-col col-3">YOUR CONTRACT SAYS</div>
             <div class="ch-col col-4">THE RULES SAY</div>
             <div class="ch-col col-5">DOES IT LINE UP?</div>
           </div>
@@ -855,7 +839,6 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
                 <div class="ch-col col-3">${esc(c.contract_says || '—')}</div>
                 <div class="ch-col col-4">
                   ${esc(c.rule_says || '—')}
-                  ${c.source_id ? `<div class="check-source-tag">Source: <u>${esc(c.source_id)}</u></div>` : ''}
                 </div>
                 <div class="ch-col col-5">
                   <div class="status-cell">
@@ -883,16 +866,23 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // -------------------------------------------------------------------------
   // 4.4 ESTIMATED RANGE (CA: ca8.png) or RELEASE CHECK (US: us8.png)
   // -------------------------------------------------------------------------
-  if (!isUS && ((nb && nb.range && nb.minimum.amount !== null) || (dyn.rangeHigh && dyn.minAmount !== null))) {
+  if (!isUS && dyn.rangeHigh !== null && dyn.minAmount !== null) {
     const minAmt = dyn.minAmtStr
     const highAmt = dyn.highAmt
     const lowAmt = dyn.lowAmt
     const offerAmt = dyn.offerStr
     const pos = nb?.gauge ? Math.round(nb.gauge.position * 100) : (dyn.isOfferAdditional ? 35 : 10)
 
-    const floorText = m.jurisdiction.has_statutory_severance
-      ? `${dyn.minWeeks || 8} weeks notice + statutory severance pay (${minAmt})`
-      : `${dyn.minWeeks || 3} weeks compensation for length of service (${minAmt})`
+    const termWeeks = nb?.minimum?.terminationWeeks ?? (nb?.minimum?.weeks != null && nb?.minimum?.severanceWeeks != null ? nb.minimum.weeks - nb.minimum.severanceWeeks : dyn.minWeeks)
+    const sevWeeks = nb?.minimum?.severanceWeeks || 0
+    const floorText = sevWeeks > 0
+      ? `${termWeeks} weeks notice + ${sevWeeks} weeks severance pay`
+      : `${termWeeks ?? dyn.minWeeks} weeks ${m.jurisdiction.has_statutory_severance ? 'notice' : 'compensation for length of service'}`
+    const monthsText = dyn.rangeLowMonths && dyn.rangeHighMonths ? `about ${dyn.rangeLowMonths}–${dyn.rangeHighMonths} months of base pay` : 'our estimate of a court award'
+    const needleText = dyn.isOfferAdditional ? `Your offer — ${offerAmt} on top of the legal minimum` : (nb?.gauge?.label || `Your offer — ${offerAmt}`)
+    const dashAt = needleText.indexOf('—')
+    const needleLead = dashAt > 0 ? needleText.slice(0, dashAt + 1) : ''
+    const needleRest = dashAt > 0 ? needleText.slice(dashAt + 1) : needleText
 
     const userOffer = typeof nb?.offer === 'number' ? nb.offer : null
     const offerStatusDesc = dyn.isOfferAdditional
@@ -901,15 +891,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         ? `Your offer is <b>${money(dyn.minAmount - userOffer)} below the minimum</b>.`
         : `Your offer is <b>${offerAmt}</b>.`)
 
-    const needleLabel = dyn.isOfferAdditional
-      ? `Your offer — ${offerAmt} (on top of legal minimum)`
-      : (nb?.gauge?.label || `Your offer: ${offerAmt}`)
 
     const rangeHtml = `
       <div class="page range-page">
         <div class="section-kicker-bar">
           <span>SECTION 1 OF 5 · WHERE YOU STAND</span>
-          ${progressDots(4)}
+          ${progressDots(1)}
         </div>
         <div class="header-divider"></div>
         <h2 class="section-heading">Your estimated <i>range.</i></h2>
@@ -919,13 +906,13 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="feature-card-kicker">ESTIMATED SEVERANCE RANGE</div>
           <div class="feature-card-amount">${minAmt} – ${highAmt}</div>
           <p class="feature-card-desc">
-            Floor = ${esc(floorText)}. Top = about ${dyn.rangeLowMonths}–${dyn.rangeHighMonths} months of base pay (${highAmt}), which applies only if your contract doesn't validly limit you. ${offerStatusDesc}
+            Floor = ${esc(floorText)}. Top = ${monthsText}, which applies only if your contract doesn't validly limit you. ${offerStatusDesc}
           </p>
         </div>
 
         <div class="gauge-container">
           ${gaugeSvg(nb?.gauge ? nb.gauge.position : (dyn.isOfferAdditional ? 0.35 : 0.08))}
-          <div class="gauge-needle-label">${esc(needleLabel)}</div>
+          <div class="gauge-needle-label">${needleLead ? `<span class="gl-lead">${esc(needleLead)}</span> ` : ''}${esc(needleRest.trim())}</div>
         </div>
 
         <div class="linear-scale-container">
@@ -939,12 +926,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           </div>
           <div class="scale-footer-row">
             <span>Legal minimum ${minAmt}</span>
-            <span>Likely open · courts ${lowAmt}–${highAmt}</span>
+            <span>${lowAmt ? `Likely open · courts ${lowAmt}–${highAmt}` : `Likely open · up to ${highAmt}`}</span>
           </div>
         </div>
 
         <div class="estimate-disclaimer-card">
-          <b>This is an estimate, not a promise.</b> Base pay only: a bonus and benefits during the notice period could add to it. Pay from a new job usually reduces the part above the minimum. Only a lawyer can confirm your number.
+          <b>This is an estimate, not a promise.</b> Base pay only: a bonus and benefits during the notice period could add to it. Pay from a new job usually reduces the part above the minimum. Only a ${esc(w.lawyer)} can confirm your number.
         </div>
         ${pageFooter(curPage, effTotal)}
       </div>
@@ -952,38 +939,36 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     sec.push({ id: 's1_range', title: 'Your estimated range', html: rangeHtml })
     curPage += 1
   } else if (isUS) {
-    const rc = r.release_check && r.release_check.length ? r.release_check : [
-      { status: 'bad', point: 'At least 45 days to consider (group layoff)', detail: 'You were given 21 days.' },
-      { status: 'bad', point: 'Job titles and ages of those selected and not selected', detail: 'Withheld as confidential.' },
-      { status: 'ok', point: '7 days to revoke after signing', detail: 'Included in section 4.' },
-      { status: 'ok', point: 'Advised to consult an attorney', detail: '"We encourage you to consult an attorney."' },
-      { status: 'ok', point: 'Refers to the age discrimination law (ADEA)', detail: 'Named in section 3.' },
-      { status: 'ok', point: "Something beyond what you're owed", detail: 'The $1,200 and severance are offered for the release.' },
-    ]
+    const rc = r.release_check || []
+    const rcText = rc.map((x) => `${x.point} ${x.detail}`).join(' ')
+    const keyDays = /\b45 days\b/i.test(rcText) ? '45 days' : /\b21 days\b/i.test(rcText) ? '21 days' : null
+    const keyDesc = keyDays === '45 days'
+      ? 'The time federal rules give you to consider a release in a group layoff when you are 40 or older.'
+      : 'The time federal rules give you to consider a release when you are 40 or older.'
     const releaseHtml = `
       <div class="page release-page">
         <div class="section-kicker-bar">
           <span>SECTION 1 OF 5 · WHERE YOU STAND</span>
-          ${progressDots(4)}
+          ${progressDots(1)}
         </div>
         <div class="header-divider"></div>
         <h2 class="section-heading">Your release <i>check.</i></h2>
         <p class="section-sub">US law sets no minimum severance, so the report checks the release you're being asked to sign against the rules that protect you.</p>
 
+        ${keyDays ? `
         <div class="navy-feature-card">
           <div class="feature-card-kicker">YOUR KEY NUMBER</div>
-          <div class="feature-card-amount">45 days</div>
-          <p class="feature-card-desc">
-            The time federal rules give you to consider a release in a group layoff at your age. You were given 21 days, and no list of who was selected.
-          </p>
-        </div>
+          <div class="feature-card-amount">${keyDays}</div>
+          <p class="feature-card-desc">${esc(keyDesc)}</p>
+        </div>` : ''}
 
         <div class="release-check-list">
           ${rc.map((item) => {
-            const isOk = item.status === 'ok'
+            const st = item.status === 'ok' || item.status === 'bad' || item.status === 'ask' ? item.status : 'info'
+            const icon = st === 'ok' ? '✓' : st === 'bad' ? '✕' : st === 'ask' ? '!' : 'i'
             return `
               <div class="release-check-row">
-                <span class="status-icon-circle ${isOk ? 'badge-ok' : 'badge-bad'}">${isOk ? '✓' : '✕'}</span>
+                <span class="status-icon-circle badge-${st}">${icon}</span>
                 <div class="release-check-content">
                   <div class="rc-point bold">${esc(item.point)}</div>
                   <div class="rc-detail">${esc(item.detail)}</div>
@@ -995,8 +980,10 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         ${pageFooter(curPage, effTotal)}
       </div>
     `
-    sec.push({ id: 's1_release', title: 'Your release check', html: releaseHtml })
-    curPage += 1
+    if (rc.length) {
+      sec.push({ id: 's1_release', title: 'Your release check', html: releaseHtml })
+      curPage += 1
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -1013,16 +1000,22 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     ]
     factorList.sort((x, y) => y.score - x.score)
     const maxScore = factorList[0].score
-    const highestFactors = factorList.filter((x) => x.score === maxScore && x.score > 0).map((x) => x.name)
+    const highestFactors = factorList.filter((x) => x.score > 0 && maxScore - x.score <= 0.1).slice(0, 2).map((x) => x.name)
+    const heavy = highestFactors.filter((x) => x === 'age' || x === 'length of service').length
+    const reachText = dyn.highAmt ? ` That is why the estimate reaches toward <b>${dyn.highAmt}</b>.` : ''
     const interpretationText = highestFactors.length > 0
-      ? `Your chart reaches furthest on <b>${highestFactors.join(' and ')}</b>. That is why the estimate reaches toward <b>${dyn.highAmt}</b>.`
-      : `Your factor scores reflect your individual employment background. That is why the estimate reaches toward <b>${dyn.highAmt}</b>.`
+      ? `Your chart reaches furthest on <b>${highestFactors.join(' and ')}</b>${heavy === 2 ? ', two of the heaviest factors' : heavy === 1 && highestFactors.length === 1 ? ', one of the heaviest factors' : ''}.${reachText}`
+      : `Your chart stays close to the centre on every factor.${reachText}`
+    const salaryNum = Number(a.salary)
+    const payLine = Number.isFinite(salaryNum) && salaryNum > 0
+      ? `${money(salaryNum)} a year (${money(salaryNum / 12)} a month)`
+      : dyn.salaryStr
 
     const factorsHtml = `
       <div class="page factors-page">
         <div class="section-kicker-bar">
           <span>SECTION 1 OF 5 · WHERE YOU STAND</span>
-          ${progressDots(5)}
+          ${progressDots(1)}
         </div>
         <div class="header-divider"></div>
         <h2 class="section-heading">What lifts your <i>range.</i></h2>
@@ -1051,7 +1044,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
               <div><b>Similar jobs nearby.</b> ${esc(reasons.similar_jobs || 'Availability of similar opportunities.')}</div>
             </div>
             <div class="pay-multiplier-note">
-              Your pay: ${esc(dyn.salaryStr)}. It turns the months into dollars.
+              Your pay: ${esc(payLine)}. It turns the months into dollars.
             </div>
           </div>
         </div>
@@ -1079,12 +1072,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       <div class="heavy-divider"></div>
       <p class="section-cover-desc">
         ${isUS
-          ? `There is no statutory severance in the US. What you're owed comes from what was promised in your agreement or severance policy.`
+          ? `In the US, no law sets a minimum severance. Yours comes from your employer's policy, and the rules protect you when you sign a release.`
           : `There are two numbers in your situation: the legal minimum, a fixed rule you can check yourself, and what a court might award, which is our estimate. This section explains the difference in plain words.`}
       </p>
       <div class="in-this-section-box">
         <div class="its-kicker">IN THIS SECTION</div>
-        <div class="its-item">${isUS ? 'The rules that govern US severance' : 'The floor, and the range above it'}</div>
+        <div class="its-item">${isUS ? 'Where your severance comes from' : 'The floor, and the range above it'}</div>
       </div>
       ${pageFooter(curPage, effTotal)}
     </div>
@@ -1092,12 +1085,39 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   sec.push({ id: 's2_cover', title: `Section 2 · ${s2Title}`, html: s2CoverHtml })
   curPage += 1
 
+  // "8 weeks × $2,163 a week = $17,308" lines; the severance line takes the remainder so the lines add up exactly.
+  const minLines: string[] = []
+  let minHow = ''
+  {
+    const mn = nb?.minimum
+    const total = mn?.amount ?? dyn.minAmount
+    const wk = mn?.weeks ?? null
+    const sev = mn?.severanceWeeks ?? 0
+    const term = mn?.terminationWeeks ?? (wk !== null ? wk - sev : null)
+    const weekly = total !== null && wk ? total / wk : (mn?.weeklyPay ?? null)
+    const money2 = (v: number) => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const statute = esc(m.jurisdiction.statute_short || 'statute')
+    if (mn?.arithmetic) minLines.push(esc(mn.arithmetic))
+    if (term !== null && weekly !== null && total !== null) {
+      const termAmt = term * weekly
+      const label = m.jurisdiction.has_statutory_severance ? 'Termination pay' : 'Notice pay'
+      minLines.push(`${label}: ${term} weeks × ${money2(weekly)} = ${money2(termAmt)} (${statute})`)
+      if (sev > 0) minLines.push(`Severance pay: ${sev} weeks × ${money2(weekly)} = ${money2(sev * weekly)} (${statute})`)
+      minHow = sev > 0 ? `${term} + ${sev} weeks × ${money2(weekly)} a week` : `${term} weeks × ${money2(weekly)} a week`
+    } else if (wk !== null) {
+      minLines.push(`${wk} weeks × your regular weekly pay (${statute})`)
+    }
+  }
+
   const s2DetailHtml = `
     <div class="page section-detail-page">
-      <div class="section-kicker">SECTION 2 OF 5 · ${s2Title.toUpperCase()}</div>
+      <div class="section-kicker-bar">
+        <span>SECTION 2 OF 5 · ${s2Title.toUpperCase()}</span>
+        ${progressDots(2)}
+      </div>
       <div class="header-divider"></div>
-      <h2 class="section-heading">${isUS ? "What you're owed comes from <i>what was promised.</i>" : "The floor — and <i>the range above it.</i>"}</h2>
-      <p class="section-sub">${isUS ? 'Here is how US severance works in practice.' : 'One number is a rule. The other is an estimate. Here is how each is worked out.'}</p>
+      <h2 class="section-heading">${isUS ? 'Where your severance <i>comes from.</i>' : "The floor — and <i>the range above it.</i>"}</h2>
+      <p class="section-sub">${isUS ? 'Three places, and which one applies to you.' : 'One number is a rule. The other is an estimate. Here is how each is worked out.'}</p>
 
       ${!isUS ? `
         <div class="detail-card">
@@ -1105,12 +1125,10 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="card-inner-box">
             <ul class="detail-list">
               ${m.jurisdiction.has_statutory_severance ? `
-                <li>Notice / termination pay: ${dyn.minWeeks || 8} weeks × regular pay (${esc(m.jurisdiction.statute_short || 'ESA')})</li>
-                <li>Statutory severance pay: ${esc(nb?.minimum?.severanceWeeks || '—')} weeks × regular pay</li>
+                ${minLines.map((l) => `<li>${l}</li>`).join('')}
                 <li class="bold">Legal minimum: ${dyn.minAmtStr}</li>
               ` : `
-                <li>Compensation for length of service: ${dyn.minWeeks || 3} weeks × regular weekly pay = ${dyn.minAmtStr} (${esc(m.jurisdiction.statute_short || 'Employment Standards Act')})</li>
-                <li>Separate statutory severance pay: None (${esc(m.jurisdiction.name)} has no separate severance pay layer on top of compensation for length of service)</li>
+                ${minLines.map((l) => `<li>${l}</li>`).join('')}
                 <li class="bold">Legal minimum: ${dyn.minAmtStr}</li>
               `}
             </ul>
@@ -1120,21 +1138,21 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         <div class="detail-card">
           <div class="card-num-title">2 · What a court might award (our estimate)</div>
           <p class="detail-text">
-            If your contract doesn't validly limit you, a court can award "reasonable notice" <b>instead of</b> the minimum, based on four factors: length of service, age, job level and similar jobs nearby. For you: about <b>${dyn.rangeLowMonths}–${dyn.rangeHighMonths} months of base pay, ${dyn.lowAmt}–${dyn.highAmt}</b>. Courts rarely go past about 24 months. Pay from a new job usually reduces the part above the minimum.
+            If your contract doesn't validly limit you, a court can award "reasonable notice" <b>instead of</b> the minimum, based on four factors: length of service, age, job level and similar jobs nearby. ${dyn.rangeLowMonths && dyn.rangeHighMonths && dyn.lowAmt ? `For you: about <b>${dyn.rangeLowMonths}–${dyn.rangeHighMonths} months of base pay, ${dyn.lowAmt}–${dyn.highAmt}</b>. ` : ''}Courts rarely go past about 24 months. Pay from a new job usually reduces the part above the minimum.
           </p>
         </div>
       ` : `
         <div class="detail-card">
-          <div class="card-num-title">1 · At-will employment and no statutory severance</div>
-          <p class="detail-text">
-            Under federal law and ${esc(m.jurisdiction.name)} law, employment is generally "at-will." Neither state nor federal statutes guarantee severance pay upon termination unless you have a contractual entitlement or severance plan.
-          </p>
+          <div class="card-num-title">1 · A written policy or agreement</div>
+          <p class="detail-text">If your employer has a written severance policy, plan or agreement, it decides what you're owed${nb?.offer != null ? `. Your offer: <b>${money(nb.offer)}</b>` : ''}. Section 3 shows what your documents say.</p>
         </div>
         <div class="detail-card">
-          <div class="card-num-title">2 · What protects you: OWBPA, WARN, and earned wages</div>
-          <p class="detail-text">
-            While severance itself is discretionary, the <b>release agreement</b> they ask you to sign must comply with federal OWBPA standards (45-day review in group layoffs, 7-day revocation) and state wage-payment deadlines.
-          </p>
+          <div class="card-num-title">2 · A law for certain layoffs</div>
+          <p class="detail-text">The federal WARN Act requires 60 days' notice, or pay instead, before a plant closing or mass layoff at employers with 100 or more workers. It only applies to larger layoffs; some states add their own rules.</p>
+        </div>
+        <div class="detail-card">
+          <div class="card-num-title">3 · Money owed no matter what</div>
+          <p class="detail-text">Your final pay is owed whether or not you sign. In some states, unused vacation or PTO counts as wages too. ${esc(m.jurisdiction.name)}'s rules are on the Sources page.</p>
         </div>
       `}
       ${pageFooter(curPage, effTotal)}
@@ -1146,40 +1164,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // -------------------------------------------------------------------------
   // 6. SECTION 3: What's in your letter and contract (ca12-ca16.png / us11-us15.png)
   // -------------------------------------------------------------------------
-  const clauses = r.clauses && r.clauses.length ? r.clauses : [
-    {
-      title: 'The payout',
-      status: 'bad',
-      what_it_says: '“Eight (8) weeks … $17,307.69” termination pay and “Fourteen and one-half (14.5) weeks … $31,370.19” severance pay, “your full entitlements”.',
-      what_it_means: 'The weeks are right, but vacation pay is owed on termination pay: 6% × $17,307.69 = about $1,038. The minimum is $49,716.',
-      question_to_ask: 'The $48,678 is paid whether you sign or not. Ask about the missing vacation pay.',
-      source_id: 'ESA s.57, s.64–65, s.5 (e-Laws) · ontario.ca vacation guide',
-    },
-    {
-      title: 'The “only the minimum” clause',
-      status: 'ask',
-      what_it_says: 's.8: “the minimum notice … required by the Employment Standards Act … no further notice … at common law.” s.7: ““Cause’ includes … any breach of Company policy, unsatisfactory performance …”',
-      what_it_means: 'Under the ESA only “wilful misconduct, disobedience or wilful neglect of duty that is not trivial and has not been condoned” removes termination pay. Ontario’s Court of Appeal: an employment agreement “must be interpreted as a whole”.',
-      question_to_ask: 'Ask a lawyer to read s.7 and s.8 together.',
-      source_id: 'Waksdale v. Swegon North America Inc., 2020 ONCA 391 · ontario.ca termination guide',
-    },
-    {
-      title: 'Life insurance and disability stop too early',
-      status: 'bad',
-      what_it_says: 'Health and dental continue 8 weeks. “Life insurance and long-term disability coverage end on the Termination Date.”',
-      what_it_means: 'Pay instead of notice also requires continuing the benefit plan contributions that keep your benefits through the notice period.',
-      question_to_ask: 'Ask them to confirm life insurance and disability continue to November 23, 2026.',
-      source_id: 'ESA s.61(1)(b) (e-Laws)',
-    },
-    {
-      title: 'Your bonus, your promotion and the release',
-      status: 'ask',
-      what_it_says: 'No 2026 bonus (“actively employed on the payment date”). Signed in 2012 as a $58,000 technician; supervisor since 2019, no new contract (s.11 says changes don’t affect it). $5,000 for a full release by Oct 5.',
-      what_it_means: 'If a longer notice period applies, a bonus earned during it is owed unless the plan clearly and unambiguously removes it. Arguments that an old contract no longer fits a bigger job rarely win alone, and s.11 is written to block them.',
-      question_to_ask: 'Ask for more time before signing, and how the 2026 bonus is handled.',
-      source_id: 'Matthews v. Ocean Nutrition Canada Ltd., 2020 SCC 26',
-    },
-  ]
+  const clauses = r.clauses || []
 
   const s3CoverHtml = `
     <div class="page section-cover-page s3-cover">
@@ -1190,7 +1175,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       <p class="section-cover-desc">Clause by clause: what your documents say, what the rules say, and what it could mean for you. Each point shows where it comes from.</p>
       <div class="in-this-section-box">
         <div class="its-kicker">IN THIS SECTION</div>
-        ${clauses.map((c) => `<div class="its-item">${esc(c.title)}</div>`).join('')}
+        ${clauses.length ? clauses.map((c) => `<div class="its-item">${esc(c.title)}</div>`).join('') : '<div class="its-item">Nothing in your documents needed a closer look.</div>'}
       </div>
       ${pageFooter(curPage, effTotal)}
     </div>
@@ -1202,12 +1187,10 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   clauses.forEach((c, idx) => {
     const isBad = c.status === 'bad'
     const isOk = c.status === 'ok'
-    const pillClass = isBad ? 'pill-red' : isOk ? 'pill-green' : 'pill-yellow'
-    const pillLabel = isBad
-      ? (idx === 0 ? 'JUST BELOW THE LEGAL MINIMUM' : "DOESN'T LINE UP")
-      : isOk
-        ? 'LINES UP'
-        : (idx === 1 ? 'MAY NOT HOLD · A LAWYER CONFIRMS' : 'ASK ABOUT IT')
+    const pillClass = isBad ? 'pill-red' : isOk ? 'pill-green' : c.status === 'info' ? 'pill-gray' : 'pill-yellow'
+    const isInfo = c.status === 'info'
+    const pillLabel = isBad ? "DOESN'T LINE UP" : isOk ? 'LINES UP' : isInfo ? 'GOOD TO KNOW' : 'ASK ABOUT IT'
+    const srcHtml = sourceLink(c.source_id, m)
 
     const clauseHtml = `
       <div class="page clause-page">
@@ -1216,14 +1199,14 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           ${progressDots(3)}
         </div>
         <div class="header-divider"></div>
-        <h2 class="section-heading">The terms to understand and the <i>questions to ask.</i></h2>
-        <p class="section-sub">For each: what your documents say, what the rules say, and what it means.</p>
+        ${idx === 0 ? `<h2 class="section-heading">The terms to understand and the <i>questions to ask.</i></h2>
+        <p class="section-sub">For each: what your documents say, what the rules say, and what it means.</p>` : ''}
 
         <div class="clause-pill-badge">
           <span class="pill ${pillClass}">${pillLabel}</span>
         </div>
 
-        <h3 class="clause-single-heading">${idx + 1}. ${esc(c.title.replace(/^\d+\.?\s*/, ''))}</h3>
+        <h3 class="clause-single-heading">${idx + 1}. ${esc(c.title.replace(/^\d+[.)]\s+/, ''))}</h3>
 
         <div class="clause-two-boxes">
           <div class="c-box c-box-white">
@@ -1241,9 +1224,9 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <span>${esc(c.question_to_ask)}</span>
         </div>
 
-        ${c.source_id ? `
+        ${srcHtml ? `
           <div class="clause-dashed-rule"></div>
-          <div class="clause-source-line">Where this comes from: <u>${esc(c.source_id)}</u></div>
+          <div class="clause-source-line">Where this comes from: ${srcHtml}</div>
         ` : ''}
         ${pageFooter(curPage, effTotal)}
       </div>
@@ -1280,7 +1263,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   sec.push({ id: 's4_cover', title: 'Section 4 · Questions to prepare', html: s4CoverHtml })
   curPage += 1
 
-  const hrContact = a.hr_name ? String(a.hr_name) : 'Human Resources'
+  const hrContact = a.hr_name ? `your HR contact (${String(a.hr_name)})` : 'your HR contact'
   const hrGreeting = a.hr_name ? `Hi ${esc(String(a.hr_name).split(' ')[0])},` : 'Hello,'
   const isCompactQuestions = questions.length > 8
   const s4QuestionsHtml = `
@@ -1303,7 +1286,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <ul class="email-questions-list ${isCompactQuestions ? 'compact-list' : ''}">
             ${questions.map((q) => `<li>${esc(q)}</li>`).join('')}
           </ul>
-          <p>Thank you,<br/>${esc(dyn.clientName)}</p>
+          <p>Thank you,<br/>${esc(String(dyn.clientName).split(' ')[0])}</p>
         </div>
       </div>
 
@@ -1353,7 +1336,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           ${nextSteps.map((step) => `
             <div class="p-bullet">
               <span class="bullet-dot teal"></span>
-              <div>${esc(step)}</div>
+              <div>${(() => { const i = step.indexOf(':'); return i > 0 && i < 40 ? `<b>${esc(step.slice(0, i + 1))}</b>${esc(step.slice(i + 1))}` : esc(step) })()}</div>
             </div>
           `).join('')}
         </div>
@@ -1430,33 +1413,61 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // -------------------------------------------------------------------------
   // 9. SECTION 6: Sources (ca22.png / us21.png)
   // -------------------------------------------------------------------------
-  const usedIds = new Set(r.citations_used || [])
-  const citedSources = m.sources.filter((s) => usedIds.has(s.id) || !usedIds.size)
-  const sourcesToShow = citedSources.length ? citedSources : m.sources.slice(0, 8)
+  // Rows: the key numbers first, then each finding that cites a source, then any other cited source.
+  type SrcRow = { item: string; value?: string; how: string; src?: SourceRow; srcText?: string }
+  const srcRows: SrcRow[] = []
+  const byId = (id?: string | null) => (id ? m.sources.find((x) => x.id === id) : undefined)
+  const statuteSrc = m.sources.find((x) => /statute|laws|act\b/i.test(`${x.url} ${x.section}`)) || m.sources[0]
+  if (nb?.offer != null) srcRows.push({ item: 'Their offer', value: money(nb.offer), how: 'What your letter says', srcText: `Your ${w.letter}` })
+  if (!isUS && dyn.minAmount !== null) srcRows.push({ item: 'Legal minimum', value: dyn.minAmtStr, how: minHow || 'Weeks owed × your regular weekly pay', src: statuteSrc })
+  if (!isUS && dyn.rangeHigh !== null) srcRows.push({ item: 'Range', value: dyn.lowAmt ? `${dyn.lowAmt}–${dyn.highAmt}` : `up to ${dyn.highAmt}`, how: `FairExit estimate${dyn.rangeLowMonths && dyn.rangeHighMonths ? `: ${dyn.rangeLowMonths}–${dyn.rangeHighMonths} months of base pay` : ''}, from the four factors courts use`, srcText: 'FairExit estimate (not a rule)' })
+  const seen = new Set<string>()
+  for (const c of r.checks || []) {
+    const src = byId(c.source_id)
+    if (!src) continue
+    seen.add(src.id)
+    srcRows.push({ item: c.topic, how: c.rule_says || src.section, src })
+  }
+  for (const c of r.clauses || []) {
+    const src = byId(c.source_id)
+    if (!src || seen.has(src.id)) continue
+    seen.add(src.id)
+    srcRows.push({ item: c.title, how: src.section, src })
+  }
+  const usedIds = new Set<string>([...(r.citations_used || []), ...(r.myths || []).map((x) => x.source_id || '')])
+  for (const src of m.sources) {
+    if (!usedIds.has(src.id) || seen.has(src.id)) continue
+    seen.add(src.id)
+    srcRows.push({ item: src.rule, how: src.section, src })
+  }
+  const SOURCE_ROWS_MAX = 14
+  const shownRows = srcRows.slice(0, SOURCE_ROWS_MAX)
+  const checkedDates = m.sources.map((x) => x.checked).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()
+  const checkedLine = checkedDates.length ? ` (checked ${esc(fmtLongDate(checkedDates[checkedDates.length - 1]))})` : ''
 
   const s6Html = `
     <div class="page sources-page">
       <div class="section-kicker">SOURCES</div>
       <div class="header-divider"></div>
       <h2 class="section-heading">Where every number <i>comes from.</i></h2>
-      <p class="section-sub">${esc(m.jurisdiction.name)} statute text checked on e-Laws and government guides.</p>
+      <p class="section-sub">${esc(m.jurisdiction.name)} rules from official statute text and government guides${checkedLine}.</p>
 
       <table class="sources-table">
         <thead>
           <tr>
-            <th style="width: 25%;">IN YOUR REPORT</th>
-            <th style="width: 35%;">HOW WE GOT IT</th>
-            <th style="width: 40%;">SOURCE</th>
+            <th style="width: 20%;">IN YOUR REPORT</th>
+            <th style="width: 27%;">HOW WE GOT IT</th>
+            <th style="width: 53%;">SOURCE</th>
           </tr>
         </thead>
         <tbody>
-          ${sourcesToShow.map((s) => `
+          ${shownRows.map((row) => `
             <tr>
-              <td><b>${esc(s.rule || s.id)}</b></td>
-              <td>${esc(s.section || 'Official statutory requirement')}</td>
+              <td class="src-item">${esc(row.item)}${row.value ? ` ${esc(row.value)}` : ''}</td>
+              <td>${esc(row.how)}</td>
               <td>
-                <div class="src-id-title">${esc(s.id)}</div>
-                <div class="src-url">${esc(s.url)}</div>
+                <div class="src-id-title">${esc(row.src ? `${row.src.rule} · ${String(row.src.section || '').split(' (')[0]}` : row.srcText || '')}</div>
+                ${row.src?.url ? `<a class="src-url" href="${esc(row.src.url)}">${esc(displayUrl(row.src.url))}</a>` : ''}
               </td>
             </tr>
           `).join('')}
@@ -1484,13 +1495,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <p class="handover-desc">
             Your report ID connects this report to FairExit, so they can see what you've already done. Connecting is free; you choose whether to go further.
           </p>
-          <div class="report-id-badge">Report ID <b>${esc(m.reportId)}</b></div>
         </div>
         <div class="handover-right">
           <div class="qr-box">
             ${qrSvgCode}
           </div>
-          <div class="qr-sub">Scan to connect report</div>
+          <div class="qr-sub">Report ID <b>${esc(m.reportId)}</b></div>
         </div>
       </div>
 
@@ -1509,6 +1519,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   sec.push({ id: 's7_lawyer', title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', html: s7Html })
   curPage += 1
 
+  for (const x of sec) x.html = x.html.replace(/SECTION (\d) OF 5 ·/g, 'SECTION <b class="kn">$1 OF 5</b> ·')
   return sec
 }
 
@@ -1535,7 +1546,7 @@ body {
   width: 8.5in;
   height: 11in;
   max-height: 11in;
-  padding: 54pt 67.5pt 14pt 67.5pt;
+  padding: 60pt 67.5pt 14pt 67.5pt;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -1557,7 +1568,7 @@ body {
 h1, h2, .huge-section-title, .cover-title, .section-heading {
   font-family: "Newsreader", Georgia, serif;
   color: #062C55;
-  font-weight: 600;
+  font-weight: 500;
 }
 i {
   font-style: italic;
@@ -1571,40 +1582,42 @@ b, strong, .bold {
 
 /* Header Kickers and Dividers */
 .section-kicker {
-  font-size: 8.5pt;
-  letter-spacing: 1.2px;
+  font-size: 7.5pt;
+  letter-spacing: 1.6px;
   text-transform: uppercase;
   color: #5A6B78;
-  font-weight: 700;
-  margin-bottom: 4px;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 .section-kicker-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 8.5pt;
-  letter-spacing: 1.2px;
+  font-size: 7.5pt;
+  letter-spacing: 1.6px;
   text-transform: uppercase;
   color: #5A6B78;
-  font-weight: 700;
-  margin-bottom: 4px;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 .header-divider {
   width: 100%;
   height: 1px;
   background: #E7E4DD;
-  margin-bottom: 12px;
+  margin-bottom: 28px;
 }
 .section-heading {
-  font-size: 24pt;
-  margin: 0 0 8px 0;
-  line-height: 1.15;
+  font-size: 21pt;
+  margin: 0 0 6px 0;
+  line-height: 1.2;
+  letter-spacing: -0.2px;
 }
 .section-sub {
-  font-size: 10pt;
-  color: #5A6B78;
+  font-size: 10.5pt;
+  color: #6B7A86;
   margin: 0 0 16px 0;
-  line-height: 1.4;
+  line-height: 1.5;
+  max-width: 94%;
 }
 
 /* Cover Page */
@@ -1623,10 +1636,11 @@ b, strong, .bold {
 }
 .cover-hero-band {
   width: 100%;
-  height: 285px;
+  height: 245px;
   position: relative;
   overflow: hidden;
   background: #EEF8F3;
+  flex-shrink: 0;
 }
 .hero-img {
   width: 100%;
@@ -1641,11 +1655,11 @@ b, strong, .bold {
 }
 .hero-logo-box {
   position: absolute;
-  top: 18px;
-  left: 24px;
+  top: 24px;
+  left: 56px;
 }
 .hero-logo {
-  height: 42px;
+  height: 30px;
   width: auto;
   display: block;
 }
@@ -1656,13 +1670,13 @@ b, strong, .bold {
   color: #062C55;
 }
 .hero-tagline {
-  font-size: 8.5pt;
-  color: #0EB28D;
+  font-size: 7.5pt;
+  color: #0C8F72;
   font-weight: 700;
-  margin-top: 2px;
+  margin-top: 3px;
 }
 .cover-content {
-  padding: 22pt 36pt 16pt 36pt;
+  padding: 81pt 42pt 16pt 42pt;
   display: flex;
   flex-direction: column;
   flex: 1;
@@ -1671,135 +1685,138 @@ b, strong, .bold {
   padding: 0 43.5pt;
 }
 .kicker-teal {
-  font-size: 8.5pt;
-  letter-spacing: 1.5px;
+  font-size: 7.5pt;
+  letter-spacing: 1.8px;
   text-transform: uppercase;
-  color: #0EB28D;
+  color: #0C8F72;
   font-weight: 700;
-  margin-bottom: 6px;
+  margin-bottom: 10px;
 }
 .cover-title {
-  font-size: 36pt;
-  margin: 0 0 12px 0;
-  line-height: 1.1;
+  font-size: 40pt;
+  font-weight: 600;
+  margin: 0 0 18px 0;
+  line-height: 1.05;
+  letter-spacing: -0.5px;
 }
 .cover-lead {
-  font-size: 11.5pt;
-  color: #3A4B58;
-  line-height: 1.45;
-  margin: 0 0 14px 0;
+  font-size: 12.5pt;
+  color: #4A5A66;
+  line-height: 1.55;
+  margin: 0 0 18px 0;
+  max-width: 84%;
 }
 .cover-tags-pill {
   display: inline-block;
-  padding: 6px 14px;
-  background: #FFFFFF;
-  border: 1px solid #E7E4DD;
-  border-radius: 6px;
-  font-size: 8pt;
+  padding: 6px 10px;
+  background: #EEEFEC;
+  border: 1px solid #E2E0D8;
+  border-radius: 4px;
+  font-size: 7pt;
   font-weight: 700;
   letter-spacing: 0.8px;
-  color: #5A6B78;
-  margin-bottom: 18px;
+  color: #3A4B58;
+  margin-bottom: 56px;
   align-self: flex-start;
 }
 .teal-bold {
   color: #0EB28D;
 }
 .cover-divider {
-  width: 100%;
-  height: 1px;
-  background: #E7E4DD;
-  margin-bottom: 18px;
+  display: none;
 }
 .cover-meta-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  row-gap: 16px;
+  row-gap: 22px;
   column-gap: 20px;
   margin-bottom: 22px;
+  width: 92%;
 }
 .meta-label {
-  font-size: 8pt;
+  font-size: 7pt;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #0EB28D;
-  font-weight: 700;
-  margin-bottom: 2px;
+  color: #0C8F72;
+  font-weight: 600;
+  margin-bottom: 4px;
 }
 .meta-value {
-  font-size: 13pt;
-  font-weight: 700;
+  font-size: 12pt;
+  font-weight: 600;
   color: #062C55;
 }
 .cover-test-note {
   font-size: 8.5pt;
-  color: #7A8B98;
-  margin-top: 10px;
+  color: #6B7A86;
+  margin-top: 4px;
 }
 
 /* Contents Page */
 .toc-list {
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 0;
   margin-bottom: 18px;
 }
 .toc-row {
   display: flex;
   align-items: baseline;
-  padding-bottom: 7px;
+  padding: 9px 0 9px;
   border-bottom: 1px solid #EFECE6;
 }
 .toc-num {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 15pt;
-  font-weight: 700;
+  font-size: 14pt;
+  font-weight: 500;
   color: #062C55;
-  width: 28px;
+  width: 34px;
   flex-shrink: 0;
 }
 .toc-body {
   flex: 1;
 }
 .toc-title {
-  font-size: 10.5pt;
-  font-weight: 600;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 12.5pt;
+  font-weight: 400;
   color: #062C55;
 }
 .toc-desc {
   font-size: 8.5pt;
-  color: #5A6B78;
+  color: #6B7A86;
+  margin-top: 4px;
 }
 .toc-range {
-  font-size: 9pt;
+  font-size: 8.5pt;
   font-weight: 700;
   color: #062C55;
 }
 
 /* Color Legend */
 .legend-card {
-  background: #FAFAF7;
-  border: 1px solid #E7E4DD;
+  background: #FFFFFF;
+  border: 1px solid #E2E0D8;
   border-radius: 8px;
-  padding: 12px 14px;
-  margin-top: auto;
+  padding: 14px 14px 12px;
+  margin-top: 20px;
   margin-bottom: 10px;
 }
 .legend-header {
   font-size: 9pt;
   color: #17242F;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .legend-pills {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 .pill {
   font-size: 7.5pt;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 4px 9px;
   border-radius: 4px;
   white-space: nowrap;
 }
@@ -1809,10 +1826,10 @@ b, strong, .bold {
 .pill-gray { background: #EEF2F6; color: #5A6B78; }
 .pill-navy { background: #062C55; color: #FFFFFF; }
 .legend-text {
-  font-size: 8.5pt;
-  color: #5A6B78;
+  font-size: 9pt;
+  color: #27343F;
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.6;
 }
 
 /* Before you use this */
@@ -1822,83 +1839,88 @@ b, strong, .bold {
   gap: 9px;
 }
 .before-card {
-  border: 1px solid #E7E4DD;
-  border-radius: 8px;
-  padding: 9px 14px;
+  border: 1px solid #E2E0D8;
+  border-radius: 6px;
+  padding: 11px 14px 12px;
   background: #FFFFFF;
 }
 .before-card.alert-card {
-  background: #FDF5E6;
-  border-color: #E6B044;
+  background: #FDF3DC;
+  border-color: #EBC873;
 }
 .card-num-title {
-  font-size: 10pt;
-  font-weight: 700;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 12pt;
+  font-weight: 500;
   color: #062C55;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 .card-body-text {
-  font-size: 8.5pt;
-  color: #3A4B58;
-  line-height: 1.4;
+  font-size: 10pt;
+  color: #27343F;
+  line-height: 1.5;
 }
 
 /* Section Covers */
 .huge-section-digit {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 80pt;
+  font-size: 84pt;
+  font-weight: 600;
   color: #062C55;
   line-height: 1;
-  margin: 14px 0 6px 0;
+  margin: 8px 0 26px 0;
 }
 .huge-section-title {
   font-size: 30pt;
-  margin: 0 0 16px 0;
-  line-height: 1.1;
+  font-weight: 600;
+  margin: 0 0 18px 0;
+  line-height: 1.15;
+  max-width: 88%;
 }
 .heavy-divider {
-  width: 100%;
+  width: 88%;
   height: 2px;
   background: #062C55;
   margin-bottom: 18px;
 }
 .section-cover-desc {
   font-size: 12pt;
-  color: #3A4B58;
-  line-height: 1.45;
-  margin-bottom: 24px;
+  color: #27343F;
+  line-height: 1.6;
+  margin: 0 0 20px 0;
+  max-width: 84%;
 }
 .in-this-section-box {
-  border-top: 1px solid #E7E4DD;
-  padding-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
+  width: 85%;
 }
 .its-kicker {
-  font-size: 8pt;
-  letter-spacing: 1px;
-  font-weight: 700;
+  font-size: 7pt;
+  letter-spacing: 1.2px;
+  font-weight: 600;
   color: #5A6B78;
-  margin-bottom: 4px;
+  padding-bottom: 7px;
+  border-bottom: 1px solid #E7E4DD;
 }
 .its-item {
   font-size: 10.5pt;
   color: #062C55;
-  padding: 4px 0;
-  border-bottom: 1px solid #F0ECE6;
+  padding: 9px 0;
+  border-bottom: 1px solid #EFECE6;
 }
 
 /* Progress Dots */
 .p-dots {
   display: flex;
-  gap: 5px;
+  gap: 6px;
 }
 .p-dot {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
-  background: #D8DFE5;
+  background: #E2E5E8;
 }
 .p-dot.active {
   background: #062C55;
@@ -1906,16 +1928,16 @@ b, strong, .bold {
 
 /* Glance 2-Column */
 .glance-card {
-  border: 1px solid #E7E4DD;
+  border: 1px solid #E2E0D8;
   border-radius: 8px;
   padding: 20px 18px;
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 24px;
+  grid-template-columns: 1.05fr 1fr;
+  gap: 26px;
 }
 .glance-lead {
-  font-size: 11pt;
-  line-height: 1.55;
+  font-size: 12pt;
+  line-height: 1.5;
   color: #17242F;
   margin: 0 0 12px 0;
 }
@@ -1934,90 +1956,97 @@ b, strong, .bold {
 .glance-row {
   display: flex;
   justify-content: space-between;
-  padding: 6px 0;
+  gap: 14px;
+  padding: 11px 0;
   border-bottom: 1px solid #EFECE6;
-  font-size: 9.5pt;
+  font-size: 9pt;
 }
 .glance-row:last-child {
   border-bottom: none;
 }
 .glance-col-label {
-  color: #5A6B78;
+  color: #6B7A86;
+  flex-shrink: 0;
 }
 .glance-col-val {
   color: #062C55;
   text-align: right;
+  font-weight: 700;
 }
 
 /* Myths */
 .myths-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 .myth-card {
-  border: 1px solid #E7E4DD;
-  border-radius: 8px;
-  padding: 12px 16px;
+  border: 1px solid #E2E0D8;
+  border-radius: 6px;
+  padding: 0;
   display: grid;
-  grid-template-columns: 1fr 1.3fr;
-  gap: 18px;
+  grid-template-columns: 0.66fr 1fr;
+  gap: 0;
+  overflow: hidden;
 }
 .myth-header {
-  font-size: 7.5pt;
-  font-weight: 700;
-  letter-spacing: 0.8px;
+  font-size: 6.5pt;
+  font-weight: 600;
+  letter-spacing: 1px;
   color: #5A6B78;
   margin-bottom: 3px;
 }
 .myth-text {
-  font-size: 10pt;
+  font-size: 8.5pt;
   font-weight: 700;
   color: #062C55;
-  line-height: 1.35;
+  line-height: 1.45;
 }
 .rule-text {
-  font-size: 9pt;
+  font-size: 8.5pt;
   color: #27343F;
-  line-height: 1.4;
+  line-height: 1.5;
 }
 .myth-source {
   font-size: 7.5pt;
-  color: #0EB28D;
-  margin-top: 3px;
+  color: #6B7A86;
+  margin-top: 4px;
 }
 
 /* Checks Cards List (ca7.png / us7.png) */
 .checks-summary-pills {
   display: flex;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 18px;
 }
 .checks-cards-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 .checks-header-row {
   display: grid;
-  grid-template-columns: 1.5fr 2.1fr 2fr 1.9fr 2.5fr;
-  gap: 8px;
-  padding: 4px 10px;
-  font-size: 7.5pt;
-  font-weight: 700;
-  letter-spacing: 0.8px;
+  grid-template-columns: 0.72fr 0.92fr 0.86fr 0.86fr 1.06fr;
+  gap: 10px;
+  padding: 0 8px 6px;
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 1px;
   color: #5A6B78;
+  line-height: 1.6;
+  align-items: end;
 }
 .check-card-row {
   display: grid;
-  grid-template-columns: 1.5fr 2.1fr 2fr 1.9fr 2.5fr;
-  gap: 8px;
-  padding: 5px 10px;
+  grid-template-columns: 0.72fr 0.92fr 0.86fr 0.86fr 1.06fr;
+  gap: 10px;
+  padding: 8px 8px 9px;
   background: #FFFFFF;
-  border: 1px solid #E7E4DD;
+  border: 1px solid #E2E0D8;
   border-radius: 6px;
-  font-size: 8pt;
-  line-height: 1.3;
+  font-size: 7.5pt;
+  line-height: 1.45;
+  color: #27343F;
   align-items: start;
 }
 .check-source-tag {
@@ -2042,17 +2071,17 @@ b, strong, .bold {
   align-items: flex-start;
 }
 .status-icon-circle {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 7.5pt;
+  font-size: 9.5pt;
   font-weight: 700;
   color: #FFFFFF;
   flex-shrink: 0;
-  margin-top: 1px;
+  margin-top: -1px;
 }
 .status-title.badge-ok { background: transparent; color: #0C8F72; }
 .status-title.badge-bad { background: transparent; color: #D42E2B; }
@@ -2063,58 +2092,61 @@ b, strong, .bold {
 .status-icon-circle.badge-ask { background: #B07A00; color: #FFF; }
 .status-icon-circle.badge-info { background: #5A6B78; color: #FFF; }
 .status-title {
-  font-size: 8pt;
+  font-size: 7.5pt;
   font-weight: 700;
   display: block;
 }
 .status-why {
-  font-size: 7.5pt;
-  color: #5A6B78;
+  font-size: 6.5pt;
+  color: #6B7A86;
   display: block;
-  line-height: 1.25;
+  line-height: 1.45;
+  margin-top: 1px;
 }
 .checks-dashed-rule {
   border-top: 1px dashed #D8D4CA;
-  margin: 10px 0 4px 0;
+  margin: 12px 0 8px 0;
 }
 .checks-footer-note {
-  font-size: 8pt;
-  color: #5A6B78;
-  margin-top: 4px;
+  font-size: 8.5pt;
+  color: #6B7A86;
+  line-height: 1.5;
 }
 
 /* Navy Feature Cards */
 .navy-feature-card {
   background: #062C55;
   color: #FFFFFF;
-  border-radius: 10px;
-  padding: 22px 28px;
+  border-radius: 8px;
+  padding: 22px 30px 24px;
   text-align: center;
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 .feature-card-kicker {
-  font-size: 8pt;
-  letter-spacing: 1.2px;
-  color: #A3BFD9;
-  font-weight: 700;
-  margin-bottom: 4px;
+  font-size: 7pt;
+  letter-spacing: 1.6px;
+  color: #D5DFEA;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
 .feature-card-amount {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 36pt;
-  font-weight: 700;
-  letter-spacing: -1px;
-  margin-bottom: 8px;
+  font-size: 34pt;
+  font-weight: 500;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+  margin-bottom: 12px;
 }
 .feature-card-desc {
-  font-size: 9pt;
-  color: #E2EBF2;
-  line-height: 1.4;
-  margin: 0;
+  font-size: 9.5pt;
+  color: #E6EDF3;
+  line-height: 1.55;
+  margin: 0 auto;
+  max-width: 94%;
 }
 .gauge-container {
   text-align: center;
-  margin: 10px 0;
+  margin: 22px 0 6px;
 }
 .gauge {
   display: block;
@@ -2122,21 +2154,21 @@ b, strong, .bold {
 }
 .gauge-needle-label {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 13pt;
+  font-size: 14pt;
   color: #062C55;
   font-weight: 600;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 .linear-scale-container {
-  width: 90%;
-  margin: 16px auto 12px;
+  width: 100%;
+  margin: 32px 0 14px;
   position: relative;
 }
 .scale-label-offer {
   position: absolute;
-  top: -24px;
+  top: -22px;
   transform: translateX(-50%);
-  font-size: 8.5pt;
+  font-size: 7.5pt;
   font-weight: 700;
   color: #062C55;
   white-space: nowrap;
@@ -2148,15 +2180,15 @@ b, strong, .bold {
   margin: 2px auto 0;
 }
 .scale-bar {
-  height: 10px;
-  border-radius: 5px;
+  height: 12px;
+  border-radius: 6px;
   background: #E5EBEF;
   display: flex;
   overflow: hidden;
 }
 .scale-segment-gradient {
-  width: 60%;
-  background: linear-gradient(to right, #D84C3E 0%, #EEB33C 45%, #24B07D 100%);
+  width: 57%;
+  background: linear-gradient(to right, #E0574A 0%, #EEB33C 45%, #1FB487 100%);
 }
 .scale-segment-hatch {
   width: 40%;
@@ -2172,52 +2204,54 @@ b, strong, .bold {
   display: flex;
   justify-content: space-between;
   font-size: 8pt;
-  color: #5A6B78;
-  margin-top: 4px;
+  color: #6B7A86;
+  margin-top: 6px;
 }
 .estimate-disclaimer-card {
-  border: 1px solid #E7E4DD;
+  border: 1px solid #E2E0D8;
   border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 8.5pt;
-  color: #3A4B58;
-  line-height: 1.4;
-  margin-top: auto;
+  padding: 12px 14px;
+  font-size: 9.5pt;
+  color: #17242F;
+  line-height: 1.55;
+  margin-top: 8px;
   margin-bottom: 10px;
 }
 
 /* Radar & Factors */
 .factors-split-layout {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 20px;
-  align-items: center;
-  margin-bottom: 16px;
+  grid-template-columns: 250px 1fr;
+  gap: 12px;
+  align-items: start;
+  margin: 4px 0 20px;
 }
 .radar-box {
-  width: 280px;
-  height: 260px;
+  width: 240px;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 .chart-caption {
-  font-size: 7.5pt;
-  color: #7A8B98;
+  font-size: 7pt;
+  color: #6B7A86;
   text-align: center;
-  margin-top: 4px;
+  margin-top: 2px;
+  line-height: 1.5;
 }
 .factors-bullets-col {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
+  padding-top: 6px;
 }
 .factor-bullet {
   display: flex;
-  gap: 8px;
+  gap: 9px;
   align-items: baseline;
-  font-size: 9pt;
-  line-height: 1.35;
+  font-size: 10pt;
+  line-height: 1.5;
+  color: #27343F;
 }
 .bullet-dot.teal {
   width: 6px;
@@ -2225,154 +2259,168 @@ b, strong, .bold {
   border-radius: 50%;
   background: #0EB28D;
   flex-shrink: 0;
+  position: relative;
+  top: -1px;
 }
 .pay-multiplier-note {
   font-size: 8.5pt;
-  color: #5A6B78;
-  margin-top: 6px;
+  color: #6B7A86;
+  margin-top: 4px;
+  line-height: 1.5;
 }
 .shape-summary-card {
-  border: 1px solid #E7E4DD;
+  border: 1px solid #E2E0D8;
   border-radius: 8px;
-  padding: 12px 14px;
-  margin-top: auto;
+  padding: 14px 16px 15px;
+  margin-top: 0;
   margin-bottom: 10px;
 }
 .shape-title {
-  font-size: 10.5pt;
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 12pt;
+  font-weight: 500;
   color: #062C55;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
 .shape-desc {
-  font-size: 9pt;
-  color: #3A4B58;
+  font-size: 10pt;
+  color: #27343F;
   margin: 0;
+  line-height: 1.55;
 }
 
 /* Release Check */
 .release-check-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
+  border-top: 1px solid #E7E4DD;
+  margin-top: 8px;
 }
 .release-check-row {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  padding: 8px 10px;
-  border-bottom: 1px solid #EFECE6;
+  padding: 10px 0 11px;
+  border-bottom: 1px solid #E7E4DD;
 }
 .rc-point {
-  font-size: 9.5pt;
+  font-size: 10pt;
+  font-weight: 700;
   color: #062C55;
+  line-height: 1.4;
 }
 .rc-detail {
-  font-size: 8.5pt;
-  color: #5A6B78;
+  font-size: 10pt;
+  color: #27343F;
+  line-height: 1.4;
+  margin-top: 2px;
 }
 
 /* Section 2 Details */
 .detail-card {
-  border: 1px solid #E7E4DD;
+  border: 1px solid #E2E0D8;
   border-radius: 8px;
-  padding: 14px 16px;
+  padding: 12px 14px 14px;
   background: #FFFFFF;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 .detail-text {
-  font-size: 9pt;
+  font-size: 8.5pt;
   color: #27343F;
-  line-height: 1.45;
-  margin: 0;
+  line-height: 1.55;
+  margin: 6px 0 0;
 }
 .card-inner-box {
-  background: #FAFAF7;
-  border: 1px solid #EAE7DF;
+  background: #F5F4EF;
+  border: 1px solid #E2E0D8;
   border-radius: 6px;
-  padding: 10px 14px;
-  margin-top: 8px;
+  padding: 14px 18px;
+  margin-top: 10px;
 }
 .detail-list {
   margin: 0;
-  padding-left: 18px;
-  font-size: 9pt;
-  line-height: 1.45;
+  padding-left: 16px;
+  font-size: 8.5pt;
+  line-height: 1.55;
   color: #27343F;
 }
 .detail-list li {
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 
 /* Clauses */
 .clause-pill-badge {
-  margin-bottom: 8px;
+  margin: 4px 0 8px;
 }
 .clause-single-heading {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 16pt;
-  font-weight: 700;
+  font-size: 13pt;
+  font-weight: 500;
   color: #062C55;
-  margin: 0 0 14px 0;
+  margin: 0 0 12px 0;
 }
 .clause-two-boxes {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: 14px;
+  margin-bottom: 14px;
 }
 .c-box-white {
   background: #FFFFFF;
-  border: 1px solid #E7E4DD;
-  border-radius: 8px;
-  padding: 14px 16px;
+  border: 1px solid #E2E0D8;
+  border-radius: 6px;
+  padding: 12px 14px 14px;
 }
 .c-box-beige {
-  background: #FAF8F5;
-  border: 1px solid #E7E4DD;
-  border-radius: 8px;
-  padding: 14px 16px;
+  background: #F5F4EF;
+  border: 1px solid #E2E0D8;
+  border-radius: 6px;
+  padding: 12px 14px 14px;
 }
 .c-box-header {
-  font-size: 7.5pt;
-  font-weight: 700;
-  letter-spacing: 0.8px;
+  font-size: 7pt;
+  font-weight: 600;
+  letter-spacing: 1px;
   color: #5A6B78;
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 .c-box-body {
-  font-size: 8.5pt;
-  line-height: 1.35;
-  color: #27343F;
+  font-size: 10pt;
+  line-height: 1.6;
+  color: #17242F;
 }
 .clause-why {
-  font-size: 8.5pt;
-  color: #27343F;
-  margin-bottom: 10px;
+  font-size: 9pt;
+  color: #17242F;
+  margin: 0 0 12px;
+  line-height: 1.6;
 }
 .clause-action-box {
   background: #FFFFFF;
-  border: 1px solid #E2E7EB;
+  border: 1px solid #E2E0D8;
   border-radius: 6px;
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-size: 9pt;
-  font-weight: 600;
-  color: #062C55;
+  font-weight: 700;
+  color: #17242F;
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: baseline;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 .action-arrow {
-  color: #0EB28D;
+  color: #17242F;
   font-weight: 700;
 }
 .clause-dashed-rule {
   border-top: 1px dashed #D8D4CA;
-  margin: 16px 0 8px 0;
+  margin: 8px 0 10px 0;
 }
 .clause-source-line {
-  font-size: 8.5pt;
-  color: #5A6B78;
+  font-size: 8pt;
+  color: #6B7A86;
+  line-height: 1.6;
 }
 .clause-source-line u {
   color: #062C55;
@@ -2381,31 +2429,32 @@ b, strong, .bold {
 
 /* Email Mock Container */
 .email-mock-container {
-  border: 1px solid #CFD8DF;
+  border: 1px solid #E2E0D8;
   border-radius: 8px;
   overflow: hidden;
   background: #FFFFFF;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 .email-meta-header {
-  background: #F4F6F8;
-  border-bottom: 1px solid #E2E7EB;
-  padding: 8px 14px;
+  background: #F5F4EF;
+  border-bottom: 1px solid #E2E0D8;
+  padding: 11px 14px;
   font-size: 8.5pt;
-  color: #5A6B78;
+  color: #6B7A86;
 }
 .email-body {
-  padding: 16px;
-  font-size: 9.5pt;
-  line-height: 1.45;
-  color: #27343F;
+  padding: 16px 14px 14px;
+  font-size: 10pt;
+  line-height: 1.6;
+  color: #17242F;
 }
 .email-questions-list {
-  padding-left: 20px;
-  margin: 10px 0;
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
 }
 .email-questions-list li {
-  margin-bottom: 6px;
+  margin-bottom: 9px;
 }
 .email-mock-container.compact-container {
   padding: 0;
@@ -2426,153 +2475,161 @@ b, strong, .bold {
   line-height: 1.35;
 }
 .why-it-works-card {
-  border: 1px solid #E7E4DD;
+  border: 1px solid #E2E0D8;
   border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 9pt;
-  color: #3A4B58;
+  padding: 11px 12px;
+  font-size: 10pt;
+  color: #17242F;
+  line-height: 1.55;
 }
 
 /* Practical Page */
 .practical-block {
-  margin-bottom: 16px;
+  margin-bottom: 0;
 }
 .practical-heading {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 14pt;
-  font-weight: 700;
+  font-size: 12.5pt;
+  font-weight: 500;
   color: #062C55;
-  margin: 0 0 8px 0;
+  margin: 4px 0 10px 0;
 }
 .practical-text {
-  font-size: 9.5pt;
-  line-height: 1.5;
-  color: #27343F;
+  font-size: 10pt;
+  line-height: 1.6;
+  color: #17242F;
   margin: 0;
 }
 .practical-divider {
   width: 100%;
   height: 1px;
-  background: #E7E4DD;
-  margin: 16px 0;
+  background: #EFECE6;
+  margin: 16px 0 12px;
 }
 .practical-bullets {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  padding-left: 4px;
 }
 .p-bullet {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   align-items: baseline;
-  font-size: 9.5pt;
-  line-height: 1.45;
-  color: #27343F;
+  font-size: 9pt;
+  line-height: 1.5;
+  color: #17242F;
 }
 
 /* Three Paths Page (ca21.png) */
 .three-paths-grid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 .path-card {
-  border: 1px solid #E7E4DD;
+  border: 1px solid #E2E0D8;
   border-radius: 8px;
-  padding: 20px 18px;
+  padding: 14px 14px 16px;
   background: #FFFFFF;
   display: flex;
   flex-direction: column;
 }
 .path-opt-kicker {
-  font-size: 8pt;
-  font-weight: 700;
-  letter-spacing: 0.8px;
+  font-size: 6.5pt;
+  font-weight: 600;
+  letter-spacing: 1px;
   color: #5A6B78;
   margin-bottom: 6px;
 }
 .path-title {
   font-family: "Newsreader", Georgia, serif;
-  font-size: 15pt;
+  font-size: 13pt;
   color: #062C55;
-  margin: 0 0 10px 0;
-  font-weight: 600;
+  margin: 0 0 14px 0;
+  font-weight: 500;
 }
 .path-desc {
-  font-size: 10pt;
-  color: #5A6B78;
-  line-height: 1.45;
-  margin: 0 0 16px 0;
+  font-size: 9pt;
+  color: #27343F;
+  line-height: 1.55;
+  margin: 0 0 12px 0;
 }
 .path-bold-note {
-  font-size: 10pt;
+  font-size: 9pt;
   font-weight: 700;
-  color: #062C55;
-  line-height: 1.4;
-  margin-top: auto;
+  color: #17242F;
+  line-height: 1.55;
+  margin: 0;
 }
 .honest-note-card {
-  border: 1px solid #E7E4DD;
+  border: 1px solid #E2E0D8;
   border-radius: 8px;
-  padding: 14px 18px;
-  font-size: 9pt;
-  color: #0C8F72;
+  padding: 12px 12px;
+  font-size: 10pt;
+  color: #17242F;
   background: #FFFFFF;
-  line-height: 1.45;
+  line-height: 1.6;
 }
 
 /* Sources */
 .sources-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 8.5pt;
+  font-size: 7.5pt;
+  color: #27343F;
 }
 .sources-table th {
   text-align: left;
-  font-size: 7.5pt;
-  letter-spacing: 0.8px;
+  font-size: 6.5pt;
+  font-weight: 600;
+  letter-spacing: 1px;
   color: #5A6B78;
-  padding: 6px 8px;
-  border-bottom: 1px solid #062C55;
+  padding: 6px 4px 7px;
+  border-bottom: 1px solid #CFCAC0;
 }
 .sources-table td {
-  padding: 8px;
+  padding: 7px 4px 8px;
   border-bottom: 1px solid #EFECE6;
   vertical-align: top;
-  line-height: 1.35;
+  line-height: 1.45;
 }
 .src-id-title {
-  font-weight: 700;
-  color: #062C55;
+  font-weight: 400;
+  color: #27343F;
 }
 .src-url {
   font-size: 7.5pt;
-  color: #0EB28D;
+  font-weight: 700;
+  color: #062C55;
+  text-decoration: underline;
   word-break: break-all;
 }
 
 /* Lawyer Handover */
 .lawyer-handover-card {
-  border: 1px solid #CFD8DF;
+  border: 1px solid #E2E0D8;
   border-radius: 10px;
-  padding: 20px;
+  padding: 22px 26px 22px 26px;
   display: grid;
-  grid-template-columns: 1fr 140px;
-  gap: 20px;
+  grid-template-columns: 1fr 120px;
+  gap: 26px;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 .handover-title {
+  font-family: "Newsreader", Georgia, serif;
   font-size: 13pt;
+  font-weight: 500;
   color: #062C55;
   margin-bottom: 6px;
 }
 .handover-desc {
-  font-size: 9pt;
-  color: #5A6B78;
-  line-height: 1.4;
-  margin: 0 0 12px 0;
+  font-size: 9.5pt;
+  color: #27343F;
+  line-height: 1.55;
+  margin: 0;
 }
 .report-id-badge {
   font-size: 10pt;
@@ -2582,24 +2639,35 @@ b, strong, .bold {
   width: 90px;
   height: 90px;
   margin: 0 auto;
+  border: 1px solid #E2E0D8;
+  border-radius: 6px;
+  padding: 6px;
+  background: #FFFFFF;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 .qr-sub {
   font-size: 7.5pt;
-  color: #7A8B98;
+  color: #27343F;
   text-align: center;
-  margin-top: 4px;
+  margin-top: 8px;
+  line-height: 1.4;
 }
 .transparency-note {
   font-size: 8.5pt;
-  color: #5A6B78;
-  line-height: 1.4;
-  margin-bottom: 16px;
+  color: #6B7A86;
+  line-height: 1.55;
+  margin-bottom: 14px;
 }
 .before-use-footer {
-  border-top: 1px solid #E7E4DD;
-  padding-top: 10px;
-  font-size: 8.5pt;
-  color: #7A8B98;
+  border-top: 1px solid #EFECE6;
+  padding-top: 8px;
+  font-size: 7.5pt;
+  color: #9AA7B2;
+  line-height: 1.5;
 }
 .rid {
   font-size: 8pt;
@@ -2620,18 +2688,22 @@ b, strong, .bold {
   width: 100%;
   box-sizing: border-box;
   padding: 6px 14px;
-  background: #F4F2EC;
-  border: 1px solid #E7E4DD;
+  background: #F5F4EF;
+  border: 1px solid #E2E0D8;
   border-radius: 6px;
-  font-size: 7.5pt;
+  font-size: 7pt;
   color: #5A6B78;
   text-align: center;
-  line-height: 1.35;
+  line-height: 1.45;
+}
+.kn {
+  color: #062C55;
+  font-weight: 700;
 }
 .page-footer-num {
-  font-size: 8.5pt;
+  font-size: 7pt;
   color: #062C55;
-  font-weight: 500;
+  font-weight: 700;
   text-align: center;
 }
 .page-footer-slim {
@@ -2642,12 +2714,129 @@ b, strong, .bold {
   align-items: center;
   width: 100%;
 }
+.toc-row:last-child {
+  border-bottom: none;
+}
+
+.before-card.alert-card .card-num-title {
+  color: #8A5A00;
+}
+
+.its-item:last-child {
+  border-bottom: none;
+}
+
+.p-dot.done {
+  background: #9AA7B2;
+}
+
+.myth-col-left {
+  background: #F5F4EF;
+  padding: 9px 12px 10px;
+}
+
+.myth-col-right {
+  padding: 9px 12px 10px;
+}
+
+a.src-link {
+  color: #062C55;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 1.5px;
+}
+
+.checks-summary-pills .pill {
+  font-size: 7pt;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+}
+
+.gauge-needle-label .gl-lead {
+  color: #6B7A86;
+  font-weight: 400;
+}
+
+.factor-bullet b {
+  color: #062C55;
+}
+
+.clause-pill-badge .pill {
+  font-size: 7pt;
+  letter-spacing: 1px;
+  padding: 5px 8px;
+}
+
+.email-meta-header b {
+  color: #062C55;
+}
+
+.email-body p {
+  margin: 0 0 9px;
+}
+
+.why-it-works-card b {
+  color: #0C8F72;
+}
+
+.p-bullet .bullet-dot.teal {
+  width: 4px;
+  height: 4px;
+  background: #062C55;
+  top: -2px;
+}
+
+.honest-note-card b {
+  color: #0C8F72;
+}
+
+.sources-table td.src-item {
+  font-weight: 700;
+  color: #062C55;
+}
+
+.handover-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qr-box svg {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.qr-sub b {
+  color: #062C55;
+}
+
+.transparency-note b {
+  color: #17242F;
+}
+
+.before-use-footer p {
+  margin: 0 0 2px;
+}
+
+.page-footer-pill b {
+  color: #062C55;
+}
+
+.glance-lead b {
+  color: #062C55;
+}
+
 `
 
 export function renderReportHtml(r: ReportJson, m: RenderMeta, totalPages?: number, upTo?: number): string {
   const initial = reportSections(r, m)
   const effTotal = totalPages || initial.length
-  const all = totalPages !== undefined ? reportSections(r, m, effTotal) : initial
+  // Page numbers for the contents page come from the real section order unless the caller gave them.
+  const pages: Record<string, number> = {}
+  initial.forEach((s, i) => { if (!(s.id in pages)) pages[s.id] = i + 1 })
+  const m2: RenderMeta = { ...m, pages: { ...pages, ...(m.pages || {}) } }
+  const all = reportSections(r, m2, effTotal)
   const secs = upTo === undefined ? all : all.slice(0, upTo)
   const fontsCss = getFontsCss()
   return `<!doctype html>
@@ -2655,9 +2844,6 @@ export function renderReportHtml(r: ReportJson, m: RenderMeta, totalPages?: numb
   <head>
     <meta charset="utf-8"/>
     <title>FairExit Severance Report ${esc(m.reportId)}</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400;1,9..40,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;0,6..72,700;1,6..72,400;1,6..72,600&display=swap" rel="stylesheet">
     <style>
 ${fontsCss}
 ${CSS}
