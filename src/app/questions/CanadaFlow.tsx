@@ -4351,7 +4351,7 @@ function QuestionsContent() {
                           Estimated range
                         </div>
                         <div className="font-serif font-bold text-3xl sm:text-[34px] text-[#0c8f72] my-1 tracking-tight leading-tight">
-                          {highAmt > lowAmt ? `${money(loAmt)} – ${money(highAmt)}` : (clauseHolds ? `${money(loAmt)} (min only)` : money(loAmt))}
+                          {highAmt > lowAmt ? `${money(lowAmt)} – ${money(highAmt)}` : (clauseHolds ? `${money(lowAmt)} (min only)` : money(lowAmt))}
                         </div>
                         <p className="text-xs sm:text-[13px] text-[#17242f] max-w-[500px] mx-auto leading-relaxed">
                           {highAmt > lowAmt
