@@ -356,6 +356,66 @@ function displayUrl(u: string): string {
   return String(u || '').replace(/^https?:\/\//, '').replace(/\/$/, '')
 }
 
+/** Round status icon drawn as SVG (same look in every PDF renderer, no font glyphs). */
+const STATUS_ICON_COLOR: Record<string, string> = { ok: '#0C7860', bad: '#B42014', ask: '#D0981C', info: '#6B7A86' }
+function statusIcon(status: string, size = 21): string {
+  const st = status === 'ok' || status === 'bad' || status === 'ask' ? status : 'info'
+  const mark = st === 'ok'
+    ? '<path d="M6.2 10.4l2.6 2.6 5-5.6" fill="none" stroke="#FFF" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>'
+    : st === 'bad'
+      ? '<path d="M7 7l6 6M13 7l-6 6" fill="none" stroke="#FFF" stroke-width="1.7" stroke-linecap="round"/>'
+      : st === 'ask'
+        ? '<path d="M10 5.6v5.3" stroke="#FFF" stroke-width="2" stroke-linecap="round"/><circle cx="10" cy="14" r="1.15" fill="#FFF"/>'
+        : '<circle cx="10" cy="6.3" r="1.15" fill="#FFF"/><path d="M10 9.2v5.2" stroke="#FFF" stroke-width="2" stroke-linecap="round"/>'
+  return `<svg class="status-icon-svg" width="${size}" height="${size}" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="10" fill="${STATUS_ICON_COLOR[st]}"/>${mark}</svg>`
+}
+
+/** Bold the leading action of a step ("Apply for EI within 4 weeks" -> "<b>Apply for EI</b> within 4 weeks"). */
+function boldLead(step: string): string {
+  const colon = step.indexOf(':')
+  if (colon > 0 && colon < 40) return `<b>${esc(step.slice(0, colon + 1))}</b>${esc(step.slice(colon + 1))}`
+  if (/^(if|when|once|before|after|while|because|since|unless)\b/i.test(step)) return esc(step)
+  const words = step.split(' ')
+  const stop = /^(to|within|with|by|until|since|so|whether|if|before|after|in|on|at|from|about|because)$/i
+  const weakStop = /^(for|this|that|and|or|the|a|an)$/i
+  let n = 0
+  while (n < words.length && n < 5) {
+    const wd = words[n].replace(/[^A-Za-z]/g, '')
+    if (n >= 1 && stop.test(wd)) break
+    if (n >= 2 && weakStop.test(wd)) break
+    n++
+    if (/[,.;)]$/.test(words[n - 1])) break
+  }
+  if (n === 0 || n >= words.length) return esc(step)
+  const lead = words.slice(0, n).join(' ').replace(/[,;]$/, '')
+  return `<b>${esc(lead)}</b>${esc(step.slice(lead.length))}`
+}
+
+/** The check that covers the same point as a clause (shared words in title/quotes, same source). */
+const STOP_WORDS = new Set(['your', 'the', 'and', 'for', 'are', 'too', 'with', 'what', 'that', 'this', 'from', 'about', 'only', 'pay', 'not', 'you', 'they', 'will', 'has', 'have', 'was', 'its', 'any', 'all', 'but', 'says', 'said'])
+const SYNONYMS: Record<string, string> = { insurance: 'benefits', disability: 'benefits', dental: 'benefits', health: 'benefits', payout: 'notice', termination: 'notice', entitlements: 'minimum', minimum: 'minimum', eight: '8' }
+function matchingCheck(c: NonNullable<ReportJson['clauses']>[number], checks: ReportJson['checks']): ReportJson['checks'][number] | undefined {
+  const words = (t: string) => {
+    const out = new Set<string>()
+    for (const raw of String(t || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/)) {
+      if (raw.length < 3 || STOP_WORDS.has(raw)) continue
+      const w0 = raw.replace(/s$/, '')
+      out.add(SYNONYMS[raw] || SYNONYMS[w0] || w0)
+    }
+    return out
+  }
+  const shared = (x: Set<string>, y: Set<string>) => [...x].filter((v) => y.has(v)).length
+  const title = words(c.title)
+  const quote = words(c.what_it_says)
+  let best: ReportJson['checks'][number] | undefined
+  let bestScore = 0
+  for (const k of checks) {
+    const score = 3 * shared(title, words(k.topic)) + shared(quote, words(`${k.letter_says || ''} ${k.contract_says || ''}`)) + (c.source_id && k.source_id === c.source_id ? 2 : 0)
+    if (score > bestScore) { best = k; bestScore = score }
+  }
+  return bestScore >= 3 ? best : undefined
+}
+
 /** Rough height (px) of one row in the checks table, so pages are split before they overflow. */
 function checkRowHeight(c: ReportJson['checks'][number]): number {
   const lines = (t: string | null | undefined, perLine: number) => Math.max(1, Math.ceil(String(t || '—').length / perLine))
@@ -828,7 +888,6 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           ${chunk.map((c) => {
             const st = c.status || 'info'
             const badgeClass = st === 'ok' ? 'badge-ok' : st === 'bad' ? 'badge-bad' : st === 'ask' ? 'badge-ask' : 'badge-info'
-            const icon = st === 'ok' ? '✓' : st === 'bad' ? '✕' : st === 'ask' ? '!' : 'ℹ'
             return `
               <div class="check-card-row">
                 <div class="ch-col col-1 bold navy">
@@ -842,7 +901,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
                 </div>
                 <div class="ch-col col-5">
                   <div class="status-cell">
-                    <span class="status-icon-circle ${badgeClass}">${icon}</span>
+                    ${statusIcon(st)}
                     <div class="status-text-box">
                       <span class="status-title ${badgeClass}">${esc(STATUS_LABEL[st] || st)}</span>
                       ${c.why ? `<span class="status-why">${esc(c.why)}</span>` : ''}
@@ -941,10 +1000,26 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   } else if (isUS) {
     const rc = r.release_check || []
     const rcText = rc.map((x) => `${x.point} ${x.detail}`).join(' ')
-    const keyDays = /\b45 days\b/i.test(rcText) ? '45 days' : /\b21 days\b/i.test(rcText) ? '21 days' : null
-    const keyDesc = keyDays === '45 days'
-      ? 'The time federal rules give you to consider a release in a group layoff when you are 40 or older.'
-      : 'The time federal rules give you to consider a release when you are 40 or older.'
+    // "Your key number": the federal review period (40+), else the deadline to decide, else the offer.
+    const ageNum = Number(a.age)
+    const over40 = Number.isFinite(ageNum) ? ageNum >= 40 : /\b(45|21) days\b/i.test(rcText)
+    const deadlineShort = dyn.deadlineStr && dyn.deadlineStr.length <= 28 && !/^(no deadline written|not stated)$/i.test(dyn.deadlineStr) ? dyn.deadlineStr : null
+    const offerShort = dyn.offerStr && dyn.offerStr !== 'Not stated' && dyn.offerStr.length <= 20 ? dyn.offerStr : null
+    let keyDays: string | null = null
+    let keyDesc = ''
+    if (over40 && /\b45 days\b/i.test(rcText)) {
+      keyDays = '45 days'
+      keyDesc = 'The time federal rules give you to consider a release in a group layoff at your age. 7 more days to take it back after you sign.'
+    } else if (over40 && /\b21 days\b/i.test(rcText)) {
+      keyDays = '21 days'
+      keyDesc = 'The time federal rules give you to consider a release at your age. 7 more days to take it back after you sign.'
+    } else if (deadlineShort) {
+      keyDays = deadlineShort
+      keyDesc = 'Your deadline to decide, from your letter. Asking for more time in writing is normal, and nothing is final until you sign.'
+    } else if (offerShort) {
+      keyDays = offerShort
+      keyDesc = "What your letter offers for signing the release. US law sets no minimum, so this comes from your employer's policy or agreement, not a legal floor."
+    }
     const releaseHtml = `
       <div class="page release-page">
         <div class="section-kicker-bar">
@@ -965,10 +1040,9 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         <div class="release-check-list">
           ${rc.map((item) => {
             const st = item.status === 'ok' || item.status === 'bad' || item.status === 'ask' ? item.status : 'info'
-            const icon = st === 'ok' ? '✓' : st === 'bad' ? '✕' : st === 'ask' ? '!' : 'i'
             return `
               <div class="release-check-row">
-                <span class="status-icon-circle badge-${st}">${icon}</span>
+                ${statusIcon(st)}
                 <div class="release-check-content">
                   <div class="rc-point bold">${esc(item.point)}</div>
                   <div class="rc-detail">${esc(item.detail)}</div>
@@ -1191,6 +1265,9 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     const isInfo = c.status === 'info'
     const pillLabel = isBad ? "DOESN'T LINE UP" : isOk ? 'LINES UP' : isInfo ? 'GOOD TO KNOW' : 'ASK ABOUT IT'
     const srcHtml = sourceLink(c.source_id, m)
+    const ruleCheck = matchingCheck(c, r.checks || [])
+    const rulesText = c.what_it_means
+    const whyText = ruleCheck?.why && ruleCheck.why.length >= 8 ? ruleCheck.why : ''
 
     const clauseHtml = `
       <div class="page clause-page">
@@ -1215,9 +1292,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           </div>
           <div class="c-box c-box-beige">
             <div class="c-box-header">WHAT THE RULES SAY</div>
-            <div class="c-box-body">${esc(c.what_it_means)}</div>
+            <div class="c-box-body">${esc(rulesText)}</div>
           </div>
         </div>
+
+        ${whyText ? `<p class="clause-why"><b>Why it matters:</b> ${esc(whyText)}</p>` : ''}
 
         <div class="clause-action-box">
           <span class="action-arrow">→</span>
@@ -1336,7 +1415,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           ${nextSteps.map((step) => `
             <div class="p-bullet">
               <span class="bullet-dot teal"></span>
-              <div>${(() => { const i = step.indexOf(':'); return i > 0 && i < 40 ? `<b>${esc(step.slice(0, i + 1))}</b>${esc(step.slice(i + 1))}` : esc(step) })()}</div>
+              <div>${boldLead(step)}</div>
             </div>
           `).join('')}
         </div>
@@ -1631,7 +1710,8 @@ b, strong, .bold {
   background: #F5F4EF;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   box-sizing: border-box;
 }
 .cover-hero-band {
@@ -1683,6 +1763,8 @@ b, strong, .bold {
 }
 .cover-page .page-footer {
   padding: 0 43.5pt;
+  margin-top: 12px;
+  flex-shrink: 0;
 }
 .kicker-teal {
   font-size: 7.5pt;
@@ -2067,7 +2149,7 @@ b, strong, .bold {
 }
 .status-cell {
   display: flex;
-  gap: 6px;
+  gap: 7px;
   align-items: flex-start;
 }
 .status-icon-circle {
@@ -2083,14 +2165,15 @@ b, strong, .bold {
   flex-shrink: 0;
   margin-top: -1px;
 }
-.status-title.badge-ok { background: transparent; color: #0C8F72; }
-.status-title.badge-bad { background: transparent; color: #D42E2B; }
-.status-title.badge-ask { background: transparent; color: #B07A00; }
+.status-title.badge-ok { background: transparent; color: #0C7860; }
+.status-title.badge-bad { background: transparent; color: #B42014; }
+.status-title.badge-ask { background: transparent; color: #8A5A0B; }
 .status-title.badge-info { background: transparent; color: #5A6B78; }
 .status-icon-circle.badge-ok { background: #0C8F72; color: #FFF; }
 .status-icon-circle.badge-bad { background: #D42E2B; color: #FFF; }
 .status-icon-circle.badge-ask { background: #B07A00; color: #FFF; }
 .status-icon-circle.badge-info { background: #5A6B78; color: #FFF; }
+.status-icon-svg { flex-shrink: 0; display: block; margin-top: -1px; }
 .status-title {
   font-size: 7.5pt;
   font-weight: 700;
@@ -2301,7 +2384,7 @@ b, strong, .bold {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  padding: 10px 0 11px;
+  padding: 8px 0 9px;
   border-bottom: 1px solid #E7E4DD;
 }
 .rc-point {
@@ -2391,7 +2474,7 @@ b, strong, .bold {
   color: #17242F;
 }
 .clause-why {
-  font-size: 9pt;
+  font-size: 10pt;
   color: #17242F;
   margin: 0 0 12px;
   line-height: 1.6;
@@ -2824,6 +2907,10 @@ a.src-link {
 }
 
 .glance-lead b {
+  color: #062C55;
+}
+
+.clause-why b {
   color: #062C55;
 }
 
