@@ -278,7 +278,9 @@ export function answersFromFlowState(state: Record<string, unknown>): Record<str
 
 /** Called from the free check results: saves the case and remembers its token. */
 export async function saveFreeCheck(country: Country, state: Record<string, unknown>): Promise<string> {
-  const r = await fairexit.createCase(country, answersFromFlowState(state))
+  const answers = answersFromFlowState(state)
+  console.log(`[FairExit API] Free check saving (${country}). User answers for report:`, answers)
+  const r = await fairexit.createCase(country, answers)
   caseStore.set(r.caseId, r.caseToken)
   return r.caseId
 }

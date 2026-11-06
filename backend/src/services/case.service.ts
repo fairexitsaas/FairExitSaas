@@ -24,6 +24,11 @@ export const caseService = {
     const code = codeFromAnswers(input.country, input.answers)
     const jurisdiction = code ? buildJurisdiction(code) : null
     const freeResult = computeFreeResult(input.country, input.answers)
+    logger.info('[CASE][FREE_CHECK_ANSWERS]', {
+      country: input.country,
+      answers: input.answers,
+      freeResult,
+    })
     const row = check(
       await db()
         .from('cases')

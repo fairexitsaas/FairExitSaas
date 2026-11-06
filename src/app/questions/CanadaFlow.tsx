@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, Suspense } from "react";
 import NextLink from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
-import { estimate, EstimateResult } from "@/lib/severance-rules";
+import { estimate, EstimateResult, marketAdjust, FairExitRules } from "@/lib/severance-rules";
 import { QuestionBackButton, QuestionNextButton } from "@/components/common/QuestionNavButtons";
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
@@ -58,9 +58,174 @@ const PROVINCE_NAMES: Record<string, string> = {
   ON: "Ontario",
   BC: "British Columbia",
   AB: "Alberta",
+  SK: "Saskatchewan",
+  MB: "Manitoba",
   NS: "Nova Scotia",
-  OTHER: "Other",
+  NB: "New Brunswick",
+  PE: "Prince Edward Island",
+  NL: "Newfoundland and Labrador",
+  OTHER: "Quebec, a territory, or a U.S. state",
 };
+
+const JURIS_LINK: Record<string, [string, string]> = {
+  ON: [
+    "Ontario ESA — termination",
+    "https://www.ontario.ca/document/your-guide-employment-standards-act-0/termination-employment",
+  ],
+  BC: [
+    "BC Employment Standards — quitting, firing & layoffs",
+    "https://www2.gov.bc.ca/gov/content/employment-business/employment-standards-advice/employment-standards/wages/quitting-getting-fired",
+  ],
+  AB: [
+    "Alberta — termination & termination pay",
+    "https://www.alberta.ca/termination-pay",
+  ],
+  NS: [
+    "Nova Scotia Labour Standards — termination",
+    "https://novascotia.ca/lae/employmentrights/terminationofemployment.asp",
+  ],
+  SK: [
+    "Saskatchewan — individual layoff or termination",
+    "https://saskatchewan.ca/business/employment-standards/layoffs-and-termination/individual-layoff-or-termination",
+  ],
+  MB: [
+    "Manitoba Employment Standards — ending employment",
+    "https://www.gov.mb.ca/labour/standards/doc,terminate-employment-after-apr-30-07,factsheet.html",
+  ],
+  NB: [
+    "New Brunswick — your rights when terminated",
+    "https://www.gnb.ca/en/topic/jobs-workplaces/labour-market-workforce/employment-standards/rights-terminated.html",
+  ],
+  PE: [
+    "PEI Employment Standards Act",
+    "https://www.princeedwardisland.ca/sites/default/files/b281/E-6.3-Employment%20Standards%20Act.pdf",
+  ],
+  NL: [
+    "Newfoundland and Labrador — labour standards",
+    "https://www.gov.nl.ca/ecc/labour/nonunion/",
+  ],
+  FED: [
+    "Canada Labour Code — termination",
+    "https://www.canada.ca/en/employment-social-development/programs/employment-standards/termination.html",
+  ],
+  OTHER: ["", ""],
+};
+
+function getCanadaVerdict(s: {
+  province: string;
+  age: number;
+  years: number;
+  salary: number;
+  roleF: number;
+  pay: Record<string, boolean>;
+  reemployed: string;
+  clause: string;
+  contract: string;
+  payroll: string;
+  reason: string;
+  market: string;
+  redflag: string;
+}): { level: "strong" | "medium" | "low"; score: number; reasons: [string, number][] } {
+  const reasons: [string, number][] = [];
+  let score = 0;
+  if (s.salary >= 150000) {
+    score += 3;
+    reasons.push(["High income — bigger case", 1]);
+  } else if (s.salary >= 90000) {
+    score += 2;
+    reasons.push(["Solid income", 1]);
+  } else if (s.salary >= 60000) {
+    score += 1;
+  }
+  if (s.years >= 10) {
+    score += 3;
+    reasons.push([`${s.years} years of service — long tenure`, 1]);
+  } else if (s.years >= 5) {
+    score += 2;
+    reasons.push([`${s.years} years of service`, 1]);
+  } else if (s.years >= 2) {
+    score += 1;
+  }
+  if (s.roleF >= 1.25) {
+    score += 2;
+    reasons.push(["Senior role — longer notice", 1]);
+  } else if (s.roleF >= 1.15) {
+    score += 1;
+  }
+  if (s.clause === "no") {
+    score += 2;
+    reasons.push(["Your answers don't mention a cap to the minimum", 1]);
+  } else if (s.clause === "unsure") {
+    score += 1;
+    reasons.push(["You're not sure about the cap clause — a lawyer can read it", 1]);
+  } else if (s.clause === "yes") {
+    score -= 3;
+    reasons.push(["Your answers mention a cap to the minimum — a lawyer would check what it means", -1]);
+  }
+  if (s.contract === "none") {
+    score += 3;
+    reasons.push(["No written contract — what courts award may apply instead of the minimum", 1]);
+  } else if (s.contract === "old" || s.contract === "changed") {
+    score += 2;
+    reasons.push(["Your contract predates a promotion or role change — a lawyer checks whether it still applies", 1]);
+  }
+  if (s.province === "ON" && s.years >= 5 && s.payroll === "yes") {
+    score += 1;
+    reasons.push(["5+ years at a large employer — ESA severance pay may apply on top of notice", 1]);
+  }
+  if (s.redflag === "mistreat") {
+    score += 3;
+    reasons.push(["Possible mistreatment / discrimination — a serious factor", 1]);
+  } else if (s.redflag === "unpaid") {
+    score += 1;
+    reasons.push(["Unpaid bonus / wages may be owed", 1]);
+  }
+  if (s.reason === "constructive") {
+    score += 1;
+    reasons.push(["Forced out — worth a closer look", 1]);
+  }
+  if (s.reason === "cause") {
+    reasons.push(['Ended "for cause" — the story matters a lot here', -1]);
+  }
+  if (s.reason === "templayoff") {
+    score += 2;
+    reasons.push(['A "temporary layoff" you didn\'t agree to in writing can be treated as a termination — a lawyer checks your contract for a layoff clause', 1]);
+  }
+  if (s.reason === "mass") {
+    score += 1;
+    reasons.push(["50+ people let go at one location — mass-termination rules may raise the minimum notice", 1]);
+  }
+  if (s.market === "hard") {
+    score += 2;
+    reasons.push(["Similar work is scarce for your role — courts stretch the notice period when re-employment is hard", 1]);
+  } else if (s.market === "easy") {
+    score -= 1;
+  }
+  if (s.reemployed === "yes") {
+    score -= 4;
+    reasons.push(["Already re-employed — this usually lowers what you're owed", -1]);
+  } else if (s.reemployed === "soon") {
+    score -= 1;
+  }
+  const extras = Object.keys(s.pay || {}).filter((k) => s.pay[k]);
+  if (extras.length) {
+    const payMap: Record<string, string> = {
+      bonus: "Bonus",
+      stock: "Stock/RSUs",
+      benefits: "Benefits",
+      commission: "Commission",
+      pto: "PTO",
+    };
+    score += 1;
+    reasons.push([extras.map((k) => payMap[k] || k).join(", ") + " may add to what you're owed", 1]);
+  }
+
+  let level: "strong" | "medium" | "low" = score >= 6 ? "strong" : score >= 3 ? "medium" : "low";
+  if (s.clause === "yes" && score < 3) {
+    level = "low";
+  }
+  return { level, score, reasons };
+}
 
 const EMP_TYPE_LABELS: Record<string, string> = {
   regular: "Regular employee",
@@ -235,38 +400,31 @@ function QuestionsContent() {
     try {
       let est: any = null;
       try {
-        const ageNum = parseInt(state.age, 10) || 52;
-        const yrsNum = parseFloat(state.years) || 14;
-        const salNum = parseFloat(state.salary) || 110000;
-        est = estimate("CA-" + (state.province || "ON"), {
-          age: ageNum,
-          years: yrsNum,
-          salary: salNum,
-          roleFactor: state.roleFactor || 1.15,
-          payrollGlobal: state.payroll === "yes" ? 3000000 : 0,
-        });
+        const ageNum = parseInt(state.age, 10);
+        const yrsNum = parseFloat(state.years);
+        const salNum = parseFloat(state.salary);
+        if (!isNaN(ageNum) && !isNaN(yrsNum) && !isNaN(salNum) && salNum > 0) {
+          const code = state.federal === "yes" ? "CA-FED" : "CA-" + (state.province || "ON");
+          est = estimate(code, {
+            age: ageNum,
+            years: yrsNum,
+            salary: salNum,
+            roleFactor: state.roleFactor || 1,
+            payrollGlobal: state.payroll === "yes" ? 3000000 : 0,
+          });
+          est = marketAdjust(est, state.market);
+        }
       } catch {}
-      const provName = {
-        ON: "Ontario",
-        BC: "British Columbia",
-        AB: "Alberta",
-        NS: "Nova Scotia",
-        QC: "Quebec",
-        MB: "Manitoba",
-        SK: "Saskatchewan",
-        NB: "New Brunswick",
-        NL: "Newfoundland and Labrador",
-        PE: "Prince Edward Island",
-      }[state.province] || state.province || "Ontario";
+      const provName = PROVINCE_NAMES[state.province] || state.province || "Ontario";
 
       saveReportInputs({
         country: "CA",
         province: state.province || "ON",
         provinceName: provName,
-        age: Number(state.age) || 52,
-        years: Number(state.years) || 14,
-        salary: Number(state.salary) || 110000,
-        offer: Number(state.offer) || 24000,
+        age: Number(state.age) || 0,
+        years: Number(state.years) || 0,
+        salary: Number(state.salary) || 0,
+        offer: Number(state.offer) || 0,
         role: userAnswers.role || "Middle management / Senior / Director",
         union: state.union === "yes" ? "Yes" : "No",
         employment: state.emptype || "Regular employee",
@@ -278,11 +436,11 @@ function QuestionsContent() {
         howEnded: state.reason || "Laid off",
         market: state.market || "Some",
         flagged: state.redflag || "Nothing unusual",
-        statutoryMin: est?.statutory?.amount || 17000,
-        courtAwardLow: est?.commonLaw?.lowAmount || 138000,
-        courtAwardHigh: est?.commonLaw?.highAmount || 193000,
-        noticeWeeks: est?.statutory?.weeks || 8,
-        courtMonths: est?.commonLaw ? `${est.commonLaw.lowMonths}–${est.commonLaw.highMonths} mo` : "15–21 mo",
+        statutoryMin: est?.statutory?.amount || 0,
+        courtAwardLow: est?.commonLaw?.lowAmount || 0,
+        courtAwardHigh: est?.commonLaw?.highAmount || 0,
+        noticeWeeks: est?.statutory?.weeks || 0,
+        courtMonths: est?.commonLaw ? `${est.commonLaw.lowMonths}–${est.commonLaw.highMonths} mo` : "—",
         userAnswers,
         fullState: state,
       });
@@ -391,13 +549,13 @@ function QuestionsContent() {
     const newAnswers: Record<string, string> = {
       union: s.union === "yes" ? "Yes" : s.union === "no" ? "No" : "Not sure",
       emptype: EMP_TYPE_LABELS[s.emptype] || "Regular employee",
-      province: PROVINCE_NAMES[s.province] || s.province || "Ontario",
-      age: s.age || "52",
-      years: s.years ? `${s.years} yrs` : "14 yrs",
-      salary: s.salary ? `${kMoney(parseFloat(s.salary))}/yr` : "$110k/yr",
+      province: PROVINCE_NAMES[s.province] || s.province || "—",
+      age: s.age || "—",
+      years: s.years ? `${s.years} yrs` : "—",
+      salary: s.salary ? `${kMoney(parseFloat(s.salary))}/yr` : "—",
       occupation: occLabel,
       payroll:
-        s.payroll === "yes" ? "Yes" : s.payroll === "no" ? "No" : "Not sure",
+        s.payroll === "yes" ? "Yes" : s.payroll === "no" ? "No" : s.payroll ? "Not sure" : "—",
       otherPay: otherPayText,
       reemployed:
         s.reemployed === "no"
@@ -413,7 +571,7 @@ function QuestionsContent() {
       reason: reasonMap[s.reason] || "Laid off",
       market: marketMap[s.market] || "Some",
       redflag: redflagMap[s.redflag] || "Nothing unusual",
-      offer: s.offer ? kMoney(s.offer) : "$24k",
+      offer: s.offer ? kMoney(s.offer) : "—",
     };
 
     setUserAnswers(newAnswers);
@@ -451,6 +609,10 @@ function QuestionsContent() {
     groupLayoff: "",
   });
 
+  const hasPrefilledBasics = Boolean(
+    state.province && state.province !== "OTHER" && state.age && state.years && state.salary
+  );
+
   // Prefill from URL query params
   useEffect(() => {
     if (!searchParams) return;
@@ -459,19 +621,18 @@ function QuestionsContent() {
     const y = searchParams.get("y") || searchParams.get("years");
     const s = searchParams.get("s") || searchParams.get("salary");
     const a = searchParams.get("age");
-    const age40 = searchParams.get("age40");
     const grp = searchParams.get("group");
     const r = searchParams.get("role");
     const off = searchParams.get("offer");
 
-    if (p || st || y || s || a || age40 || grp || r || off) {
+    if (p || st || y || s || a || grp || r || off) {
       setState((prev) => ({
         ...prev,
         ...(p ? { province: p } : {}),
         ...(st ? { usState: st } : {}),
         ...(y ? { years: y.replace(/\D/g, "") } : {}),
         ...(s ? { salary: s.replace(/\D/g, "") } : {}),
-        ...(a ? { age: a.replace(/\D/g, "") } : age40 === "yes" ? { age: "52" } : {}),
+        ...(a ? { age: a.replace(/\D/g, "") } : {}),
         ...(r ? { roleFactor: parseFloat(r) } : {}),
         ...(off ? { offer: parseInt(off.replace(/\D/g, ""), 10) } : {}),
         ...(grp ? { groupLayoff: grp } : {}),
@@ -492,7 +653,7 @@ function QuestionsContent() {
         province: p || state.province,
         years: y ? y.replace(/\D/g, "") : state.years,
         salary: s ? s.replace(/\D/g, "") : state.salary,
-        age: a ? a.replace(/\D/g, "") : age40 === "yes" ? "52" : state.age,
+        age: a ? a.replace(/\D/g, "") : state.age,
         roleFactor: r ? parseFloat(r) : state.roleFactor,
         offer: off ? parseInt(off.replace(/\D/g, ""), 10) : state.offer,
       });
@@ -519,7 +680,7 @@ function QuestionsContent() {
         province: p || state.province,
         years: y ? y.replace(/\D/g, "") : state.years,
         salary: s ? s.replace(/\D/g, "") : state.salary,
-        age: a ? a.replace(/\D/g, "") : age40 === "yes" ? "52" : state.age,
+        age: a ? a.replace(/\D/g, "") : state.age,
         roleFactor: r ? parseFloat(r) : state.roleFactor,
         offer: off ? parseInt(off.replace(/\D/g, ""), 10) : state.offer,
       });
@@ -534,42 +695,50 @@ function QuestionsContent() {
     const ageNum = parseInt(state.age, 10);
     const yrsNum = parseFloat(state.years);
     const salNum = parseFloat(state.salary);
-    if (!ageNum || !yrsNum || !salNum) return null;
+    if (!ageNum || isNaN(yrsNum) || !salNum) return null;
 
     try {
-      const code = isCanada ? "CA-" + state.province : "US-FED";
+      const code = state.federal === "yes" ? "CA-FED" : "CA-" + (state.province || "ON");
       const e = estimate(code, {
         age: ageNum,
         years: yrsNum,
         salary: salNum,
-        roleFactor: state.roleFactor,
+        roleFactor: state.roleFactor || 1,
         payrollGlobal: state.payroll === "yes" ? 3000000 : 0,
       });
 
-      const mkFactor =
-        state.market === "easy" ? 0.9 : state.market === "hard" ? 1.15 : 1;
-      if (e.commonLaw) {
-        e.commonLaw = {
-          lowMonths: Math.round(e.commonLaw.lowMonths * mkFactor),
-          highMonths: Math.round(e.commonLaw.highMonths * mkFactor),
-          lowAmount: Math.round(e.commonLaw.lowAmount * mkFactor),
-          highAmount: Math.round(e.commonLaw.highAmount * mkFactor),
-        };
-      }
-      return e;
+      return marketAdjust(e, state.market);
     } catch {
       return null;
     }
   }, [
-    isCanada,
     state.age,
     state.years,
     state.salary,
     state.province,
+    state.federal,
     state.roleFactor,
     state.payroll,
     state.market,
   ]);
+
+  const verdict = useMemo(() => {
+    return getCanadaVerdict({
+      province: state.province,
+      age: parseInt(state.age, 10) || 0,
+      years: parseFloat(state.years) || 0,
+      salary: parseFloat(state.salary) || 0,
+      roleF: state.roleFactor || 1,
+      pay: state.pay,
+      reemployed: state.reemployed,
+      clause: state.clause,
+      contract: state.contract,
+      payroll: state.payroll,
+      reason: state.reason,
+      market: state.market,
+      redflag: state.redflag,
+    });
+  }, [state]);
 
   // Context Why Card data matching active question
   const whyCopy = useMemo(() => {
@@ -746,6 +915,33 @@ function QuestionsContent() {
   };
 
   const handleStartAnalyze = () => {
+    const freeReportAnswers = {
+      country: "CA",
+      province: state.province,
+      federal: state.federal,
+      age: state.age,
+      years: state.years,
+      salary: state.salary,
+      roleFactor: state.roleFactor,
+      payroll: state.payroll,
+      clause: state.clause,
+      contract: state.contract,
+      reason: state.reason,
+      market: state.market,
+      reemployed: state.reemployed,
+      redflag: state.redflag,
+      pay: state.pay,
+      offer: state.offer,
+      union: state.union,
+      emptype: state.emptype,
+      userAnswers,
+    };
+    console.log(
+      "[FairExit CA] Free questions finished. All user answers used for free report:\n",
+      JSON.stringify(freeReportAnswers, null, 2),
+      "\nCalculated free report result:",
+      estResult
+    );
     caseSaving.current = null; // answers may have changed since the last save
     ensureCase().catch((err) => console.warn("FairExit: free check not saved yet", err));
     populateAllAnswers(state);
@@ -756,6 +952,38 @@ function QuestionsContent() {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, 2400);
   };
+
+  useEffect(() => {
+    if (currentStep === "step-results") {
+      console.log(
+        "[FairExit CA] Free report results generated. All user answers used:\n",
+        {
+          province: state.province,
+          federal: state.federal,
+          age: state.age,
+          years: state.years,
+          salary: state.salary,
+          roleFactor: state.roleFactor,
+          payroll: state.payroll,
+          clause: state.clause,
+          contract: state.contract,
+          reason: state.reason,
+          market: state.market,
+          reemployed: state.reemployed,
+          redflag: state.redflag,
+          pay: state.pay,
+          offer: state.offer,
+          union: state.union,
+          emptype: state.emptype,
+        },
+        "\nFree Report Outputs (Estimates & Verdict):",
+        {
+          estResult,
+          verdict,
+        }
+      );
+    }
+  }, [currentStep, estResult, verdict, state]);
 
   const caSteps = [
     { key: "q1", num: "1", label: "Eligible" },
@@ -1872,7 +2100,7 @@ function QuestionsContent() {
                         type="text"
                         inputMode="numeric"
                         value={state.age}
-                        placeholder="52"
+                        placeholder="e.g. 45"
                         onChange={(e) =>
                           setState({ ...state, age: e.target.value })
                         }
@@ -1887,7 +2115,7 @@ function QuestionsContent() {
                         type="text"
                         inputMode="numeric"
                         value={state.years}
-                        placeholder="9"
+                        placeholder="e.g. 8"
                         onChange={(e) =>
                           setState({ ...state, years: e.target.value })
                         }
@@ -1904,7 +2132,7 @@ function QuestionsContent() {
                       type="text"
                       inputMode="numeric"
                       value={state.salary}
-                      placeholder="128000"
+                      placeholder="e.g. 90000"
                       onChange={(e) =>
                         setState({ ...state, salary: e.target.value })
                       }
@@ -2114,18 +2342,15 @@ function QuestionsContent() {
                 </div>
 
                 <h1 className="font-serif font-semibold text-2xl sm:text-[28px] text-[#062c55] leading-tight mb-3">
-                  We don&apos;t cover your province yet.
+                  We don&apos;t cover your area.
                 </h1>
 
                 <p className="text-sm text-[#5a6b78] max-w-[520px] mx-auto leading-relaxed mb-6">
                   Severance rules are different in every province, and
                   Quebec&apos;s are a different legal system altogether. Rather
-                  than give you an Ontario answer that could be wrong for you,
-                  we stop here. We&apos;re live in{" "}
-                  <b className="text-[#17242f] font-bold">
-                    Ontario, British Columbia, Alberta and Nova Scotia
-                  </b>{" "}
-                  today.
+                  than give you an answer that could be wrong for you,
+                  we stop here. We cover all nine common-law provinces and federally
+                  regulated jobs. We don&apos;t cover Quebec or the territories.
                 </p>
 
                 {/* Info Container with 2 rows */}
@@ -2214,30 +2439,42 @@ function QuestionsContent() {
                   of it).
                 </p>
 
-                {/* Prefilled Box */}
-                <div className="my-4 p-3.5 sm:p-4 rounded-xl bg-[#f3faf6] border border-[#b9e6d4]">
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <div className="w-full text-[11px] font-extrabold uppercase tracking-wider text-[#0c7a60] flex items-center gap-1.5">
-                      <span>✓</span> ALREADY FILLED FROM YOUR QUICK START
+                {/* Basics Form / Prefilled Box */}
+                {hasPrefilledBasics && !editingBasics ? (
+                  <div className="my-4 p-3.5 sm:p-4 rounded-xl bg-[#f3faf6] border border-[#b9e6d4]">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                      <div className="w-full text-[11px] font-extrabold uppercase tracking-wider text-[#0c7a60] flex items-center gap-1.5">
+                        <span>✓</span> ALREADY FILLED FROM YOUR QUICK START
+                      </div>
+                      <div className="text-sm sm:text-[14.5px] font-bold text-[#062c55]">
+                        {PROVINCE_NAMES[state.province] || state.province} · age{" "}
+                        {state.age} · {state.years} yrs · $
+                        {Number(state.salary).toLocaleString("en-CA")}
+                        /yr
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingBasics(true)}
+                        className="ml-auto text-xs sm:text-[12.5px] font-bold text-[#0c7a60] border border-[#b9e6d4] bg-white rounded-full px-3.5 py-1 hover:bg-[#f3faf6] transition-colors cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        Change something
+                      </button>
                     </div>
-                    <div className="text-sm sm:text-[14.5px] font-bold text-[#062c55]">
-                      {PROVINCE_NAMES[state.province] || state.province} · age{" "}
-                      {state.age || "52"} · {state.years || "14"} yrs · $
-                      {Number(state.salary || 110000).toLocaleString("en-CA")}
-                      /yr
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditingBasics(!editingBasics)}
-                      className="ml-auto text-xs sm:text-[12.5px] font-bold text-[#0c7a60] border border-[#b9e6d4] bg-white rounded-full px-3.5 py-1 hover:bg-[#f3faf6] transition-colors cursor-pointer shrink-0 shadow-2xs"
-                    >
-                      {editingBasics ? "Done" : "Change something"}
-                    </button>
                   </div>
-
-                  {/* Inline fields revealed when clicking Change something */}
-                  {editingBasics && (
-                    <div className="mt-4 pt-3.5 border-t border-[#cfe8dd] grid grid-cols-1 sm:grid-cols-2 gap-3 text-left animate-fade">
+                ) : (
+                  <div className="my-4 p-3.5 sm:p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0]">
+                    {hasPrefilledBasics && (
+                      <div className="flex justify-end mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingBasics(false)}
+                          className="text-xs font-bold text-[#0c7a60] border border-[#b9e6d4] bg-white rounded-full px-3 py-0.5 hover:bg-[#f3faf6] cursor-pointer"
+                        >
+                          Done editing
+                        </button>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
                       <div className="sm:col-span-2">
                         <label className="block text-xs font-bold text-[#5a6b78] mb-1">
                           Where were you employed?
@@ -2250,7 +2487,7 @@ function QuestionsContent() {
                             if (val === "OTHER") {
                               saveAnswer(
                                 "province",
-                                "Another province / U.S. state",
+                                "Another province / territory / U.S. state",
                               );
                               setCurrentStep("province-stop");
                               window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2267,9 +2504,14 @@ function QuestionsContent() {
                           <option value="ON">Ontario</option>
                           <option value="BC">British Columbia</option>
                           <option value="AB">Alberta</option>
+                          <option value="SK">Saskatchewan</option>
+                          <option value="MB">Manitoba</option>
                           <option value="NS">Nova Scotia</option>
+                          <option value="NB">New Brunswick</option>
+                          <option value="PE">Prince Edward Island</option>
+                          <option value="NL">Newfoundland and Labrador</option>
                           <option value="OTHER">
-                            Another province / U.S. state
+                            Quebec, a territory, or a U.S. state
                           </option>
                         </select>
                       </div>
@@ -2281,7 +2523,7 @@ function QuestionsContent() {
                           type="text"
                           inputMode="numeric"
                           value={state.age}
-                          placeholder="52"
+                          placeholder="e.g. 45"
                           onChange={(e) => {
                             setState({ ...state, age: e.target.value });
                             if (fieldErrors.age) {
@@ -2304,7 +2546,7 @@ function QuestionsContent() {
                           type="text"
                           inputMode="numeric"
                           value={state.years}
-                          placeholder="14"
+                          placeholder="e.g. 8"
                           onChange={(e) => {
                             setState({ ...state, years: e.target.value });
                             if (fieldErrors.years) {
@@ -2327,7 +2569,7 @@ function QuestionsContent() {
                           type="text"
                           inputMode="numeric"
                           value={state.salary}
-                          placeholder="110000"
+                          placeholder="e.g. 90000"
                           onChange={(e) => {
                             setState({ ...state, salary: e.target.value });
                             if (fieldErrors.salary) {
@@ -2352,8 +2594,8 @@ function QuestionsContent() {
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Question 1: Global payroll */}
                 <div className="font-bold text-[15px] sm:text-[16px] text-[#062c55] mb-2.5">
@@ -2466,7 +2708,13 @@ function QuestionsContent() {
                         "province",
                         PROVINCE_NAMES[state.province] ||
                           state.province ||
-                          "Ontario",
+                          "—",
+                      );
+                      saveAnswer("age", state.age);
+                      saveAnswer("years", `${state.years} yrs`);
+                      saveAnswer(
+                        "salary",
+                        `${kMoney(parseFloat(state.salary))}/yr`,
                       );
                       saveAnswer(
                         "payroll",
@@ -2516,30 +2764,42 @@ function QuestionsContent() {
                   of it).
                 </p>
 
-                {/* Prefilled Box */}
-                <div className="my-4 p-3.5 sm:p-4 rounded-xl bg-[#f3faf6] border border-[#b9e6d4]">
-                  <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                    <div className="w-full text-[11px] font-extrabold uppercase tracking-wider text-[#0c7a60] flex items-center gap-1.5">
-                      <span>✓</span> ALREADY FILLED FROM YOUR QUICK START
+                {/* Basics Form / Prefilled Box */}
+                {hasPrefilledBasics && !editingBasics ? (
+                  <div className="my-4 p-3.5 sm:p-4 rounded-xl bg-[#f3faf6] border border-[#b9e6d4]">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                      <div className="w-full text-[11px] font-extrabold uppercase tracking-wider text-[#0c7a60] flex items-center gap-1.5">
+                        <span>✓</span> ALREADY FILLED FROM YOUR QUICK START
+                      </div>
+                      <div className="text-sm sm:text-[14.5px] font-bold text-[#062c55]">
+                        {PROVINCE_NAMES[state.province] || state.province} · age{" "}
+                        {state.age} · {state.years} yrs · $
+                        {Number(state.salary).toLocaleString("en-CA")}
+                        /yr
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setEditingBasics(true)}
+                        className="ml-auto text-xs sm:text-[12.5px] font-bold text-[#0c7a60] border border-[#b9e6d4] bg-white rounded-full px-3.5 py-1 hover:bg-[#f3faf6] transition-colors cursor-pointer shrink-0 shadow-2xs"
+                      >
+                        Change something
+                      </button>
                     </div>
-                    <div className="text-sm sm:text-[14.5px] font-bold text-[#062c55]">
-                      {PROVINCE_NAMES[state.province] || state.province} · age{" "}
-                      {state.age || "52"} · {state.years || "14"} yrs · $
-                      {Number(state.salary || 110000).toLocaleString("en-CA")}
-                      /yr
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setEditingBasics(!editingBasics)}
-                      className="ml-auto text-xs sm:text-[12.5px] font-bold text-[#0c7a60] border border-[#b9e6d4] bg-white rounded-full px-3.5 py-1 hover:bg-[#f3faf6] transition-colors cursor-pointer shrink-0 shadow-2xs"
-                    >
-                      {editingBasics ? "Done" : "Change something"}
-                    </button>
                   </div>
-
-                  {/* Inline fields revealed when clicking Change something */}
-                  {editingBasics && (
-                    <div className="mt-4 pt-3.5 border-t border-[#cfe8dd] grid grid-cols-1 sm:grid-cols-2 gap-3 text-left animate-fade">
+                ) : (
+                  <div className="my-4 p-3.5 sm:p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0]">
+                    {hasPrefilledBasics && (
+                      <div className="flex justify-end mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditingBasics(false)}
+                          className="text-xs font-bold text-[#0c7a60] border border-[#b9e6d4] bg-white rounded-full px-3 py-0.5 hover:bg-[#f3faf6] cursor-pointer"
+                        >
+                          Done editing
+                        </button>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
                       <div className="sm:col-span-2">
                         <label className="block text-xs font-bold text-[#5a6b78] mb-1">
                           Where were you employed?
@@ -2552,7 +2812,7 @@ function QuestionsContent() {
                             if (val === "OTHER") {
                               saveAnswer(
                                 "province",
-                                "Another province / U.S. state",
+                                "Another province / territory / U.S. state",
                               );
                               setCurrentStep("province-stop");
                               window.scrollTo({ top: 0, behavior: "smooth" });
@@ -2569,9 +2829,14 @@ function QuestionsContent() {
                           <option value="ON">Ontario</option>
                           <option value="BC">British Columbia</option>
                           <option value="AB">Alberta</option>
+                          <option value="SK">Saskatchewan</option>
+                          <option value="MB">Manitoba</option>
                           <option value="NS">Nova Scotia</option>
+                          <option value="NB">New Brunswick</option>
+                          <option value="PE">Prince Edward Island</option>
+                          <option value="NL">Newfoundland and Labrador</option>
                           <option value="OTHER">
-                            Another province / U.S. state
+                            Quebec, a territory, or a U.S. state
                           </option>
                         </select>
                       </div>
@@ -2583,7 +2848,7 @@ function QuestionsContent() {
                           type="text"
                           inputMode="numeric"
                           value={state.age}
-                          placeholder="52"
+                          placeholder="e.g. 45"
                           onChange={(e) => {
                             setState({ ...state, age: e.target.value });
                             if (fieldErrors.age) {
@@ -2606,7 +2871,7 @@ function QuestionsContent() {
                           type="text"
                           inputMode="numeric"
                           value={state.years}
-                          placeholder="14"
+                          placeholder="e.g. 8"
                           onChange={(e) => {
                             setState({ ...state, years: e.target.value });
                             if (fieldErrors.years) {
@@ -2629,7 +2894,7 @@ function QuestionsContent() {
                           type="text"
                           inputMode="numeric"
                           value={state.salary}
-                          placeholder="110000"
+                          placeholder="e.g. 90000"
                           onChange={(e) => {
                             setState({ ...state, salary: e.target.value });
                             if (fieldErrors.salary) {
@@ -2654,8 +2919,8 @@ function QuestionsContent() {
                         </div>
                       )}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Question 2: Role / Occupation */}
                 <div className="mb-2">
@@ -2727,11 +2992,11 @@ function QuestionsContent() {
                         OCCUPATIONS.find(
                           (o) => Math.abs(o.value - state.roleFactor) < 0.01,
                         )?.label || "Middle management / Senior / Director";
-                      saveAnswer("age", state.age || "52");
-                      saveAnswer("years", `${state.years || "14"} yrs`);
+                      saveAnswer("age", state.age);
+                      saveAnswer("years", `${state.years} yrs`);
                       saveAnswer(
                         "salary",
-                        `${kMoney(parseFloat(state.salary || "110000"))}/yr`,
+                        `${kMoney(parseFloat(state.salary))}/yr`,
                       );
                       saveAnswer("occupation", occ);
                       setCurrentStep("money-q1");
@@ -2799,7 +3064,7 @@ function QuestionsContent() {
                         type="text"
                         inputMode="numeric"
                         value={state.age}
-                        placeholder="52"
+                        placeholder="e.g. 45"
                         onChange={(e) =>
                           setState({ ...state, age: e.target.value })
                         }
@@ -2814,7 +3079,7 @@ function QuestionsContent() {
                         type="text"
                         inputMode="numeric"
                         value={state.years}
-                        placeholder="14"
+                        placeholder="e.g. 8"
                         onChange={(e) =>
                           setState({ ...state, years: e.target.value })
                         }
@@ -2831,7 +3096,7 @@ function QuestionsContent() {
                       type="text"
                       inputMode="numeric"
                       value={state.salary}
-                      placeholder="110000"
+                      placeholder="e.g. 90000"
                       onChange={(e) =>
                         setState({ ...state, salary: e.target.value })
                       }
@@ -3814,90 +4079,116 @@ function QuestionsContent() {
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "step-results" &&
               (() => {
-                const lowAmt = estResult?.statutory
-                  ? estResult.statutory.amount
-                  : 16923;
-                const loAmt = estResult?.commonLaw
-                  ? estResult.commonLaw.lowAmount
-                  : 137500;
-                const highAmt = estResult?.commonLaw
-                  ? estResult.commonLaw.highAmount
-                  : 192500;
-                const offerAmt = state.offer || 24000;
-                const termWeeks = estResult?.statutory
-                  ? estResult.statutory.terminationWeeks
-                  : 8;
-                const sevWeeks = estResult?.statutory?.severanceWeeks || 0;
+                if (!estResult || !estResult.statutory) {
+                  return (
+                    <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-6 sm:p-10 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] text-center animate-fade">
+                      <div className="w-12 h-12 rounded-full bg-[#fef3c7] text-[#92400e] flex items-center justify-center mx-auto mb-4 text-xl font-bold">
+                        !
+                      </div>
+                      <h2 className="font-serif font-semibold text-2xl text-[#062c55] mb-2">
+                        Missing required details
+                      </h2>
+                      <p className="text-sm text-[#5a6b78] max-w-md mx-auto mb-6">
+                        To calculate your legal minimum and severance range, we need your province, age, years of service, and annual pay.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingBasics(true);
+                          setCurrentStep("basics-q1");
+                          window.scrollTo({ top: 0, behavior: "smooth" });
+                        }}
+                        className="py-3 px-6 rounded-xl bg-[#062c55] text-white font-bold text-sm hover:bg-[#0c8f72] transition-colors cursor-pointer"
+                      >
+                        Complete required questions →
+                      </button>
+                    </div>
+                  );
+                }
+
+                const st = estResult.statutory;
+                const cl = estResult.commonLaw;
+                const clauseHolds = state.clause === "yes" && state.contract === "current";
+                const lowAmt = st.amount;
+                const loAmt = cl && !clauseHolds ? cl.lowAmount : st.amount;
+                const highAmt = cl && !clauseHolds ? cl.highAmount : st.amount;
+                const offerAmt = state.offer || 0;
+                const termWeeks = st.terminationWeeks;
+                const sevWeeks = st.severanceWeeks || 0;
                 const sevLine =
                   sevWeeks > 0
                     ? `${sevWeeks} wks severance pay`
                     : state.province === "ON"
-                      ? "severance pay — depends on employer payroll (≥ $2.5M)"
-                      : "depends on provincial rules";
-                const clMonths = estResult?.commonLaw
-                  ? `${estResult.commonLaw.lowMonths}–${estResult.commonLaw.highMonths} months`
-                  : "15–21 months";
+                      ? (parseFloat(state.years) >= 5
+                          ? (state.payroll === "unsure"
+                              ? "severance pay — depends on employer payroll (≥ $2.5M)"
+                              : "no ESA severance pay (payroll under $2.5M)")
+                          : "no ESA severance pay (needs 5+ years)")
+                      : "see provincial rules";
+                const clMonths =
+                  cl && !clauseHolds
+                    ? `${cl.lowMonths}–${cl.highMonths} months`
+                    : "—";
+
+                const copy = {
+                  strong: {
+                    tag: "Often worth a closer look",
+                    h: "This is the kind of offer people often review with a lawyer.",
+                    p: "Offers with the features you described are the ones people most often take to an employment lawyer for a closer look. That's not an opinion on your case — only a lawyer can tell you what yours means.",
+                  },
+                  medium: {
+                    tag: "A few things to understand",
+                    h: "A few things here are worth understanding better.",
+                    p: "Some of what you told us is worth understanding before you decide. A quick lawyer conversation is a good way to do that — you choose whether to go further.",
+                  },
+                  low: {
+                    tag: "Nothing flagged here",
+                    h: "We didn't spot the things we check for.",
+                    p: "Based on what you told us, we didn't flag the things we look at — but that isn't the same as saying the offer is fair or that you have no claim. If anything felt off (how it ended, unpaid amounts), a lawyer can tell you.",
+                  },
+                }[verdict.level];
 
                 // Gauge percentage relative to span
-                const span = highAmt * 1.08;
+                const span = Math.max(highAmt, offerAmt) * 1.08;
                 const pct = (val: number) =>
-                  Math.max(0, Math.min(100, (val / span) * 100));
+                  Math.max(0, Math.min(100, (val / (span || 1)) * 100));
                 const minPct = pct(lowAmt);
                 const loPct = pct(loAmt);
                 const hiPct = pct(highAmt);
                 const offerPct = pct(offerAmt);
+
+                const sourceKey = state.federal === "yes" ? "FED" : (state.province || "ON");
+                const jl = JURIS_LINK[sourceKey] || JURIS_LINK.ON;
+                const jlHost = (jl[1]?.split("/")[2] || "").replace(/^www\./, "");
 
                 return (
                   <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-7 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
                     {/* ── VERDICT CARD (encompasses tag, title, reasons, estbox, and srcbadge) ── */}
                     <div className="text-center p-4 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
                       <span className="text-[11.5px] font-extrabold uppercase tracking-[0.8px] text-[#0c8f72] block mb-1.5">
-                        Often worth a closer look
+                        {copy.tag}
                       </span>
                       <h2 className="font-serif font-semibold text-2xl sm:text-[28px] text-[#062c55] my-2 leading-[1.14] tracking-tight">
-                        This is the kind of offer people often review with a
-                        lawyer.
+                        {copy.h}
                       </h2>
                       <p className="text-[13.5px] sm:text-[14.5px] text-[#17242f] max-w-[460px] mx-auto leading-relaxed mt-2.5">
-                        Offers with the features you described are the ones
-                        people most often take to an employment lawyer for a
-                        closer look. That&apos;s not an opinion on your case —
-                        only a lawyer can tell you what yours means.
+                        {copy.p}
                       </p>
 
                       {/* Reasons Checklist */}
                       <div className="mt-4 text-left max-w-[440px] mx-auto space-y-1.5 text-[13px] sm:text-[13.5px] text-[#17242f]">
-                        <div className="flex items-start gap-2.5">
-                          <span className="text-[#0eb28d] font-extrabold text-[15px] shrink-0">
-                            ✓
-                          </span>
-                          <span>Solid income</span>
-                        </div>
-                        <div className="flex items-start gap-2.5">
-                          <span className="text-[#0eb28d] font-extrabold text-[15px] shrink-0">
-                            ✓
-                          </span>
-                          <span>
-                            {state.years || "14"} years of service — long tenure
-                          </span>
-                        </div>
-                        <div className="flex items-start gap-2.5">
-                          <span className="text-[#0eb28d] font-extrabold text-[15px] shrink-0">
-                            ✓
-                          </span>
-                          <span>
-                            Your answers don&apos;t mention a cap to the minimum
-                          </span>
-                        </div>
-                        <div className="flex items-start gap-2.5">
-                          <span className="text-[#0eb28d] font-extrabold text-[15px] shrink-0">
-                            ✓
-                          </span>
-                          <span>
-                            Your contract predates a promotion or role change —
-                            a lawyer checks whether it still applies
-                          </span>
-                        </div>
+                        {verdict.reasons.slice(0, 4).map(([text, dir], idx) => (
+                          <div key={idx} className="flex items-start gap-2.5">
+                            <span
+                              className={`font-extrabold text-[15px] shrink-0 ${
+                                dir > 0 ? "text-[#0eb28d]" : "text-[#c53030]"
+                              }`}
+                            >
+                              {dir > 0 ? "✓" : "!"}
+                            </span>
+                            <span>{text}</span>
+                          </div>
+                        ))}
                       </div>
 
                       {/* ── ESTIMATED RANGE BOX (.estbox) ── */}
@@ -3909,12 +4200,12 @@ function QuestionsContent() {
                           Estimated range
                         </div>
                         <div className="font-serif font-bold text-3xl sm:text-[34px] text-[#0c8f72] my-1 tracking-tight leading-tight">
-                          {money(lowAmt)} – {money(highAmt)}
+                          {highAmt > lowAmt ? `${money(lowAmt)} – ${money(highAmt)}` : money(lowAmt)}
                         </div>
                         <p className="text-xs sm:text-[13px] text-[#17242f] max-w-[500px] mx-auto leading-relaxed">
-                          From the legal minimum you can verify yourself, up to
-                          what court-awarded &quot;reasonable notice&quot; may
-                          reach for a profile like yours.
+                          {highAmt > lowAmt
+                            ? "From the legal minimum you can verify yourself, up to what court-awarded \"reasonable notice\" may reach for a profile like yours."
+                            : "The legal minimum. Your answers say a valid clause may limit you to it — whether it holds is the first thing a lawyer checks."}
                         </p>
 
                         {/* Reading this callout box */}
@@ -3950,63 +4241,74 @@ function QuestionsContent() {
                               3 · What courts award
                             </b>
                             <span>
-                              {clMonths} · what courts award when no valid clause
-                              caps you — a lawyer&apos;s call
+                              {clauseHolds
+                                ? "May not apply — your answers say a valid clause caps you at the minimum"
+                                : `${clMonths} · what courts award when no valid clause caps you — a lawyer's call`}
                             </span>
                           </div>
                         </div>
 
                         {/* Visual Range Bar Gauge (.rbar) */}
-                        <div className="mt-4 max-w-[540px] mx-auto text-left bg-white border border-[#e7e4dd] rounded-[12px] p-4 pt-9">
-                          <div className="relative pb-1 mx-2 sm:mx-3">
-                            {/* Track */}
-                            <div className="relative h-3 bg-[#eef1f4] rounded-full overflow-visible">
-                              {/* Min Bar (Gray) */}
-                              <div
-                                className="absolute left-0 top-0 bottom-0 bg-[#b9c5cf] rounded-l-full"
-                                style={{ width: `${minPct}%` }}
-                              />
-                              {/* Court-awarded Band (Green Gradient) */}
-                              <div
-                                className="absolute top-0 bottom-0 bg-gradient-to-r from-[#b7e3d1] via-[#5fc9a6] to-[#0eb28d] rounded-full shadow-[0_0_0_2px_rgba(14,178,141,0.15)]"
-                                style={{
-                                  left: `${loPct}%`,
-                                  width: `${Math.max(2, hiPct - loPct)}%`,
-                                }}
-                              />
-                              {/* Your Offer Pin Marker */}
-                              <div
-                                className="absolute top-[-8px] bottom-[-8px] w-[3px] bg-[#062c55] rounded-full -translate-x-1/2 z-10"
-                                style={{ left: `${offerPct}%` }}
-                              >
-                                <div className="absolute bottom-[calc(100%+4px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-extrabold text-white bg-[#062c55] px-2 py-0.5 rounded-[6px] shadow-sm flex items-center gap-1 select-none">
-                                  <span>Your offer · {kMoney(offerAmt)}</span>
-                                </div>
+                        {highAmt > lowAmt && (
+                          <div className="mt-4 max-w-[540px] mx-auto text-left bg-white border border-[#e7e4dd] rounded-[12px] p-4 pt-9">
+                            <div className="relative pb-1 mx-2 sm:mx-3">
+                              {/* Track */}
+                              <div className="relative h-3 bg-[#eef1f4] rounded-full overflow-visible">
+                                {/* Min Bar (Gray) */}
+                                <div
+                                  className="absolute left-0 top-0 bottom-0 bg-[#b9c5cf] rounded-l-full"
+                                  style={{ width: `${minPct}%` }}
+                                />
+                                {/* Court-awarded Band (Green Gradient) */}
+                                <div
+                                  className="absolute top-0 bottom-0 bg-gradient-to-r from-[#b7e3d1] via-[#5fc9a6] to-[#0eb28d] rounded-full shadow-[0_0_0_2px_rgba(14,178,141,0.15)]"
+                                  style={{
+                                    left: `${loPct}%`,
+                                    width: `${Math.max(2, hiPct - loPct)}%`,
+                                  }}
+                                />
+                                {/* Your Offer Pin Marker */}
+                                {offerAmt > 0 && (
+                                  <div
+                                    className="absolute top-[-8px] bottom-[-8px] w-[3px] bg-[#062c55] rounded-full -translate-x-1/2 z-10"
+                                    style={{ left: `${offerPct}%` }}
+                                  >
+                                    <div className="absolute bottom-[calc(100%+4px)] left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-extrabold text-white bg-[#062c55] px-2 py-0.5 rounded-[6px] shadow-sm flex items-center gap-1 select-none">
+                                      <span>Your offer · {kMoney(offerAmt)}</span>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
-                          </div>
 
-                          {/* Key / Legend below */}
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3.5 text-xs text-[#5a6b78]">
-                            <span className="inline-flex items-center gap-1.5">
-                              <i className="w-2.5 h-2.5 rounded-[3px] bg-[#b9c5cf] inline-block shrink-0" />
-                              Legal minimum · {kMoney(lowAmt)}
-                            </span>
-                            <span className="inline-flex items-center gap-1.5">
-                              <i className="w-2.5 h-2.5 rounded-[3px] bg-[#0eb28d] inline-block shrink-0" />
-                              What courts often award · {kMoney(loAmt)}–
-                              {kMoney(highAmt)}
-                            </span>
+                            {/* Key / Legend below */}
+                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3.5 text-xs text-[#5a6b78]">
+                              <span className="inline-flex items-center gap-1.5">
+                                <i className="w-2.5 h-2.5 rounded-[3px] bg-[#b9c5cf] inline-block shrink-0" />
+                                Legal minimum · {kMoney(lowAmt)}
+                              </span>
+                              <span className="inline-flex items-center gap-1.5">
+                                <i className="w-2.5 h-2.5 rounded-[3px] bg-[#0eb28d] inline-block shrink-0" />
+                                What courts often award · {kMoney(loAmt)}–
+                                {kMoney(highAmt)}
+                              </span>
+                            </div>
+                            <div className="text-[11.5px] text-[#5a6b78] italic mt-1.5">
+                              An estimate from a general model, not what you&apos;re
+                              owed. Only a lawyer can tell you that.
+                            </div>
                           </div>
-                          <div className="text-[11.5px] text-[#5a6b78] italic mt-1.5">
-                            An estimate from a general model, not what you&apos;re
-                            owed. Only a lawyer can tell you that.
+                        )}
+
+                        {state.signed === "yes" && (
+                          <div className="my-3.5 p-3 sm:p-3.5 rounded-lg border-l-[3px] border-[#8a6400] bg-[#fffdf6] border border-[#f0dca8] text-left text-xs sm:text-[12.5px] text-[#8a6400] leading-relaxed max-w-[540px] mx-auto">
+                            <b>You told us you already signed.</b> A signed release is usually final — but some rights survive a signature (unpaid wages, human-rights claims, and anything the release didn&apos;t validly cover). Worth one free lawyer call.
                           </div>
-                        </div>
+                        )}
 
                         {/* Footnote */}
                         <div className="mt-4 pt-3 border-t border-[#e7e4dd] text-[11.5px] text-[#5a6b78] leading-relaxed max-w-[540px] mx-auto text-left">
-                          Rules v0.1.0 · legal minimum table from the official
+                          Rules v{FairExitRules.version} · legal minimum table from the official
                           source below · court-awarded band is a general estimate
                           pending employment-lawyer sign-off. Not what you are
                           owed; only a lawyer can tell you that.
@@ -4014,27 +4316,29 @@ function QuestionsContent() {
                       </div>
 
                       {/* Official government source badge (inside verdict) */}
-                      <div className="mt-3.5 max-w-[540px] mx-auto text-left">
-                        <a
-                          href="https://www.ontario.ca/document/your-guide-employment-standards-act-0/termination-employment"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-between p-2.5 px-3.5 rounded-[9px] border border-[#cbdcee] bg-white hover:border-[#0eb28d] shadow-[0_6px_16px_-12px_rgba(11,46,79,0.4)] transition-all group no-underline"
-                        >
-                          <div className="text-xs text-[#5a6b78] leading-tight">
-                            <b className="block text-[#062c55] font-bold text-xs mb-0.5">
-                              Official government source
-                            </b>
-                            <span>
-                              Ontario ESA — termination · ontario.ca ·{" "}
-                              <i className="italic">last reviewed Oct 2026</i>
+                      {jl && jl[1] && (
+                        <div className="mt-3.5 max-w-[540px] mx-auto text-left">
+                          <a
+                            href={jl[1]}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between p-2.5 px-3.5 rounded-[9px] border border-[#cbdcee] bg-white hover:border-[#0eb28d] shadow-[0_6px_16px_-12px_rgba(11,46,79,0.4)] transition-all group no-underline"
+                          >
+                            <div className="text-xs text-[#5a6b78] leading-tight">
+                              <b className="block text-[#062c55] font-bold text-xs mb-0.5">
+                                Official government source
+                              </b>
+                              <span>
+                                {jl[0]} · {jlHost} ·{" "}
+                                <i className="italic">last reviewed Oct 2026</i>
+                              </span>
+                            </div>
+                            <span className="text-[#0c8f72] font-extrabold text-sm ml-2 group-hover:translate-x-0.5 transition-transform">
+                              →
                             </span>
-                          </div>
-                          <span className="text-[#0c8f72] font-extrabold text-sm ml-2 group-hover:translate-x-0.5 transition-transform">
-                            →
-                          </span>
-                        </a>
-                      </div>
+                          </a>
+                        </div>
+                      )}
                     </div>
                     {/* ── END VERDICT CARD ── */}
 

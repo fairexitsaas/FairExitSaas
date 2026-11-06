@@ -54,6 +54,220 @@ function money(n: number): string {
   return "$" + Math.round(n).toLocaleString("en-US");
 }
 
+export function getUsVerdict(s: {
+  state?: string;
+  age?: number;
+  ended?: string;
+  others?: string;
+  release?: string;
+  deadline?: string;
+  advise?: string;
+  list?: string;
+  revoke?: string;
+  empsize?: string;
+  notice?: string;
+  promise?: string;
+  redflag?: string;
+  union?: string;
+  comp?: Record<string, boolean>;
+  nc?: string;
+  signed?: string;
+}): {
+  score: number;
+  level: "strong" | "medium" | "low";
+  reasons: [string, number][];
+  warn: boolean;
+  warnAmt: number;
+  owbpa: boolean;
+} {
+  const reasons: [string, number][] = [];
+  let score = 100;
+  let warn = false;
+  const warnAmt = 0;
+  let unmet = 0;
+
+  const age40 = (s.age ?? 0) >= 40;
+  const group = s.ended === "closure" || s.ended === "mass" || s.others === "50";
+  const owbpa = age40 && s.release === "yes";
+
+  if (owbpa) {
+    if (s.deadline === "short" || (group && s.deadline === "mid")) {
+      score -= 18;
+      unmet++;
+      reasons.push([
+        `Time to consider looks short — for an age-40+ ${
+          group
+            ? "group program the law sets a 45-day minimum to offer"
+            : "individual release the law sets a 21-day minimum to offer"
+        } (you may still sign earlier)`,
+        -1,
+      ]);
+    }
+    if (s.advise === "no") {
+      score -= 12;
+      unmet++;
+      reasons.push([
+        "An age-40+ release must advise you in writing to consult an attorney — yours may not. Worth confirming",
+        -1,
+      ]);
+    }
+    if (group && s.list === "no") {
+      score -= 12;
+      unmet++;
+      reasons.push([
+        "You say you didn't get the ages-and-titles disclosure — for an age-40+ group program the law requires it",
+        -1,
+      ]);
+    }
+    if (s.revoke === "no") {
+      score -= 18;
+      unmet++;
+      reasons.push([
+        "A 7-day period to change your mind is a common requirement for age-40+ releases — worth confirming yours has one",
+        -1,
+      ]);
+    }
+    if (s.deadline === "unsure" || s.revoke === "unsure") {
+      reasons.push([
+        "Some release terms need a closer read (an attorney can check)",
+        -1,
+      ]);
+    }
+    if (group && s.list !== "no") {
+      score -= 6;
+      reasons.push([
+        "For an age-40+ group program, the law requires a disclosure of the ages & job titles selected — keep your copy for the attorney",
+        -1,
+      ]);
+    }
+  }
+
+  const big = s.empsize === "big";
+  const mass = s.others === "50";
+  const days = { none: 0, wk: 10, mid: 35, full: 60 }[s.notice || "none"] ?? 0;
+
+  if (big && mass && days < 60) {
+    warn = true;
+    score -= 25;
+    reasons.push([
+      "50+ people lost their job at your site (for a layoff, also at least a third of the site) and the employer has 100+ staff — that's the fact pattern where WARN's advance-notice rules can apply. Confirm the notice you got with an attorney",
+      -1,
+    ]);
+  } else if (
+    big &&
+    (s.ended === "mass" || s.ended === "closure") &&
+    s.others !== "50" &&
+    s.others !== "me"
+  ) {
+    reasons.push([
+      "WARN only applies above specific single-site thresholds (generally 50+ at one location). Whether yours met them is worth confirming with an attorney",
+      -1,
+    ]);
+  }
+
+  if (s.promise === "yes") {
+    score -= 8;
+    reasons.push([
+      "Your offer letter, contract or handbook may promise severance — no law requires it, but a written promise can. Worth an attorney's read against what you were offered",
+      -1,
+    ]);
+  }
+  if (s.redflag === "discrim") {
+    score -= 12;
+    reasons.push([
+      "Possible discrimination / retaliation — a serious, separate claim",
+      -1,
+    ]);
+  }
+  if (s.redflag === "unpaid") {
+    reasons.push(["Unpaid wages / bonus / PTO may be owed", 1]);
+  }
+  if (s.union === "yes") {
+    reasons.push([
+      "You're under a union contract — severance and grievances usually run through the CBA and your union rep, not a private agreement. Talk to your rep before signing anything",
+      -1,
+    ]);
+  }
+
+  const cxk = Object.keys(s.comp || {}).filter((k) => s.comp?.[k]);
+  if (cxk.length) {
+    reasons.push([
+      "Bonus, equity or PTO on top of base — check the release doesn't waive what's already earned, and ask what happens to unvested equity",
+      -1,
+    ]);
+  }
+  if (s.nc === "yes") {
+    reasons.push([
+      "There's a non-compete — whether it's enforceable depends heavily on your state (in some states these are void). Worth asking an attorney",
+      1,
+    ]);
+  }
+
+  const STATE_NOTES: Record<string, string> = {
+    California:
+      "California has its own Cal-WARN Act (often broader than federal) and generally voids non-competes — a state-specific attorney should check both.",
+    "New York":
+      "New York's WARN Act is broader than federal (it covers 50+ employees and generally requires 90 days' notice) — worth confirming with a New York attorney.",
+    "New Jersey":
+      "New Jersey requires statutory severance for covered mass layoffs (roughly one week's pay per year of service) plus 90 days' notice — a New Jersey attorney can confirm whether it applies to you.",
+    Illinois:
+      "Illinois has its own WARN Act with a lower threshold (75+ employees) than the federal Act — worth confirming with an Illinois attorney.",
+  };
+
+  const STATE_PAGES = [
+    "California",
+    "New Jersey",
+    "New York",
+    "Illinois",
+    "Texas",
+    "Florida",
+    "Pennsylvania",
+    "Ohio",
+    "North Carolina",
+    "Michigan",
+    "Washington",
+    "Massachusetts",
+    "Arizona",
+    "Tennessee",
+    "Maryland",
+    "Wisconsin",
+    "Minnesota",
+    "Maine",
+    "Iowa",
+    "Vermont",
+    "New Hampshire",
+    "Delaware",
+  ];
+
+  if (s.state && !STATE_PAGES.includes(s.state)) {
+    reasons.unshift([
+      `We've checked the federal rules. ${s.state}'s own rules aren't in FairExit yet, so ask an attorney about state-specific items.`,
+      -1,
+    ]);
+  }
+
+  const stateExtra = Boolean(s.state && STATE_NOTES[s.state]);
+  if (stateExtra && s.state) {
+    reasons.push([STATE_NOTES[s.state], -1]);
+  }
+
+  if (score < 0) score = 0;
+  if (owbpa && unmet === 0 && !warn && s.redflag === "none") {
+    reasons.push(["The release appears to check the main required boxes", 1]);
+  }
+
+  let level: "strong" | "medium" | "low" =
+    score < 55 || warn || s.redflag === "discrim"
+      ? "strong"
+      : score < 82
+        ? "medium"
+        : "low";
+
+  if (level === "low" && stateExtra) level = "medium";
+
+  return { score, level, reasons, warn, warnAmt, owbpa };
+}
+
 export default function USFlow() {
   const searchParams = useSearchParams();
 
@@ -128,12 +342,12 @@ export default function USFlow() {
     try {
       saveReportInputs({
         country: "US",
-        state: state.usState || "California",
-        provinceName: state.usState || "California",
-        age: Number(state.age) || 52,
-        years: Number(state.years) || 9,
-        salary: Number(state.salary) || 128000,
-        offer: Number(state.offer) || 22000,
+        state: state.usState || "—",
+        provinceName: state.usState || "—",
+        age: Number(state.age) || 0,
+        years: Number(state.years) || 0,
+        salary: Number(state.salary) || 0,
+        offer: Number(state.offer) || 0,
         role: "Middle management / Senior / Director",
         union: state.union === "yes" ? "Yes" : state.union === "no" ? "No" : "Not sure",
         employment: "Regular employee",
@@ -146,11 +360,11 @@ export default function USFlow() {
         market: state.market || "Some",
         flagged: state.redflag || "Nothing unusual",
         statutoryMin: 0,
-        courtAwardLow: 45000,
-        courtAwardHigh: 85000,
+        courtAwardLow: 0,
+        courtAwardHigh: 0,
         noticeWeeks: 0,
-        courtMonths: "3–6 mo",
-        signByDays: state.deadline === "21" ? "21 days" : state.deadline === "45" ? "45 days" : "Under 21 days",
+        courtMonths: "—",
+        signByDays: state.deadline === "21" ? "21 days" : state.deadline === "45" ? "45 days" : state.deadline === "short" ? "Under 21 days" : "—",
         fullState: state,
       });
 
@@ -211,6 +425,63 @@ export default function USFlow() {
     redflag: "",
     nc: "",
   });
+
+  const verdict = useMemo(() => {
+    return getUsVerdict({
+      state: state.usState,
+      age: parseInt(state.age, 10) || 0,
+      ended: state.ended,
+      others: state.others,
+      release: state.release,
+      deadline: state.deadline,
+      advise: state.advise,
+      list: state.list,
+      revoke: state.revoke,
+      empsize: state.empsize,
+      notice: state.notice,
+      promise: state.promise,
+      redflag: state.redflag,
+      union: state.union,
+      comp: state.comp,
+      nc: state.nc,
+      signed: state.signed,
+    });
+  }, [state]);
+
+  useEffect(() => {
+    if (currentStep === "step-results") {
+      console.log(
+        "[FairExit US] Free report results generated. All user answers used:\n",
+        {
+          usState: state.usState,
+          age: state.age,
+          years: state.years,
+          salary: state.salary,
+          comp: state.comp,
+          union: state.union,
+          ended: state.ended,
+          empsize: state.empsize,
+          others: state.others,
+          notice: state.notice,
+          release: state.release,
+          offer: state.offer,
+          promise: state.promise,
+          deadline: state.deadline,
+          advise: state.advise,
+          list: state.list,
+          revoke: state.revoke,
+          signed: state.signed,
+          redflag: state.redflag,
+          nc: state.nc,
+          market: state.market,
+          contract: state.contract,
+          reason: state.reason,
+        },
+        "\nFree Report Verdict:",
+        verdict
+      );
+    }
+  }, [currentStep, verdict, state]);
 
   const getMobileSummarySnippet = () => {
     const parts: string[] = [];
@@ -1462,7 +1733,7 @@ export default function USFlow() {
                           type="text"
                           inputMode="numeric"
                           value={state.age}
-                          placeholder="52"
+                          placeholder="e.g. 45"
                           onChange={(e) => {
                             setState({ ...state, age: e.target.value });
                             if (fieldErrors.age) {
@@ -1485,7 +1756,7 @@ export default function USFlow() {
                           type="text"
                           inputMode="numeric"
                           value={state.years}
-                          placeholder="9"
+                          placeholder="e.g. 8"
                           onChange={(e) => {
                             setState({ ...state, years: e.target.value });
                             if (fieldErrors.years) {
@@ -1587,7 +1858,7 @@ export default function USFlow() {
                       type="text"
                       inputMode="numeric"
                       value={state.salary}
-                      placeholder="128000"
+                      placeholder="e.g. 90000"
                       onChange={(e) => {
                         setState({ ...state, salary: e.target.value });
                         if (fieldErrors.salary) {
@@ -2414,7 +2685,7 @@ export default function USFlow() {
                       type="text"
                       inputMode="numeric"
                       value={state.offer || ""}
-                      placeholder="22154"
+                      placeholder="e.g. 20000"
                       onChange={(e) => {
                         const val =
                           parseFloat(e.target.value.replace(/[^0-9.]/g, "")) ||
@@ -3007,6 +3278,38 @@ export default function USFlow() {
                       <button
                         type="button"
                         onClick={() => {
+                          const freeReportAnswers = {
+                            country: "US",
+                            usState: state.usState,
+                            age: state.age,
+                            years: state.years,
+                            salary: state.salary,
+                            comp: state.comp,
+                            union: state.union,
+                            ended: state.ended,
+                            empsize: state.empsize,
+                            others: state.others,
+                            notice: state.notice,
+                            release: state.release,
+                            offer: state.offer,
+                            promise: state.promise,
+                            deadline: state.deadline,
+                            advise: state.advise,
+                            list: state.list,
+                            revoke: state.revoke,
+                            signed: state.signed,
+                            redflag: state.redflag,
+                            nc: state.nc,
+                            market: state.market,
+                            contract: state.contract,
+                            reason: state.reason,
+                          };
+                          console.log(
+                            "[FairExit US] Free questions finished. All user answers used for free report:\n",
+                            JSON.stringify(freeReportAnswers, null, 2),
+                            "\nCalculated free report verdict:",
+                            verdict
+                          );
                           populateAllAnswers(state);
                           caseSaving.current = null; // answers may have changed since the last save
                           ensureCase().catch((err) => console.warn("FairExit: free check not saved yet", err));
@@ -3070,134 +3373,130 @@ export default function USFlow() {
             {/* ════════════════════════════════════════════════════════════════
                 STEP 6: RESULTS & VERDICT
             ════════════════════════════════════════════════════════════════ */}
-            {currentStep === "step-results" && (
-              <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-7 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
-                {/* ── VERDICT CARD (encompasses tag, title, reasons, and srcbadge) ── */}
-                <div className="text-center p-4 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
-                  {/* Upper Badges */}
-                  <div className="mb-2">
-                    <span className="inline-block font-sans font-[800] uppercase text-[#8a6400] bg-[#fbf3df] border border-[#eeddb0] text-[10.5px] leading-[16.5px] tracking-[0.5px] px-[10px] py-[3px] rounded-[6px] mb-2">
-                      NOT AN ASSESSMENT OF YOUR SITUATION
-                    </span>
-                    <div className="font-sans font-[800] uppercase text-[#0c8f72] text-[11.5px] leading-[18px] tracking-[1px] mb-2">
-                      WORTH AN ATTORNEY&apos;S LOOK
-                    </div>
-                  </div>
+            {currentStep === "step-results" && (() => {
+              const copy = {
+                strong: {
+                  tag: "Worth an attorney's look",
+                  h: "A few things here are worth an attorney's look.",
+                  p: "Some of your answers point to federal rules worth confirming — in the US the question usually isn't a legal minimum (there isn't one), it's the process and the notice. A free attorney call can tell you what applies to you. This isn't an opinion on your case.",
+                },
+                medium: {
+                  tag: "A few things to understand",
+                  h: "A few things are worth understanding before you sign.",
+                  p: "Most of what you told us looks routine, but a couple of items are worth understanding. A quick, free attorney call can help.",
+                },
+                low: {
+                  tag: "Nothing flagged here",
+                  h: "We didn't spot the things we check for.",
+                  p: "Based on what you told us, we didn't flag the federal items we look at — but that isn't the same as saying it was handled correctly or that you have no claim. If anything felt unfair or you're unsure, an attorney can tell you.",
+                },
+              }[verdict.level];
 
-                  {/* Main Title */}
-                  <h2 className="font-serif font-[600] text-[26px] sm:text-[30px] md:text-[32px] text-[#062c55] leading-[31.5px] sm:leading-[36px] max-w-[580px] mx-auto mb-3">
-                    A few things here are worth an attorney&apos;s look.
-                  </h2>
+              const src = verdict.warn
+                ? [
+                    "U.S. Department of Labor — WARN Act",
+                    "https://www.dol.gov/agencies/eta/layoffs/warn",
+                  ]
+                : [
+                    "EEOC — severance & age-claim waivers",
+                    "https://www.eeoc.gov/laws/guidance/qa-understanding-waivers-discrimination-claims-employee-severance-agreements",
+                  ];
+              const host = src[1].split("/")[2]?.replace(/^www\./, "");
 
-                  {/* Intro Description */}
-                  <p className="font-sans font-normal text-[14.5px] sm:text-[15px] text-[#17242f] max-w-[460px] mx-auto leading-[23.5px] tracking-normal mb-5 sm:mb-6">
-                    Some of your answers point to federal rules worth confirming — in
-                    the US the question usually isn&apos;t a legal minimum (there
-                    isn&apos;t one), it&apos;s the process and the notice. A free
-                    attorney call can tell you what applies to you. This isn&apos;t
-                    an opinion on your case.
-                  </p>
-
-                  {/* Federal Law Expects Intro */}
-                  <p className="font-sans font-normal text-[12.5px] text-[#5a6b78] leading-[19px] tracking-normal mb-3 text-left max-w-[440px] mx-auto">
-                    What federal law generally expects — and what your answers
-                    suggest to double-check with an attorney:
-                  </p>
-
-                  {/* 5 Bullet Points with Teal Exclamation */}
-                  <div className="space-y-2 mb-4 text-left max-w-[440px] mx-auto">
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
-                        !
+              return (
+                <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-7 md:p-9 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
+                  {/* ── VERDICT CARD (encompasses tag, title, reasons, and srcbadge) ── */}
+                  <div className="text-center p-4 sm:p-7 md:p-[24px_26px] bg-gradient-to-b from-[#fbfdfc] to-[#eef8f3] border border-[#c7e6d6] rounded-[16px]">
+                    {/* Upper Badges */}
+                    <div className="mb-2">
+                      <span className="inline-block font-sans font-[800] uppercase text-[#8a6400] bg-[#fbf3df] border border-[#eeddb0] text-[10.5px] leading-[16.5px] tracking-[0.5px] px-[10px] py-[3px] rounded-[6px] mb-2">
+                        NOT AN ASSESSMENT OF YOUR SITUATION
                       </span>
-                      <span>
-                        Time to consider looks short — for an age-40+ group program
-                        the law sets a 45-day minimum to offer (you may still sign
-                        earlier)
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
-                        !
-                      </span>
-                      <span>
-                        A 7-day period to change your mind is a common requirement
-                        for age-40+ releases — worth confirming yours has one
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
-                        !
-                      </span>
-                      <span>
-                        For an age-40+ group program, the law requires a disclosure
-                        of the ages &amp; job titles selected — keep your copy for
-                        the attorney
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
-                        !
-                      </span>
-                      <span>
-                        50+ people lost their job at your site and the employer has
-                        100+ staff — that&apos;s the fact pattern where WARN&apos;s
-                        advance-notice rules can apply. Confirm the notice you got
-                        with an attorney
-                      </span>
-                    </div>
-                    <div className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5">
-                      <span className="text-[#0c8f72] font-[800] text-[13.5px] shrink-0">
-                        !
-                      </span>
-                      <span>
-                        {state.usState} has its own{" "}
-                        {state.usState === "California"
-                          ? "Cal-WARN Act"
-                          : `${state.usState} WARN rules`}{" "}
-                        (often broader than federal) and generally voids
-                        non-competes — a state-specific attorney should check
-                        both.
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Amber/Yellow Callout Box (warnbox) */}
-                  <div className="p-[13px_16px] rounded-[12px] bg-[#fffdf6] border border-[#f0dca8] font-sans font-normal text-[13px] text-[#17242f] leading-[20px] mb-4 text-left max-w-[440px] mx-auto">
-                    <b className="font-[700] text-[#8a6400]">
-                      Advance-notice (WARN) rules may apply.
-                    </b>{" "}
-                    For a covered mass layoff or closing, a 100+-employee
-                    employer generally must give 60 days&apos; written notice. If
-                    yours was shorter, the shortfall can matter — but the amount
-                    depends on offsets an attorney applies, and any civil penalty
-                    runs to the government, not to you. We don&apos;t calculate
-                    it. We never claim a legal severance minimum; the US doesn&apos;t
-                    set one.
-                  </div>
-
-                  {/* Official Government Source Card (srcbadge) */}
-                  <a
-                    href="https://www.dol.gov/agencies/eta/layoffs/warn"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="border border-[#cbdcee] bg-white hover:border-[#0c8f72] rounded-[11px] p-[9px_12px_9px_14px] flex items-center justify-between transition-all group text-left cursor-pointer shadow-[0_6px_16px_-12px_rgba(11,46,79,0.4)] max-w-[440px] mx-auto mt-4"
-                  >
-                    <div>
-                      <div className="font-sans font-[700] text-[12px] leading-[16px] text-[#062c55] mb-0.5">
-                        Official government source
-                      </div>
-                      <div className="font-sans font-[600] text-[12px] leading-[16px] text-[#5a6b78] group-hover:text-[#0c8f72] transition-colors">
-                        U.S. Department of Labor — WARN Act · dol.gov ·{" "}
-                        <i className="italic">last reviewed Oct 2026</i>
+                      <div className="font-sans font-[800] uppercase text-[#0c8f72] text-[11.5px] leading-[18px] tracking-[1px] mb-2">
+                        {copy.tag}
                       </div>
                     </div>
-                    <span className="text-[#0c8f72] font-[800] text-[15px] group-hover:translate-x-1 transition-transform ml-3">
-                      →
-                    </span>
-                  </a>
-                </div>
-                {/* ── END VERDICT CARD ── */}
+
+                    {/* Main Title */}
+                    <h2 className="font-serif font-[600] text-[26px] sm:text-[30px] md:text-[32px] text-[#062c55] leading-[31.5px] sm:leading-[36px] max-w-[580px] mx-auto mb-3">
+                      {copy.h}
+                    </h2>
+
+                    {/* Intro Description */}
+                    <p className="font-sans font-normal text-[14.5px] sm:text-[15px] text-[#17242f] max-w-[460px] mx-auto leading-[23.5px] tracking-normal mb-5 sm:mb-6">
+                      {copy.p}
+                    </p>
+
+                    {/* Signed note if state.signed === "yes" */}
+                    {state.signed === "yes" && (
+                      <div className="my-3.5 p-3 sm:p-3.5 rounded-lg border-l-[3px] border-[#8a6400] bg-[#fffdf6] border border-[#f0dca8] text-center text-xs sm:text-[12.5px] text-[#8a6400] leading-relaxed max-w-[440px] mx-auto mb-4">
+                        <b>You told us you already signed.</b> If you&apos;re 40+ you may still have 7 days to revoke; some claims survive a release. Worth one free attorney call.
+                      </div>
+                    )}
+
+                    {/* Federal Law Expects Intro */}
+                    <p className="font-sans font-normal text-[12.5px] text-[#5a6b78] leading-[19px] tracking-normal mb-3 text-left max-w-[440px] mx-auto">
+                      What federal law generally expects — and what your answers
+                      suggest to double-check with an attorney:
+                    </p>
+
+                    {/* Dynamic Reasons list */}
+                    <div className="space-y-2 mb-4 text-left max-w-[440px] mx-auto">
+                      {verdict.reasons.slice(0, 5).map(([text, dir], idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-start gap-2.5 font-sans font-normal text-[13.5px] text-[#17242f] leading-[21px] py-0.5"
+                        >
+                          <span
+                            className={`font-[800] text-[13.5px] shrink-0 ${
+                              dir > 0 ? "text-[#0c8f72]" : "text-[#c53030]"
+                            }`}
+                          >
+                            {dir > 0 ? "✓" : "!"}
+                          </span>
+                          <span>{text}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Amber/Yellow Callout Box (warnbox) - only if v.warn */}
+                    {verdict.warn && (
+                      <div className="p-[13px_16px] rounded-[12px] bg-[#fffdf6] border border-[#f0dca8] font-sans font-normal text-[13px] text-[#17242f] leading-[20px] mb-4 text-left max-w-[440px] mx-auto">
+                        <b className="font-[700] text-[#8a6400]">
+                          Advance-notice (WARN) rules may apply.
+                        </b>{" "}
+                        For a covered mass layoff or closing, a 100+-employee
+                        employer generally must give 60 days&apos; written notice. If
+                        yours was shorter, the shortfall can matter — but the amount
+                        depends on offsets an attorney applies, and any civil penalty
+                        runs to the government, not to you. We don&apos;t calculate
+                        it. We never claim a legal severance minimum; the US doesn&apos;t
+                        set one.
+                      </div>
+                    )}
+
+                    {/* Official Government Source Card (srcbadge) */}
+                    <a
+                      href={src[1]}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="border border-[#cbdcee] bg-white hover:border-[#0c8f72] rounded-[11px] p-[9px_12px_9px_14px] flex items-center justify-between transition-all group text-left cursor-pointer shadow-[0_6px_16px_-12px_rgba(11,46,79,0.4)] max-w-[440px] mx-auto mt-4"
+                    >
+                      <div>
+                        <div className="font-sans font-[700] text-[12px] leading-[16px] text-[#062c55] mb-0.5">
+                          Official government source
+                        </div>
+                        <div className="font-sans font-[600] text-[12px] leading-[16px] text-[#5a6b78] group-hover:text-[#0c8f72] transition-colors">
+                          {src[0]} · {host} ·{" "}
+                          <i className="italic">last reviewed Oct 2026</i>
+                        </div>
+                      </div>
+                      <span className="text-[#0c8f72] font-[800] text-[15px] group-hover:translate-x-1 transition-transform ml-3">
+                        →
+                      </span>
+                    </a>
+                  </div>
+                  {/* ── END VERDICT CARD ── */}
 
                 {/* Free Check Done Pill + Email Link */}
                 <div className="text-center my-6">
@@ -3364,7 +3663,7 @@ export default function USFlow() {
                   you always choose who to talk to.
                 </p>
               </div>
-            )}
+            )})()}
           </div>
 
           {/* ── RIGHT: DESKTOP SIDEBAR ── */}
@@ -3578,73 +3877,73 @@ export default function USFlow() {
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">State</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {state.usState || "Washington"}
+                      {state.usState || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">Age 40 or older?</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {Number(state.age) >= 40 ? "Yes" : "No"}
+                      {state.age ? (Number(state.age) >= 40 ? "Yes" : "No") : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">How it ended</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {{ layoff: "Laid off", closure: "Site closure", mass: "Mass layoff", cause: "For cause" }[state.ended] || "Laid off"}
+                      {{ layoff: "Laid off", closure: "Site closure", mass: "Mass layoff", cause: "For cause" }[state.ended] || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">Group layoff?</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {state.groupLayoff === "yes" || state.ended === "closure" || state.ended === "mass" || state.others === "50" ? "Yes" : "No"}
+                      {state.ended === "closure" || state.ended === "mass" || state.others === "50" ? "Yes" : "No"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">Employer size</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {{ big: "100+", small: "Under 100", unsure: "Unknown" }[state.empsize] || "100+"}
+                      {{ big: "100+", small: "Under 100", unsure: "Unknown" }[state.empsize] || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">Advance notice</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {{ none: "None", wk: "1–2 wks", mid: "3–8 wks", full: "60+ days" }[state.notice] || "None"}
+                      {{ none: "None", wk: "1–2 wks", mid: "3–8 wks", full: "60+ days" }[state.notice] || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">Release requested?</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {{ yes: "Yes", no: "No", unsure: "Unclear" }[state.release] || "No"}
+                      {{ yes: "Yes", no: "No", unsure: "Unclear" }[state.release] || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">Severance promised in writing?</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {{ yes: "Yes", no: "No", unsure: "Unclear" }[state.promise] || "Unclear"}
+                      {{ yes: "Yes", no: "No", unsure: "Unclear" }[state.promise] || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">Review period</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {{ short: "<21 days", mid: "21–44", full: "45+", unsure: "Unclear" }[state.deadline] || "<21 days"}
+                      {{ short: "<21 days", mid: "21–44", full: "45+", unsure: "Unclear" }[state.deadline] || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">7-day revocation</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {{ yes: "Yes", no: "Not mentioned", unsure: "Unclear" }[state.revoke] || "Not mentioned"}
+                      {{ yes: "Yes", no: "Not mentioned", unsure: "Unclear" }[state.revoke] || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b border-dashed border-[#c7e6d6]">
                     <span className="font-sans font-normal text-[#5a6b78]">Already signed?</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {state.signed === "yes" ? "Yes" : "Not yet"}
+                      {state.signed === "yes" ? "Yes" : state.signed === "no" ? "Not yet" : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-3 py-[5px] border-b-0">
                     <span className="font-sans font-normal text-[#5a6b78]">Flags</span>
                     <span className="font-sans font-[600] text-[#062c55] text-right">
-                      {{ none: "None noted", discrim: "Possible discrimination/retaliation", unpaid: "Unpaid wages/bonus" }[state.redflag] || "Possible discrimination/retaliation"}
+                      {{ none: "None noted", discrim: "Possible discrimination/retaliation", unpaid: "Unpaid wages/bonus" }[state.redflag] || "None noted"}
                     </span>
                   </div>
                 </div>

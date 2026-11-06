@@ -11,7 +11,9 @@ import { validateShape } from '../../src/fairexit/reportOutput'
 import { parseDate, parseMoney, parseDays } from '../../src/fairexit/values'
 import { systemPromptCallA, promptSha256 } from '../../src/fairexit/prompts'
 
-const ORIGINAL = path.resolve(__dirname, '../../../FairExit-Phase1-Code-2026-10-25/resource-hub-v2/severance-rules.js')
+const ORIGINAL = fs.existsSync(path.resolve(__dirname, '../../../codebase/resource-hub-v2/severance-rules.js'))
+  ? path.resolve(__dirname, '../../../codebase/resource-hub-v2/severance-rules.js')
+  : path.resolve(__dirname, '../../../FairExit-Phase1-Code-2026-10-25/resource-hub-v2/severance-rules.js')
 
 describe('rules engine port', () => {
   it.skipIf(!fs.existsSync(ORIGINAL))('matches the client severance-rules.js exactly', () => {

@@ -28,6 +28,7 @@ export const caseController = {
   // ---------------------------------------------------------------- free check
   create: async (req: Request, res: Response) => {
     const { country, answers, platform, industry } = req.body
+    logger.info('[FREE_CHECK][COMPLETED] Free questions finished. All user answers for free report:', { country, answers, platform, industry })
     const { row, token } = await caseService.create({ country, answers, platform: (req.headers['x-platform'] as Platform) || platform, industry, userId: req.user?.id || null })
     return ApiResponse.created(res, { caseId: row.id, caseToken: token, case: caseService.view(row, []) }, 'Free check saved. Keep caseToken: it is the only way to reopen this case without an account.')
   },
