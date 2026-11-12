@@ -11,7 +11,7 @@ export interface ChangeJurisdictionModalProps {
   currentRegion?: string;
   suggestedCountry?: "CA" | "US" | null;
   suggestedRegion?: string | null;
-  onSuccess?: () => void;
+  onSuccess?: (result?: { case?: any; page?: any }, region?: string) => void;
 }
 
 const CA_PROVINCES = [
@@ -100,11 +100,11 @@ export default function ChangeJurisdictionModal({
     setErrorMessage("");
 
     try {
-      await fairexit.changeJurisdiction(caseId, country, region);
+      const res = await fairexit.changeJurisdiction(caseId, country, region);
       if (onSuccess) {
-        onSuccess();
+        onSuccess(res, region);
       } else {
-        window.location.reload();
+        onClose();
       }
     } catch (err: any) {
       console.error("Failed to update jurisdiction:", err);

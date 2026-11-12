@@ -178,6 +178,18 @@ export const reviewService = {
       const targetKey = normalizeReviewKey(input.key, c.country)
       const action = input.action || 'change'
 
+      // When state or province is changed via review key, trigger changeJurisdiction to ensure
+      // recalculation of jurisdiction, location mismatch and invalidation of stale report outputs
+      if ((targetKey === 'state' || targetKey === 'province') && action === 'change' && typeof input.value === 'string' && input.value.trim()) {
+        try {
+          const newCountry = targetKey === 'province' ? 'CA' : 'US';
+          const jResult = await flowService.changeJurisdiction(c, newCountry, input.value.trim());
+          return { success: true, case: jResult.case, page: jResult.page, checkState: (jResult.case as any)?.checkState || (jResult.page as any) };
+        } catch (jErr: any) {
+          logger.warn('Could not change jurisdiction via review key', { targetKey, value: input.value, error: jErr?.message });
+        }
+      }
+
       try {
         rowResult = await flowService.rowAction(c, targetKey, {
           action,

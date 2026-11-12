@@ -99,34 +99,103 @@ describe('Group 2 Frontend Regression Tests', () => {
   })
 
   // ═════════════════════════════════════════════════════════════════════════
-  // 2. PROGRESS COUNTER CALCULATION
+  // 2. PROGRESS COUNTER CALCULATION (1-TO-1 TASK MAPPING)
   // ═════════════════════════════════════════════════════════════════════════
-  describe('2. Progress Counter Logic', () => {
-    it('Canada review page excludes optional and hasOnlyChange items from required count', () => {
-      expect(caContent).toContain('const requiredItems = items.filter((i) => !i.isOptional && !i.hasOnlyChange);')
+  describe('2. Progress Counter Logic (1-to-1 Task Mapping)', () => {
+    it('Canada review page maps required items 1-to-1 without double-counting conflicts or missing tasks', () => {
+      expect(caContent).toContain('const totalCount = requiredItems.length + (isBonusRequired ? 1 : 0);')
+      expect(caContent).toContain('requiredItems.filter(isItemConfirmed).length')
+      expect(caContent).not.toContain('requiredItems.length + activeConflictsCount')
     })
 
-    it('Canada review page calculates totalCount from requiredItems, activeConflicts, and activeMissingCount', () => {
-      expect(caContent).toContain('const totalCount = requiredItems.length + activeConflictsCount + activeMissingCount;')
+    it('US review page maps required items 1-to-1 without inflating total when conflicts or missing questions exist', () => {
+      expect(usContent).toContain('const totalCount = requiredItems.length;')
+      expect(usContent).toContain('requiredItems.filter(isItemConfirmed).length')
+      expect(usContent).not.toContain('requiredItems.length + activeConflictsCount')
     })
 
-    it('Canada review page confirmedCount only includes active confirmations without pre-counting', () => {
-      expect(caContent).toContain('hasOfferConflict && offerConflictChoice !== null ? 1 : 0')
-      expect(caContent).toContain('hasContractConflict && contractConflictChoice !== null ? 1 : 0')
-      expect(caContent).not.toContain('!hasOfferConflict || offerConflictChoice !== null ? 1 : 0')
+    it('US review page accurately maps 19 cards to 19 total tasks (never 20)', () => {
+      // 19 US review cards matching USReviewPage items
+      const items = [
+        // Section 3: About you (6)
+        { id: 'state', confirmed: false },
+        { id: 'employee_name', confirmed: false },
+        { id: 'employer_name', confirmed: false },
+        { id: 'age', confirmed: false },
+        { id: 'years', confirmed: false },
+        { id: 'salary', confirmed: false },
+        // Section 4: Your agreement (12)
+        { id: 'offerMoney', confirmed: false },
+        { id: 'pay_rate', confirmed: false },
+        { id: 'document_place', confirmed: false },
+        { id: 'contractStartDate', confirmed: false },
+        { id: 'contractJobTitle', confirmed: false },
+        { id: 'signRelease', confirmed: false },
+        { id: 'daysToDecide', confirmed: false },
+        { id: 'revocationPeriod', confirmed: false },
+        { id: 'seeAttorney', confirmed: false },
+        { id: 'agesTitlesList', confirmed: false },
+        { id: 'nonCompete', confirmed: false },
+        { id: 'lastDayAgreement', confirmed: false },
+        // Section 5: The layoff (1)
+        { id: 'advanceNotice', confirmed: false },
+      ]
+
+      let hasNoticeConflict = true
+      let noticeConflictChoice: string | null = null
+      let hasMissingLastDay = true
+      let lastDayWorkSaved = false
+
+      const isItemConfirmed = (item: any) => {
+        if (item.id === 'advanceNotice' && hasNoticeConflict) {
+          return noticeConflictChoice !== null || item.confirmed === true
+        }
+        if (item.id === 'lastDayAgreement' && hasMissingLastDay) {
+          return lastDayWorkSaved || item.confirmed === true
+        }
+        return item.confirmed === true
+      }
+
+      function calcUS() {
+        const requiredItems = items.filter((i: any) => !i.isOptional)
+        const totalCount = requiredItems.length
+        const confirmedCount = Math.min(totalCount, requiredItems.filter(isItemConfirmed).length)
+        const remainingCount = Math.max(0, totalCount - confirmedCount)
+        const isAllConfirmed = remainingCount === 0
+        return { totalCount, confirmedCount, remainingCount, isAllConfirmed }
+      }
+
+      // Initial: 19 cards total, 0 confirmed
+      const init = calcUS()
+      expect(init.totalCount).toBe(19)
+      expect(init.confirmedCount).toBe(0)
+      expect(init.remainingCount).toBe(19)
+      expect(init.isAllConfirmed).toBe(false)
+
+      // Resolving notice conflict marks advanceNotice confirmed -> 1 of 19 (total remains 19)
+      noticeConflictChoice = 'agreement'
+      const step1 = calcUS()
+      expect(step1.totalCount).toBe(19)
+      expect(step1.confirmedCount).toBe(1)
+      expect(step1.remainingCount).toBe(18)
+
+      // Saving missing last day question marks lastDayAgreement confirmed -> 2 of 19 (total remains 19)
+      lastDayWorkSaved = true
+      const step2 = calcUS()
+      expect(step2.totalCount).toBe(19)
+      expect(step2.confirmedCount).toBe(2)
+      expect(step2.remainingCount).toBe(17)
+
+      // Confirm all remaining cards -> exactly 19 of 19 confirmed, never 20
+      for (const itm of items) itm.confirmed = true
+      const finalStep = calcUS()
+      expect(finalStep.totalCount).toBe(19)
+      expect(finalStep.confirmedCount).toBe(19)
+      expect(finalStep.remainingCount).toBe(0)
+      expect(finalStep.isAllConfirmed).toBe(true)
     })
 
-    it('US review page calculates totalCount from requiredItems, activeConflicts, and activeMissingCount', () => {
-      expect(usContent).toContain('const totalCount = requiredItems.length + activeConflictsCount + activeMissingCount;')
-    })
-
-    it('US review page confirmedCount only includes active confirmations without pre-counting', () => {
-      expect(usContent).toContain('hasOfferConflict && offerConflictChoice !== null ? 1 : 0')
-      expect(usContent).toContain('hasNoticeConflict && noticeConflictChoice !== null ? 1 : 0')
-      expect(usContent).toContain('hasServiceConflict && serviceConflictChoice !== null ? 1 : 0')
-    })
-
-    it('Simulated Canada progress counter behaves consistently from 0 to complete', () => {
+    it('Simulated Canada progress counter maps each item 1-to-1 from 0 to complete without double-counting', () => {
       const items = [
         // 8 about you (all required)
         { id: 'province', confirmed: false },
@@ -137,14 +206,14 @@ describe('Group 2 Frontend Regression Tests', () => {
         { id: 'salary', confirmed: false },
         { id: 'role', confirmed: false },
         { id: 'howEnded', confirmed: false },
-        // 10 offer (9 required, 1 hasOnlyChange)
+        // 10 offer (all required)
         { id: 'offerMoney', confirmed: false },
         { id: 'pay_rate', confirmed: false },
         { id: 'document_place', confirmed: false },
         { id: 'offerNotice', confirmed: false },
         { id: 'offerVacation', confirmed: false },
         { id: 'offerLastDay', confirmed: false },
-        { id: 'offerNoticeWorked', hasOnlyChange: true, confirmed: false },
+        { id: 'offerNoticeWorked', confirmed: false },
         { id: 'offerDecideBy', confirmed: false },
         { id: 'offerRelease', confirmed: false },
         { id: 'offerBenefitsEnd', confirmed: false },
@@ -154,79 +223,126 @@ describe('Group 2 Frontend Regression Tests', () => {
         { id: 'contractJobTitle', isOptional: true, confirmed: false },
       ]
 
-      const hasOfferConflict = true
+      let hasOfferConflict = true
       let offerConflictChoice: string | null = null
-      const hasContractConflict = false
+      let hasContractConflict = false
       let contractConflictChoice: string | null = null
       let workingWeeksSaved = false
-      const hasBonusQuestion = false
+      let hasBonusQuestion = true
       let bonusSaved = false
 
-      function calc() {
-        const required = items.filter((i) => !i.isOptional && !i.hasOnlyChange)
-        const confirmedItems = required.filter((i) => i.confirmed).length
-        const activeConflicts = (hasOfferConflict ? 1 : 0) + (hasContractConflict ? 1 : 0)
-        const confirmedConflicts =
-          (hasOfferConflict && offerConflictChoice !== null ? 1 : 0) +
-          (hasContractConflict && contractConflictChoice !== null ? 1 : 0)
-        const activeMissing = 1 + (hasBonusQuestion ? 1 : 0)
-        const confirmedMissing =
-          (workingWeeksSaved ? 1 : 0) + (hasBonusQuestion && bonusSaved ? 1 : 0)
-
-        const total = required.length + activeConflicts + activeMissing
-        const confirmed = Math.min(total, confirmedItems + confirmedConflicts + confirmedMissing)
-        const remaining = Math.max(0, total - confirmed)
-        return { total, confirmed, remaining }
+      const isItemConfirmed = (item: any) => {
+        if (item.id === 'offerNoticeWorked') {
+          return workingWeeksSaved || item.confirmed === true
+        }
+        if (item.id === 'offerMoney' && hasOfferConflict) {
+          return offerConflictChoice !== null || item.confirmed === true
+        }
+        if (item.id === 'contractLimit' && hasContractConflict) {
+          return contractConflictChoice !== null || item.confirmed === true
+        }
+        return item.confirmed === true
       }
 
-      // Initial state: 19 required items + 1 active conflict + 1 missing question = 21 tasks
-      const init = calc()
-      expect(init.total).toBe(21)
-      expect(init.confirmed).toBe(0)
-      expect(init.remaining).toBe(21)
+      function calcCA() {
+        const requiredItems = items.filter((i: any) => !i.isOptional)
+        const isBonusRequired = Boolean(hasBonusQuestion)
+        const isBonusConfirmed = isBonusRequired && Boolean(bonusSaved)
+        const totalCount = requiredItems.length + (isBonusRequired ? 1 : 0)
+        const confirmedCount = Math.min(
+          totalCount,
+          requiredItems.filter(isItemConfirmed).length + (isBonusConfirmed ? 1 : 0)
+        )
+        const remainingCount = Math.max(0, totalCount - confirmedCount)
+        const isAllConfirmed = remainingCount === 0
+        return { totalCount, confirmedCount, remainingCount, isAllConfirmed }
+      }
+
+      // Initial state: 20 required items (21 - 1 optional) + 1 bonus question = 21 tasks
+      const init = calcCA()
+      expect(init.totalCount).toBe(21)
+      expect(init.confirmedCount).toBe(0)
+      expect(init.remainingCount).toBe(21)
 
       // Confirm 1 review item
       items[0].confirmed = true
-      const step1 = calc()
-      expect(step1.confirmed).toBe(1)
-      expect(step1.remaining).toBe(20)
+      const step1 = calcCA()
+      expect(step1.confirmedCount).toBe(1)
+      expect(step1.remainingCount).toBe(20)
 
-      // Resolve conflict
+      // Resolve conflict (marks offerMoney confirmed, does not add extra task)
       offerConflictChoice = 'letter'
-      const step2 = calc()
-      expect(step2.confirmed).toBe(2)
-      expect(step2.remaining).toBe(19)
+      const step2 = calcCA()
+      expect(step2.confirmedCount).toBe(2)
+      expect(step2.remainingCount).toBe(19)
 
-      // Save missing question
+      // Save working notice (marks offerNoticeWorked confirmed)
       workingWeeksSaved = true
-      const step3 = calc()
-      expect(step3.confirmed).toBe(3)
-      expect(step3.remaining).toBe(18)
+      const step3 = calcCA()
+      expect(step3.confirmedCount).toBe(3)
+      expect(step3.remainingCount).toBe(18)
 
-      // Confirm all remaining
+      // Save bonus question
+      bonusSaved = true
+      const step4 = calcCA()
+      expect(step4.confirmedCount).toBe(4)
+      expect(step4.remainingCount).toBe(17)
+
+      // Confirm all remaining -> exactly 21 of 21 confirmed
       for (const itm of items) itm.confirmed = true
-      const finalStep = calc()
-      expect(finalStep.confirmed).toBe(21)
-      expect(finalStep.remaining).toBe(0)
+      const finalStep = calcCA()
+      expect(finalStep.confirmedCount).toBe(21)
+      expect(finalStep.remainingCount).toBe(0)
+      expect(finalStep.isAllConfirmed).toBe(true)
     })
   })
 
   // ═════════════════════════════════════════════════════════════════════════
-  // 3. CHANGE REGION MODAL MOUNTING & BEHAVIOUR
+  // 3. CHANGE REGION & IN-PLACE STATE UPDATE (NO RELOAD / NO LOADER)
   // ═════════════════════════════════════════════════════════════════════════
-  describe('3. Change Region Modal Integration', () => {
-    it('CanadaReviewPage renders ChangeJurisdictionModal with showChangeRegionModal', () => {
+  describe('3. Change Region Modal & In-Place State Update', () => {
+    it('Neither CanadaReviewPage nor USReviewPage calls window.location.reload()', () => {
+      expect(caContent).not.toContain('window.location.reload()')
+      expect(usContent).not.toContain('window.location.reload()')
+    })
+
+    it('Both review pages implement handleJurisdictionChanged for in-place state updating', () => {
+      expect(caContent).toContain('handleJurisdictionChanged')
+      expect(usContent).toContain('handleJurisdictionChanged')
+    })
+
+    it('Changing region resets declaredCorrect to false (requiring re-attestation before build)', () => {
+      expect(caContent).toContain('setDeclaredCorrect(false)')
+      expect(usContent).toContain('setDeclaredCorrect(false)')
+    })
+
+    it('Saving State/Province inline triggers fairexit.changeJurisdiction', () => {
+      expect(usContent).toContain("if (id === 'state')")
+      expect(usContent).toContain("fairexit.changeJurisdiction(activeCaseId, 'US', formattedVal)")
+      expect(caContent).toContain("if (id === 'province')")
+      expect(caContent).toContain("fairexit.changeJurisdiction(activeCaseId, 'CA', formattedVal)")
+    })
+
+    it('CanadaReviewPage renders ChangeJurisdictionModal with in-place onSuccess handler', () => {
       expect(caContent).toContain('<ChangeJurisdictionModal')
       expect(caContent).toContain('isOpen={showChangeRegionModal}')
       expect(caContent).toContain('currentCountry="CA"')
       expect(caContent).toContain('onClose={() => setShowChangeRegionModal(false)}')
+      expect(caContent).toContain('handleJurisdictionChanged')
     })
 
-    it('USReviewPage renders ChangeJurisdictionModal with showChangeRegionModal', () => {
+    it('USReviewPage renders ChangeJurisdictionModal with in-place onSuccess handler', () => {
       expect(usContent).toContain('<ChangeJurisdictionModal')
       expect(usContent).toContain('isOpen={showChangeRegionModal}')
       expect(usContent).toContain('currentCountry="US"')
       expect(usContent).toContain('onClose={() => setShowChangeRegionModal(false)}')
+      expect(usContent).toContain('handleJurisdictionChanged')
+    })
+
+    it('ChangeJurisdictionModal passes API response and region to onSuccess without page reload', () => {
+      expect(modalContent).toContain('const res = await fairexit.changeJurisdiction(caseId, country, region);')
+      expect(modalContent).toContain('onSuccess(res, region);')
+      expect(modalContent).not.toContain('window.location.reload();')
     })
 
     it('ChangeJurisdictionModal matches substring regions (e.g. "Ontario, Canada" -> "Ontario")', () => {
@@ -239,10 +355,6 @@ describe('Group 2 Frontend Regression Tests', () => {
       expect(modalContent).toContain('React.useEffect(() => {')
       expect(modalContent).toContain('if (isOpen) {')
       expect(modalContent).toContain('setRegion(')
-    })
-
-    it('ChangeJurisdictionModal invokes fairexit.changeJurisdiction on Save', () => {
-      expect(modalContent).toContain('await fairexit.changeJurisdiction(caseId, country, region)')
     })
 
     it('ChangeJurisdictionModal displays error on failure and does not falsely report success', () => {

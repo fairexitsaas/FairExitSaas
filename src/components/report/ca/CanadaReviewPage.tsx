@@ -725,30 +725,32 @@ export default function CanadaReviewPage({
   // Track changes made by user
   const changedItemsCount = items.filter((i) => i.userChanged).length;
 
-  const requiredItems = items.filter((i) => !i.isOptional && !i.hasOnlyChange);
-  const confirmedItemsCount = requiredItems.filter((i) => {
-    if (i.userChanged) {
-      return i.userChangeAck === true;
+  // Confirmation counting: 1-to-1 mapping with actual confirmation tasks
+  const requiredItems = items.filter((i) => !i.isOptional);
+
+  const isItemConfirmed = (item: ReviewItem) => {
+    if (item.id === "offerNoticeWorked") {
+      return workingWeeksSaved || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
     }
-    return i.confirmed === true;
-  }).length;
+    if (item.id === "offerMoney" && hasOfferConflict) {
+      return offerConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    }
+    if (item.id === "contractLimit" && hasContractConflict) {
+      return contractConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    }
+    if (item.userChanged) {
+      return item.userChangeAck === true;
+    }
+    return item.confirmed === true;
+  };
 
-  // Conflicts and missing numbers confirmations
-  const activeConflictsCount = (hasOfferConflict ? 1 : 0) + (hasContractConflict ? 1 : 0);
-  const confirmedConflictsCount =
-    (hasOfferConflict && offerConflictChoice !== null ? 1 : 0) +
-    (hasContractConflict && contractConflictChoice !== null ? 1 : 0);
+  const isBonusRequired = Boolean(hasBonusQuestion);
+  const isBonusConfirmed = isBonusRequired && Boolean(bonusSaved);
 
-  const activeMissingCount = 1 + (hasBonusQuestion ? 1 : 0);
-  const confirmedMissingCount =
-    (workingWeeksSaved ? 1 : 0) +
-    (hasBonusQuestion && bonusSaved ? 1 : 0);
-
-  const totalCount = requiredItems.length + activeConflictsCount + activeMissingCount;
-
+  const totalCount = requiredItems.length + (isBonusRequired ? 1 : 0);
   const confirmedCount = Math.min(
     totalCount,
-    confirmedItemsCount + confirmedConflictsCount + confirmedMissingCount
+    requiredItems.filter(isItemConfirmed).length + (isBonusConfirmed ? 1 : 0)
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
   const isAllConfirmed = remainingCount === 0;
@@ -951,9 +953,68 @@ export default function CanadaReviewPage({
       );
       const activeCaseId = caseId || cs?.id;
       if (activeCaseId) {
-        const keyMap = CA_KEY_MAP;
-        fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
+        if (id === 'province') {
+          fairexit.changeJurisdiction(activeCaseId, 'CA', formattedVal).then((res) => {
+            handleJurisdictionChanged(formattedVal, res);
+          }).catch((err) => {
+            console.error('Failed to update jurisdiction via province card inline edit:', err);
+          });
+        } else {
+          const keyMap = CA_KEY_MAP;
+          fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
+        }
       }
+    }
+  };
+
+  const handleJurisdictionChanged = (newRegion?: string, apiResult?: { case?: any; page?: any }) => {
+    setShowChangeRegionModal(false);
+    if (!newRegion) return;
+
+    // 1. In-place update of province review item (preserving all other review items)
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === 'province'
+          ? {
+              ...i,
+              value: newRegion,
+              originalDocumentValue: newRegion,
+              confirmed: true,
+              userChanged: false,
+              showSecondLook: false,
+              userChangeAck: false,
+            }
+          : i
+      )
+    );
+
+    // 2. Update location mismatch banner in-place
+    if (apiResult?.case?.checkState?.locationMismatch || apiResult?.page?.locationMismatch) {
+      setLocationMismatch(apiResult.case?.checkState?.locationMismatch || apiResult.page?.locationMismatch);
+    } else {
+      setLocationMismatch((prev: any) => {
+        if (!prev) return null;
+        const docPlace = prev.documentPlace || prev.docPlace || prev.documentRegion || '';
+        const docLower = docPlace.toLowerCase();
+        const newLower = newRegion.toLowerCase();
+        if (docLower.includes(newLower) || newLower.includes(docLower)) {
+          return { ...prev, detected: false };
+        }
+        return prev;
+      });
+    }
+
+    // 3. User must re-attest after changing province (statutory rules/calculations updated)
+    setDeclaredCorrect(false);
+
+    // 4. Background refresh review data without restarting document reading
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.getReviewData(activeCaseId).then((rev) => {
+        if (rev && (rev as any).locationMismatch) {
+          setLocationMismatch((rev as any).locationMismatch);
+        }
+      }).catch(() => {});
     }
   };
 
@@ -1885,12 +1946,11 @@ export default function CanadaReviewPage({
         onClose={() => setShowChangeRegionModal(false)}
         caseId={caseId || (cs?.id as string) || ""}
         currentCountry="CA"
-        currentRegion={answers.provinceName || data.provinceName || (cs?.jurisdiction as any)?.name || data.province || "Ontario"}
+        currentRegion={items.find(i => i.id === 'province')?.value || answers.provinceName || data.provinceName || (cs?.jurisdiction as any)?.name || data.province || "Ontario"}
         suggestedCountry={locationMismatch?.documentCountry || (locationMismatch?.docPlace?.includes("CA") || locationMismatch?.documentPlace?.includes("Canada") ? "CA" : locationMismatch?.docPlace?.includes("US") || locationMismatch?.documentPlace?.includes("United States") ? "US" : null)}
         suggestedRegion={locationMismatch?.documentRegion || locationMismatch?.docPlace || locationMismatch?.documentPlace}
-        onSuccess={() => {
-          setShowChangeRegionModal(false);
-          window.location.reload();
+        onSuccess={(result, updatedRegion) => {
+          handleJurisdictionChanged(updatedRegion || locationMismatch?.documentRegion || locationMismatch?.docPlace || locationMismatch?.documentPlace || undefined, result);
         }}
       />
     </div>

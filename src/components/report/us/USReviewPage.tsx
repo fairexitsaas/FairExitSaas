@@ -707,36 +707,35 @@ export default function USReviewPage({
     }).catch((e) => console.warn('Could not load US review data:', e));
   }, [caseId, cs, intakeOfferNum]);
 
-  // Confirmation counting
+  // Confirmation counting: 1-to-1 mapping with actual confirmation tasks
   const hasMissingLastDay = !items.find((i) => i.id === "lastDayAgreement")?.originalDocumentValue ||
     items.find((i) => i.id === "lastDayAgreement")?.originalDocumentValue === "Not in your agreement";
 
-  const requiredItems = items.filter((i) => !i.isOptional && (!hasMissingLastDay || i.id !== "lastDayAgreement"));
-  const confirmedItemsCount = requiredItems.filter((i) => {
-    if (i.userChanged) {
-      return i.userChangeAck === true;
+  const requiredItems = items.filter((i) => !i.isOptional);
+
+  const isItemConfirmed = (item: USReviewItem) => {
+    if (item.id === "advanceNotice" && hasNoticeConflict) {
+      return noticeConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
     }
-    return i.confirmed === true;
-  }).length;
+    if (item.id === "lastDayAgreement" && hasMissingLastDay) {
+      return lastDayWorkSaved || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    }
+    if (item.id === "offerMoney" && hasOfferConflict) {
+      return offerConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    }
+    if (item.id === "years" && hasServiceConflict) {
+      return serviceConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    }
+    if (item.userChanged) {
+      return item.userChangeAck === true;
+    }
+    return item.confirmed === true;
+  };
 
-  const activeConflictsCount =
-    (hasOfferConflict ? 1 : 0) +
-    (hasNoticeConflict ? 1 : 0) +
-    (hasServiceConflict ? 1 : 0);
-
-  const confirmedConflictsCount =
-    (hasOfferConflict && offerConflictChoice !== null ? 1 : 0) +
-    (hasNoticeConflict && noticeConflictChoice !== null ? 1 : 0) +
-    (hasServiceConflict && serviceConflictChoice !== null ? 1 : 0);
-
-  const activeMissingCount = hasMissingLastDay ? 1 : 0;
-  const confirmedMissingCount = hasMissingLastDay && lastDayWorkSaved ? 1 : 0;
-
-  const totalCount = requiredItems.length + activeConflictsCount + activeMissingCount;
-
+  const totalCount = requiredItems.length;
   const confirmedCount = Math.min(
     totalCount,
-    confirmedItemsCount + confirmedConflictsCount + confirmedMissingCount
+    requiredItems.filter(isItemConfirmed).length
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
   const isAllConfirmed = remainingCount === 0;
@@ -978,9 +977,68 @@ export default function USReviewPage({
       );
       const activeCaseId = caseId || cs?.id;
       if (activeCaseId) {
-        const keyMap = US_KEY_MAP;
-        fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
+        if (id === 'state') {
+          fairexit.changeJurisdiction(activeCaseId, 'US', formattedVal).then((res) => {
+            handleJurisdictionChanged(formattedVal, res);
+          }).catch((err) => {
+            console.error('Failed to update jurisdiction via state card inline edit:', err);
+          });
+        } else {
+          const keyMap = US_KEY_MAP;
+          fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
+        }
       }
+    }
+  };
+
+  const handleJurisdictionChanged = (newRegion?: string, apiResult?: { case?: any; page?: any }) => {
+    setShowChangeRegionModal(false);
+    if (!newRegion) return;
+
+    // 1. In-place update of state review item (preserving all other review items)
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === 'state'
+          ? {
+              ...i,
+              value: newRegion,
+              originalDocumentValue: newRegion,
+              confirmed: true,
+              userChanged: false,
+              showSecondLook: false,
+              userChangeAck: false,
+            }
+          : i
+      )
+    );
+
+    // 2. Update location mismatch banner in-place
+    if (apiResult?.case?.checkState?.locationMismatch || apiResult?.page?.locationMismatch) {
+      setLocationMismatch(apiResult.case?.checkState?.locationMismatch || apiResult.page?.locationMismatch);
+    } else {
+      setLocationMismatch((prev: any) => {
+        if (!prev) return null;
+        const docPlace = prev.documentPlace || prev.docPlace || prev.documentRegion || '';
+        const docLower = docPlace.toLowerCase();
+        const newLower = newRegion.toLowerCase();
+        if (docLower.includes(newLower) || newLower.includes(docLower)) {
+          return { ...prev, detected: false };
+        }
+        return prev;
+      });
+    }
+
+    // 3. User must re-attest after changing state (statutory rules/calculations updated)
+    setDeclaredCorrect(false);
+
+    // 4. Background refresh review data without restarting document reading
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.getReviewData(activeCaseId).then((rev) => {
+        if (rev && (rev as any).locationMismatch) {
+          setLocationMismatch((rev as any).locationMismatch);
+        }
+      }).catch(() => {});
     }
   };
 
@@ -1702,12 +1760,11 @@ export default function USReviewPage({
         onClose={() => setShowChangeRegionModal(false)}
         caseId={caseId || (cs?.id as string) || ""}
         currentCountry="US"
-        currentRegion={answers.state || data.state || (cs?.jurisdiction as any)?.name || "California"}
+        currentRegion={items.find(i => i.id === 'state')?.value || answers.state || data.state || (cs?.jurisdiction as any)?.name || "California"}
         suggestedCountry={locationMismatch?.documentCountry || (locationMismatch?.docPlace?.includes("CA") || locationMismatch?.documentPlace?.includes("Canada") ? "CA" : locationMismatch?.docPlace?.includes("US") || locationMismatch?.documentPlace?.includes("United States") ? "US" : null)}
         suggestedRegion={locationMismatch?.documentRegion || locationMismatch?.docPlace || locationMismatch?.documentPlace}
-        onSuccess={() => {
-          setShowChangeRegionModal(false);
-          window.location.reload();
+        onSuccess={(result, updatedRegion) => {
+          handleJurisdictionChanged(updatedRegion || locationMismatch?.documentRegion || locationMismatch?.docPlace || locationMismatch?.documentPlace || undefined, result);
         }}
       />
     </div>
@@ -1778,9 +1835,6 @@ function USItemCard({
               onClick={onToggleConfirm}
               className="min-h-[34px] max-w-full px-3.5 py-1.5 rounded-[6px] font-sans font-bold text-[13px] flex items-center gap-1.5 transition cursor-pointer bg-[#0EB28D] text-white shadow-xs"
             >
-              <span className="bg-[#FFE4E6] text-[#E11D48] px-1.5 py-0.5 rounded-[4px] text-[10px] font-extrabold tracking-wider shrink-0">
-                C-52
-              </span>
               <span className="truncate max-w-[180px] sm:max-w-[280px]" title={rawVal}>{rawVal || "Missing"}</span>
             </div>
           ) : (
