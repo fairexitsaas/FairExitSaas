@@ -690,6 +690,7 @@ export const flowService = {
       generatedAt: c.report_ready_at || new Date().toISOString(),
       numbers: reportNumbers((c.report_inputs as any)?.input),
       answers: (c.answers || {}) as Record<string, any>,
+      input: (c.report_inputs as any)?.input,
     }
   },
 

@@ -1031,28 +1031,65 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   } else if (isUS) {
     const rc = r.release_check || []
     const rcText = rc.map((x) => `${x.point} ${x.detail}`).join(' ')
-    // "Your key number": the federal review period (40+), else the deadline to decide, else the offer.
-    const ageNum = Number(a.age)
-    const over40 = Number.isFinite(ageNum) ? ageNum >= 40 : /\b(45|21) days\b/i.test(rcText)
-    const deadlineShort = dyn.deadlineStr && dyn.deadlineStr.length <= 28 && !/^(no deadline written|not stated)$/i.test(dyn.deadlineStr) ? dyn.deadlineStr : null
-    const offerShort = dyn.offerStr && dyn.offerStr !== 'Not stated' && dyn.offerStr.length <= 20 ? dyn.offerStr : null
-    let keyDays: string | null = null
+    // "Your key number": the federal release consideration period (21 or 45 days under OWBPA rules).
+    // The severance/offer amount ($12,500 or any amount) must NEVER appear as the key number.
+    const rawAge = a.age ?? a.raw?.age ?? m.input?.answers?.age ?? m.input?.confirmed_facts?.rows?.age?.value
+    const ageNum = Number(rawAge)
+    const hasAge = Number.isFinite(ageNum)
+
+    // Check if group termination or exit incentive program applies
+    const isExplicitIndividual = a.others === 'me' || a.others_laid_off === 'me' || a.layoffType === 'individual' || a.layoff_type === 'individual'
+    const hasGroupFlag = a.mass === true || a.mass === 'yes' ||
+      a.closure === true || a.closure === 'yes' ||
+      a.group_layoff === true || a.group_layoff === 'yes' ||
+      a.groupLayoff === true || a.groupLayoff === 'yes' ||
+      a.others === '50' || a.others === 'few' ||
+      a.others_laid_off === '50' || a.others_laid_off === 'few' || a.others_laid_off === 'yes' ||
+      a.ended === 'mass' || a.ended === 'closure' ||
+      a.reason === 'mass' || a.reason === 'closure' ||
+      a.how_it_ended === 'mass' || a.how_it_ended === 'closure' ||
+      (typeof a.how_it_ended === 'string' && /\b(group|mass|closure|reduction in force|rif)\b/i.test(a.how_it_ended)) ||
+      a.layoffType === 'group' || a.layoff_type === 'group' ||
+      (a.raw && typeof a.raw === 'object' && (
+        a.raw.mass === true || a.raw.closure === true ||
+        a.raw.groupLayoff === 'yes' || a.raw.groupLayoff === true ||
+        a.raw.others === '50' || a.raw.others === 'few' ||
+        a.raw.ended === 'mass' || a.raw.ended === 'closure'
+      ))
+    const rcIndicatesGroup = /\b45 days\b/i.test(rcText) || /\b(group layoff|group termination|group reduction|exit incentive|decisional unit)\b/i.test(rcText)
+    const isGroupTermination = hasGroupFlag || rcIndicatesGroup || (!isExplicitIndividual && hasGroupFlag)
+
+    let keyDays: '21 days' | '45 days' | null = null
     let keyDesc = ''
-    const isGroupLayoff = a.mass === true || a.closure === true || a.group_layoff === true
-    if (over40 && /\b45 days\b/i.test(rcText) && isGroupLayoff) {
-      keyDays = '45 days'
-      keyDesc = 'The time federal rules give you to consider a release in a group layoff at your age. 7 more days to take it back after you sign.'
-    } else if (over40 && (/\b45 days\b/i.test(rcText) || /\b21 days\b/i.test(rcText))) {
-      keyDays = isGroupLayoff ? '45 days' : '21 or 45 days'
-      keyDesc = isGroupLayoff
-        ? 'The time federal rules give you to consider a release in a group layoff at your age. 7 more days to take it back after you sign.'
-        : 'The time federal rules give you to consider a release at your age (21 days for an individual termination, 45 days for a group layoff). 7 more days to take it back after you sign.'
-    } else if (deadlineShort) {
-      keyDays = deadlineShort
-      keyDesc = 'Your deadline to decide, from your letter. Asking for more time in writing is normal, and nothing is final until you sign.'
-    } else if (offerShort) {
-      keyDays = offerShort
-      keyDesc = "What your letter offers for signing the release. US law sets no minimum, so this comes from your employer's policy or agreement, not a legal floor."
+
+    if (hasAge) {
+      if (ageNum >= 40) {
+        if (isGroupTermination && (!isExplicitIndividual || rcIndicatesGroup)) {
+          keyDays = '45 days'
+          keyDesc = 'The time federal rules give you to consider a release in a group layoff at your age. 7 more days to take it back after you sign.'
+        } else {
+          keyDays = '21 days'
+          keyDesc = 'The time federal rules give you to consider a release at your age (21 days for an individual termination). 7 more days to take it back after you sign.'
+        }
+      } else {
+        // Under 40: OWBPA statutory periods do not generally apply unless specified in document/checks
+        if (rcIndicatesGroup || /\b45 days\b/i.test(rcText)) {
+          keyDays = '45 days'
+          keyDesc = 'The consideration period given to review a release in a group layoff. 7 more days to take it back after you sign.'
+        } else if (/\b21 days\b/i.test(rcText)) {
+          keyDays = '21 days'
+          keyDesc = 'The consideration period given to review a release for an individual termination. 7 more days to take it back after you sign.'
+        }
+      }
+    } else {
+      // Age not specified: check group status or release checks
+      if (isGroupTermination && (!isExplicitIndividual || rcIndicatesGroup)) {
+        keyDays = '45 days'
+        keyDesc = 'The time federal rules give you to consider a release in a group layoff at your age. 7 more days to take it back after you sign.'
+      } else {
+        keyDays = '21 days'
+        keyDesc = 'The time federal rules give you to consider a release at your age (21 days for an individual termination). 7 more days to take it back after you sign.'
+      }
     }
     const releaseHtml = `
       <div class="page release-page">
@@ -1764,7 +1801,8 @@ b, strong, .bold {
   background: #F5F4EF;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
+  height: 705.8pt;
+  max-height: 705.8pt;
   min-height: 0;
   box-sizing: border-box;
 }

@@ -1087,15 +1087,6 @@ export default function CanadaReviewPage({
             }`}
           />
 
-          {isAllConfirmed && (
-            <div className="absolute right-[8px] top-[4px] pointer-events-none flex items-center justify-center -z-0">
-              <div className="w-[30px] h-[30px] rounded-full border-[8px] border-[#0EB28D]/10 flex items-center justify-center">
-                <div className="w-[22px] h-[22px] rounded-full border-[4px] border-[#0EB28D]/20 flex items-center justify-center">
-                  <div className="w-[14px] h-[14px] rounded-full bg-[#0EB28D]" />
-                </div>
-              </div>
-            </div>
-          )}
 
           {[
             { label: "Eligible", done: true },
@@ -1106,9 +1097,10 @@ export default function CanadaReviewPage({
             { label: "Your results", active: true },
           ].map((st, i) => (
             <div key={i} className="relative z-10 flex flex-col items-center">
-              {st.active && isAllConfirmed ? (
-                <div className="w-[29.5px] h-[29.5px] rounded-full border-[4px] border-[#062C55]/10 flex items-center justify-center">
-                  <div className="w-[21.5px] h-[21.5px] rounded-full bg-[#062C55] text-white flex items-center justify-center text-[10px] font-extrabold">
+              {st.active ? (
+                <div className="relative flex items-center justify-center w-[18px] h-[18px]">
+                  <div className="absolute w-[28px] h-[28px] rounded-full border-[4px] border-[#062C55]/10 pointer-events-none" />
+                  <div className="w-[20px] h-[20px] rounded-full bg-[#062C55] text-white flex items-center justify-center text-[10px] font-extrabold z-10">
                     ★
                   </div>
                 </div>
@@ -1117,12 +1109,10 @@ export default function CanadaReviewPage({
                   className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-extrabold ${
                     st.done
                       ? "bg-[#0EB28D] text-white border border-[#0EB28D]"
-                      : st.active
-                      ? "bg-[#062C55] text-white border border-[#062C55]"
                       : "bg-white text-[#8A96A0] border border-[#D8D3C8]"
                   }`}
                 >
-                  {st.done ? "✓" : st.active ? "✦" : ""}
+                  {st.done ? "✓" : ""}
                 </div>
               )}
               <span
