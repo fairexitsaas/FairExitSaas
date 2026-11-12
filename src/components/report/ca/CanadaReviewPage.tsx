@@ -35,7 +35,7 @@ interface ReviewItem {
   showPlausibilityAlert?: boolean;
   isReReading?: boolean;
   showSecondLook?: boolean;
-  section?: "you" | "offer" | "contract";
+  section: "you" | "offer" | "contract";
 }
 
 const MONTHS_MAP: Record<string, string> = {
@@ -326,16 +326,38 @@ export default function CanadaReviewPage({
   // Review Items for Sections 3, 4, 5
   // ══════════════════════════════════════════════════════════
   const [items, setItems] = useState<ReviewItem[]>([
-    // Section 3: About you (6 items)
+    // Section 3: About you (8 items)
     {
       id: "province",
+      section: "you",
       label: "Province",
       value: answers.provinceName || data.provinceName || (cs?.jurisdiction as any)?.name || data.province || "Ontario",
       source: "From your answers",
       confirmed: false,
     },
     {
+      id: "employee_name",
+      section: "you",
+      label: "Your name",
+      value: answers.employee_name || answers.name || answers.full_name || data.employee_name || "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
+      confirmed: false,
+    },
+    {
+      id: "employer_name",
+      section: "you",
+      label: "Employer",
+      value: answers.employer_name || answers.employer || answers.company || data.employer_name || "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
+      confirmed: false,
+    },
+    {
       id: "age",
+      section: "you",
       label: "Age",
       value: answers.age !== undefined && answers.age !== null ? String(answers.age) : (data.age ? String(data.age) : ""),
       source: "From your answers",
@@ -343,6 +365,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "years",
+      section: "you",
       label: "Years on the job",
       value: answers.years !== undefined && answers.years !== null ? `${answers.years} years` : (data.years ? `${data.years} years` : ""),
       source: "From your answers",
@@ -350,6 +373,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "salary",
+      section: "you",
       label: "Pay per year",
       value: answers.salary ? `$${Number(answers.salary).toLocaleString()}` : (data.salary ? `$${Number(data.salary).toLocaleString()}` : ""),
       source: "From your answers",
@@ -357,6 +381,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "role",
+      section: "you",
       label: "Your role",
       value: answers.role || data.role || "",
       source: "From your answers",
@@ -364,15 +389,17 @@ export default function CanadaReviewPage({
     },
     {
       id: "howEnded",
+      section: "you",
       label: "How your job ended",
       value: answers.howEnded || data.howEnded || "",
       source: "From your answers",
       confirmed: false,
     },
 
-    // Section 4: Your offer (8 items)
+    // Section 4: Your offer (10 items)
     {
       id: "offerMoney",
+      section: "offer",
       label: "Money offered",
       value: intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "",
       originalDocumentValue: "",
@@ -381,7 +408,28 @@ export default function CanadaReviewPage({
       confirmed: false,
     },
     {
+      id: "pay_rate",
+      section: "offer",
+      label: "Pay rate",
+      value: "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
+      confirmed: false,
+    },
+    {
+      id: "document_place",
+      section: "offer",
+      label: "Place in documents",
+      value: "",
+      originalDocumentValue: "",
+      source: "Your letter",
+      citation: "",
+      confirmed: false,
+    },
+    {
       id: "offerNotice",
+      section: "offer",
       label: "Notice or pay in place of notice",
       value: "",
       originalDocumentValue: "",
@@ -391,6 +439,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "offerVacation",
+      section: "offer",
       label: "Vacation pay on that notice",
       value: "",
       originalDocumentValue: "",
@@ -400,6 +449,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "offerLastDay",
+      section: "offer",
       label: "Last day of work",
       value: "",
       originalDocumentValue: "",
@@ -409,6 +459,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "offerNoticeWorked",
+      section: "offer",
       label: "Notice you already worked",
       value: "Not in your documents yet",
       originalDocumentValue: "Not in your documents yet",
@@ -418,6 +469,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "offerDecideBy",
+      section: "offer",
       label: "Decide by",
       value: "",
       originalDocumentValue: "",
@@ -427,6 +479,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "offerRelease",
+      section: "offer",
       label: "You must sign a release to get it",
       value: "",
       originalDocumentValue: "",
@@ -436,6 +489,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "offerBenefitsEnd",
+      section: "offer",
       label: "Benefits end",
       value: "",
       originalDocumentValue: "",
@@ -447,6 +501,7 @@ export default function CanadaReviewPage({
     // Section 5: Your contract (3 items)
     {
       id: "contractLimit",
+      section: "contract",
       label: "Limits you to the legal minimum",
       value: "",
       originalDocumentValue: "",
@@ -456,6 +511,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "contractStartDate",
+      section: "contract",
       label: "Start date",
       value: "",
       originalDocumentValue: "",
@@ -465,6 +521,7 @@ export default function CanadaReviewPage({
     },
     {
       id: "contractJobTitle",
+      section: "contract",
       label: "Job title when hired",
       value: "",
       originalDocumentValue: "",
@@ -475,7 +532,7 @@ export default function CanadaReviewPage({
     },
   ]);
 
-  // Overall declaration checkbox
+    // Overall declaration checkbox
   const [declaredCorrect, setDeclaredCorrect] = useState(false);
 
   // Load real extracted facts and saved review data from backend
@@ -651,6 +708,7 @@ export default function CanadaReviewPage({
 
           return {
             ...item,
+            section: item.section,
             value: val,
             originalDocumentValue: origVal,
             source: src,
@@ -667,7 +725,8 @@ export default function CanadaReviewPage({
   // Track changes made by user
   const changedItemsCount = items.filter((i) => i.userChanged).length;
 
-  const confirmedItemsCount = items.filter((i) => {
+  const requiredItems = items.filter((i) => !i.isOptional && !i.hasOnlyChange);
+  const confirmedItemsCount = requiredItems.filter((i) => {
     if (i.userChanged) {
       return i.userChangeAck === true;
     }
@@ -675,18 +734,21 @@ export default function CanadaReviewPage({
   }).length;
 
   // Conflicts and missing numbers confirmations
-  const conflict1Confirmed = !hasOfferConflict || offerConflictChoice !== null ? 1 : 0;
-  const conflict2Confirmed = !hasContractConflict || contractConflictChoice !== null ? 1 : 0;
-  const numberWeeksConfirmed = workingWeeksSaved ? 1 : 0;
-  const numberBonusConfirmed = !hasBonusQuestion || bonusSaved ? 1 : 0;
-
   const activeConflictsCount = (hasOfferConflict ? 1 : 0) + (hasContractConflict ? 1 : 0);
+  const confirmedConflictsCount =
+    (hasOfferConflict && offerConflictChoice !== null ? 1 : 0) +
+    (hasContractConflict && contractConflictChoice !== null ? 1 : 0);
+
   const activeMissingCount = 1 + (hasBonusQuestion ? 1 : 0);
-  const totalCount = items.length + activeConflictsCount + activeMissingCount;
+  const confirmedMissingCount =
+    (workingWeeksSaved ? 1 : 0) +
+    (hasBonusQuestion && bonusSaved ? 1 : 0);
+
+  const totalCount = requiredItems.length + activeConflictsCount + activeMissingCount;
 
   const confirmedCount = Math.min(
     totalCount,
-    confirmedItemsCount + conflict1Confirmed + conflict2Confirmed + numberWeeksConfirmed + numberBonusConfirmed
+    confirmedItemsCount + confirmedConflictsCount + confirmedMissingCount
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
   const isAllConfirmed = remainingCount === 0;
@@ -743,7 +805,7 @@ export default function CanadaReviewPage({
     }
     setItems((prev) =>
       prev.map((i) =>
-        i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true } : i
+        i.id === "offerMoney" ? { ...i, value: chosenVal } : i
       )
     );
     const activeCaseId = caseId || cs?.id;
@@ -763,7 +825,7 @@ export default function CanadaReviewPage({
     }
     setItems((prev) =>
       prev.map((i) =>
-        i.id === "contractLimit" ? { ...i, value: chosenVal, confirmed: true } : i
+        i.id === "contractLimit" ? { ...i, value: chosenVal } : i
       )
     );
     const activeCaseId = caseId || cs?.id;
@@ -1825,6 +1887,22 @@ export default function CanadaReviewPage({
           </div>
         </div>
       )}
+
+
+      {/* ── Change Jurisdiction Modal ── */}
+      <ChangeJurisdictionModal
+        isOpen={showChangeRegionModal}
+        onClose={() => setShowChangeRegionModal(false)}
+        caseId={caseId || (cs?.id as string) || ""}
+        currentCountry="CA"
+        currentRegion={answers.provinceName || data.provinceName || (cs?.jurisdiction as any)?.name || data.province || "Ontario"}
+        suggestedCountry={locationMismatch?.documentCountry || (locationMismatch?.docPlace?.includes("CA") || locationMismatch?.documentPlace?.includes("Canada") ? "CA" : locationMismatch?.docPlace?.includes("US") || locationMismatch?.documentPlace?.includes("United States") ? "US" : null)}
+        suggestedRegion={locationMismatch?.documentRegion || locationMismatch?.docPlace || locationMismatch?.documentPlace}
+        onSuccess={() => {
+          setShowChangeRegionModal(false);
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }

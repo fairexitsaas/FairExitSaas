@@ -35,7 +35,8 @@ interface USReviewItem {
   showPlausibilityAlert?: boolean;
   isReReading?: boolean;
   showSecondLook?: boolean;
-  section?: "you" | "offer" | "layoff";
+  section: "you" | "offer" | "layoff";
+  isOptional?: boolean;
 }
 
 const MONTHS_MAP: Record<string, string> = {
@@ -321,9 +322,10 @@ export default function USReviewPage({
   // Review Items (13 items total matching US spec)
   // ══════════════════════════════════════════════════════════
   const [items, setItems] = useState<USReviewItem[]>([
-    // Section 3: About you (4 items)
+    // Section 3: About you (6 items)
     {
       id: "state",
+      section: "you",
       label: "State",
       value: answers.state || data.state || (cs?.jurisdiction as any)?.name || "California",
       originalDocumentValue: answers.state || data.state || (cs?.jurisdiction as any)?.name || "California",
@@ -331,7 +333,28 @@ export default function USReviewPage({
       confirmed: false,
     },
     {
+      id: "employee_name",
+      section: "you",
+      label: "Your name",
+      value: answers.employee_name || answers.name || answers.full_name || data.employee_name || "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
+      confirmed: false,
+    },
+    {
+      id: "employer_name",
+      section: "you",
+      label: "Employer",
+      value: answers.employer_name || answers.employer || answers.company || data.employer_name || "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
+      confirmed: false,
+    },
+    {
       id: "age",
+      section: "you",
       label: "Age",
       value: answers.age !== undefined && answers.age !== null ? String(answers.age) : (data.age ? String(data.age) : ""),
       originalDocumentValue: answers.age !== undefined && answers.age !== null ? String(answers.age) : (data.age ? String(data.age) : ""),
@@ -340,6 +363,7 @@ export default function USReviewPage({
     },
     {
       id: "years",
+      section: "you",
       label: "Years on the job",
       value: answers.years !== undefined && answers.years !== null ? `${answers.years} years` : (data.years ? `${data.years} years` : ""),
       originalDocumentValue: answers.years !== undefined && answers.years !== null ? `${answers.years} years` : (data.years ? `${data.years} years` : ""),
@@ -348,6 +372,7 @@ export default function USReviewPage({
     },
     {
       id: "salary",
+      section: "you",
       label: "Pay per year",
       value: answers.salary ? `$${Number(answers.salary).toLocaleString()}` : (data.salary ? `$${Number(data.salary).toLocaleString()}` : ""),
       originalDocumentValue: answers.salary ? `$${Number(answers.salary).toLocaleString()}` : (data.salary ? `$${Number(data.salary).toLocaleString()}` : ""),
@@ -355,9 +380,10 @@ export default function USReviewPage({
       confirmed: false,
     },
 
-    // Section 4: Your agreement (from your documents) - 8 items
+    // Section 4: Your agreement (from your documents) - 12 items
     {
       id: "offerMoney",
+      section: "offer",
       label: "Money offered",
       value: intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "",
       originalDocumentValue: "",
@@ -366,7 +392,48 @@ export default function USReviewPage({
       confirmed: false,
     },
     {
+      id: "pay_rate",
+      section: "offer",
+      label: "Pay rate",
+      value: "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
+      confirmed: false,
+    },
+    {
+      id: "document_place",
+      section: "offer",
+      label: "Place in documents",
+      value: "",
+      originalDocumentValue: "",
+      source: "Your agreement",
+      citation: "",
+      confirmed: false,
+    },
+    {
+      id: "contractStartDate",
+      section: "offer",
+      label: "Contract start date",
+      value: "",
+      originalDocumentValue: "",
+      source: "Your contract",
+      citation: "",
+      confirmed: false,
+    },
+    {
+      id: "contractJobTitle",
+      section: "offer",
+      label: "Contract job title",
+      value: "",
+      originalDocumentValue: "",
+      source: "Your contract",
+      citation: "",
+      confirmed: false,
+    },
+    {
       id: "signRelease",
+      section: "offer",
       label: "You must sign a release",
       value: "",
       originalDocumentValue: "",
@@ -376,6 +443,7 @@ export default function USReviewPage({
     },
     {
       id: "daysToDecide",
+      section: "offer",
       label: "Days to decide",
       value: "",
       originalDocumentValue: "",
@@ -385,6 +453,7 @@ export default function USReviewPage({
     },
     {
       id: "revocationPeriod",
+      section: "offer",
       label: "7 days to change your mind after signing",
       value: "",
       originalDocumentValue: "",
@@ -394,6 +463,7 @@ export default function USReviewPage({
     },
     {
       id: "seeAttorney",
+      section: "offer",
       label: "Tells you to see an attorney",
       value: "",
       originalDocumentValue: "",
@@ -403,6 +473,7 @@ export default function USReviewPage({
     },
     {
       id: "agesTitlesList",
+      section: "offer",
       label: "List of ages and job titles",
       value: "",
       originalDocumentValue: "",
@@ -412,6 +483,7 @@ export default function USReviewPage({
     },
     {
       id: "nonCompete",
+      section: "offer",
       label: "Non-compete",
       value: "",
       originalDocumentValue: "",
@@ -421,6 +493,7 @@ export default function USReviewPage({
     },
     {
       id: "lastDayAgreement",
+      section: "offer",
       label: "Last day of work",
       value: "Not in your agreement",
       originalDocumentValue: "Not in your agreement",
@@ -433,6 +506,7 @@ export default function USReviewPage({
     // Section 5: The layoff (from your documents) - 1 item
     {
       id: "advanceNotice",
+      section: "layoff",
       label: "Advance notice you got",
       value: "",
       originalDocumentValue: "",
@@ -442,7 +516,7 @@ export default function USReviewPage({
     },
   ]);
 
-  // Load real extracted facts and saved review data from backend
+    // Load real extracted facts and saved review data from backend
   useEffect(() => {
     const activeCaseId = caseId || cs?.id;
     if (!activeCaseId) return;
@@ -582,6 +656,7 @@ export default function USReviewPage({
 
             origVal = formatted;
             val = formatted;
+            if (factKey === 'last_day') item.hasOnlyChange = false;
             if (fact.quote) {
               cit = fact.where ? `"${fact.quote}" · ${fact.where}` : `"${fact.quote}"`;
             }
@@ -617,6 +692,7 @@ export default function USReviewPage({
 
           return {
             ...item,
+            section: item.section,
             value: val,
             originalDocumentValue: origVal,
             source: src,
@@ -632,24 +708,35 @@ export default function USReviewPage({
   }, [caseId, cs, intakeOfferNum]);
 
   // Confirmation counting
-  const totalCount = items.length;
-  const confirmedItemsCount = items.filter((i) => {
+  const hasMissingLastDay = !items.find((i) => i.id === "lastDayAgreement")?.originalDocumentValue ||
+    items.find((i) => i.id === "lastDayAgreement")?.originalDocumentValue === "Not in your agreement";
+
+  const requiredItems = items.filter((i) => !i.isOptional && (!hasMissingLastDay || i.id !== "lastDayAgreement"));
+  const confirmedItemsCount = requiredItems.filter((i) => {
     if (i.userChanged) {
       return i.userChangeAck === true;
     }
     return i.confirmed === true;
   }).length;
 
-  const conflict1Confirmed = !hasOfferConflict || offerConflictChoice !== null ? 1 : 0;
-  const conflict2Confirmed = !hasNoticeConflict || noticeConflictChoice !== null ? 1 : 0;
-  const missingLastDayConfirmed = lastDayWorkSaved ? 1 : 0;
+  const activeConflictsCount =
+    (hasOfferConflict ? 1 : 0) +
+    (hasNoticeConflict ? 1 : 0) +
+    (hasServiceConflict ? 1 : 0);
+
+  const confirmedConflictsCount =
+    (hasOfferConflict && offerConflictChoice !== null ? 1 : 0) +
+    (hasNoticeConflict && noticeConflictChoice !== null ? 1 : 0) +
+    (hasServiceConflict && serviceConflictChoice !== null ? 1 : 0);
+
+  const activeMissingCount = hasMissingLastDay ? 1 : 0;
+  const confirmedMissingCount = hasMissingLastDay && lastDayWorkSaved ? 1 : 0;
+
+  const totalCount = requiredItems.length + activeConflictsCount + activeMissingCount;
 
   const confirmedCount = Math.min(
     totalCount,
-    confirmedItemsCount +
-      (hasOfferConflict && conflict1Confirmed > 0 && !items.find((i) => i.id === "offerMoney")?.confirmed ? 1 : 0) +
-      (hasNoticeConflict && conflict2Confirmed > 0 && !items.find((i) => i.id === "advanceNotice")?.confirmed ? 1 : 0) +
-      (missingLastDayConfirmed > 0 && !items.find((i) => i.id === "lastDayAgreement")?.confirmed ? 1 : 0)
+    confirmedItemsCount + confirmedConflictsCount + confirmedMissingCount
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
   const isAllConfirmed = remainingCount === 0;
@@ -668,7 +755,7 @@ export default function USReviewPage({
       chosenVal = cleanNum ? `${cleanNum.toLocaleString()}` : customVal;
     }
     setItems((prev) =>
-      prev.map((i) => (i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true, userChanged: false, showSecondLook: false } : i))
+      prev.map((i) => (i.id === "offerMoney" ? { ...i, value: chosenVal, userChanged: false, showSecondLook: false } : i))
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
@@ -728,7 +815,7 @@ export default function USReviewPage({
     setItems((prev) =>
       prev.map((i) =>
         i.id === "years"
-          ? { ...i, value: chosenVal, confirmed: true }
+          ? { ...i, value: chosenVal }
           : i
       )
     );
@@ -750,7 +837,7 @@ export default function USReviewPage({
     setItems((prev) =>
       prev.map((i) =>
         i.id === "advanceNotice"
-          ? { ...i, value: chosenVal, warningNote: undefined, confirmed: true }
+          ? { ...i, value: chosenVal, warningNote: undefined }
           : i
       )
     );
@@ -1617,6 +1704,22 @@ export default function USReviewPage({
           </div>
         </div>
       )}
+
+
+      {/* ── Change Jurisdiction Modal ── */}
+      <ChangeJurisdictionModal
+        isOpen={showChangeRegionModal}
+        onClose={() => setShowChangeRegionModal(false)}
+        caseId={caseId || (cs?.id as string) || ""}
+        currentCountry="US"
+        currentRegion={answers.state || data.state || (cs?.jurisdiction as any)?.name || "California"}
+        suggestedCountry={locationMismatch?.documentCountry || (locationMismatch?.docPlace?.includes("CA") || locationMismatch?.documentPlace?.includes("Canada") ? "CA" : locationMismatch?.docPlace?.includes("US") || locationMismatch?.documentPlace?.includes("United States") ? "US" : null)}
+        suggestedRegion={locationMismatch?.documentRegion || locationMismatch?.docPlace || locationMismatch?.documentPlace}
+        onSuccess={() => {
+          setShowChangeRegionModal(false);
+          window.location.reload();
+        }}
+      />
     </div>
   );
 }

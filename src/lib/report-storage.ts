@@ -29,6 +29,8 @@ export interface ReportInputs {
   email?: string;
   termsAccepted?: boolean;
   remindMe?: boolean;
+  employee_name?: string;
+  employer_name?: string;
   userAnswers?: Record<string, string>;
   fullState?: Record<string, unknown>;
   timestamp?: number;

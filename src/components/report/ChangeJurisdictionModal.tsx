@@ -37,6 +37,17 @@ const US_STATES = [
   "Wisconsin", "Wyoming"
 ];
 
+function matchRegion(val: string | null | undefined, c: "CA" | "US"): string | null {
+  if (!val) return null;
+  const list = c === "CA" ? CA_PROVINCES : US_STATES;
+  const clean = val.trim().toLowerCase();
+  const exact = list.find((r) => r.toLowerCase() === clean);
+  if (exact) return exact;
+  const sub = list.find((r) => clean.includes(r.toLowerCase()) || r.toLowerCase().includes(clean));
+  if (sub) return sub;
+  return null;
+}
+
 export default function ChangeJurisdictionModal({
   isOpen,
   onClose,
@@ -47,22 +58,30 @@ export default function ChangeJurisdictionModal({
   suggestedRegion,
   onSuccess,
 }: ChangeJurisdictionModalProps) {
-  const initialCountry = suggestedCountry || currentCountry;
+  const initialCountry = suggestedCountry || currentCountry || "CA";
   const [country, setCountry] = useState<"CA" | "US">(initialCountry);
   const [region, setRegion] = useState<string>(() => {
-    if (suggestedRegion) {
-      if (initialCountry === "CA" && CA_PROVINCES.includes(suggestedRegion)) return suggestedRegion;
-      if (initialCountry === "US" && US_STATES.includes(suggestedRegion)) return suggestedRegion;
-    }
-    if (currentRegion) {
-      if (initialCountry === "CA" && CA_PROVINCES.includes(currentRegion)) return currentRegion;
-      if (initialCountry === "US" && US_STATES.includes(currentRegion)) return currentRegion;
-    }
+    const matchedSuggested = matchRegion(suggestedRegion, initialCountry);
+    if (matchedSuggested) return matchedSuggested;
+    const matchedCurrent = matchRegion(currentRegion, initialCountry);
+    if (matchedCurrent) return matchedCurrent;
     return initialCountry === "CA" ? "Ontario" : "California";
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  React.useEffect(() => {
+    if (isOpen) {
+      const initCountry = suggestedCountry || currentCountry || "CA";
+      setCountry(initCountry);
+      const matchedSuggested = matchRegion(suggestedRegion, initCountry);
+      const matchedCurrent = matchRegion(currentRegion, initCountry);
+      setRegion(matchedSuggested || matchedCurrent || (initCountry === "CA" ? "Ontario" : "California"));
+      setErrorMessage("");
+      setIsSubmitting(false);
+    }
+  }, [isOpen, suggestedCountry, suggestedRegion, currentCountry, currentRegion]);
 
   if (!isOpen) return null;
 
