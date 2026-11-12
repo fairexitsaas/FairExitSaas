@@ -10,6 +10,7 @@ import { getReportInputs, ReportInputs } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
+import ChangeJurisdictionModal from "@/components/report/ChangeJurisdictionModal";
 
 interface USReviewPageProps {
   caseId?: string | null;
@@ -34,6 +35,7 @@ interface USReviewItem {
   showPlausibilityAlert?: boolean;
   isReReading?: boolean;
   showSecondLook?: boolean;
+  section?: "you" | "offer" | "layoff";
 }
 
 const MONTHS_MAP: Record<string, string> = {
@@ -74,7 +76,59 @@ export interface USFieldConfig {
   formatSave?: (val: string) => string;
 }
 
+export const US_KEY_MAP: Record<string, string> = {
+  state: "state",
+  employee_name: "employee_name",
+  employer_name: "employer_name",
+  age: "age",
+  years: "years",
+  salary: "pay",
+  offerMoney: "offer_amount",
+  pay_rate: "pay_rate",
+  document_place: "document_place",
+  contractStartDate: "contract_start",
+  contractJobTitle: "job_title_contract",
+  signRelease: "release_required",
+  daysToDecide: "days_to_decide",
+  revocationPeriod: "take_back",
+  seeAttorney: "attorney_line",
+  agesTitlesList: "age_list",
+  nonCompete: "non_compete",
+  lastDayAgreement: "last_day",
+  advanceNotice: "advance_notice",
+};
+
 export const US_FIELD_CONFIGS: Record<string, USFieldConfig> = {
+  employee_name: {
+    type: "text",
+    label: "Your name",
+    placeholder: "e.g. Jordan Taylor",
+  },
+  employer_name: {
+    type: "text",
+    label: "Employer",
+    placeholder: "e.g. Empire Harbor Analytics",
+  },
+  pay_rate: {
+    type: "text",
+    label: "Pay rate",
+    placeholder: "e.g. $32.00 per hour or $128,000 / year",
+  },
+  document_place: {
+    type: "text",
+    label: "Place in documents",
+    placeholder: "e.g. New York, NY",
+  },
+  contractStartDate: {
+    type: "date",
+    label: "Contract start date",
+    placeholder: "Aug 11, 2025",
+  },
+  contractJobTitle: {
+    type: "text",
+    label: "Contract job title",
+    placeholder: "e.g. Temporary Data Operations Analyst",
+  },
   state: {
     type: "select",
     label: "Choose state",
@@ -197,6 +251,30 @@ export default function USReviewPage({
   const [isSubmittingBuild, setIsSubmittingBuild] = useState(false);
   const [buildError, setBuildError] = useState("");
   const buildSubmitLock = useRef(false);
+  // Change 21: Location mismatch state & modal
+  const [locationMismatch, setLocationMismatch] = useState<{
+    detected: boolean;
+    documentPlace?: string | null;
+    selectedPlace?: string;
+    message?: string | null;
+    documentCountry?: "CA" | "US" | null;
+    documentRegion?: string | null;
+    docPlace?: string;
+    chosen?: string;
+  } | null>(null);
+  const [locationMismatchDismissed, setLocationMismatchDismissed] = useState(false);
+  const [showChangeRegionModal, setShowChangeRegionModal] = useState(false);
+
+  // Change 19: Years of service conflict (contract start vs answered years)
+  const [hasServiceConflict, setHasServiceConflict] = useState<boolean>(false);
+  const [docServiceDisplay, setDocServiceDisplay] = useState<string>("");
+  const [docServiceQuote, setDocServiceQuote] = useState<string>("");
+  const [docServiceWhere, setDocServiceWhere] = useState<string>("");
+  const [intakeServiceDisplay, setIntakeServiceDisplay] = useState<string>("");
+  const [serviceConflictChoice, setServiceConflictChoice] = useState<"contract" | "told" | "custom" | null>(null);
+  const [showServiceConflictCustom, setShowServiceConflictCustom] = useState(false);
+  const [serviceConflictCustomVal, setServiceConflictCustomVal] = useState("");
+
 
   // Resolved intake answers (from server case answers or client storage)
   const answers = (cs?.answers as Record<string, any>) || {};
@@ -425,6 +503,21 @@ export default function USReviewPage({
         }
       }
 
+            // 3. Process Service Conflict (contract start vs answered years)
+      const confService = conflicts.find((c: any) => c.key === 'contract_start');
+      if (confService) {
+        setHasServiceConflict(true);
+        setDocServiceDisplay(confService.document?.display || "");
+        setDocServiceQuote(confService.document?.quote || "");
+        setDocServiceWhere(confService.document?.where || "");
+        setIntakeServiceDisplay(confService.answers?.display || (answers.years ? `${answers.years} years` : ""));
+      } else {
+        setHasServiceConflict(false);
+      }
+
+      if (res.reviewModel?.locationMismatch?.detected) {
+        setLocationMismatch(res.reviewModel.locationMismatch);
+      }
       // 2. Process Last Day of Work (check if present in agreement)
       const fLastDay = facts.find((f: any) => f.key === 'last_day');
       if (fLastDay?.value) {
@@ -444,21 +537,7 @@ export default function USReviewPage({
 
       setItems((prev) =>
         prev.map((item) => {
-          const keyMap: Record<string, string> = {
-            state: 'state',
-            age: 'age',
-            years: 'years',
-            salary: 'pay',
-            offerMoney: 'offer_amount',
-            signRelease: 'release_required',
-            daysToDecide: 'days_to_decide',
-            revocationPeriod: 'take_back',
-            seeAttorney: 'attorney_line',
-            agesTitlesList: 'age_list',
-            nonCompete: 'non_compete',
-            lastDayAgreement: 'last_day',
-            advanceNotice: 'advance_notice',
-          };
+          const keyMap = US_KEY_MAP;
           const factKey = keyMap[item.id] || item.id;
           const modelRow = allModelRows.find((r: any) => r.key === factKey);
 
@@ -605,12 +684,7 @@ export default function USReviewPage({
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId && newConfirmed) {
-      const keyMap: Record<string, string> = {
-        state: 'usState', age: 'age', years: 'years', salary: 'salary',
-        offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
-        revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
-        nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
-      };
+      const keyMap = US_KEY_MAP;
       const factKey = keyMap[id] || id;
       fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: item?.value }).catch(() => {});
     }
@@ -631,12 +705,36 @@ export default function USReviewPage({
     );
     if (hasOfferConflict) setOfferConflictChoice("agreement");
     if (hasNoticeConflict) setNoticeConflictChoice("agreement");
+    if (hasServiceConflict) setServiceConflictChoice("contract");
+    if (hasOfferConflict) setOfferConflictChoice("agreement");
     setLastDayWork((prev) => prev || items.find(i => i.id === "lastDayAgreement")?.value || "");
     setLastDayWorkSaved(true);
     setDeclaredCorrect(true);
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
       fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {});
+    }
+  };
+
+    const handleChooseServiceConflict = (choice: "contract" | "told" | "custom", customVal?: string) => {
+    setServiceConflictChoice(choice);
+    setShowServiceConflictCustom(false);
+    let chosenVal = docServiceDisplay;
+    if (choice === "told") {
+      chosenVal = intakeServiceDisplay;
+    } else if (choice === "custom" && customVal) {
+      chosenVal = customVal;
+    }
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === "years"
+          ? { ...i, value: chosenVal, confirmed: true }
+          : i
+      )
+    );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.saveReviewData(activeCaseId, { key: 'years', action: choice === 'custom' ? 'change' : 'confirm', value: chosenVal }).catch(() => {});
     }
   };
 
@@ -793,12 +891,7 @@ export default function USReviewPage({
       );
       const activeCaseId = caseId || cs?.id;
       if (activeCaseId) {
-        const keyMap: Record<string, string> = {
-          state: 'state', age: 'age', years: 'years', salary: 'pay',
-          offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
-          revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
-          nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
-        };
+        const keyMap = US_KEY_MAP;
         fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
       }
     }
@@ -827,12 +920,7 @@ export default function USReviewPage({
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      const keyMap: Record<string, string> = {
-        state: 'state', age: 'age', years: 'years', salary: 'pay',
-        offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
-        revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
-        nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
-      };
+      const keyMap = US_KEY_MAP;
       const factKey = keyMap[id] || id;
       const currentItem = items.find((i) => i.id === id);
       fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: currentItem?.originalDocumentValue }).catch(() => {});
@@ -864,12 +952,7 @@ export default function USReviewPage({
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      const keyMap: Record<string, string> = {
-        state: 'state', age: 'age', years: 'years', salary: 'pay',
-        offerMoney: 'offer_amount', signRelease: 'release_required', daysToDecide: 'days_to_decide',
-        revocationPeriod: 'take_back', seeAttorney: 'attorney_line', agesTitlesList: 'age_list',
-        nonCompete: 'non_compete', lastDayAgreement: 'last_day', advanceNotice: 'advance_notice',
-      };
+      const keyMap = US_KEY_MAP;
       const factKey = keyMap[id] || id;
       const currentItem = items.find((i) => i.id === id);
       fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'change', value: currentItem?.inlineInputValue || currentItem?.value }).catch(() => {});
@@ -1088,6 +1171,39 @@ export default function USReviewPage({
             </div>
           )}
 
+                    {/* Change 21: Location Mismatch Warning Banner */}
+          {locationMismatch?.detected && !locationMismatchDismissed && (
+            <div className="mb-8 rounded-[14px] bg-[#FFF8E7] border border-[#E8D196] border-l-4 border-l-[#B07A00] p-4.5 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="text-[22px] leading-none mt-0.5">📍</span>
+                <div>
+                  <h4 className="font-sans font-[700] text-[15.5px] text-[#062C55]">
+                    {locationMismatch.message || `Your documents mention ${locationMismatch.documentPlace || locationMismatch.docPlace}. Is ${locationMismatch.selectedPlace || locationMismatch.chosen} right?`}
+                  </h4>
+                  <p className="font-sans text-[13px] text-[#5A6B78] mt-0.5">
+                    Severance laws and regulations differ by state. If you worked in ${locationMismatch.documentPlace || locationMismatch.docPlace}, please update your state before generating the report.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowChangeRegionModal(true)}
+                  className="px-4 py-2 bg-[#062C55] hover:bg-[#0C3B6E] text-white font-sans font-[700] text-[13px] rounded-[8px] transition cursor-pointer shadow-xs"
+                >
+                  Change region
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocationMismatchDismissed(true)}
+                  className="px-3 py-2 text-[#5A6B78] hover:text-[#062C55] font-sans font-[600] text-[13px] rounded-[8px] hover:bg-black/5 transition cursor-pointer"
+                >
+                  It&apos;s right
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* SECTION 1: Check these first (Conflict card if exists) */}
           {hasNoticeConflict && (
             <div className="mb-8">
@@ -1282,7 +1398,7 @@ export default function USReviewPage({
             </div>
 
             <div className="space-y-2.5">
-              {items.slice(0, 4).map((item) => (
+              {items.filter((item) => item.section === "you").map((item) => (
                 <USItemCard
                   key={item.id}
                   item={item}
@@ -1315,7 +1431,7 @@ export default function USReviewPage({
             </div>
 
             <div className="space-y-2.5">
-              {items.slice(4, 12).map((item) => (
+              {items.filter((item) => item.section === "offer").map((item) => (
                 <USItemCard
                   key={item.id}
                   item={item}
@@ -1348,7 +1464,7 @@ export default function USReviewPage({
             </div>
 
             <div className="space-y-2.5">
-              {items.slice(12).map((item) => (
+              {items.filter((item) => item.section === "layoff").map((item) => (
                 <USItemCard
                   key={item.id}
                   item={item}

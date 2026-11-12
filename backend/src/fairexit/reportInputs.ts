@@ -100,9 +100,9 @@ export function buildMinimumAndRange(c: CaseRow, ctx: CheckCtx, j: Jurisdiction)
   let terminationWeeks = st.terminationWeeks
   let arithmetic: string | undefined
   if (worked && worked > 0) {
-    const sub = Math.min(worked, st.terminationWeeks) // never subtract more than the notice owed
+    const sub = Math.min(worked, st.terminationWeeks) // never subtract more than the notice period
     terminationWeeks = st.terminationWeeks - sub
-    arithmetic = `${j.statute_short} notice ${st.terminationWeeks} weeks − ${sub} weeks you worked = ${terminationWeeks} weeks still owed as pay.`
+    arithmetic = `${j.statute_short} notice ${st.terminationWeeks} weeks − ${sub} weeks you worked = ${terminationWeeks} weeks still due as pay.`
   }
   const weeks = terminationWeeks + st.severanceWeeks
   const minimum = {
@@ -115,7 +115,7 @@ export function buildMinimumAndRange(c: CaseRow, ctx: CheckCtx, j: Jurisdiction)
     notice_before_worked_weeks: worked && worked > 0 ? st.terminationWeeks : undefined,
     working_notice_weeks: worked && worked > 0 ? Math.min(worked, st.terminationWeeks) : undefined,
     arithmetic,
-    weekly_pay: Math.round(weekly),
+    weekly_pay: Math.round(weekly * 100) / 100,
     basis: 'regular wages (base pay)',
   }
 

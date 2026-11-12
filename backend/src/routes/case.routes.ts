@@ -49,6 +49,8 @@ one.get('/check', h(cc.check))
 one.post('/check/rows/:key', validate({ params: V.rowParams, body: V.rowActionSchema }), h(cc.rowAction))
 one.post('/check/conflicts/:key', validate({ params: V.rowParams, body: V.conflictSchema }), h(cc.conflict))
 one.post('/check/attest', validate({ body: V.attestSchema }), h(cc.attest))
+one.post('/check/jurisdiction', validate({ body: V.changeJurisdictionSchema }), h(cc.changeJurisdiction))
+one.put('/jurisdiction', validate({ body: V.changeJurisdictionSchema }), h(cc.changeJurisdiction))
 
 // report (Call B)
 one.post('/report', h(cc.startBuild))

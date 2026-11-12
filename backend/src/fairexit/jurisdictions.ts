@@ -152,3 +152,76 @@ export function listJurisdictions(country?: Country) {
   }
   return out
 }
+
+export interface ParsedLocation {
+  country?: Country
+  code?: string
+  name?: string
+}
+
+/**
+ * Parses freeform text (such as extracted document_place) to identify the mentioned jurisdiction.
+ * Supports province and state names, abbreviations, and country references.
+ */
+export function parseLocationFromText(rawText: string | null | undefined): ParsedLocation | null {
+  if (!rawText) return null
+  const text = String(rawText).trim()
+  if (!text) return null
+
+  // Fast check with normalizeCode
+  const norm = normalizeCode(text)
+  if (norm) {
+    const j = buildJurisdiction(norm)
+    if (j) return { country: j.country, code: j.code, name: j.name }
+  }
+
+  const lower = ' ' + text.toLowerCase() + ' '
+
+  // Check Canadian provinces by full name
+  for (const [code, prov] of Object.entries(CA_PROVINCES)) {
+    const nameLower = prov.name.toLowerCase()
+    const regex = new RegExp(`(^|[^a-zA-Z])${nameLower}([^a-zA-Z]|$)`, 'i')
+    if (regex.test(text)) {
+      return { country: 'CA', code: 'CA-' + code, name: prov.name }
+    }
+  }
+
+  // Check US states by full name
+  for (const [code, stateName] of Object.entries(US_STATES)) {
+    const nameLower = stateName.toLowerCase()
+    const regex = new RegExp(`(^|[^a-zA-Z])${nameLower}([^a-zA-Z]|$)`, 'i')
+    if (regex.test(text)) {
+      return { country: 'US', code: 'US-' + code, name: stateName }
+    }
+  }
+
+  // Check 2-letter state / province abbreviations when preceded by comma or space and uppercase
+  for (const [code, prov] of Object.entries(CA_PROVINCES)) {
+    const regex = new RegExp(`(?:,\\s*|\\b)${code}\\b`)
+    if (regex.test(text)) {
+      return { country: 'CA', code: 'CA-' + code, name: prov.name }
+    }
+  }
+  for (const [code, stateName] of Object.entries(US_STATES)) {
+    // Avoid matching common English words as abbreviations (IN, OR, ME, OK, HI, AS, etc.)
+    const skipBare = ['IN', 'OR', 'ME', 'OK', 'HI', 'ID', 'LA', 'MA', 'MD', 'PA', 'OH']
+    const pattern = skipBare.includes(code)
+      ? `(?:,\\s*|State of\\s+)${code}\\b`
+      : `(?:,\\s*|\\b)${code}\\b`
+    const regex = new RegExp(pattern)
+    if (regex.test(text)) {
+      return { country: 'US', code: 'US-' + code, name: stateName }
+    }
+  }
+
+  // Check country level mentions
+  if (/\b(canada|canadian)\b/i.test(text)) {
+    return { country: 'CA', name: 'Canada' }
+  }
+  if (/\b(united states|u\.?s\.?a?\.?|america)\b/i.test(text)) {
+    return { country: 'US', name: 'United States' }
+  }
+
+  return null
+}
+

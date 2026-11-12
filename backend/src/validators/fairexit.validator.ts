@@ -132,6 +132,11 @@ export const conflictSchema = z.object({
 
 export const attestSchema = z.object({ agreed: z.literal(true, { errorMap: () => ({ message: 'Tick the final agreement to continue' }) }) })
 
+export const changeJurisdictionSchema = z.object({
+  country: z.enum(['CA', 'US']),
+  region: z.string().min(1).max(80),
+})
+
 export const remindersSchema = z.object({ email: z.boolean() })
 
 export const deviceSchema = z.object({

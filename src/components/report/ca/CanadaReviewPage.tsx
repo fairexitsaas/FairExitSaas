@@ -10,6 +10,7 @@ import { getReportInputs, ReportInputs } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
+import ChangeJurisdictionModal from "@/components/report/ChangeJurisdictionModal";
 
 interface CanadaReviewPageProps {
   caseId?: string | null;
@@ -34,6 +35,7 @@ interface ReviewItem {
   showPlausibilityAlert?: boolean;
   isReReading?: boolean;
   showSecondLook?: boolean;
+  section?: "you" | "offer" | "contract";
 }
 
 const MONTHS_MAP: Record<string, string> = {
@@ -74,7 +76,51 @@ export interface CAFieldConfig {
   formatSave?: (val: string) => string;
 }
 
+export const CA_KEY_MAP: Record<string, string> = {
+  province: "province",
+  employee_name: "employee_name",
+  employer_name: "employer_name",
+  age: "age",
+  years: "years",
+  salary: "pay",
+  role: "role",
+  howEnded: "ended",
+  offerMoney: "offer_amount",
+  pay_rate: "pay_rate",
+  document_place: "document_place",
+  offerNotice: "notice_weeks",
+  offerVacation: "vacation_on_notice",
+  offerLastDay: "last_day",
+  offerNoticeWorked: "working_notice_weeks",
+  offerDecideBy: "sign_by",
+  offerRelease: "release_required",
+  offerBenefitsEnd: "benefits_end",
+  contractLimit: "min_only_clause",
+  contractStartDate: "contract_start",
+  contractJobTitle: "job_title_contract",
+};
+
 export const CA_FIELD_CONFIGS: Record<string, CAFieldConfig> = {
+  employee_name: {
+    type: "text",
+    label: "Your name",
+    placeholder: "e.g. Jordan Taylor",
+  },
+  employer_name: {
+    type: "text",
+    label: "Employer",
+    placeholder: "e.g. Empire Harbor Analytics",
+  },
+  pay_rate: {
+    type: "text",
+    label: "Pay rate",
+    placeholder: "e.g. $32.00 per hour or $75,000 / year",
+  },
+  document_place: {
+    type: "text",
+    label: "Place in documents",
+    placeholder: "e.g. Ontario, Canada",
+  },
   province: {
     type: "select",
     label: "Choose province",
@@ -214,6 +260,20 @@ export default function CanadaReviewPage({
   const [isSubmittingBuild, setIsSubmittingBuild] = useState(false);
   const [buildError, setBuildError] = useState("");
   const buildSubmitLock = useRef(false);
+  // Change 21: Location mismatch state & modal
+  const [locationMismatch, setLocationMismatch] = useState<{
+    detected: boolean;
+    documentPlace?: string | null;
+    selectedPlace?: string;
+    message?: string | null;
+    documentCountry?: "CA" | "US" | null;
+    documentRegion?: string | null;
+    docPlace?: string;
+    chosen?: string;
+  } | null>(null);
+  const [locationMismatchDismissed, setLocationMismatchDismissed] = useState(false);
+  const [showChangeRegionModal, setShowChangeRegionModal] = useState(false);
+
 
   // Resolved intake answers (from server case answers or client storage)
   const answers = (cs?.answers as Record<string, any>) || {};
@@ -430,6 +490,9 @@ export default function CanadaReviewPage({
       const checkRows: Record<string, any> = res.checkState?.rows || {};
       const conflicts: any[] = res.reviewModel?.conflicts || [];
       const missingList: any[] = res.reviewModel?.missing || [];
+      if (res.reviewModel?.locationMismatch?.detected) {
+        setLocationMismatch(res.reviewModel.locationMismatch);
+      }
 
       // 1. Process Offer Conflict
       const confOffer = conflicts.find((c: any) => c.key === 'offer_amount');
@@ -498,25 +561,7 @@ export default function CanadaReviewPage({
 
       setItems((prev) =>
         prev.map((item) => {
-          const keyMap: Record<string, string> = {
-            province: 'province',
-            age: 'age',
-            years: 'years',
-            salary: 'pay',
-            role: 'role',
-            howEnded: 'ended',
-            offerMoney: 'offer_amount',
-            offerNotice: 'notice_weeks',
-            offerVacation: 'vacation_on_notice',
-            offerLastDay: 'last_day',
-            offerNoticeWorked: 'working_notice_weeks',
-            offerDecideBy: 'sign_by',
-            offerRelease: 'release_required',
-            offerBenefitsEnd: 'benefits_end',
-            contractLimit: 'min_only_clause',
-            contractStartDate: 'contract_start',
-            contractJobTitle: 'job_title_contract',
-          };
+          const keyMap = CA_KEY_MAP;
           const factKey = keyMap[item.id] || item.id;
           const modelRow = allModelRows.find((r: any) => r.key === factKey);
 
@@ -656,13 +701,7 @@ export default function CanadaReviewPage({
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId && newConfirmed) {
-      const keyMap: Record<string, string> = {
-        province: 'province', age: 'age', years: 'years', salary: 'pay', role: 'role', howEnded: 'ended',
-        offerMoney: 'offer_amount', offerNotice: 'notice_weeks', offerVacation: 'vacation_on_notice',
-        offerLastDay: 'last_day', offerNoticeWorked: 'working_notice_weeks', offerDecideBy: 'sign_by',
-        offerRelease: 'release_required', offerBenefitsEnd: 'benefits_end', contractLimit: 'min_only_clause',
-        contractStartDate: 'contract_start', contractJobTitle: 'job_title_contract',
-      };
+      const keyMap = CA_KEY_MAP;
       const factKey = keyMap[id] || id;
       fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: item?.value }).catch(() => {});
     }
@@ -850,13 +889,7 @@ export default function CanadaReviewPage({
       );
       const activeCaseId = caseId || cs?.id;
       if (activeCaseId) {
-        const keyMap: Record<string, string> = {
-          province: 'province', age: 'age', years: 'years', salary: 'pay', role: 'role', howEnded: 'ended',
-          offerMoney: 'offer_amount', offerNotice: 'notice_weeks', offerVacation: 'vacation_on_notice',
-          offerLastDay: 'last_day', offerNoticeWorked: 'working_notice_weeks', offerDecideBy: 'sign_by',
-          offerRelease: 'release_required', offerBenefitsEnd: 'benefits_end', contractLimit: 'min_only_clause',
-          contractStartDate: 'contract_start', contractJobTitle: 'job_title_contract',
-        };
+        const keyMap = CA_KEY_MAP;
         fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
       }
     }
@@ -885,13 +918,7 @@ export default function CanadaReviewPage({
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      const keyMap: Record<string, string> = {
-        province: 'province', age: 'age', years: 'years', salary: 'pay', role: 'role', howEnded: 'ended',
-        offerMoney: 'offer_amount', offerNotice: 'notice_weeks', offerVacation: 'vacation_on_notice',
-        offerLastDay: 'last_day', offerNoticeWorked: 'working_notice_weeks', offerDecideBy: 'sign_by',
-        offerRelease: 'release_required', offerBenefitsEnd: 'benefits_end', contractLimit: 'min_only_clause',
-        contractStartDate: 'contract_start', contractJobTitle: 'job_title_contract',
-      };
+      const keyMap = CA_KEY_MAP;
       const factKey = keyMap[id] || id;
       const currentItem = items.find((i) => i.id === id);
       fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: currentItem?.originalDocumentValue }).catch(() => {});
@@ -923,13 +950,7 @@ export default function CanadaReviewPage({
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      const keyMap: Record<string, string> = {
-        province: 'province', age: 'age', years: 'years', salary: 'pay', role: 'role', howEnded: 'ended',
-        offerMoney: 'offer_amount', offerNotice: 'notice_weeks', offerVacation: 'vacation_on_notice',
-        offerLastDay: 'last_day', offerNoticeWorked: 'working_notice_weeks', offerDecideBy: 'sign_by',
-        offerRelease: 'release_required', offerBenefitsEnd: 'benefits_end', contractLimit: 'min_only_clause',
-        contractStartDate: 'contract_start', contractJobTitle: 'job_title_contract',
-      };
+      const keyMap = CA_KEY_MAP;
       const factKey = keyMap[id] || id;
       const currentItem = items.find((i) => i.id === id);
       fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'change', value: currentItem?.inlineInputValue || currentItem?.value }).catch(() => {});
@@ -1144,6 +1165,39 @@ export default function CanadaReviewPage({
                   className="h-full bg-[#0EB28D] rounded-[2px] transition-all duration-300"
                   style={{ width: `${(confirmedCount / totalCount) * 100}%` }}
                 />
+              </div>
+            </div>
+          )}
+
+                    {/* Change 21: Location Mismatch Warning Banner */}
+          {locationMismatch?.detected && !locationMismatchDismissed && (
+            <div className="mb-8 rounded-[14px] bg-[#FFF8E7] border border-[#E8D196] border-l-4 border-l-[#B07A00] p-4.5 sm:p-5 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <span className="text-[22px] leading-none mt-0.5">📍</span>
+                <div>
+                  <h4 className="font-sans font-[700] text-[15.5px] text-[#062C55]">
+                    {locationMismatch.message || `Your documents mention ${locationMismatch.documentPlace || locationMismatch.docPlace}. Is ${locationMismatch.selectedPlace || locationMismatch.chosen} right?`}
+                  </h4>
+                  <p className="font-sans text-[13px] text-[#5A6B78] mt-0.5">
+                    Severance laws and calculations are specific to each province or state. If you worked in ${locationMismatch.documentPlace || locationMismatch.docPlace}, please update your region before generating the report.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowChangeRegionModal(true)}
+                  className="px-4 py-2 bg-[#062C55] hover:bg-[#0C3B6E] text-white font-sans font-[700] text-[13px] rounded-[8px] transition cursor-pointer shadow-xs"
+                >
+                  Change region
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setLocationMismatchDismissed(true)}
+                  className="px-3 py-2 text-[#5A6B78] hover:text-[#062C55] font-sans font-[600] text-[13px] rounded-[8px] hover:bg-black/5 transition cursor-pointer"
+                >
+                  It&apos;s right
+                </button>
               </div>
             </div>
           )}
@@ -1552,7 +1606,7 @@ export default function CanadaReviewPage({
             </div>
 
             <div className="space-y-2.5">
-              {items.slice(0, 6).map((item) => (
+              {items.filter((item) => item.section === "you").map((item) => (
                 <ItemCard
                   key={item.id}
                   item={item}
@@ -1585,7 +1639,7 @@ export default function CanadaReviewPage({
             </div>
 
             <div className="space-y-2.5">
-              {items.slice(6, 14).map((item) => (
+              {items.filter((item) => item.section === "offer").map((item) => (
                 <ItemCard
                   key={item.id}
                   item={item}
@@ -1618,7 +1672,7 @@ export default function CanadaReviewPage({
             </div>
 
             <div className="space-y-2.5">
-              {items.slice(14).map((item) => (
+              {items.filter((item) => item.section === "contract").map((item) => (
                 <ItemCard
                   key={item.id}
                   item={item}
@@ -2186,6 +2240,7 @@ function ItemCardInlineEditor({
       )}
 
 
-    </div>
+    
+          </div>
   );
 }

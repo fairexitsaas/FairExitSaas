@@ -12,7 +12,7 @@ import type { SourceRow } from './regionData'
 import type { Jurisdiction } from './jurisdictions'
 
 export interface ReportJson {
-  cover: { role_line: string; place_line: string }
+  cover: { role_line: string; place_line: string; name_line?: string | null }
   glance: string
   contract_note?: string
   confirmed_line: string
@@ -105,6 +105,21 @@ export function ruleWarnings(report: ReportJson, allowedSourceIds: string[], all
   return warn
 }
 
+/**
+ * Item 03: words run together where italic meets normal text ("Yourrelease", "afterthe").
+ * Moves any space that sits just inside an <em>/<i>/<b>/<strong> tag to just outside it,
+ * and adds a space where a closing tag is glued straight onto the next word.
+ */
+export function fixItalicSpaces(html: string): string {
+  return html
+    // "<em>Your </em>release" -> "<em>Your</em> release"
+    .replace(/(\s+)<\/(em|i|b|strong)>/g, '</$2>$1')
+    // "after<em> the</em>" -> "after <em>the</em>"
+    .replace(/<(em|i|b|strong)(\s[^>]*)?>(\s+)/g, '$3<$1$2>')
+    // "<em>Your</em>release" -> "<em>Your</em> release" (only when a letter follows directly)
+    .replace(/<\/(em|i)>(?=[A-Za-z0-9])/g, '</$1> ')
+}
+
 // ---------------------------------------------------------------------------
 // HTML & Asset Helpers
 // ---------------------------------------------------------------------------
@@ -189,6 +204,7 @@ export interface RenderMeta {
   pages?: Record<string, number>
   numbers?: ReportNumbers | null
   answers?: Record<string, any>
+  input?: any
 }
 
 export interface ReportNumbers {
@@ -337,7 +353,7 @@ function sectionCoverFooter(curPage: number, totalPages: number): string {
 /** "ontario.ca · Your guide to the ESA, Termination of employment" style label for a source row. */
 function sourceLabel(s: SourceRow): string {
   let host = ''
-  try { host = new URL(s.url).hostname.replace(/^www\./, '') } catch { /* no url */ }
+  try { host = new URL(s.url).hostname.replace(/^www\d?\./, '') } catch { /* no url */ }
   const section = String(s.section || '').split(' (')[0].replace(/^Your guide to the [A-Z]+,\s*/i, '').trim()
   const short = section.length > 60 ? `${section.slice(0, 57).trim()}…` : section
   return [host || s.rule, short].filter(Boolean).join(' · ')
@@ -442,8 +458,13 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
   const nb = m.numbers
   const money = (v: number) => fmtMoney(v, m.jurisdiction.country)
 
-  // 1. Client Name
-  const clientName = a.name || a.full_name || 'Client'
+  // 1. Client Name (Change 02: extracted as employee_name, never use 'Client')
+  const rawName = r.cover?.name_line || m.input?.confirmed_facts?.employee_name || a.employee_name || a.name || a.full_name || null
+  const clientName = rawName && String(rawName).trim() !== '' && String(rawName).trim() !== 'Client' ? String(rawName).trim() : null
+
+  // Weekly pay calculation (Change 12A: annual pay / 52 rounded to cent once at the end)
+  const salaryNum = typeof a.salary === 'number' ? a.salary : typeof a.pay === 'number' ? a.pay : null
+  const weeklyPayNum = salaryNum ? Math.round((salaryNum / 52) * 100) / 100 : null
 
   // 2. Dates
   const confirmedDateMatch = r.confirmed_line ? r.confirmed_line.match(/confirmed on ([A-Za-z]+ \d{1,2}, \d{4})/i) : null
@@ -550,6 +571,8 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
     rangeHighMonths,
     lowAmt,
     highAmt,
+    weeklyPayNum,
+    salaryNum,
   }
 }
 
@@ -578,7 +601,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           ${heroBandSrc ? `<img class="hero-img" src="${heroBandSrc}" alt="FairExit Illustration"/>` : '<div class="hero-placeholder"></div>'}
           <div class="hero-logo-box">
             ${logoSrc ? `<img src="${logoSrc}" class="hero-logo" alt="FairExit"/>` : '<div class="hero-logo-text">FairExit</div>'}
-            <div class="hero-tagline">Challenge your severance offer.</div>
+            <div class="hero-tagline">Challenge your severance offer</div>
           </div>
         </div>
         <div class="cover-content">
@@ -594,10 +617,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           </div>
           <div class="cover-divider"></div>
           <div class="cover-meta-grid">
+            ${dyn.clientName ? `
             <div class="meta-col">
               <div class="meta-label">PREPARED FOR</div>
               <div class="meta-value">${esc(dyn.clientName)}</div>
-            </div>
+            </div>` : ''}
             <div class="meta-col">
               <div class="meta-label">ROLE</div>
               <div class="meta-value">${esc(r.cover?.role_line || dyn.yearsStr)}</div>
@@ -630,12 +654,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   const before = (id: string) => (p[id] ? p[id] - 1 : undefined)
   const tocItems = [
     { num: '1', title: 'Where you stand', desc: 'Your offer checked against the rules, and what lines up.', range: pr(p['s1_cover'], before('s2_cover')) },
-    { num: '2', title: isUS ? "Why there's no minimum" : 'Two numbers to understand', desc: isUS ? "What you're owed comes from what was promised." : 'The legal minimum, and what a court might award.', range: pr(p['s2_cover'], before('s3_cover')) },
+    { num: '2', title: isUS ? "Why there's no minimum" : 'Two numbers to understand', desc: isUS ? "What applies to you comes from what was promised." : 'The legal minimum, and what a court might award.', range: pr(p['s2_cover'], before('s3_cover')) },
     { num: '3', title: "What's in your letter and contract", desc: 'Clause by clause, with sources.', range: pr(p['s3_cover'], before('s4_cover')) },
     { num: '4', title: 'Questions to prepare', desc: "Calm questions for HR, and this week's steps.", range: pr(p['s4_cover'], before('s5_cover')) },
     { num: '5', title: 'Your next step', desc: 'The three paths, side by side.', range: pr(p['s5_cover'], before('s6_sources')) },
-    { num: '6', title: 'Where every number comes from', desc: 'Every number and rule, with its official source.', range: pr(p['s6_sources']) },
-    { num: '7', title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', desc: 'How to hand this report over, and your report ID.', range: pr(p['s7_lawyer']) },
+    { num: '·', title: 'Where every number comes from', desc: 'Every number and rule, with its official source.', range: pr(p['s6_sources']) },
+    { num: '·', title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', desc: isUS ? 'How to hand this report over, and your report ID.' : 'How to hand this report to a lawyer, and your report ID.', range: pr(p['s7_lawyer']) },
   ]
 
   const tocHtml = `
@@ -659,7 +683,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       </div>
 
       <div class="legend-card">
-        <div class="legend-header"><b>How to read the colours:</b> they always mean the same thing.</div>
+        <div class="legend-header"><b>How to read the ${isUS ? 'colors' : 'colours'}:</b> they always mean the same thing.</div>
         <div class="legend-pills">
           <span class="pill pill-green">Green · lines up</span>
           <span class="pill pill-red">Red · doesn't line up</span>
@@ -682,13 +706,15 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // -------------------------------------------------------------------------
   // 3. BEFORE YOU USE THIS ("The important stuff — please read" - ca3.png / us3.png)
   // -------------------------------------------------------------------------
+  const aLawyer = isUS ? 'an attorney' : 'a lawyer'
+  const lawyerClient = isUS ? 'an attorney–client' : 'a lawyer–client'
   const beforeCards = [
-    { num: '1', title: 'This is a do-it-yourself report', text: `This is designed for you to use <b>on your own</b>. It organizes your offer and prepares questions — it is <b>not</b> advice a ${w.lawyer} would give you after reviewing your full situation, and a ${w.lawyer} may see things very differently. Anything you choose to send or say, you're doing <b>on your own initiative</b>.` },
-    { num: '2', title: 'Information, not legal advice', text: `This pack gives you information to help you prepare. It does <b>not</b> make FairExit your ${w.lawyer} and does not create a ${w.lawyer}–client relationship. Nothing here is legal advice.` },
+    { num: '1', title: 'This is a do-it-yourself report', text: `This is designed for you to use <b>on your own</b>. It organizes your offer and prepares questions — it is <b>not</b> advice ${aLawyer} would give you after reviewing your full situation, and ${aLawyer} may see things very differently. Anything you choose to send or say, you're doing <b>on your own initiative</b>.` },
+    { num: '2', title: 'Information, not legal advice', text: `This pack gives you information to help you prepare. It does <b>not</b> make FairExit your ${w.lawyer} and does not create ${lawyerClient} relationship. Nothing here is legal advice.` },
     { num: '3', title: 'We use AI — mistakes can happen', isAlert: true, text: `The explanations, notes, and draft questions are produced by <b>software and AI</b> from general rules and the details you gave us. <b>AI can be wrong, details can be misread, and laws change</b>. It is up to you to read everything carefully and confirm every fact is correct before you rely on it.` },
-    { num: '4', title: 'No guarantee — and the decisions are yours', text: `Any general information here can be wrong, and outcomes depend on your paperwork and your situation. <b>FairExit accepts no responsibility for what you send, say, or decide based on this report</b> — those choices are entirely yours. Deadlines to act can be short; confirm them with a ${w.lawyer} promptly.` },
-    { num: '5', title: `Only a ${w.lawyer} can give you the exact answer`, text: `We provide clarity in an organized way. <b>Only a licensed employment ${w.lawyer}</b> can confirm what you're truly owed, review your real contract, and advise you. If anything feels urgent or serious — especially before you sign anything — speak to a ${w.lawyer}. The first call is often free.` },
-    { num: '6', title: `Once a ${w.lawyer} takes your case, follow them`, text: `Everything here is <b>general and organizational</b>. If you retain a ${w.lawyer}, their advice <b>supersedes</b> anything in this report — follow your ${w.lawyer}, not this document. <b>Do not rely on this report once you're working with a ${w.lawyer}</b>.` },
+    { num: '4', title: 'No guarantee — and the decisions are yours', text: `Any general information here can be wrong, and outcomes depend on your paperwork and your situation. <b>FairExit accepts no responsibility for what you send, say, or decide based on this report</b> — those choices are entirely yours. Deadlines to act can be short; confirm them with ${aLawyer} promptly.` },
+    { num: '5', title: `Only ${aLawyer} can give you the exact answer`, text: `We provide clarity in an organized way. <b>Only a licensed employment ${w.lawyer}</b> can confirm your estimate, review your real contract, and advise you. If anything feels urgent or serious — especially before you sign anything — speak to ${aLawyer}. The first call is often free.` },
+    { num: '6', title: `Once ${aLawyer} takes your case, follow them`, text: `Everything here is <b>general and organizational</b>. If you retain ${aLawyer}, their advice <b>supersedes</b> anything in this report — follow your ${w.lawyer}, not this document. <b>Do not rely on this report once you're working with ${aLawyer}</b>.` },
   ]
 
   const beforeHtml = `
@@ -758,36 +784,41 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           ${r.contract_note ? `<p class="glance-contract-note">${esc(r.contract_note)}</p>` : ''}
         </div>
         <div class="glance-table">
+          ${dyn.employerName && dyn.employerName !== 'Not stated' ? `
           <div class="glance-row">
             <span class="glance-col-label">Employer</span>
             <span class="glance-col-val bold">${esc(dyn.employerName)}</span>
-          </div>
+          </div>` : ''}
+          ${dyn.yearsStr && dyn.yearsStr !== 'Not stated' ? `
           <div class="glance-row">
             <span class="glance-col-label">${isUS ? 'Service' : 'Years of service'}</span>
             <span class="glance-col-val bold">${esc(dyn.yearsStr)}</span>
-          </div>
+          </div>` : ''}
           ${isUS && a.age ? `
             <div class="glance-row">
               <span class="glance-col-label">Age</span>
               <span class="glance-col-val bold">${esc(String(a.age))}</span>
             </div>` : ''}
+          ${dyn.salaryStr && dyn.salaryStr !== 'Not stated' ? `
           <div class="glance-row">
             <span class="glance-col-label">Your pay</span>
             <span class="glance-col-val bold">${esc(dyn.salaryStr)}</span>
-          </div>
+          </div>` : ''}
+          ${dyn.offerStr && dyn.offerStr !== 'Not stated' ? `
           <div class="glance-row">
             <span class="glance-col-label">They offered</span>
             <span class="glance-col-val bold">${esc(dyn.offerStr)}</span>
-          </div>
-          ${isUS ? '' : `
+          </div>` : ''}
+          ${!isUS && dyn.minDisplayWithWeeks && dyn.minDisplayWithWeeks !== 'Not stated' ? `
           <div class="glance-row">
             <span class="glance-col-label">Legal minimum</span>
             <span class="glance-col-val bold">${esc(dyn.minDisplayWithWeeks)}</span>
-          </div>`}
+          </div>` : ''}
+          ${dyn.deadlineStr && dyn.deadlineStr !== 'Not stated' ? `
           <div class="glance-row">
             <span class="glance-col-label">Decide by</span>
             <span class="glance-col-val bold">${esc(dyn.deadlineStr)}</span>
-          </div>
+          </div>` : ''}
         </div>
       </div>
       ${pageFooter(curPage, effTotal)}
@@ -990,7 +1021,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         </div>
 
         <div class="estimate-disclaimer-card">
-          <b>This is an estimate, not a promise.</b> Base pay only: a bonus and benefits during the notice period could add to it. Pay from a new job usually reduces the part above the minimum. Only a ${esc(w.lawyer)} can confirm your number.
+          <b>This is an estimate, not a promise.</b> Base pay only: a bonus and benefits during the notice period could add to it. Pay from a new job usually reduces the part above the minimum. Only ${esc(isUS ? 'an attorney' : 'a lawyer')} can confirm your number.
         </div>
         ${pageFooter(curPage, effTotal)}
       </div>
@@ -1007,12 +1038,15 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     const offerShort = dyn.offerStr && dyn.offerStr !== 'Not stated' && dyn.offerStr.length <= 20 ? dyn.offerStr : null
     let keyDays: string | null = null
     let keyDesc = ''
-    if (over40 && /\b45 days\b/i.test(rcText)) {
+    const isGroupLayoff = a.mass === true || a.closure === true || a.group_layoff === true
+    if (over40 && /\b45 days\b/i.test(rcText) && isGroupLayoff) {
       keyDays = '45 days'
       keyDesc = 'The time federal rules give you to consider a release in a group layoff at your age. 7 more days to take it back after you sign.'
-    } else if (over40 && /\b21 days\b/i.test(rcText)) {
-      keyDays = '21 days'
-      keyDesc = 'The time federal rules give you to consider a release at your age. 7 more days to take it back after you sign.'
+    } else if (over40 && (/\b45 days\b/i.test(rcText) || /\b21 days\b/i.test(rcText))) {
+      keyDays = isGroupLayoff ? '45 days' : '21 or 45 days'
+      keyDesc = isGroupLayoff
+        ? 'The time federal rules give you to consider a release in a group layoff at your age. 7 more days to take it back after you sign.'
+        : 'The time federal rules give you to consider a release at your age (21 days for an individual termination, 45 days for a group layoff). 7 more days to take it back after you sign.'
     } else if (deadlineShort) {
       keyDays = deadlineShort
       keyDesc = 'Your deadline to decide, from your letter. Asking for more time in writing is normal, and nothing is final until you sign.'
@@ -1168,7 +1202,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     const wk = mn?.weeks ?? null
     const sev = mn?.severanceWeeks ?? 0
     const term = mn?.terminationWeeks ?? (wk !== null ? wk - sev : null)
-    const weekly = total !== null && wk ? total / wk : (mn?.weeklyPay ?? null)
+    const weekly = dyn.weeklyPayNum ?? (total !== null && wk ? total / wk : (mn?.weeklyPay ?? null))
     const money2 = (v: number) => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const statute = esc(m.jurisdiction.statute_short || 'statute')
     if (mn?.arithmetic) minLines.push(esc(mn.arithmetic))
@@ -1218,15 +1252,15 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       ` : `
         <div class="detail-card">
           <div class="card-num-title">1 · A written policy or agreement</div>
-          <p class="detail-text">If your employer has a written severance policy, plan or agreement, it decides what you're owed${nb?.offer != null ? `. Your offer: <b>${money(nb.offer)}</b>` : ''}. Section 3 shows what your documents say.</p>
+          <p class="detail-text">If your employer has a written severance policy, plan or agreement, it decides what applies to you${nb?.offer != null ? `. Your offer: <b>${money(nb.offer)}</b>` : ''}. Section 3 shows what your documents say.</p>
         </div>
         <div class="detail-card">
           <div class="card-num-title">2 · A law for certain layoffs</div>
           <p class="detail-text">The federal WARN Act requires 60 days' notice, or pay instead, before a plant closing or mass layoff at employers with 100 or more workers. It only applies to larger layoffs; some states add their own rules.</p>
         </div>
         <div class="detail-card">
-          <div class="card-num-title">3 · Money owed no matter what</div>
-          <p class="detail-text">Your final pay is owed whether or not you sign. In some states, unused vacation or PTO counts as wages too. ${esc(m.jurisdiction.name)}'s rules are on the Sources page.</p>
+          <div class="card-num-title">3 · Money paid no matter what</div>
+          <p class="detail-text">Your final pay is paid whether or not you sign. In some states, unused vacation or PTO counts as wages too. ${esc(m.jurisdiction.name)}'s rules are on the Sources page.</p>
         </div>
       `}
       ${pageFooter(curPage, effTotal)}
@@ -1257,63 +1291,63 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   sec.push({ id: 's3_cover', title: "Section 3 · What's in your letter and contract", html: s3CoverHtml })
   curPage += 1
 
-  // Each clause gets its own dedicated page matching ca13-ca16.png
-  clauses.forEach((c, idx) => {
-    const isBad = c.status === 'bad'
-    const isOk = c.status === 'ok'
-    const pillClass = isBad ? 'pill-red' : isOk ? 'pill-green' : c.status === 'info' ? 'pill-gray' : 'pill-yellow'
-    const isInfo = c.status === 'info'
-    const pillLabel = isBad ? "DOESN'T LINE UP" : isOk ? 'LINES UP' : isInfo ? 'GOOD TO KNOW' : 'ASK ABOUT IT'
-    const srcHtml = sourceLink(c.source_id, m)
-    const ruleCheck = matchingCheck(c, r.checks || [])
-    const rulesText = c.what_it_means
-    const whyText = ruleCheck?.why && ruleCheck.why.length >= 8 ? ruleCheck.why : ''
-
-    const clauseHtml = `
-      <div class="page clause-page">
-        <div class="section-kicker-bar">
-          <span>SECTION 3 OF 5 · WHAT'S IN YOUR LETTER AND CONTRACT</span>
-          ${progressDots(3)}
-        </div>
-        <div class="header-divider"></div>
-        ${idx === 0 ? `<h2 class="section-heading">The terms to understand and the <i>questions to ask.</i></h2>
-        <p class="section-sub">For each: what your documents say, what the rules say, and what it means.</p>` : ''}
-
-        <div class="clause-pill-badge">
-          <span class="pill ${pillClass}">${pillLabel}</span>
-        </div>
-
-        <h3 class="clause-single-heading">${idx + 1}. ${esc(c.title.replace(/^\d+[.)]\s+/, ''))}</h3>
-
-        <div class="clause-two-boxes">
-          <div class="c-box c-box-white">
-            <div class="c-box-header">YOUR DOCUMENTS SAY</div>
-            <div class="c-box-body">${esc(c.what_it_says)}</div>
-          </div>
-          <div class="c-box c-box-beige">
-            <div class="c-box-header">WHAT THE RULES SAY</div>
-            <div class="c-box-body">${esc(rulesText)}</div>
-          </div>
-        </div>
-
-        ${whyText ? `<p class="clause-why"><b>Why it matters:</b> ${esc(whyText)}</p>` : ''}
-
-        <div class="clause-action-box">
-          <span class="action-arrow">→</span>
-          <span>${esc(c.question_to_ask)}</span>
-        </div>
-
-        ${srcHtml ? `
-          <div class="clause-dashed-rule"></div>
-          <div class="clause-source-line">Where this comes from: ${srcHtml}</div>
-        ` : ''}
-        ${pageFooter(curPage, effTotal)}
+  const s3ClausesHtml = `
+    <div class="page clause-page clauses-flow">
+      <div class="section-kicker-bar">
+        <span>SECTION 3 OF 5 · WHAT'S IN YOUR LETTER AND CONTRACT</span>
+        ${progressDots(3)}
       </div>
-    `
-    const clauseId = idx === clauses.length - 1 ? 's3_clause_last' : `s3_clause_${idx}`
-    sec.push({ id: clauseId, title: c.title, html: clauseHtml })
-    curPage += 1
-  })
+      <div class="header-divider"></div>
+      <h2 class="section-heading">The terms to understand and the <i>questions to ask.</i></h2>
+      <p class="section-sub">For each: what your documents say, what the rules say, and what it means.</p>
+
+      ${clauses.map((c, idx) => {
+        const isBad = c.status === 'bad'
+        const isOk = c.status === 'ok'
+        const pillClass = isBad ? 'pill-red' : isOk ? 'pill-green' : c.status === 'info' ? 'pill-gray' : 'pill-yellow'
+        const isInfo = c.status === 'info'
+        const pillLabel = isBad ? "DOESN'T LINE UP" : isOk ? 'LINES UP' : isInfo ? 'GOOD TO KNOW' : 'ASK ABOUT IT'
+        const ruleCheck = matchingCheck(c, r.checks || [])
+        const srcHtml = sourceLink(c.source_id || ruleCheck?.source_id, m) || `Your ${esc(w.letter)} and ${esc(w.contract)}`
+        const rulesText = c.what_it_means
+        const whyText = ruleCheck?.why && ruleCheck.why.length >= 8 ? ruleCheck.why : ''
+
+        return `
+          <div class="clause-item">
+            <div class="clause-pill-badge">
+              <span class="pill ${pillClass}">${pillLabel}</span>
+            </div>
+
+            <h3 class="clause-single-heading">${idx + 1}. ${esc(c.title.replace(/^\d+[.)]\s+/, ''))}</h3>
+
+            <div class="clause-two-boxes">
+              <div class="c-box c-box-white">
+                <div class="c-box-header">YOUR DOCUMENTS SAY</div>
+                <div class="c-box-body">${esc(c.what_it_says)}</div>
+              </div>
+              <div class="c-box c-box-beige">
+                <div class="c-box-header">WHAT THE RULES SAY</div>
+                <div class="c-box-body">${esc(rulesText)}</div>
+              </div>
+            </div>
+
+            ${whyText ? `<p class="clause-why"><b>Why it matters:</b> ${esc(whyText)}</p>` : ''}
+
+            <div class="clause-action-box">
+              <span class="action-arrow">→</span>
+              <span>${esc(c.question_to_ask)}</span>
+            </div>
+
+            <div class="clause-dashed-rule"></div>
+            <div class="clause-source-line">Where this comes from: ${srcHtml}</div>
+          </div>
+        `
+      }).join('')}
+      ${pageFooter(curPage, effTotal)}
+    </div>
+  `
+  sec.push({ id: 's3_clauses', title: 'The terms to understand and the questions to ask', html: s3ClausesHtml })
+  curPage += 1
 
   // -------------------------------------------------------------------------
   // 7. SECTION 4: Questions to prepare (ca17-ca19.png / us16-us18.png)
@@ -1365,7 +1399,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <ul class="email-questions-list ${isCompactQuestions ? 'compact-list' : ''}">
             ${questions.map((q) => `<li>${esc(q)}</li>`).join('')}
           </ul>
-          <p>Thank you,<br/>${esc(String(dyn.clientName).split(' ')[0])}</p>
+          <p>Thank you,<br/>${esc(dyn.clientName ? String(dyn.clientName).split(' ')[0] : '[Your name]')}</p>
         </div>
       </div>
 
@@ -1499,7 +1533,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   const statuteSrc = m.sources.find((x) => /statute|laws|act\b/i.test(`${x.url} ${x.section}`)) || m.sources[0]
   if (nb?.offer != null) srcRows.push({ item: 'Their offer', value: money(nb.offer), how: 'What your letter says', srcText: `Your ${w.letter}` })
   if (!isUS && dyn.minAmount !== null) srcRows.push({ item: 'Legal minimum', value: dyn.minAmtStr, how: minHow || 'Weeks owed × your regular weekly pay', src: statuteSrc })
-  if (!isUS && dyn.rangeHigh !== null) srcRows.push({ item: 'Range', value: dyn.lowAmt ? `${dyn.lowAmt}–${dyn.highAmt}` : `up to ${dyn.highAmt}`, how: `FairExit estimate${dyn.rangeLowMonths && dyn.rangeHighMonths ? `: ${dyn.rangeLowMonths}–${dyn.rangeHighMonths} months of base pay` : ''}, from the four factors courts use`, srcText: 'FairExit estimate (not a rule)' })
+  if (!isUS && dyn.rangeHigh !== null) srcRows.push({ item: 'Range', value: dyn.lowAmt ? `${dyn.lowAmt}–${dyn.highAmt}` : `up to ${dyn.highAmt}`, how: `FairExit estimate${dyn.rangeLowMonths && dyn.rangeHighMonths ? `: ${dyn.rangeLowMonths}–${dyn.rangeHighMonths} months of base pay` : ''}, from the four factors courts use`, srcText: 'FairExit estimate based on how courts decide notice, not a rule' })
   const seen = new Set<string>()
   for (const c of r.checks || []) {
     const src = byId(c.source_id)
@@ -1519,8 +1553,25 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     seen.add(src.id)
     srcRows.push({ item: src.rule, how: src.section, src })
   }
-  const SOURCE_ROWS_MAX = 14
-  const shownRows = srcRows.slice(0, SOURCE_ROWS_MAX)
+  if (isUS) {
+    const hasWarn = srcRows.some((x) => /warn/i.test(`${x.item} ${x.how} ${x.src?.rule || ''}`))
+    if (!hasWarn) {
+      srcRows.push({
+        item: '60 days notice',
+        how: 'WARN Act (plant closing or mass layoff with 100+ workers)',
+        srcText: 'Federal WARN Act · 20 U.S.C. § 2101',
+        src: {
+          id: 'US-FED-S1',
+          rule: 'Federal WARN Act',
+          section: '20 U.S.C. § 2101',
+          url: 'https://www.dol.gov/agencies/eta/layoffs/warn',
+          status: 'verified',
+          checked: '2026-10-31',
+        },
+      })
+    }
+  }
+  const shownRows = srcRows
   const checkedDates = m.sources.map((x) => x.checked).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()
   const checkedLine = checkedDates.length ? ` (checked ${esc(fmtLongDate(checkedDates[checkedDates.length - 1]))})` : ''
 
@@ -1546,7 +1597,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
               <td>${esc(row.how)}</td>
               <td>
                 <div class="src-id-title">${esc(row.src ? `${row.src.rule} · ${String(row.src.section || '').split(' (')[0]}` : row.srcText || '')}</div>
-                ${row.src?.url ? `<a class="src-url" href="${esc(row.src.url)}">${esc(displayUrl(row.src.url))}</a>` : ''}
+                ${row.src?.url ? `<a class="src-url" href="${esc(row.src.url)}">${esc(sourceLabel(row.src))}</a>` : ''}
               </td>
             </tr>
           `).join('')}
@@ -1561,12 +1612,15 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // -------------------------------------------------------------------------
   // 10. SECTION 7: Talking to a lawyer / attorney (ca23.png / us22.png)
   // -------------------------------------------------------------------------
+  const aLawyerTitle = isUS ? 'an attorney' : 'a lawyer'
+  const lawyerClientRel = isUS ? 'an attorney–client' : 'a lawyer–client'
+  const lawyersPlural = isUS ? 'attorneys' : `${w.lawyer}s`
   const s7Html = `
     <div class="page lawyer-handover-page">
       <div class="section-kicker">IF YOU'D RATHER NOT DO IT ALONE</div>
       <div class="header-divider"></div>
-      <h2 class="section-heading">One step, and a ${esc(w.lawyer)} <i>takes it from here.</i></h2>
-      <p class="section-sub">If they push back, go quiet, or it feels like too much, you can hand this report to a ${esc(w.lawyer)}.</p>
+      <h2 class="section-heading">One step, and ${esc(aLawyerTitle)} <i>takes it from here.</i></h2>
+      <p class="section-sub">If they push back, go quiet, or it feels like too much, you can hand this report to ${esc(aLawyerTitle)}.</p>
 
       <div class="lawyer-handover-card">
         <div class="handover-left">
@@ -1584,7 +1638,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       </div>
 
       <div class="transparency-note">
-        <b>For information only, not legal advice</b>, and not a ${esc(w.lawyer)}–client relationship. How we're paid: ${esc(w.lawyer)}s pay a flat advertising fee; never a cut of your outcome.
+        <b>For information only, not legal advice</b>, and not ${esc(lawyerClientRel)} relationship. How we're paid: ${esc(lawyersPlural)} pay a flat advertising fee; never a cut of your outcome.
       </div>
 
       <div class="before-use-footer">
@@ -2914,6 +2968,45 @@ a.src-link {
   color: #062C55;
 }
 
+/* Clauses flowing */
+.page.clauses-flow {
+  height: auto !important;
+  min-height: 11in !important;
+  max-height: none !important;
+  overflow: visible !important;
+  page-break-after: always;
+  break-after: page;
+}
+.clause-item {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 24px;
+}
+
+/* Sources flowing & layout */
+.page.sources-page {
+  height: auto !important;
+  min-height: 11in !important;
+  max-height: none !important;
+  overflow: visible !important;
+  page-break-after: always;
+  break-after: page;
+}
+.sources-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.sources-table th:nth-child(1) { width: 22%; }
+.sources-table th:nth-child(2) { width: 33%; }
+.sources-table th:nth-child(3) { width: 45%; }
+.sources-table thead { display: table-header-group; }
+.sources-table tr { break-inside: avoid; page-break-inside: avoid; }
+.sources-table td, .sources-table a { word-break: normal; overflow-wrap: anywhere; }
+
+@media print {
+  .page-footer { display: none !important; }
+}
 `
 
 export function renderReportHtml(r: ReportJson, m: RenderMeta, totalPages?: number, upTo?: number): string {
@@ -2926,7 +3019,7 @@ export function renderReportHtml(r: ReportJson, m: RenderMeta, totalPages?: numb
   const all = reportSections(r, m2, effTotal)
   const secs = upTo === undefined ? all : all.slice(0, upTo)
   const fontsCss = getFontsCss()
-  return `<!doctype html>
+  const rawHtml = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8"/>
@@ -2940,6 +3033,7 @@ ${CSS}
     ${secs.map((s) => s.html).join('\n')}
   </body>
 </html>`
+  return fixItalicSpaces(rawHtml)
 }
 
 export function allowedAmounts(input: Record<string, any>): number[] {

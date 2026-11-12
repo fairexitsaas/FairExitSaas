@@ -63,6 +63,17 @@ function normalizeReviewKey(key: string, country?: string): string {
     contract_start: 'contract_start',
     contractJobTitle: 'job_title_contract',
     job_title_contract: 'job_title_contract',
+    employee_name: 'employee_name',
+    employeeName: 'employee_name',
+    clientName: 'employee_name',
+    employer_name: 'employer_name',
+    employerName: 'employer_name',
+    company: 'employer_name',
+    pay_rate: 'pay_rate',
+    payRate: 'pay_rate',
+    document_place: 'document_place',
+    documentPlace: 'document_place',
+    location: 'document_place',
   }
   return map[key] || key
 }

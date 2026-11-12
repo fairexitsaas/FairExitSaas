@@ -7,7 +7,7 @@ import { buildJurisdiction } from '../../src/fairexit/jurisdictions'
 describe('Claude Call A Prompt and Extraction Unit Tests', () => {
   it('verifies Call A prompt file integrity and SHA-256 hash', () => {
     const hash = getPromptHash()
-    expect(hash).toBe('e914ac5878fa8ad1a26d1ca4058edad0aa1cb9d1c70a0bd5cf483849311b7724')
+    expect(hash).toBe('1f7d19cc6fcf4ccdc81e94447d78868c729990e096c635114563026dd93071d6')
   })
 
   it('verifies that Call A prompt replaces jurisdiction words correctly', () => {
@@ -22,7 +22,12 @@ describe('Claude Call A Prompt and Extraction Unit Tests', () => {
     expect(promptUS).toContain('offer letter or employment contract')
   })
 
-  it('contains all 26 required Call A extraction keys', () => {
+  it('contains all required Call A extraction keys', () => {
+    expect(CALL_A_KEYS.length).toBe(30)
+    expect(CALL_A_KEYS).toContain('employee_name')
+    expect(CALL_A_KEYS).toContain('employer_name')
+    expect(CALL_A_KEYS).toContain('pay_rate')
+    expect(CALL_A_KEYS).toContain('document_place')
     expect(CALL_A_KEYS).toContain('offer_amount')
     expect(CALL_A_KEYS).toContain('notice_weeks')
     expect(CALL_A_KEYS).toContain('severance_weeks')
@@ -38,7 +43,7 @@ describe('Claude Call A Prompt and Extraction Unit Tests', () => {
     expect(CALL_A_KEYS).toContain('attorney_line')
     expect(CALL_A_KEYS).toContain('non_compete')
     expect(CALL_A_KEYS).toContain('contract_mentioned')
-    expect(CALL_A_KEYS.length).toBe(26)
+    expect(CALL_A_KEYS.length).toBe(30)
   })
 
   it('validates a valid Call A JSON response with Zod schema', () => {

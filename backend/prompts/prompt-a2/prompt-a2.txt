@@ -1,0 +1,21 @@
+FAIREXIT · PROMPT A2 · SECOND LOOK (v0.7)
+Model: Claude Opus 5.5 (claude-opus-5-5). Output is JSON only.
+
+=== CALL A2 · SECOND LOOK ===
+Unchanged from v0.5. Runs when the person changes a document value on the check page.
+You re-read ONE item in the document.
+INPUT (JSON):
+ { "key": "field key from Call A", "person_value": "what the person entered",
+   "first_reading": { value, quote, where }, "document": the document text or images }
+OUTPUT (JSON, exactly these keys):
+ { "found_value": "the value the document states, or null",
+   "quote": "exact words, max 25, or null",
+   "where": "page and paragraph or section, or null",
+   "matches_person": true | false,
+   "confidence": "high" | "low" }
+Rules:
+ 1. Re-read only that one item. Ignore everything else.
+ 2. Quote exactly. Never paraphrase inside "quote".
+ 3. If the item is not in the document, set found_value, quote and where to null and
+    matches_person to false. Say nothing else.
+ 4. Never guess. If the words are unclear, use confidence "low".

@@ -195,6 +195,8 @@ export function createFairExitClient(opts: FairExitClientOptions) {
     resolveConflict: (id: string, key: string, choice: 'document' | 'answers' | 'other' | 'not_sure', value?: unknown) =>
       call<any>('POST', `${c(id)}/check/conflicts/${key}`, { choice, value }, id, undefined, 'Resolve Conflict'),
     attest: (id: string) => call<any>('POST', `${c(id)}/check/attest`, { agreed: true }, id, undefined, 'Check Attestation'),
+    changeJurisdiction: (id: string, country: 'CA' | 'US', region: string) =>
+      call<{ case: any; page: any }>('POST', `${c(id)}/check/jurisdiction`, { country, region }, id, undefined, 'Change Jurisdiction'),
 
     // report
     buildReport: (id: string) => call<any>('POST', `${c(id)}/report`, {}, id, undefined, 'Report Generation'),

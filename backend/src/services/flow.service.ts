@@ -13,7 +13,8 @@ import { emailService } from './email.service'
 import { storageService } from './storage.service'
 import { renderReportPdf } from './pdf.service'
 import * as CP from '../fairexit/checkPage'
-import { buildJurisdiction } from '../fairexit/jurisdictions'
+import { computeFreeResult } from '../fairexit/freeCheck'
+import { buildJurisdiction, normalizeCode, type Country } from '../fairexit/jurisdictions'
 import { buildCallBInput } from '../fairexit/reportInputs'
 import { validateShape, ruleWarnings, allowedAmounts, renderReportHtml, reportNumbers, ReportJson, RenderMeta } from '../fairexit/reportOutput'
 import { sourcesFor, latestCheckedDate, regionRulesFor } from '../fairexit/regionData'
@@ -130,7 +131,7 @@ async function executeReportBuildJob(
       report_pdf_path: null,
       docs_delete_after: new Date(now.getTime() + env.RETENTION_DOCS_DAYS * 864e5).toISOString(),
       report_delete_after: new Date(new Date(now).setMonth(now.getMonth() + env.RETENTION_REPORT_MONTHS)).toISOString(),
-      rules_version: RULES_VERSION, prompt_version: PROMPT_VERSION, prompt_sha256: promptSha256(),
+      rules_version: RULES_VERSION, prompt_version: PROMPT_VERSION, prompt_sha256: promptSha256('B'),
     })
     logger.info('[REPORT][JSON_SAVED]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - persistenceStartedAt })
 
@@ -220,7 +221,7 @@ export const flowService = {
         for (const [k, v] of Object.entries(fresh.check_state?.rows || {})) if (v.source === 'answers') keep.rows[k] = v
         await caseService.update(c.id, {
           status: 'checking', status_detail: null, call_a: out, call_a_at: new Date().toISOString(), check_state: keep,
-          attested_at: null, job_started_at: null, prompt_version: PROMPT_VERSION, prompt_sha256: promptSha256(),
+          attested_at: null, job_started_at: null, prompt_version: PROMPT_VERSION, prompt_sha256: promptSha256('A1'),
         })
       } catch (err) {
         logger.error('Call A failed', { requestId, caseId: c.id, message: (err as Error).message })
@@ -428,6 +429,124 @@ export const flowService = {
     ctx.check.attested_at = new Date().toISOString()
     const saved = await saveCtx(c, ctx)
     return CP.buildModel(ctxOf(saved))
+  },
+
+  async changeJurisdiction(c: CaseRow, newCountry: Country, newRegion: string) {
+    this.assertCheckable(c)
+    const code = normalizeCode(newRegion, newCountry)
+    if (!code) throw ApiError.unprocessable(`Unknown or unsupported region: ${newRegion}`)
+    const j = buildJurisdiction(code)
+    if (!j) throw ApiError.unprocessable(`Jurisdiction not covered: ${newRegion}`)
+
+    const answers = { ...(c.answers || {}) }
+    if (newCountry === 'CA') {
+      const provCode = code.slice(3)
+      answers.province = provCode
+      answers.provinceName = j.name
+      delete answers.usState
+      delete answers.state
+      delete answers.stateName
+      delete answers.warnNotice
+      delete answers.miniWarn
+      delete answers.others
+      delete answers.deadline
+      delete answers.advise
+      delete answers.list
+      delete answers.revoke
+      delete answers.nc
+      delete answers.promise
+      delete answers.comp
+
+      // Province-dependent logic within Canada:
+      // In Ontario, §64 ESA requires knowing if payroll is over $2.5M.
+      // Other provinces (e.g. BC, Alberta) do not have this statutory severance threshold.
+      if (provCode !== 'ON') {
+        delete answers.payroll
+        delete answers.payrollGlobal
+        delete answers.payrollUnknown
+      } else if (answers.payroll === undefined || answers.payroll === null) {
+        answers.payrollUnknown = true
+      }
+    } else {
+      answers.usState = j.name
+      answers.state = j.name
+      answers.stateName = j.name
+      delete answers.province
+      delete answers.provinceName
+      delete answers.federal
+      delete answers.payroll
+      delete answers.payrollGlobal
+      delete answers.payrollUnknown
+      delete answers.clause
+      delete answers.minClause
+      delete answers.reemployed
+      delete answers.redflag
+
+      // State-dependent cleanup within US
+      delete answers.stateWarn
+      delete answers.stateStatute
+    }
+
+    const checkState: CheckState = c.check_state && c.check_state.rows
+      ? JSON.parse(JSON.stringify(c.check_state))
+      : { rows: {}, attested: false, attested_at: null, dismissed: [] }
+
+    if (newCountry === 'CA') {
+      delete checkState.rows['state']
+      checkState.rows['province'] = {
+        value: code.slice(3),
+        source: 'answers',
+        status: 'confirmed',
+        user_value: code.slice(3),
+        doc_value: null,
+        quote: null,
+        where: null,
+      }
+    } else {
+      delete checkState.rows['province']
+      checkState.rows['state'] = {
+        value: j.name,
+        source: 'answers',
+        status: 'confirmed',
+        user_value: j.name,
+        doc_value: null,
+        quote: null,
+        where: null,
+      }
+    }
+
+    // Require user to review and re-attest for the new jurisdiction
+    checkState.attested = false
+    checkState.attested_at = null
+    checkState.dismissed = []
+
+    // Recalculate statutory severance and range for the new jurisdiction
+    const newFreeResult = computeFreeResult(newCountry, answers)
+
+    // Invalidate stale report artifacts and persist new jurisdiction
+    const updated = await caseService.update(c.id, {
+      country: newCountry,
+      jurisdiction_code: code,
+      jurisdiction: j,
+      covered: true,
+      answers,
+      free_result: newFreeResult,
+      check_state: checkState,
+      attested_at: null,
+      report: null,
+      report_id: null,
+      report_inputs: null,
+      report_ready_at: null,
+      report_pdf_path: null,
+      status: 'checking',
+      status_detail: null,
+    })
+
+    const ctx = ctxOf(updated)
+    return {
+      case: caseService.view(updated),
+      page: CP.buildModel(ctx),
+    }
   },
 
   // -------------------------------------------------------------------------

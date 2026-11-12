@@ -6,7 +6,7 @@ This document is written so a developer **or an AI coding assistant** can wire t
 frontend (Next.js), the iOS app and the Android app to the backend without reading the backend code.
 It follows the client's code pack `FairExit-Phase1-Code-2026-10-25`, the spec
 `specs/check-page-spec-v2.md`, the explainer video "FairExit copy and facts update" (Oct 2026) and the
-report prompt `report-prompt-v0.6.txt` (used **unchanged**, see section 12).
+prompt files organized by responsibility (`prompt-a1/prompt-a1.txt`, `prompt-a2/prompt-a2.txt`, `prompt-b/prompt-b.txt`, see section 12).
 
 ---
 
@@ -471,12 +471,13 @@ Print-ready HTML of the same report (WebView / iframe / browser print).
 
 ---
 
-## 12. What the backend does with the prompt (for reviewers)
+## 12. What the backend does with the prompts (for reviewers)
 
-* `prompts/report-prompt-v0.6.txt` is the client's file, byte-for-byte (SHA-256 `e914ac58…7724`,
-  unit-tested). It is split on its `=== … ===` headings: Call A gets SHARED INPUT + CALL A
-  (the two `{jurisdiction.words.*}` placeholders are filled in), Call A2 gets CALL A2, Call B gets
-  SHARED INPUT + CALL B. NOTES and CHANGES are not sent to the model.
+* The prompt files are organized into dedicated directories by purpose under `backend/prompts/`:
+  - `prompt-a1/prompt-a1.txt`: Prompt A1 (Call A · Read the Documents / Fact Extraction). Replaces `{jurisdiction.words.*}` placeholders.
+  - `prompt-a2/prompt-a2.txt`: Prompt A2 (Call A2 · Second Look). Re-reads individual contested facts.
+  - `prompt-b/prompt-b.txt`: Prompt B (Call B · Write the Report). Produces full report JSON.
+  NOTES and CHANGES sections are preserved for engineering reference and not sent to the model. Prompt integrity is verified via SHA-256 hashes.
 * Model `claude-opus-5-5`, JSON only, `max_tokens` 24,000 (A) / 32,000 (B), streamed, retried on 429/5xx.
 * Call B input = `jurisdiction, answers, contract, call_a (unedited), confirmed_facts, minimum, range, region_rules, sources`:
   - `minimum`/`range` come from the rules engine (port of `severance-rules.js` v0.2.0, tested equal on 5,928 cases).

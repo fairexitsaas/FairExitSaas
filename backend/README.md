@@ -263,9 +263,12 @@ Phase 1 implements secure document upload, Claude Call A extraction, raw respons
 | `PUT` | `/api/v1/documents/:id/review` | Save user-corrected facts independently |
 | `GET` | `/api/v1/health` | Backend service health check |
 
-### Claude Call A Integration
-- **Source Prompt:** `backend/prompts/report-prompt-v0.6.txt` (matches `codebase/prompt-claude-draft-v0.6.txt`).
-- **Prompt Integrity:** Verified via SHA-256 hash `E914AC5878FA8AD1A26D1CA4058EDAD0AA1CB9D1C70A0BD5CF483849311B7724`.
+### Claude Prompt Architecture & Integration
+- **Prompt Structure:**
+  - `backend/prompts/prompt-a1/prompt-a1.txt`: Prompt A1 (Call A · Read the Documents / Fact Extraction)
+  - `backend/prompts/prompt-a2/prompt-a2.txt`: Prompt A2 (Call A2 · Second Look)
+  - `backend/prompts/prompt-b/prompt-b.txt`: Prompt B (Call B · Write the Report)
+- **Prompt Integrity:** Verified via SHA-256 hash tracked per prompt (Prompt A1 SHA-256: `1f7d19cc6fcf4ccdc81e94447d78868c729990e096c635114563026dd93071d6`).
 - **Validation:** Strict runtime validation of Claude output using Zod (`callAOutputSchema`).
 - **Separation of Concerns:** Original extracted facts (`extracted_facts`) are never modified when users submit corrections (`corrected_facts`).
 

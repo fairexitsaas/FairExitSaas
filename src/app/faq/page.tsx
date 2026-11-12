@@ -96,7 +96,7 @@ const CA_FAQS: FaqItem[] = [
     category: "Money after you leave",
     question: "Will severance affect EI?",
     answer:
-      "Normally it can delay when EI starts, because severance and pay in lieu are allocated to the weeks after your job ends. Right now a temporary federal measure pauses that: for claims starting between March 30, 2025 and October 9, 2027, separation pay is not deducted from EI and the one-week waiting period is waived. Apply for EI as soon as you stop working.",
+      "Normally it can delay when EI starts, because severance and pay in lieu are allocated to the weeks after your job ends. Temporary rules have changed this year. Check the current rules on canada.ca (EI) before you apply. Apply for EI as soon as you stop working.",
   },
   {
     id: "what-happens-to-my-benefits",

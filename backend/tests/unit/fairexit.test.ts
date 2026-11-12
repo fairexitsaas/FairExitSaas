@@ -9,7 +9,7 @@ import { mockCallA, mockCallB } from '../../src/fairexit/mocks'
 import { buildCallBInput } from '../../src/fairexit/reportInputs'
 import { validateShape } from '../../src/fairexit/reportOutput'
 import { parseDate, parseMoney, parseDays } from '../../src/fairexit/values'
-import { systemPromptCallA, promptSha256 } from '../../src/fairexit/prompts'
+import { systemPromptCallA, systemPromptCallA2, systemPromptCallB, promptSha256 } from '../../src/fairexit/prompts'
 
 const ORIGINAL = fs.existsSync(path.resolve(__dirname, '../../../codebase/resource-hub-v2/severance-rules.js'))
   ? path.resolve(__dirname, '../../../codebase/resource-hub-v2/severance-rules.js')
@@ -85,8 +85,12 @@ describe('check page + Call B input (Ontario sample)', () => {
 })
 
 describe('prompt file', () => {
-  it('is used unchanged (v0.6)', () => {
-    expect(promptSha256()).toBe('e914ac5878fa8ad1a26d1ca4058edad0aa1cb9d1c70a0bd5cf483849311b7724')
+  it('is used unchanged (v0.7)', () => {
+    expect(promptSha256('A1')).toBe('1f7d19cc6fcf4ccdc81e94447d78868c729990e096c635114563026dd93071d6')
+    expect(promptSha256('A2')).toBe('164cc114b35ecc34c970f7f80e4cd5c052cc4af0cce5513341bb55a6917f85f5')
+    expect(promptSha256('B')).toBe('4dc8f10f23b473d6b483ce1d6207d46ba478369039afe52888aa696ee7d377ce')
     expect(systemPromptCallA(buildJurisdiction('US-CA')!)).toContain("person's separation agreement")
+    expect(systemPromptCallA2()).toContain('=== CALL A2 · SECOND LOOK ===')
+    expect(systemPromptCallB()).toContain('=== CALL B · WRITE THE REPORT ===')
   })
 })

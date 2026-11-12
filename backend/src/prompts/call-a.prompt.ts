@@ -1,8 +1,8 @@
 /**
  * FairExit Call A Prompt Module
  *
- * Source of truth: codebase/prompt-claude-draft-v0.6.txt / backend/prompts/report-prompt-v0.6.txt
- * Exact SHA-256: E914AC5878FA8AD1A26D1CA4058EDAD0AA1CB9D1C70A0BD5CF483849311B7724
+ * Source of truth: backend/prompts/prompt-a1/prompt-a1.txt
+ * Exact SHA-256: 1f7d19cc6fcf4ccdc81e94447d78868c729990e096c635114563026dd93071d6
  *
  * This module exports the exact system prompt for Call A (Read the Documents),
  * ensuring zero unauthorized alterations to its instructions.
@@ -41,6 +41,10 @@ export const CALL_A_KEYS = [
   'final_pay_date',
   'unused_vacation_payout',
   'contract_mentioned',
+  'employee_name',
+  'employer_name',
+  'pay_rate',
+  'document_place',
   'other',
 ] as const
 
@@ -62,9 +66,8 @@ export function getCallA2SystemPrompt(): string {
 }
 
 /**
- * Returns SHA-256 hash of the source prompt text to verify integrity.
+ * Returns SHA-256 hash of Prompt A1 to verify integrity.
  */
 export function getPromptHash(): string {
-  return promptSha256()
+  return promptSha256('A1')
 }
-

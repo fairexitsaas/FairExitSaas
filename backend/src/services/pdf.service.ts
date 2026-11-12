@@ -7,18 +7,24 @@
  * (remote WebSocket, @sparticuz/chromium on Vercel, Playwright locally).
  */
 import { logger } from '../utils/logger'
-import { renderReportHtml, reportSections, ReportJson, RenderMeta } from '../fairexit/reportOutput'
+import { renderReportHtml, reportSections, ReportJson, RenderMeta, fixItalicSpaces } from '../fairexit/reportOutput'
 import { getPdfBrowser, releasePdfBrowser } from './pdfBrowser'
 
 type PdfLogContext = { caseId?: string; reportId?: string; generationId?: string; requestId?: string }
+
+const FOOT = `<div style="width:100%;padding:0 90px;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;">
+ <div style="border:1px solid #d9d4c8;border-radius:6px;background:#f6f4ef;padding:6px 12px;font-size:9.5px;line-height:1.35;color:#3d4a55;text-align:center;"><b style="color:#062c55">General information, not legal advice.</b> We've done our best to make this clear and accurate, but please check the details before you act. If anything feels unclear, a lawyer can help.</div>
+ <div style="text-align:center;font-size:9.5px;font-weight:700;color:#062c55;margin-top:5px;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>
+</div>`
 
 /** One set of print options, used by every renderer so the PDF looks the same everywhere. */
 const PDF_OPTIONS = {
   format: 'Letter',
   printBackground: true,
   preferCSSPageSize: true,
-  displayHeaderFooter: false,
-  margin: { top: '0', bottom: '0', left: '0', right: '0' },
+  displayHeaderFooter: true,
+  headerTemplate: '<div></div>',
+  footerTemplate: FOOT,
 }
 
 /**
@@ -158,5 +164,5 @@ export async function renderReportPdf(report: ReportJson, meta: RenderMeta, cont
   }
   logger.info('[PDF][LAYOUT_COMPLETE]', { ...context, reportId: meta.reportId, pages, totalPages, durationMs: Date.now() - layoutStartedAt })
   const html = renderReportHtml(report, { ...meta, pages }, totalPages)
-  return printPdf(html, { ...context, reportId: meta.reportId }, startedAt)
+  return printPdf(fixItalicSpaces(html), { ...context, reportId: meta.reportId }, startedAt)
 }

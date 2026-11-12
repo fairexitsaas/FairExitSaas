@@ -8,9 +8,9 @@
  * and exports `confirmed_facts` for Call B exactly as spec section 4 defines it.
  */
 import type { Country } from './jurisdictions'
-import { CA_PROVINCES, US_STATES } from './jurisdictions'
+import { CA_PROVINCES, US_STATES, parseLocationFromText, normalizeCode } from './jurisdictions'
 import type { CallAFact, CallAOutput, CheckRowState, CheckState, ContractStatus, RowSource, RowStatus } from './types'
-import { ValueType, parseMoney, parseWeeks, parseDays, parseDate, addDays, yearsBetween, fmtMoney, fmtDate } from './values'
+import { ValueType, parseMoney, parseWeeks, parseDays, parseDate, addDays, yearsBetween, fmtMoney, fmtDate, isPlaceholderValue } from './values'
 
 export const FINAL_AGREEMENT_TEXT =
   "I've checked each item against my documents and confirmed it's correct to the best of my knowledge. I understand my report is built on what I confirmed here."
@@ -149,6 +149,20 @@ function normNonCompete(s: string) {
 // ---------------------------------------------------------------------------
 const CA_ROWS: RowDef[] = [
   {
+    key: 'employee_name', group: 'you', label: 'Your name', type: 'text', source: 'letter',
+    required: () => false,
+    told: (a) => (a.name || a.full_name ? { v: a.name || a.full_name, t: String(a.name || a.full_name) } : null),
+    fromAnswers: (a) => a.name || a.full_name || null,
+    toAnswers: (v, a) => { a.name = v; a.full_name = v },
+  },
+  {
+    key: 'employer_name', group: 'you', label: 'Employer name', type: 'text', source: 'letter',
+    required: () => false,
+    told: (a) => (a.employer || a.company ? { v: a.employer || a.company, t: String(a.employer || a.company) } : null),
+    fromAnswers: (a) => a.employer || a.company || null,
+    toAnswers: (v, a) => { a.employer = v; a.company = v },
+  },
+  {
     key: 'province', group: 'you', label: 'Province', type: 'choice', source: 'answers',
     options: Object.entries(CA_PROVINCES).map(([k, v]) => [k, v.name] as Opt),
     fromAnswers: (a) => a.province || null, toAnswers: (v, a) => { a.province = v },
@@ -207,6 +221,8 @@ const CA_ROWS: RowDef[] = [
     options: [['full', 'Yes, a full release'], ['yes', 'Yes, a release'], ['no', 'No release']], normalize: normReleaseCA,
   },
   { key: 'benefits_end', group: 'offer', label: 'Benefits end', type: 'date', source: 'letter' },
+  { key: 'pay_rate', group: 'offer', label: 'Pay rate in documents', type: 'text', source: 'letter', required: () => false },
+  { key: 'document_place', group: 'offer', label: 'Document location', type: 'text', source: 'letter', required: () => false },
   {
     key: 'min_only_clause', group: 'contract', label: 'Limits you to the legal minimum', type: 'choice', source: 'contract',
     options: YN, normalize: normMinOnly,
@@ -223,6 +239,20 @@ const CA_ROWS: RowDef[] = [
 ]
 
 const US_ROWS: RowDef[] = [
+  {
+    key: 'employee_name', group: 'you', label: 'Your name', type: 'text', source: 'agreement',
+    required: () => false,
+    told: (a) => (a.name || a.full_name ? { v: a.name || a.full_name, t: String(a.name || a.full_name) } : null),
+    fromAnswers: (a) => a.name || a.full_name || null,
+    toAnswers: (v, a) => { a.name = v; a.full_name = v },
+  },
+  {
+    key: 'employer_name', group: 'you', label: 'Employer name', type: 'text', source: 'agreement',
+    required: () => false,
+    told: (a) => (a.employer || a.company ? { v: a.employer || a.company, t: String(a.employer || a.company) } : null),
+    fromAnswers: (a) => a.employer || a.company || null,
+    toAnswers: (v, a) => { a.employer = v; a.company = v },
+  },
   {
     key: 'state', group: 'you', label: 'State', type: 'choice', source: 'answers',
     options: Object.values(US_STATES).map((n) => [n, n] as Opt),
@@ -282,6 +312,10 @@ const US_ROWS: RowDef[] = [
   // Prompt v0.6 added these Call A keys; shown only when the documents state them (not required).
   { key: 'final_pay_date', group: 'agr', label: 'Final pay date', type: 'date', source: 'agreement', required: () => false, onlyIfFound: true },
   { key: 'unused_vacation_payout', group: 'agr', label: 'Unused vacation or PTO paid out', type: 'text', source: 'agreement', required: () => false, onlyIfFound: true },
+  { key: 'pay_rate', group: 'agr', label: 'Pay rate in documents', type: 'text', source: 'agreement', required: () => false },
+  { key: 'document_place', group: 'agr', label: 'Document location', type: 'text', source: 'agreement', required: () => false },
+  { key: 'contract_start', group: 'agr', label: 'Start date', type: 'date', source: 'contract', required: () => false, onlyIfFound: true },
+  { key: 'job_title_contract', group: 'agr', label: 'Job title when hired', type: 'text', source: 'contract', required: () => false, onlyIfFound: true },
   {
     key: 'advance_notice', group: 'lay', label: 'Advance notice you got', type: 'days', source: 'agreement',
     told: (a) => {
@@ -334,7 +368,11 @@ export function normalizeCallA(out: CallAOutput | null): CallAOutput | null {
 function factFor(ctx: CheckCtx, d: RowDef): CallAFact | null {
   const facts = (ctx.callA?.facts || []).filter((f) => f.key === d.key && f.value !== null && f.value !== undefined && String(f.value).trim() !== '')
   if (!facts.length) return null
-  const wantDocs: string[] = d.source === 'contract' ? ['contract'] : d.source === 'agreement' ? ['agreement', 'letter', 'contract'] : ['letter', 'agreement', 'contract']
+  const wantDocs: string[] = d.source === 'contract'
+    ? ['contract', 'agreement', 'letter']
+    : d.source === 'agreement'
+    ? ['agreement', 'contract', 'letter']
+    : ['letter', 'agreement', 'contract']
   facts.sort((a, b) => {
     const da = wantDocs.indexOf(a.document), db = wantDocs.indexOf(b.document)
     if (da !== db) return (da < 0 ? 99 : da) - (db < 0 ? 99 : db)
@@ -377,7 +415,7 @@ function sourceLine(ctx: CheckCtx, doc: string, where: string | null | undefined
 // row state helpers
 // ---------------------------------------------------------------------------
 function contractIn(ctx: CheckCtx) {
-  return ctx.contractStatus === 'added'
+  return ctx.contractStatus === 'added' || !!ctx.callA?.facts?.some((f) => f.document === 'contract' || f.key === 'contract_start')
 }
 function noContractRow(ctx: CheckCtx, d: RowDef) {
   return ctx.country === 'CA' && d.group === 'contract' && !contractIn(ctx)
@@ -503,8 +541,47 @@ export function conflicts(ctx: CheckCtx): ConflictCard[] {
       answers: { value: told.v, display: told.t, label: 'You told us' },
     })
   }
-  // Canada: contract start date vs years on the job
-  if (ctx.country === 'CA' && contractIn(ctx) && !dismissed.has('years')) {
+    // Inter-document conflict detection (when letter and contract differ on the same fact)
+  for (const d of rowDefs(ctx.country)) {
+    if (d.source === 'answers' || !rowVisible(ctx, d) || noContractRow(ctx, d) || dismissed.has(d.key) || out.some((x) => x.key === d.key)) continue
+    const docFacts = (ctx.callA?.facts || []).filter(
+      (f) => f.key === d.key && f.value !== null && f.value !== undefined && String(f.value).trim() !== ''
+    )
+    if (docFacts.length > 1) {
+      const fLetter = docFacts.find((f) => f.document === 'letter')
+      const fContract = docFacts.find((f) => f.document === 'contract' || f.document === 'agreement')
+      if (fLetter && fContract) {
+        const vLetter = normalizeDoc(ctx, d, String(fLetter.value))
+        const vContract = normalizeDoc(ctx, d, String(fContract.value))
+        if (vLetter !== null && vContract !== null && !sameValue(vLetter, vContract)) {
+          const o = rec(ctx, d.key)
+          if (!o.status) {
+            const cWord = docWord(ctx, fContract.document)
+            out.push({
+              key: d.key,
+              title: d.label,
+              lead: `Your letter and your ${cWord} give different values. Which is right?`,
+              document: {
+                value: vLetter,
+                display: display(ctx, d, vLetter),
+                quote: fLetter.quote || null,
+                where: fLetter.where || null,
+                label: 'Your letter says',
+              },
+              answers: {
+                value: vContract,
+                display: display(ctx, d, vContract),
+                label: `Your ${cWord} says`,
+              },
+            })
+          }
+        }
+      }
+    }
+  }
+
+  // Contract start date vs years on the job (Canada and US)
+  if (contractIn(ctx) && !dismissed.has('years')) {
     const start = rec(ctx, 'contract_start')
     const yrs = rec(ctx, 'years')
     const y = num(ctx.answers.years)
@@ -607,6 +684,7 @@ export function buildModel(ctx: CheckCtx) {
     noContractNote: ctx.country === 'CA' && !contractIn(ctx) ? "You didn't add a contract, so these are left out of your report." : null,
     counter: { confirmed, total: required.length, label: `${confirmed} of ${required.length} confirmed`, allSet: left === 0 },
     conflicts: conflicts(ctx),
+    locationMismatch: detectLocationMismatch(ctx),
     missing: missingCards(ctx),
     groups: GROUPS[ctx.country]
       .map((g) => ({ ...g, rows: rows.filter((r) => r.group === g.id) }))
@@ -713,8 +791,115 @@ export function exportConfirmedFacts(ctx: CheckCtx) {
       change_ack_at: o.status === 'corrected' ? o.change_ack_at || null : undefined,
     }
   }
-  return { rows, attested: !!ctx.check.attested, attested_at: ctx.check.attested_at }
+  const employee_name = confirmedValue(ctx, 'employee_name')
+    || (ctx.check.rows['employee_name']?.value ? String(ctx.check.rows['employee_name'].value) : null)
+    || (ctx.check.rows['employee_name']?.doc_value ? String(ctx.check.rows['employee_name'].doc_value) : null)
+    || ctx.answers.name
+    || ctx.answers.full_name
+    || (ctx.callA?.facts?.find((f) => f.key === 'employee_name')?.value ? String(ctx.callA.facts.find((f) => f.key === 'employee_name')?.value) : null)
+
+  const employer_name = confirmedValue(ctx, 'employer_name')
+    || (ctx.check.rows['employer_name']?.value ? String(ctx.check.rows['employer_name'].value) : null)
+    || (ctx.check.rows['employer_name']?.doc_value ? String(ctx.check.rows['employer_name'].doc_value) : null)
+    || ctx.answers.employer
+    || ctx.answers.company
+    || (ctx.callA?.facts?.find((f) => f.key === 'employer_name')?.value ? String(ctx.callA.facts.find((f) => f.key === 'employer_name')?.value) : null)
+
+  const pay_rate = confirmedValue(ctx, 'pay_rate')
+    || (ctx.check.rows['pay_rate']?.value ? String(ctx.check.rows['pay_rate'].value) : null)
+    || (ctx.check.rows['pay_rate']?.doc_value ? String(ctx.check.rows['pay_rate'].doc_value) : null)
+    || (ctx.callA?.facts?.find((f) => f.key === 'pay_rate')?.value ? String(ctx.callA.facts.find((f) => f.key === 'pay_rate')?.value) : null)
+
+  const document_place = confirmedValue(ctx, 'document_place')
+    || (ctx.check.rows['document_place']?.value ? String(ctx.check.rows['document_place'].value) : null)
+    || (ctx.check.rows['document_place']?.doc_value ? String(ctx.check.rows['document_place'].doc_value) : null)
+    || (ctx.callA?.facts?.find((f) => f.key === 'document_place')?.value ? String(ctx.callA.facts.find((f) => f.key === 'document_place')?.value) : null)
+
+  return { rows, employee_name, employer_name, pay_rate, document_place, attested: !!ctx.check.attested, attested_at: ctx.check.attested_at }
 }
+
+export interface LocationMismatch {
+  detected: boolean
+  documentPlace: string | null
+  selectedPlace: string
+  message: string | null
+  documentCountry?: Country | null
+  documentRegion?: string | null
+}
+
+export function detectLocationMismatch(ctx: CheckCtx): LocationMismatch {
+  const docPlaceRaw = (
+    confirmedValue(ctx, 'document_place')
+    ?? ctx.check.rows['document_place']?.value
+    ?? ctx.check.rows['document_place']?.doc_value
+    ?? ctx.callA?.facts?.find((f) => f.key === 'document_place')?.value
+    ?? null
+  )
+
+  const selectedPlaceName = (
+    ctx.country === 'CA'
+      ? (CA_PROVINCES[String(ctx.answers.province || '')]?.name || String(ctx.answers.province || 'Canada'))
+      : String(ctx.answers.usState || ctx.answers.state || 'United States')
+  )
+
+  if (!docPlaceRaw || typeof docPlaceRaw !== 'string' || isPlaceholderValue(docPlaceRaw)) {
+    return { detected: false, documentPlace: null, selectedPlace: selectedPlaceName, message: null }
+  }
+
+  const trimmed = docPlaceRaw.trim()
+  const parsed = parseLocationFromText(trimmed)
+  if (!parsed) {
+    return { detected: false, documentPlace: trimmed, selectedPlace: selectedPlaceName, message: null }
+  }
+
+  // Country mismatch
+  if (parsed.country && parsed.country !== ctx.country) {
+    const placeMentioned = parsed.name || trimmed
+    return {
+      detected: true,
+      documentPlace: placeMentioned,
+      selectedPlace: selectedPlaceName,
+      message: `Your documents mention ${placeMentioned}. Is ${selectedPlaceName} right?`,
+      documentCountry: parsed.country,
+      documentRegion: parsed.name || null,
+    }
+  }
+
+  // Same country, check province or state mismatch
+  if (parsed.name) {
+    let matches = false
+    if (ctx.country === 'CA') {
+      const selectedProv = String(ctx.answers.province || '').toUpperCase()
+      const selName = CA_PROVINCES[selectedProv]?.name?.toLowerCase() || ''
+      matches = Boolean(
+        parsed.name.toLowerCase() === selName ||
+        (parsed.code && parsed.code === 'CA-' + selectedProv)
+      )
+    } else {
+      const selectedState = String(ctx.answers.usState || ctx.answers.state || '').toLowerCase()
+      const selCode = selectedState ? normalizeCode(selectedState, 'US') : null
+      const selStateName = selCode ? US_STATES[selCode.slice(3)]?.toLowerCase() || selectedState : selectedState
+      matches = Boolean(
+        parsed.name.toLowerCase() === selStateName ||
+        parsed.name.toLowerCase() === selectedState
+      )
+    }
+
+    if (!matches) {
+      return {
+        detected: true,
+        documentPlace: parsed.name,
+        selectedPlace: selectedPlaceName,
+        message: `Your documents mention ${parsed.name}. Is ${selectedPlaceName} right?`,
+        documentCountry: parsed.country,
+        documentRegion: parsed.name,
+      }
+    }
+  }
+
+  return { detected: false, documentPlace: trimmed, selectedPlace: selectedPlaceName, message: null }
+}
+
 
 /** Confirmed (or acknowledged-corrected) value of a row, for the rules engine. */
 export function confirmedValue(ctx: CheckCtx, key: string): unknown {

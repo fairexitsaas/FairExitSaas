@@ -131,7 +131,7 @@
         {
           "id": "CA-AB-L4",
           "topic": "Deadline",
-          "fact": "Apply for EI in your first week off work. (Until October 9, 2027, a temporary measure means separation pay does not delay EI.)",
+          "fact": "Apply for EI in your first week off work.",
           "source_id": null,
           "status": "confirmed"
         }
@@ -285,7 +285,7 @@
         {
           "id": "CA-BC-L4",
           "topic": "Deadline",
-          "fact": "File for EI the week you stop working. (Until October 9, 2027, a temporary measure means separation pay does not delay EI.)",
+          "fact": "File for EI the week you stop working.",
           "source_id": null,
           "status": "confirmed"
         }
@@ -326,7 +326,7 @@
         {
           "id": "CA-BC-S5",
           "rule": "Government of Canada",
-          "section": "Temporary EI measures: separation earnings not deducted and waiting period waived for claims March 30, 2025 to October 9, 2027",
+          "section": "Temporary EI measures: separation earnings not deducted and waiting period waived",
           "url": "https://www.canada.ca/en/services/benefits/ei/temporary-measures-for-major-economic-conditions.html",
           "status": "verified",
           "checked": "2026-10-25"
@@ -637,7 +637,7 @@
         {
           "id": "CA-MB-L4",
           "topic": "Deadline",
-          "fact": "Register for EI as soon as work stops. (Until October 9, 2027, a temporary measure means separation pay does not delay EI.)",
+          "fact": "Register for EI as soon as work stops.",
           "source_id": null,
           "status": "confirmed"
         }
@@ -797,7 +797,7 @@
         {
           "id": "CA-NB-L4",
           "topic": "Deadline",
-          "fact": "File for EI the week your work stops. (Until October 9, 2027, a temporary measure means separation pay does not delay EI.)",
+          "fact": "File for EI the week your work stops.",
           "source_id": null,
           "status": "confirmed"
         }
@@ -957,7 +957,7 @@
         {
           "id": "CA-NL-L4",
           "topic": "Deadline",
-          "fact": "Register for EI as soon as the layoff or termination starts. (Until October 9, 2027, a temporary measure means separation pay does not delay EI.)",
+          "fact": "Register for EI as soon as the layoff or termination starts.",
           "source_id": null,
           "status": "confirmed"
         }
@@ -1117,7 +1117,7 @@
         {
           "id": "CA-NS-L4",
           "topic": "Deadline",
-          "fact": "Apply for EI promptly. (Until October 9, 2027, a temporary measure means separation pay does not delay EI.)",
+          "fact": "Apply for EI promptly.",
           "source_id": null,
           "status": "confirmed"
         },
@@ -1278,7 +1278,7 @@
         {
           "id": "CA-ON-L4",
           "topic": "Deadline",
-          "fact": "Apply for EI as soon as you stop working. (Until October 9, 2027, a temporary measure means separation pay does not delay EI.)",
+          "fact": "Apply for EI as soon as you stop working.",
           "source_id": null,
           "status": "confirmed"
         }
@@ -1327,7 +1327,7 @@
         {
           "id": "CA-ON-S6",
           "rule": "Government of Canada",
-          "section": "Temporary EI measures: separation earnings not deducted and waiting period waived for claims March 30, 2025 to October 9, 2027",
+          "section": "Temporary EI measures: separation earnings not deducted and waiting period waived",
           "url": "https://www.canada.ca/en/services/benefits/ei/temporary-measures-for-major-economic-conditions.html",
           "status": "verified",
           "checked": "2026-10-25"

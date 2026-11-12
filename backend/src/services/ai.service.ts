@@ -1,6 +1,6 @@
 /**
- * The three Claude calls from prompt v0.6. Inputs are assembled here; the prompt text itself is
- * loaded unchanged from backend/prompts/report-prompt-v0.6.txt (see fairexit/prompts.ts).
+ * The three Claude calls (Prompt A1, Prompt A2, Prompt B) for FairExit.
+ * Inputs are assembled here; system prompts are loaded by fairexit/prompts.ts.
  */
 import zlib from 'zlib'
 import { db } from '../config/db'
@@ -9,9 +9,10 @@ import { ApiError } from '../utils/ApiError'
 import { logger } from '../utils/logger'
 import { callClaudeJson, ContentBlock, type ClaudeLogContext } from './claude.service'
 import { documentService } from './document.service'
+import { caseService } from './case.service'
 import { systemPromptCallA, systemPromptCallA2, systemPromptCallB, promptSha256 } from '../fairexit/prompts'
 import { mockCallA, mockCallA2, mockCallB } from '../fairexit/mocks'
-import type { CaseRow, CallAOutput, CallA2Output, DocKind } from '../fairexit/types'
+import type { CaseRow, CaseDocumentRow, CallAOutput, CallA2Output, DocKind } from '../fairexit/types'
 import type { Jurisdiction } from '../fairexit/jurisdictions'
 
 type CallName = 'A' | 'A2' | 'B'
@@ -65,7 +66,7 @@ async function record(caseId: string, call: CallName, r: { status: 'ok' | 'error
   await db().from('ai_calls').insert({
     case_id: caseId, call, status: r.status, model: r.model || env.ANTHROPIC_MODEL,
     input_tokens: r.usage?.input_tokens ?? null, output_tokens: r.usage?.output_tokens ?? null,
-    duration_ms: r.durationMs ?? null, error: r.error?.slice(0, 2000) ?? null, output: r.output ?? null, prompt_sha256: promptSha256(),
+    duration_ms: r.durationMs ?? null, error: r.error?.slice(0, 2000) ?? null, output: r.output ?? null, prompt_sha256: promptSha256(call === 'A' ? 'A1' : call === 'A2' ? 'A2' : 'B'),
   }).then(({ error }) => { if (error) logger.warn('ai_calls insert failed', { message: error.message }) })
 }
 
@@ -87,22 +88,31 @@ async function documentBlocks(c: CaseRow, j: Jurisdiction, kinds: DocKind[]): Pr
   const files = await documentService.loadForAi(c, kinds)
   const blocks: ContentBlock[] = []
   for (const f of files) {
-    const label = `${f.kind === 'letter' ? 'letter' : 'contract'}: the person's ${docTitle(j, f.kind)}, file ${f.page} of ${f.pages}`
-    blocks.push({ type: 'text', text: `Document ${label}` })
-    if (f.mime === 'application/pdf') {
-      blocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: f.data.toString('base64') }, title: label })
-    } else if (f.mime === 'text/plain') {
-      blocks.push({ type: 'document', source: { type: 'text', media_type: 'text/plain', data: f.data.toString('utf8') }, title: label })
-    } else if (
-      f.mime.includes('wordprocessingml') ||
-      f.mime.includes('msword') ||
-      f.storagePath?.endsWith('.docx') ||
-      f.storagePath?.endsWith('.doc')
-    ) {
-      const text = extractTextFromDocx(f.data)
-      blocks.push({ type: 'document', source: { type: 'text', media_type: 'text/plain', data: text }, title: label })
-    } else {
-      blocks.push({ type: 'image', source: { type: 'base64', media_type: f.mime, data: f.data.toString('base64') } })
+    try {
+      const label = `${f.kind === 'letter' ? 'letter' : 'contract'}: the person's ${docTitle(j, f.kind)}, file ${f.page} of ${f.pages}`
+      blocks.push({ type: 'text', text: `Document ${label}` })
+      if (f.mime === 'application/pdf') {
+        blocks.push({ type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: f.data.toString('base64') }, title: label })
+      } else if (f.mime === 'text/plain') {
+        blocks.push({ type: 'document', source: { type: 'text', media_type: 'text/plain', data: f.data.toString('utf8') }, title: label })
+      } else if (
+        f.mime.includes('wordprocessingml') ||
+        f.mime.includes('msword') ||
+        f.storagePath?.endsWith('.docx') ||
+        f.storagePath?.endsWith('.doc')
+      ) {
+        const text = extractTextFromDocx(f.data)
+        blocks.push({ type: 'document', source: { type: 'text', media_type: 'text/plain', data: text }, title: label })
+      } else {
+        blocks.push({ type: 'image', source: { type: 'base64', media_type: f.mime, data: f.data.toString('base64') } })
+      }
+    } catch (docErr) {
+      logger.error('Failed to prepare document block for AI, skipping document', {
+        caseId: c.id,
+        kind: f.kind,
+        storagePath: f.storagePath,
+        error: (docErr as Error).message,
+      })
     }
   }
   return blocks
@@ -114,14 +124,31 @@ export const aiService = {
     const started = Date.now()
     try {
       let out: CallAOutput
+      const uploadedDocs = await caseService.documents(c.id)
+      const uploadedLetter = uploadedDocs.filter((d: CaseDocumentRow) => d.kind === 'letter' && d.status === 'uploaded')
+      const uploadedContract = uploadedDocs.filter((d: CaseDocumentRow) => d.kind === 'contract' && d.status === 'uploaded')
+      const hasContract = uploadedContract.length > 0 || c.contract_status === 'added'
+
+      // Synchronize contract_status if contract documents exist
+      if (uploadedContract.length > 0 && c.contract_status !== 'added') {
+        await caseService.update(c.id, { contract_status: 'added' }).catch(() => undefined)
+        c.contract_status = 'added'
+      }
+
       if (env.AI_MODE === 'mock') {
-        out = mockCallA(j, c.contract_status === 'added')
+        out = mockCallA(j, hasContract)
         await record(c.id, 'A', { status: 'ok', model: 'mock', durationMs: Date.now() - started })
         return out
       }
-      const docs = await documentBlocks(c, j, c.contract_status === 'added' ? ['letter', 'contract'] : ['letter'])
+
+      const kindsToLoad: DocKind[] = []
+      if (uploadedLetter.length > 0) kindsToLoad.push('letter')
+      if (hasContract) kindsToLoad.push('contract')
+      if (kindsToLoad.length === 0) kindsToLoad.push('letter', 'contract')
+
+      const docs = await documentBlocks(c, j, kindsToLoad)
       const content: ContentBlock[] = [
-        { type: 'text', text: `INPUT (JSON):\n${JSON.stringify({ jurisdiction: j, contract_given: c.contract_status === 'added' }, null, 2)}` },
+        { type: 'text', text: `INPUT (JSON):\n${JSON.stringify({ jurisdiction: j, contract_given: hasContract }, null, 2)}` },
         ...docs,
         { type: 'text', text: 'Return the JSON described in CALL A only.' },
       ]

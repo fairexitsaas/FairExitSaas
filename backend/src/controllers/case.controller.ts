@@ -144,6 +144,7 @@ export const caseController = {
   rowAction: async (req: Request, res: Response) => ApiResponse.ok(res, await flowService.rowAction(C(req), req.params.key, req.body)),
   conflict: async (req: Request, res: Response) => ApiResponse.ok(res, await flowService.resolveConflict(C(req), req.params.key, req.body)),
   attest: async (req: Request, res: Response) => ApiResponse.ok(res, await flowService.attest(C(req), req.body.agreed === true)),
+  changeJurisdiction: async (req: Request, res: Response) => ApiResponse.ok(res, await flowService.changeJurisdiction(C(req), req.body.country, req.body.region), 'Jurisdiction updated successfully'),
 
   // ---------------------------------------------------------------- report
   startBuild: async (req: Request, res: Response) => {

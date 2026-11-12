@@ -8,21 +8,38 @@ import type { Jurisdiction } from './jurisdictions'
 
 export function mockCallA(j: Jurisdiction, hasContract: boolean): CallAOutput {
   if (j.country === 'US') {
-    return {
-      facts: [
-        { key: 'offer_amount', value: '$22,154', document: 'agreement', quote: 'a severance payment of $22,154, equal to about 9 weeks of your base pay', where: 'page 1, section 2', confidence: 'high' },
-        { key: 'release_required', value: 'Yes', document: 'agreement', quote: 'In exchange for the severance payment, you release the Company from all claims', where: 'page 2, section 4', confidence: 'high' },
-        { key: 'days_to_decide', value: '14 days', document: 'agreement', quote: 'You have fourteen (14) days to consider this Agreement', where: 'page 2, section 6', confidence: 'high' },
-        { key: 'take_back', value: 'not mentioned', document: 'agreement', quote: null, where: 'page 2, section 6', confidence: 'high' },
-        { key: 'attorney_line', value: 'not mentioned', document: 'agreement', quote: null, where: 'page 2', confidence: 'high' },
-        { key: 'age_list', value: 'missing', document: 'agreement', quote: null, where: 'page 3', confidence: 'high' },
-        { key: 'non_compete', value: 'No', document: 'agreement', quote: null, where: 'all pages', confidence: 'high' },
-        { key: 'advance_notice', value: '12 days', document: 'agreement', quote: "This Agreement confirms you received 12 days' notice before your layoff date", where: 'page 1, section 1', confidence: 'high' },
-      ],
-      missing: ['last_day', 'final_pay_date', 'unused_vacation_payout'],
+    const facts: CallAOutput['facts'] = [
+      { key: 'offer_amount', value: '$8,400', document: 'agreement', quote: 'a severance payment of $8,400', where: 'page 1, section 2', confidence: 'high' },
+      { key: 'last_day', value: 'January 30, 2026', document: 'agreement', quote: 'employment termination date is January 30, 2026', where: 'page 1, section 1', confidence: 'high' },
+      { key: 'release_required', value: 'Yes', document: 'agreement', quote: 'In exchange for the severance payment, you release the Company from all claims', where: 'page 2, section 4', confidence: 'high' },
+      { key: 'days_to_decide', value: '14 days', document: 'agreement', quote: 'You have fourteen (14) days to consider this Agreement', where: 'page 2, section 6', confidence: 'high' },
+      { key: 'take_back', value: 'not mentioned', document: 'agreement', quote: null, where: 'page 2, section 6', confidence: 'high' },
+      { key: 'attorney_line', value: 'not mentioned', document: 'agreement', quote: null, where: 'page 2', confidence: 'high' },
+      { key: 'age_list', value: 'missing', document: 'agreement', quote: null, where: 'page 3', confidence: 'high' },
+      { key: 'non_compete', value: 'No', document: 'agreement', quote: null, where: 'all pages', confidence: 'high' },
+      { key: 'advance_notice', value: '12 days', document: 'agreement', quote: "This Agreement confirms you received 12 days' notice before your layoff date", where: 'page 1, section 1', confidence: 'high' },
+      { key: 'employee_name', value: 'Jordan Taylor', document: 'agreement', quote: 'Jordan Taylor', where: 'page 1, section 1', confidence: 'high' },
+      { key: 'employer_name', value: 'Empire Harbor Analytics LLC', document: 'agreement', quote: 'Empire Harbor Analytics LLC', where: 'page 1', confidence: 'high' },
+      { key: 'pay_rate', value: '$32.00 per hour', document: 'agreement', quote: '$32.00 per hour', where: 'page 1', confidence: 'high' },
+      { key: 'document_place', value: 'New York', document: 'agreement', quote: 'New York', where: 'page 1', confidence: 'high' },
+    ]
+    if (hasContract) {
+      facts.push(
+        { key: 'contract_start', value: 'August 11, 2025', document: 'contract', quote: 'employment will begin on August 11, 2025', where: 'page 1, section 2', confidence: 'high' },
+        { key: 'job_title_contract', value: 'Temporary Data Operations Analyst', document: 'contract', quote: 'Temporary Data Operations Analyst', where: 'page 1, section 1', confidence: 'high' },
+      )
     }
+    const missing = ['final_pay_date', 'unused_vacation_payout']
+    if (!hasContract) {
+      missing.push('contract_start', 'job_title_contract')
+    }
+    return { facts, missing }
   }
   const facts: CallAOutput['facts'] = [
+    { key: 'employee_name', value: 'Gurpreet Sandhu', document: 'letter', quote: 'Dear Gurpreet Sandhu', where: 'page 1, salutation', confidence: 'high' },
+    { key: 'employer_name', value: 'Lakeshore Precision Inc.', document: 'letter', quote: 'Lakeshore Precision Inc.', where: 'page 1, letterhead', confidence: 'high' },
+    { key: 'pay_rate', value: '$112,500 per year', document: 'letter', quote: 'annual base salary of $112,500', where: 'page 1, paragraph 2', confidence: 'high' },
+    { key: 'document_place', value: 'Ontario', document: 'letter', quote: 'laws of Ontario', where: 'page 2', confidence: 'high' },
     { key: 'offer_amount', value: '$24,000', document: 'letter', quote: 'a lump sum of $24,000, less required deductions', where: 'page 1, paragraph 2', confidence: 'high' },
     { key: 'notice_weeks', value: '8 weeks', document: 'letter', quote: 'equal to 8 weeks of your base salary, in place of notice', where: 'page 1, paragraph 2', confidence: 'high' },
     { key: 'vacation_on_notice', value: 'not mentioned', document: 'letter', quote: null, where: 'page 1', confidence: 'high' },
@@ -60,8 +77,9 @@ export function mockCallB(input: Record<string, any>) {
   const longDate = new Date(date + 'T12:00:00Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
   const role = rows.role?.value || rows.job_title_contract?.value || 'Your role'
   const years = rows.years?.value
+  const empName = rows.employee_name?.value ? String(rows.employee_name.value) : (input.confirmed_facts?.employee_name ? String(input.confirmed_facts.employee_name) : null)
   return {
-    cover: { role_line: `${role} · ${years ?? '?'} years of service`, place_line: j.name },
+    cover: { name_line: empName, role_line: `${role} · ${years ?? '?'} years of service`, place_line: j.name },
     glance: `[MOCK REPORT] This is sample text so the app can be built without the AI. A real report reads your confirmed details for ${j.name}.`,
     ...(input.contract !== 'added' ? { contract_note: '[MOCK] Your contract was not added.' } : {}),
     confirmed_line: `Built on the details you confirmed on ${longDate}.`,
