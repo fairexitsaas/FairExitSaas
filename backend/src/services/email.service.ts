@@ -63,7 +63,7 @@ async function send(to: string, subject: string, text: string): Promise<{ sent: 
     if (!res.ok) {
       let errorMsg = `Resend delivery failed with status ${res.status}`
       try {
-        const errJson = await res.json()
+        const errJson = (await res.json()) as Record<string, any>
         errorMsg = errJson?.message || errJson?.error || errorMsg
       } catch {
         const rawText = await res.text().catch(() => '')
@@ -73,7 +73,7 @@ async function send(to: string, subject: string, text: string): Promise<{ sent: 
       return { sent: false, error: errorMsg, reason: 'resend_rejected' }
     }
 
-    const data = await res.json().catch(() => ({}))
+    const data = (await res.json().catch(() => ({}))) as Record<string, any>
     logger.info('[email:sent]', { to, subject, id: data?.id })
     return { sent: true, id: data?.id }
   } catch (err: any) {
