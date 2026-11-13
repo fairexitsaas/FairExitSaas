@@ -238,6 +238,11 @@ export default function ReportFlow() {
           cs={cs}
           onContinue={() => {
             setView("ready");
+            if (caseId) {
+              router.push(`/report?step=ready&case=${caseId}`);
+            } else {
+              router.push(`/report?step=ready`);
+            }
             refresh();
           }}
         />
@@ -249,6 +254,11 @@ export default function ReportFlow() {
         cs={cs}
         onContinue={() => {
           setView("ready");
+          if (caseId) {
+            router.push(`/report?step=ready&case=${caseId}`);
+          } else {
+            router.push(`/report?step=ready`);
+          }
           refresh();
         }}
       />

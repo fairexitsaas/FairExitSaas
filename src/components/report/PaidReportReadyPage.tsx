@@ -83,11 +83,23 @@ export default function PaidReportReadyPage({
       return;
     }
 
+    // Ensure report build is triggered if not already in building or ready status
+    if (cs?.status !== "building" && cs?.status !== "ready") {
+      (async () => {
+        try {
+          await fairexit.attest(activeId);
+          await fairexit.buildReport(activeId);
+        } catch (err) {
+          console.warn("Background report build trigger error:", err);
+        }
+      })();
+    }
+
     const stopPolling = startPollLoop({
       poll: (signal) => fairexit.reportStatus(activeId, signal),
-      intervalMs: 4000,
-      maxRetries: 2,
-      isTerminal: (res) => res.status !== "building",
+      intervalMs: 3000,
+      maxRetries: 3,
+      isTerminal: (res) => res.ready || res.failed,
       onValue: (res) => {
         if (res.ready) {
           setBuildStatus("ready");
@@ -114,7 +126,8 @@ export default function PaidReportReadyPage({
             const msg = res.error || "Report generation failed. Please try again.";
             setBuildError(msg);
           }
-        } else if (res.status === "building") {
+        } else {
+          // Status is 'building', 'preparing', 'checking', etc. Keep in building loading state.
           setBuildStatus("building");
           setFailureKind(null);
           if (res.stage === "pdf" || res.statusDetail === "pdf") {
@@ -122,11 +135,6 @@ export default function PaidReportReadyPage({
           } else {
             setBuildProgressStep(2);
           }
-        } else {
-          setBuildStatus("failed");
-          setFailureKind("generic_failed");
-          const msg = "The report build has not started. Please return to the review step and select Build my report.";
-          setBuildError(msg);
         }
       },
       onError: (error) => {

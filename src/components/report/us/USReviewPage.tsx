@@ -249,7 +249,6 @@ export default function USReviewPage({
   const [data] = useState<ReportInputs>(() => getReportInputs());
   const [explainQuestions, setExplainQuestions] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isSubmittingBuild, setIsSubmittingBuild] = useState(false);
   const [buildError, setBuildError] = useState("");
   const buildSubmitLock = useRef(false);
   // Change 21: Location mismatch state & modal
@@ -833,6 +832,7 @@ export default function USReviewPage({
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
       fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {});
+      fairexit.attest(activeCaseId).catch(() => {});
     }
   };
 
@@ -1656,7 +1656,14 @@ export default function USReviewPage({
 
           {/* Confirmation Checkbox Box */}
           <div
-            onClick={() => setDeclaredCorrect(!declaredCorrect)}
+            onClick={() => {
+              const nextVal = !declaredCorrect;
+              setDeclaredCorrect(nextVal);
+              const activeCaseId = caseId || cs?.id;
+              if (nextVal && activeCaseId) {
+                fairexit.attest(activeCaseId).catch(() => {});
+              }
+            }}
             className={`rounded-[14px] p-4.5 sm:p-5 mt-8 mb-5 flex items-start gap-3.5 shadow-xs cursor-pointer transition border ${
               declaredCorrect
                 ? "bg-[#EEF8F3] border-[#0C8F72]"
@@ -1687,7 +1694,7 @@ export default function USReviewPage({
             {buildError && <p role="alert" className="mb-3 text-sm text-[#A3231F]">{buildError}</p>}
             <button
               type="button"
-              disabled={!canBuild || isSubmittingBuild}
+              disabled={!canBuild}
               onClick={async () => {
                 if (buildSubmitLock.current) return;
                 const activeCaseId = caseId || cs?.id;
@@ -1700,45 +1707,30 @@ export default function USReviewPage({
                   return;
                 }
                 buildSubmitLock.current = true;
-                setIsSubmittingBuild(true);
-                setBuildError("");
-                let started = false;
+
+                // Await attest first so backend saves check_state.attested = true before buildReport runs
                 try {
                   await fairexit.attest(activeCaseId);
                   await fairexit.buildReport(activeCaseId);
-                  started = true;
-                } catch (err: unknown) {
-                  const apiErr = err instanceof FairExitApiError ? err : new FairExitApiError(0, err instanceof Error ? err.message : "Could not start report generation. Please try again.");
-                  setBuildError(apiErr.message);
-                  showErrorModal({
-                    title: "Report Generation Failed",
-                    message: apiErr.message,
-                    stage: apiErr.stage || "Report Generation",
-                    statusCode: apiErr.status,
-                    requestId: apiErr.requestId,
-                  });
-                } finally {
-                  setIsSubmittingBuild(false);
+                } catch (err) {
+                  console.warn("Background report build trigger error:", err);
                 }
-                if (started) {
-                  if (onContinue) onContinue();
-                  else setIsDone(true);
+
+                // Immediately transition to the loading page for generating report
+                if (onContinue) {
+                  onContinue();
                 } else {
-                  buildSubmitLock.current = false;
+                  setIsDone(true);
+                  router.push(`/report?step=ready${activeCaseId ? `&case=${activeCaseId}` : ""}`);
                 }
               }}
               className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] transition flex items-center justify-center ${
-                canBuild && !isSubmittingBuild
+                canBuild
                   ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
                   : "bg-[#C9D1D7] text-white cursor-not-allowed opacity-90"
               }`}
             >
-              {isSubmittingBuild ? (
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                  <span>Starting report build…</span>
-                </div>
-              ) : canBuild ? (
+              {canBuild ? (
                 "Build my report (PDF) →"
               ) : remainingCount > 0 ? (
                 `Confirm ${remainingCount} more to build your report`
