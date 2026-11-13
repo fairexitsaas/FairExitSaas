@@ -9,6 +9,7 @@ import {
   AdminReportRecord,
   AdminLawyerRecord,
 } from '@/lib/api/admin'
+import { createClient } from '@/lib/supabase/client'
 
 export type RegionFilter = 'both' | 'ca' | 'us'
 
@@ -30,6 +31,9 @@ interface AdminContextType {
   lawyers: LawyerRecord[]
   loading: boolean
   error: string | null
+  authError: 'unauthorized' | 'forbidden' | null
+  currentUserEmail: string | null
+  signOut: () => Promise<void>
   refreshData: () => Promise<void>
   toastMessage: string | null
   showToast: (msg: string) => void
@@ -70,6 +74,8 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const [lawyers, setLawyers] = useState<LawyerRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [authError, setAuthError] = useState<'unauthorized' | 'forbidden' | null>(null)
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null)
 
   const [toastMessage, setToastMessage] = useState<string | null>(null)
   const [summaryModalReq, setSummaryModalReq] = useState<LawyerRequestRecord | null>(null)
@@ -87,29 +93,72 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   const fetchData = useCallback(async () => {
     setLoading(true)
     setError(null)
+
+    // Check client Supabase session first
+    let hasSession = false
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session?.user) {
+        hasSession = true
+        setCurrentUserEmail(session.user.email || null)
+      } else {
+        setCurrentUserEmail(null)
+      }
+    } catch {
+      // ignore
+    }
+
+    if (!hasSession) {
+      setAuthError('unauthorized')
+      setLoading(false)
+      return
+    }
+
+    let detectedForbidden = false
+    let detectedUnauthorized = false
+
     try {
       const [ovData, usersData, leadsData, reportsData, lawyersData] = await Promise.all([
         adminApi.getOverview(countryParam).catch((err) => {
-          console.warn('adminApi.getOverview failed:', err.message)
+          if (err.status === 403 || String(err.message).includes('Admins only')) detectedForbidden = true
+          if (err.status === 401 || String(err.message).includes('Sign in')) detectedUnauthorized = true
+          console.warn('adminApi.getOverview:', err.message)
           return null
         }),
         adminApi.getUsers(countryParam).catch((err) => {
-          console.warn('adminApi.getUsers failed:', err.message)
+          if (err.status === 403 || String(err.message).includes('Admins only')) detectedForbidden = true
+          if (err.status === 401 || String(err.message).includes('Sign in')) detectedUnauthorized = true
+          console.warn('adminApi.getUsers:', err.message)
           return [] as UserRecord[]
         }),
         adminApi.getLeads(countryParam).catch((err) => {
-          console.warn('adminApi.getLeads failed:', err.message)
+          if (err.status === 403 || String(err.message).includes('Admins only')) detectedForbidden = true
+          if (err.status === 401 || String(err.message).includes('Sign in')) detectedUnauthorized = true
+          console.warn('adminApi.getLeads:', err.message)
           return [] as AdminLeadRecord[]
         }),
         adminApi.getReports(countryParam).catch((err) => {
-          console.warn('adminApi.getReports failed:', err.message)
+          if (err.status === 403 || String(err.message).includes('Admins only')) detectedForbidden = true
+          if (err.status === 401 || String(err.message).includes('Sign in')) detectedUnauthorized = true
+          console.warn('adminApi.getReports:', err.message)
           return [] as ReportRecord[]
         }),
         adminApi.getLawyers().catch((err) => {
-          console.warn('adminApi.getLawyers failed:', err.message)
+          if (err.status === 403 || String(err.message).includes('Admins only')) detectedForbidden = true
+          if (err.status === 401 || String(err.message).includes('Sign in')) detectedUnauthorized = true
+          console.warn('adminApi.getLawyers:', err.message)
           return [] as LawyerRecord[]
         }),
       ])
+
+      if (detectedForbidden) {
+        setAuthError('forbidden')
+      } else if (detectedUnauthorized) {
+        setAuthError('unauthorized')
+      } else {
+        setAuthError(null)
+      }
 
       setOverview(ovData)
       setUsers(usersData || [])
@@ -132,6 +181,17 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetchData()
   }, [fetchData])
+
+  const signOut = useCallback(async () => {
+    try {
+      const supabase = createClient()
+      await supabase.auth.signOut()
+    } catch {
+      // ignore
+    } finally {
+      window.location.href = '/login?redirectTo=/admin/overview'
+    }
+  }, [])
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
@@ -225,6 +285,9 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
         lawyers,
         loading,
         error,
+        authError,
+        currentUserEmail,
+        signOut,
         refreshData: fetchData,
         toastMessage,
         showToast,

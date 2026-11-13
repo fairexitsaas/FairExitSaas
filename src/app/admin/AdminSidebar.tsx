@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useAdmin } from './AdminContext'
@@ -13,7 +13,13 @@ export default function AdminSidebar({
   isMobileDrawer?: boolean
 } = {}) {
   const pathname = usePathname()
-  const { lawyerRequests } = useAdmin()
+  const { lawyerRequests, currentUserEmail, authError, signOut } = useAdmin()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const newRequestsCount = lawyerRequests.filter((r) => r.status === 'new').length
 
   const navLinks = [
@@ -61,6 +67,10 @@ export default function AdminSidebar({
   const containerClasses = isMobileDrawer
     ? 'w-full h-full bg-[#062c55] text-[#cfdcea] p-[22px_16px] flex flex-col gap-1 select-none overflow-y-auto'
     : 'hidden md:flex w-[232px] shrink-0 bg-[#062c55] text-[#cfdcea] p-[22px_14px] sticky top-0 h-screen flex-col gap-1 select-none overflow-hidden z-30'
+
+  const displayInitial = mounted && currentUserEmail ? currentUserEmail.charAt(0).toUpperCase() : 'O'
+  const displayName = mounted && currentUserEmail ? currentUserEmail.split('@')[0] : 'Operator'
+  const displayRole = mounted && authError ? 'Unauthorized' : 'Admin'
 
   return (
     <aside className={containerClasses} aria-label="Operations">
@@ -133,14 +143,28 @@ export default function AdminSidebar({
       </div>
 
       {/* Profile at bottom */}
-      <div className="mt-auto flex items-center gap-2.5 pt-3.5 px-2.5 border-t border-white/10">
-        <div className="w-[30px] h-[30px] rounded-full bg-[#0eb28d] text-[#04291f] font-extrabold text-sm flex items-center justify-center shrink-0">
-          S
+      <div className="mt-auto flex items-center justify-between pt-3.5 px-2 border-t border-white/10 gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-[30px] h-[30px] rounded-full bg-[#0eb28d] text-[#04291f] font-extrabold text-sm flex items-center justify-center shrink-0">
+            {displayInitial}
+          </div>
+          <div className="leading-tight min-w-0">
+            <b className="text-white text-[12.5px] block font-bold truncate max-w-[105px]" title={mounted && currentUserEmail ? currentUserEmail : 'Operator'}>
+              {displayName}
+            </b>
+            <small className="text-[#8fb0cf] text-[11px] block font-medium">
+              {displayRole}
+            </small>
+          </div>
         </div>
-        <div className="leading-tight">
-          <b className="text-white text-[13px] block font-bold">Sundeep</b>
-          <small className="text-[#8fb0cf] text-[11.5px] block font-medium">Owner</small>
-        </div>
+        <button
+          type="button"
+          onClick={signOut}
+          title="Sign out of backoffice"
+          className="text-[11px] font-semibold text-[#8fb0cf] hover:text-white px-1.5 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors shrink-0"
+        >
+          Sign out
+        </button>
       </div>
     </aside>
   )
