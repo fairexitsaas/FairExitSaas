@@ -211,13 +211,39 @@ export default function PaidReportReadyPage({
   const userEmail = postPayEmail || cs?.email || data.email || "";
   const priceCurrency = isCanada ? "$59 CAD" : "$59 USD";
 
-  const token = typeof window !== "undefined" ? (activeId ? caseStore.get(activeId) || "" : "") : "";
+  const [persistedToken, setPersistedToken] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    const activeCaseId = caseId || cs?.id;
+    const urlT = new URLSearchParams(window.location.search).get("t");
+    if (urlT && activeCaseId) {
+      caseStore.set(activeCaseId, urlT);
+      return urlT;
+    }
+    return activeCaseId ? caseStore.get(activeCaseId) || "" : "";
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !activeId) return;
+    const urlT = new URLSearchParams(window.location.search).get("t");
+    if (urlT) {
+      caseStore.set(activeId, urlT);
+      setPersistedToken(urlT);
+    } else {
+      const stored = caseStore.get(activeId);
+      if (stored) setPersistedToken(stored);
+    }
+  }, [activeId]);
+
+  const activeToken =
+    persistedToken ||
+    (activeId && typeof window !== "undefined" ? caseStore.get(activeId) || "" : "");
   const origin = typeof window !== "undefined" ? window.location.origin : "";
-  const privateLink = activeId && token
-    ? `${origin}/report?case=${activeId}&t=${encodeURIComponent(token)}`
-    : activeId
-    ? `${origin}/report?case=${activeId}`
-    : "";
+  const privateLink =
+    activeId && activeToken
+      ? `${origin}/report?case=${activeId}&t=${encodeURIComponent(activeToken)}`
+      : activeId
+      ? `${origin}/report?case=${activeId}`
+      : "";
 
   const handleCopyLink = () => {
     if (privateLink) {
@@ -283,7 +309,26 @@ export default function PaidReportReadyPage({
         });
         setPostPayName(trimmedName);
         setPostPayEmail(trimmedEmail);
-        if (res?.emailDelivery?.status === "sent") {
+        if (res?.privateLink) {
+          try {
+            const parsed = new URL(res.privateLink);
+            const t = parsed.searchParams.get("t");
+            if (t && activeId) {
+              caseStore.set(activeId, t);
+              setPersistedToken(t);
+            }
+          } catch {
+            const match = res.privateLink.match(/[?&]t=([^&]+)/);
+            if (match?.[1] && activeId) {
+              const decoded = decodeURIComponent(match[1]);
+              caseStore.set(activeId, decoded);
+              setPersistedToken(decoded);
+            }
+          }
+        }
+        if (emailMode === "mock") {
+          notifySuccess("Customer information saved!");
+        } else if (res?.emailDelivery?.status === "sent") {
           setEmailSentState("sent");
           notifySuccess(`Report sent to ${trimmedEmail}!`);
         } else if (res?.emailDelivery?.status === "failed") {
@@ -559,9 +604,9 @@ export default function PaidReportReadyPage({
           <div className="w-full lg:w-[714px] bg-white border border-[#E7E4DD] rounded-[12px] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] p-6 sm:p-10 flex flex-col items-center justify-center text-center min-h-[340px]">
             {buildStatus === "ready" ? (
               <>
-                {/* Pill: Paid · $59 CAD · receipt emailed */}
+                {/* Pill: Paid · $59 CAD (only mentions "receipt emailed" if actually sent in live mode) */}
                 <div className="inline-flex items-center justify-center px-4 py-1 bg-white border border-[#E7E4DD] rounded-[6px] text-[12px] font-sans font-[700] text-[#062C55] mb-5 sm:mb-6">
-                  Paid · {priceCurrency} · receipt emailed
+                  Paid · {priceCurrency}{emailMode === "live" && emailSentState === "sent" ? " · receipt emailed" : ""}
                 </div>
 
                 {/* Title */}
@@ -598,21 +643,40 @@ export default function PaidReportReadyPage({
                   {isCanada ? "Talk to a lawyer, free" : "Talk to an attorney, free"}
                 </button>
 
-                {/* Email delivery status & Private Report Link (Change 24) */}
+                {/* ── 1. Email delivery status (Shown in BOTH mock and live modes) ── */}
                 {emailMode === "mock" ? (
-                  <div className="w-full sm:w-[480px] p-3 rounded-[10px] bg-[#FAF9F5] border border-[#E7E4DD] text-left mb-3">
-                    <p className="font-sans font-[500] text-[13px] leading-[19px] text-[#5A6B78]">
-                      Email delivery is disabled in demo mode. You can access your report here.
+                  <div className="w-full sm:w-[480px] p-3.5 rounded-[12px] bg-[#FAF9F5] border border-[#E7E4DD] text-left mb-3">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="w-2 h-2 rounded-full bg-[#0EB28D]" />
+                      <span className="font-sans font-[700] text-[13px] text-[#062C55]">
+                        Email sent (Demo Mode)
+                      </span>
+                      {userEmail ? (
+                        <span className="ml-auto text-[11.5px] font-mono text-[#5A6B78] truncate max-w-[200px]" title={userEmail}>
+                          {userEmail}
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="font-sans font-[400] text-[12.5px] leading-[18px] text-[#5A6B78]">
+                      Email delivery is simulated in demo mode. No actual email was sent.
+                      {userEmail ? (
+                        <span className="block mt-0.5 text-[11.5px] text-[#8695A0]">
+                          Recipient: <strong className="font-[600] text-[#5A6B78]">{userEmail}</strong>
+                        </span>
+                      ) : null}
                     </p>
                   </div>
                 ) : userEmail ? (
                   <div className="w-full flex flex-col items-center">
                     {emailSentState === "failed" ? (
-                      <div className="w-full sm:w-[480px] p-3 rounded-[10px] bg-[#FBECEB] border border-[#F4CBC8] text-left mb-3">
+                      <div className="w-full sm:w-[480px] p-3.5 rounded-[12px] bg-[#FBECEB] border border-[#F4CBC8] text-left mb-3">
                         <div className="flex items-center justify-between">
-                          <span className="font-sans font-[700] text-[13px] text-[#A3231F]">
-                            Email delivery failed to {userEmail}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-[#A3231F]" />
+                            <span className="font-sans font-[700] text-[13px] text-[#A3231F]">
+                              Email delivery failed
+                            </span>
+                          </div>
                           <button
                             type="button"
                             onClick={handleRetryEmail}
@@ -627,47 +691,69 @@ export default function PaidReportReadyPage({
                         )}
                       </div>
                     ) : emailSentState === "sent" ? (
-                      <p className="font-sans font-[400] text-[14px] leading-[22px] text-[#5A6B78]">
-                        We also emailed your report to{" "}
-                        <strong className="font-[700] text-[#062C55]">{userEmail}</strong>.
-                      </p>
-                    ) : null}
-
-                    {/* Private Report Link Box */}
-                    {privateLink && (
-                      <div className="w-full sm:w-[480px] mt-4 p-4 rounded-[12px] bg-[#FAF9F5] border border-[#E7E4DD] text-left">
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="font-sans font-[700] text-[12px] uppercase tracking-wider text-[#062C55]">
-                            Your private report link
+                      <div className="w-full sm:w-[480px] p-3.5 rounded-[12px] bg-[#FAF9F5] border border-[#E7E4DD] text-left mb-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="w-2 h-2 rounded-full bg-[#0EB28D]" />
+                          <span className="font-sans font-[700] text-[13px] text-[#062C55]">
+                            Email sent
                           </span>
-                          <span className="text-[11px] font-semibold text-[#0C8F72] bg-[#E5F5EE] px-2 py-0.5 rounded">
-                            No sign-in needed
+                          <span className="ml-auto text-[11.5px] font-mono text-[#5A6B78] truncate max-w-[200px]" title={userEmail}>
+                            {userEmail}
                           </span>
                         </div>
-                        <div className="flex items-center gap-2 mt-2">
-                          <input
-                            type="text"
-                            readOnly
-                            value={privateLink}
-                            className="w-full bg-white border border-[#CFD8DF] rounded-[8px] px-3 py-2 text-[12px] font-mono text-[#062C55] outline-none select-all"
-                          />
-                          <button
-                            type="button"
-                            onClick={handleCopyLink}
-                            className="px-3.5 py-2 bg-[#0EB28D] hover:bg-[#0C8F72] text-white rounded-[8px] font-sans font-[700] text-[12px] whitespace-nowrap transition cursor-pointer shrink-0"
-                          >
-                            {copiedLink ? "Copied! ✓" : "Copy link"}
-                          </button>
-                        </div>
-                        <p className="font-sans text-[11.5px] leading-[17px] text-[#5A6B78] mt-2">
-                          Only someone with this secret link can access your report. Your documents are deleted after 30 days; your report is kept for 12 months.
+                        <p className="font-sans font-[400] text-[12.5px] leading-[18px] text-[#5A6B78]">
+                          We emailed your report to{" "}
+                          <strong className="font-[700] text-[#062C55]">{userEmail}</strong>.
                         </p>
                       </div>
-                    )}
+                    ) : emailSentState === "pending" ? (
+                      <div className="w-full sm:w-[480px] p-3.5 rounded-[12px] bg-[#FAF9F5] border border-[#E7E4DD] text-left mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full border-2 border-[#0EB28D] border-t-transparent animate-spin" />
+                          <span className="font-sans font-[600] text-[13px] text-[#062C55]">
+                            Sending report email to {userEmail}…
+                          </span>
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
-                ) : (
-                  /* Form if customer info was not entered yet */
-                  <div className="w-full sm:w-[480px] mt-4 p-5 rounded-[14px] bg-[#FAF9F5] border border-[#E7E4DD] text-left">
+                ) : null}
+
+                {/* ── 2. Private Report Link Box (Shown in BOTH mock and live modes) ── */}
+                {privateLink && (
+                  <div className="w-full sm:w-[480px] p-4 rounded-[12px] bg-[#FAF9F5] border border-[#E7E4DD] text-left mb-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-sans font-[700] text-[12px] uppercase tracking-wider text-[#062C55]">
+                        Your private report link
+                      </span>
+                      <span className="text-[11px] font-semibold text-[#0C8F72] bg-[#E5F5EE] px-2 py-0.5 rounded">
+                        No sign-in needed
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={privateLink}
+                        className="w-full bg-white border border-[#CFD8DF] rounded-[8px] px-3 py-2 text-[12px] font-mono text-[#062C55] outline-none select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        className="px-3.5 py-2 bg-[#0EB28D] hover:bg-[#0C8F72] text-white rounded-[8px] font-sans font-[700] text-[12px] whitespace-nowrap transition cursor-pointer shrink-0"
+                      >
+                        {copiedLink ? "Copied! ✓" : "Copy link"}
+                      </button>
+                    </div>
+                    <p className="font-sans text-[11.5px] leading-[17px] text-[#5A6B78] mt-2">
+                      Only someone with this secret link can access your report. Your documents are deleted after 30 days; your report is kept for 12 months.
+                    </p>
+                  </div>
+                )}
+
+                {/* ── 3. Customer Info Form (if customer name/email not yet provided) ── */}
+                {!userEmail && (
+                  <div className="w-full sm:w-[480px] p-5 rounded-[14px] bg-[#FAF9F5] border border-[#E7E4DD] text-left mb-3">
                     <h3 className="font-serif font-[600] text-[18px] text-[#062C55] mb-1">
                       Your payment is confirmed. Enter your name and email so we can send you your report.
                     </h3>

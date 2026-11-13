@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
+import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
 import { saveReportInputs } from "@/lib/report-storage";
 import { notifySuccess } from "@/lib/notifications";
 
@@ -64,6 +64,16 @@ export default function PostPaymentCustomerModal({
           email: trimmedEmail,
           remindMe: consentNews,
         });
+        if (res?.privateLink) {
+          try {
+            const parsed = new URL(res.privateLink);
+            const t = parsed.searchParams.get("t");
+            if (t) caseStore.set(caseId, t);
+          } catch {
+            const match = res.privateLink.match(/[?&]t=([^&]+)/);
+            if (match?.[1]) caseStore.set(caseId, decodeURIComponent(match[1]));
+          }
+        }
         notifySuccess("Customer information saved!");
         onSuccess({
           name: trimmedName,

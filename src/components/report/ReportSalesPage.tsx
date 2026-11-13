@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReportInputs, getReportInputs, saveReportInputs, defaultMockReportInputs } from "@/lib/report-storage";
-import { fairexit } from "@/lib/api/fairexit";
+import { fairexit, caseStore } from "@/lib/api/fairexit";
 import {
   ApplePayBadge,
   GooglePayBadge,
@@ -396,6 +396,16 @@ export default function ReportSalesPage({
   const handleCustomerSuccess = (customerData: { name: string; email: string; privateLink?: string }) => {
     setCustomerModalOpen(false);
     const activeCaseId = caseId || cs?.id;
+    if (activeCaseId && customerData?.privateLink) {
+      try {
+        const parsed = new URL(customerData.privateLink);
+        const t = parsed.searchParams.get("t");
+        if (t) caseStore.set(activeCaseId, t);
+      } catch {
+        const match = customerData.privateLink.match(/[?&]t=([^&]+)/);
+        if (match?.[1]) caseStore.set(activeCaseId, decodeURIComponent(match[1]));
+      }
+    }
     if (onPaySuccess) {
       onPaySuccess(activeCaseId || undefined);
     }
