@@ -1,0 +1,2026 @@
+{
+ "_about": {
+  "built": "2026-11-09",
+  "how": "Region cards are copied word for word from the verified \"at a glance\" facts on the FairExit region pages. Each one carries its official source. Facts with no source, a source we could not open directly, or a topic in the page's \"couldn't confirm yet\" list are left out.",
+  "show_source": "Show the source name under each region card as small text, linked to the url.",
+  "approved_for_launch": false,
+  "approval_note": "Region facts are pending employment-lawyer sign-off, like the calculator numbers. Do not show region cards in production until this is true; lawyer and report cards are fine.",
+  "do_not_edit": "Never edit card text by hand. FairExit regenerates this file whenever a region page changes."
+ },
+ "CA-AB": [
+  {
+   "kind": "region",
+   "text": "Alberta · Termination notice or pay: 1 week after 90 days, 2 weeks at 2 years, 4 at 4 years, 5 at 6 years, 6 at 8 years, 8 weeks at 10 years and beyond.",
+   "source": {
+    "name": "Government of Alberta",
+    "section": "Termination and termination pay (notice table, 90-day rule, 13-week average, employee notice)",
+    "url": "https://www.alberta.ca/termination-pay"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Alberta · Separate severance pay: None in the Code; the weeks above are the full statutory floor.",
+   "source": {
+    "name": "Government of Alberta",
+    "section": "Termination and termination pay (notice table, 90-day rule, 13-week average, employee notice)",
+    "url": "https://www.alberta.ca/termination-pay"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in Alberta. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "Alberta · Group termination: 50 or more people at one location within 4 weeks: at least 4 weeks' written notice to the Minister, and each person still gets their own notice.",
+   "source": {
+    "name": "Government of Alberta",
+    "section": "Group terminations (50+ at one location in 4 weeks, 4 weeks' notice to the Minister)",
+    "url": "https://www.alberta.ca/group-terminations"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Alberta · How pay in lieu is counted: If your wages vary, the average of the 13 weeks you worked before termination.",
+   "source": {
+    "name": "Government of Alberta",
+    "section": "Termination and termination pay (notice table, 90-day rule, 13-week average, employee notice)",
+    "url": "https://www.alberta.ca/termination-pay"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Alberta · Time to file a complaint: Up to 6 months after your last day of employment.",
+   "source": {
+    "name": "Government of Alberta",
+    "section": "File an employment standards complaint (6 months after last day)",
+    "url": "https://www.alberta.ca/file-employment-standards-complaint"
+   }
+  }
+ ],
+ "CA-BC": [
+  {
+   "kind": "region",
+   "text": "British Columbia · Compensation for length of service: 1 week after 3 months, 2 weeks after 12 months, 3 weeks after 3 years plus 1 week per added year, max 8 weeks.",
+   "source": {
+    "name": "BC Employment Standards Branch",
+    "section": "Interpretation Guidelines Manual, ESA Part 8, section 63 (compensation for length of service)",
+    "url": "https://www2.gov.bc.ca/gov/content/employment-business/employment-standards-advice/employment-standards/forms-resources/igm/esa-part-8-section-63"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "British Columbia · Separate severance pay: None in the Act. The 8-week cap is the whole statutory floor.",
+   "source": {
+    "name": "BC Employment Standards Branch",
+    "section": "Interpretation Guidelines Manual, ESA Part 8, section 63 (compensation for length of service)",
+    "url": "https://www2.gov.bc.ca/gov/content/employment-business/employment-standards-advice/employment-standards/forms-resources/igm/esa-part-8-section-63"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in British Columbia. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "British Columbia · Group termination: 50+ employees at one location within 2 months: written notice of 8 weeks (50 to 100), 12 weeks (101 to 300) or 16 weeks (301+), or pay instead.",
+   "source": {
+    "name": "BC Employment Standards Branch",
+    "section": "Interpretation Guidelines Manual, ESA Part 8, section 64 (group terminations)",
+    "url": "https://www2.gov.bc.ca/gov/content/employment-business/employment-standards-advice/employment-standards/forms-resources/igm/esa-part-8-section-64"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "British Columbia · Time to file a complaint: 6 months after your last day of employment, with the Employment Standards Branch.",
+   "source": {
+    "name": "BC Employment Standards Branch",
+    "section": "Interpretation Guidelines Manual, ESA Part 10, section 74 (6-month complaint limit)",
+    "url": "https://www2.gov.bc.ca/gov/content/employment-business/employment-standards-advice/employment-standards/forms-resources/igm/esa-part-10-section-74"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "British Columbia · Common-law notice: Applies unless a valid clause caps you; BC courts use the same Bardal factors as Ontario.",
+   "source": {
+    "name": "BC Employment Standards Branch",
+    "section": "Interpretation Guidelines Manual, ESA Part 8, section 63 (compensation for length of service)",
+    "url": "https://www2.gov.bc.ca/gov/content/employment-business/employment-standards-advice/employment-standards/forms-resources/igm/esa-part-8-section-63"
+   }
+  }
+ ],
+ "CA-FED": [
+  {
+   "kind": "region",
+   "text": "Federally regulated · Who is covered: Banks, telecom and broadcasting, airlines, railways, interprovincial trucking and shipping, federal Crown corporations and many First Nations employers.",
+   "source": {
+    "name": "Government of Canada",
+    "section": "Termination of employment, federal labour standards (coverage, graduated notice from Feb 1 2024, statement of benefits, group termination)",
+    "url": "https://www.canada.ca/en/employment-social-development/programs/employment-standards/termination.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Federally regulated · Notice (section 230): 2 weeks for under 3 years, then 1 week per completed year from 3 years up to a cap of 8 weeks; graduated scale in force since February 1, 2024.",
+   "source": {
+    "name": "Government of Canada",
+    "section": "Termination of employment, federal labour standards (coverage, graduated notice from Feb 1 2024, statement of benefits, group termination)",
+    "url": "https://www.canada.ca/en/employment-social-development/programs/employment-standards/termination.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in Federally regulated. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "Federally regulated · Severance pay (section 235): After 12 consecutive months: the greater of 2 days' wages per completed year and 5 days' wages, paid on top of notice.",
+   "source": {
+    "name": "Canada Labour Code, R.S.C. 1985 c. L-2",
+    "section": "Section 235, severance pay (greater of 2 days per completed year and 5 days, after 12 consecutive months)",
+    "url": "https://laws-lois.justice.gc.ca/eng/acts/L-2/section-235.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Federally regulated · Group termination: 50 or more people at one establishment within 4 weeks: 16 weeks' notice to the Head of Compliance and Enforcement, plus a joint planning committee.",
+   "source": {
+    "name": "Government of Canada",
+    "section": "Termination of employment, federal labour standards (coverage, graduated notice from Feb 1 2024, statement of benefits, group termination)",
+    "url": "https://www.canada.ca/en/employment-social-development/programs/employment-standards/termination.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Federally regulated · Layoff that is not a termination: Up to 3 months, or longer than 3 months with a fixed recall date inside 6 months, under the regulations.",
+   "source": {
+    "name": "Canada Labour Standards Regulations, C.R.C. c. 986",
+    "section": "Section 30, layoffs not deemed terminations (3 months; fixed recall within 6 months)",
+    "url": "https://laws-lois.justice.gc.ca/eng/regulations/C.R.C.,_c._986/section-30.html"
+   }
+  }
+ ],
+ "CA-MB": [
+  {
+   "kind": "region",
+   "text": "Manitoba · Notice or wages in lieu: 1 week from 30 days, 2 weeks at 1 year, 4 weeks at 3 years, 6 weeks at 5 years, 8 weeks at 10 years.",
+   "source": {
+    "name": "Manitoba Employment Standards",
+    "section": "Fact sheet: Termination of employment (notice table, 30-day rule, group termination, temporary layoff, 6-month wage average)",
+    "url": "https://www.gov.mb.ca/labour/standards/doc,terminate-employment-after-apr-30-07,factsheet.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Manitoba · Separate severance pay: None under the Code.",
+   "source": {
+    "name": "Manitoba Employment Standards",
+    "section": "Fact sheet: Termination of employment (notice table, 30-day rule, group termination, temporary layoff, 6-month wage average)",
+    "url": "https://www.gov.mb.ca/labour/standards/doc,terminate-employment-after-apr-30-07,factsheet.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in Manitoba. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "Manitoba · Group termination: 50 or more people within 4 weeks: 10 weeks' notice for 50 to 100, 14 weeks for 101 to 299, 18 weeks for 300 or more, and the Minister must be told.",
+   "source": {
+    "name": "Manitoba Employment Standards",
+    "section": "Fact sheet: Termination of employment (notice table, 30-day rule, group termination, temporary layoff, 6-month wage average)",
+    "url": "https://www.gov.mb.ca/labour/standards/doc,terminate-employment-after-apr-30-07,factsheet.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Manitoba · How wages in lieu are counted: Average regular weekly earnings over the last 6 months if your hours vary; overtime and vacation pay are left out.",
+   "source": {
+    "name": "Manitoba Employment Standards",
+    "section": "Fact sheet: Termination of employment (notice table, 30-day rule, group termination, temporary layoff, 6-month wage average)",
+    "url": "https://www.gov.mb.ca/labour/standards/doc,terminate-employment-after-apr-30-07,factsheet.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Manitoba · Time to file a claim: 6 months from your last day of work, or 6 months after the wages were due; recovery is capped at 6 months' wages.",
+   "source": {
+    "name": "Manitoba Employment Standards",
+    "section": "Fact sheet: Filing a claim (6-month limit, 6-month recovery cap)",
+    "url": "https://gov.mb.ca/labour/standards/doc,filing-claim,factsheet.html"
+   }
+  }
+ ],
+ "CA-NB": [
+  {
+   "kind": "region",
+   "text": "New Brunswick · Notice or pay in lieu (s.30): 2 weeks' written notice from 6 months to under 5 years; 4 weeks from 5 years on; the table has only these two steps.",
+   "source": {
+    "name": "Government of New Brunswick, laws.gnb.ca",
+    "section": "Employment Standards Act, S.N.B. 1982 c.E-7.2, ss.30, 31, 32, 34 (notice table, 6-month rule, layoff, pay in lieu, notice void after a month of further work)",
+    "url": "https://laws.gnb.ca/en/showfulldoc/cs/E-7.2/"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "New Brunswick · Separate severance pay: None in the Act.",
+   "source": {
+    "name": "Government of New Brunswick, laws.gnb.ca",
+    "section": "Employment Standards Act, S.N.B. 1982 c.E-7.2, ss.30, 31, 32, 34 (notice table, 6-month rule, layoff, pay in lieu, notice void after a month of further work)",
+    "url": "https://laws.gnb.ca/en/showfulldoc/cs/E-7.2/"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in New Brunswick. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "New Brunswick · Group termination (s.32): more than 10 employees (11 or more) who make up at least 25% of the workforce, within 4 weeks: at least 6 weeks' notice to the Minister, the employees and any union.",
+   "source": {
+    "name": "Government of New Brunswick",
+    "section": "Employment standards: your rights if your employment is terminated (written reasons for cause, group termination of 11+ and 25%)",
+    "url": "https://www.gnb.ca/en/topic/jobs-workplaces/labour-market-workforce/employment-standards/rights-terminated.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "New Brunswick · Dismissal for cause (s.30(2)): The reasons must be given in writing; if they are not, the employer cannot rely on cause later.",
+   "source": {
+    "name": "Government of New Brunswick",
+    "section": "Employment standards: your rights if your employment is terminated (written reasons for cause, group termination of 11+ and 25%)",
+    "url": "https://www.gnb.ca/en/topic/jobs-workplaces/labour-market-workforce/employment-standards/rights-terminated.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "New Brunswick · How pay in lieu is counted (s.34): The pay you would have earned during the notice weeks.",
+   "source": {
+    "name": "Government of New Brunswick, laws.gnb.ca",
+    "section": "Employment Standards Act, S.N.B. 1982 c.E-7.2, ss.30, 31, 32, 34 (notice table, 6-month rule, layoff, pay in lieu, notice void after a month of further work)",
+    "url": "https://laws.gnb.ca/en/showfulldoc/cs/E-7.2/"
+   }
+  }
+ ],
+ "CA-NL": [
+  {
+   "kind": "region",
+   "text": "Newfoundland and Labrador · Notice or pay in lieu (s.55): 1 week from 3 months, 2 weeks from 2 years, 3 weeks from 5 years, 4 weeks from 10 years, 6 weeks from 15 years; the cap is 6 weeks.",
+   "source": {
+    "name": "House of Assembly of Newfoundland and Labrador",
+    "section": "Labour Standards Act, R.S.N.L. 1990 c.L-2, ss.49 to 57, 62 (notice table, 3-month rule, seasonal service, group termination, temporary layoff, pay in lieu, reciprocal contract notice, complaint limits)",
+    "url": "https://www.assembly.nl.ca/legislation/sr/statutes/l02.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Newfoundland and Labrador · Separate severance pay: None in the Act.",
+   "source": {
+    "name": "House of Assembly of Newfoundland and Labrador",
+    "section": "Labour Standards Act, R.S.N.L. 1990 c.L-2, ss.49 to 57, 62 (notice table, 3-month rule, seasonal service, group termination, temporary layoff, pay in lieu, reciprocal contract notice, complaint limits)",
+    "url": "https://www.assembly.nl.ca/legislation/sr/statutes/l02.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in Newfoundland and Labrador. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "Newfoundland and Labrador · Group termination (s.57): 50 or more people within 4 weeks: 8 weeks' notice for 50 to 199, 12 weeks for 200 to 499, 16 weeks for 500 or more; the Minister must be notified.",
+   "source": {
+    "name": "House of Assembly of Newfoundland and Labrador",
+    "section": "Labour Standards Act, R.S.N.L. 1990 c.L-2, ss.49 to 57, 62 (notice table, 3-month rule, seasonal service, group termination, temporary layoff, pay in lieu, reciprocal contract notice, complaint limits)",
+    "url": "https://www.assembly.nl.ca/legislation/sr/statutes/l02.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Newfoundland and Labrador · Seasonal work (s.55(2)): Two or more consecutive seasons of 5 months or more count as continuous service.",
+   "source": {
+    "name": "House of Assembly of Newfoundland and Labrador",
+    "section": "Labour Standards Act, R.S.N.L. 1990 c.L-2, ss.49 to 57, 62 (notice table, 3-month rule, seasonal service, group termination, temporary layoff, pay in lieu, reciprocal contract notice, complaint limits)",
+    "url": "https://www.assembly.nl.ca/legislation/sr/statutes/l02.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Newfoundland and Labrador · How pay in lieu is counted (s.53): Your normal wages for the length of the notice period.",
+   "source": {
+    "name": "House of Assembly of Newfoundland and Labrador",
+    "section": "Labour Standards Act, R.S.N.L. 1990 c.L-2, ss.49 to 57, 62 (notice table, 3-month rule, seasonal service, group termination, temporary layoff, pay in lieu, reciprocal contract notice, complaint limits)",
+    "url": "https://www.assembly.nl.ca/legislation/sr/statutes/l02.htm"
+   }
+  }
+ ],
+ "CA-NS": [
+  {
+   "kind": "region",
+   "text": "Nova Scotia · Notice or pay in lieu (s.72): 1 week under 2 years, 2 weeks from 2 years, 4 weeks from 5 years, 8 weeks from 10 years.",
+   "source": {
+    "name": "Nova Scotia Legislature",
+    "section": "Labour Standards Code, R.S.N.S. 1989 c.246, ss.21, 23, 71, 72, 73, 75, 76 (notice table, group termination, 10-year just-cause rule, 6-day layoff, 6-month complaint limit)",
+    "url": "https://nslegislature.ca/sites/default/files/legc/statutes/labour%20standards%20code.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Nova Scotia · Separate severance pay: None; the Code does not define the term.",
+   "source": {
+    "name": "Nova Scotia Legislature",
+    "section": "Labour Standards Code, R.S.N.S. 1989 c.246, ss.21, 23, 71, 72, 73, 75, 76 (notice table, group termination, 10-year just-cause rule, 6-day layoff, 6-month complaint limit)",
+    "url": "https://nslegislature.ca/sites/default/files/legc/statutes/labour%20standards%20code.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in Nova Scotia. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "Nova Scotia · Group termination (s.72(2)): 10 or more people within 4 weeks: 8 weeks' notice for 10 to 99, 12 weeks for 100 to 299, 16 weeks for 300 or more; the Minister must be told in writing.",
+   "source": {
+    "name": "Nova Scotia Legislature",
+    "section": "Labour Standards Code, R.S.N.S. 1989 c.246, ss.21, 23, 71, 72, 73, 75, 76 (notice table, group termination, 10-year just-cause rule, 6-day layoff, 6-month complaint limit)",
+    "url": "https://nslegislature.ca/sites/default/files/legc/statutes/labour%20standards%20code.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Nova Scotia · How pay in lieu is counted: Your regular rate for a normal week without overtime, for each week of notice.",
+   "source": {
+    "name": "Nova Scotia Legislature",
+    "section": "Labour Standards Code, R.S.N.S. 1989 c.246, ss.21, 23, 71, 72, 73, 75, 76 (notice table, group termination, 10-year just-cause rule, 6-day layoff, 6-month complaint limit)",
+    "url": "https://nslegislature.ca/sites/default/files/legc/statutes/labour%20standards%20code.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Nova Scotia · Time to file a complaint: 6 months.",
+   "source": {
+    "name": "Nova Scotia Legislature",
+    "section": "Labour Standards Code, R.S.N.S. 1989 c.246, ss.21, 23, 71, 72, 73, 75, 76 (notice table, group termination, 10-year just-cause rule, 6-day layoff, 6-month complaint limit)",
+    "url": "https://nslegislature.ca/sites/default/files/legc/statutes/labour%20standards%20code.pdf"
+   }
+  }
+ ],
+ "CA-ON": [
+  {
+   "kind": "region",
+   "text": "Ontario · Termination pay (floor): 1 week under 1 year, then 2 to 8 weeks by years of service, capped at 8 weeks.",
+   "source": {
+    "name": "Ontario Ministry of Labour",
+    "section": "Your guide to the ESA, Termination of employment (notice table, 3-month rule, mass termination, temporary layoff)",
+    "url": "https://www.ontario.ca/document/your-guide-employment-standards-act-0/termination-employment"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Ontario · Severance pay (second floor): 1 week per year (months prorated), max 26 weeks, if 5+ years and payroll of $2.5 million or more, or 50+ people cut in a closure.",
+   "source": {
+    "name": "Ontario Ministry of Labour",
+    "section": "Your guide to the ESA, Severance pay (5 years, $2.5M payroll, 26-week cap, 7-day payment rule)",
+    "url": "https://www.ontario.ca/document/your-guide-employment-standards-act-0/severance-pay"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in Ontario. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "Ontario · How payroll is counted: Across the whole company, including outside Ontario and outside Canada (Hawkes v. Max Aicher, 2021).",
+   "source": {
+    "name": "Ontario Ministry of Labour",
+    "section": "Your guide to the ESA, Severance pay: the $2.5 million payroll test counts the employer's global payroll, not just Ontario (as confirmed in Hawkes v. Max Aicher (North America) Ltd., 2021 ONSC 4290)",
+    "url": "https://www.ontario.ca/document/your-guide-employment-standards-act-0/severance-pay"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Ontario · Mass termination: 50+ people at one establishment within 4 weeks: 8, 12 or 16 weeks' notice for everyone, whatever their tenure.",
+   "source": {
+    "name": "Ontario Ministry of Labour",
+    "section": "Your guide to the ESA, Termination of employment (notice table, 3-month rule, mass termination, temporary layoff)",
+    "url": "https://www.ontario.ca/document/your-guide-employment-standards-act-0/termination-employment"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Ontario · Time to file an ESA claim: 2 years from the breach; wages must have come due within 2 years of filing.",
+   "source": {
+    "name": "Ontario Ministry of Labour",
+    "section": "Your guide to the ESA, Filing a claim (2-year limit)",
+    "url": "https://www.ontario.ca/document/your-guide-employment-standards-act-0/filing-claim"
+   }
+  }
+ ],
+ "CA-PE": [
+  {
+   "kind": "region",
+   "text": "Prince Edward Island · Which law applies: The 2026 Act for terminations on or after June 30, 2026; the former Act (6-month qualifying period, 2 to 8 weeks) for terminations before that date.",
+   "source": {
+    "name": "Government of Prince Edward Island",
+    "section": "Employment Standards Act, S.P.E.I. 2024 c.66, Cap. E-6.3, in force June 30 2026, ss.59, 60, 61, 64 (notice table, 90-day rule, group termination, layoff, pay in lieu, 2-year complaint limit)",
+    "url": "https://www.princeedwardisland.ca/sites/default/files/b281/E-6.3-Employment%20Standards%20Act.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Prince Edward Island · Notice or pay in lieu (s.59): 1 week from 90 days, 2 weeks from 1 year, 4 weeks from 5 years, 6 weeks from 10 years, 8 weeks from 15 years.",
+   "source": {
+    "name": "Government of Prince Edward Island",
+    "section": "Employment Standards Act, S.P.E.I. 2024 c.66, Cap. E-6.3, in force June 30 2026, ss.59, 60, 61, 64 (notice table, 90-day rule, group termination, layoff, pay in lieu, 2-year complaint limit)",
+    "url": "https://www.princeedwardisland.ca/sites/default/files/b281/E-6.3-Employment%20Standards%20Act.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in Prince Edward Island. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "Prince Edward Island · Separate severance pay: None in the Act.",
+   "source": {
+    "name": "Government of Prince Edward Island",
+    "section": "Employment Standards Act, S.P.E.I. 2024 c.66, Cap. E-6.3, in force June 30 2026, ss.59, 60, 61, 64 (notice table, 90-day rule, group termination, layoff, pay in lieu, 2-year complaint limit)",
+    "url": "https://www.princeedwardisland.ca/sites/default/files/b281/E-6.3-Employment%20Standards%20Act.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Prince Edward Island · How pay in lieu is counted (s.59(5)): Your regular wages without overtime for the notice period; vacation time cannot be used as notice (s.59(6)).",
+   "source": {
+    "name": "Government of Prince Edward Island",
+    "section": "Employment Standards Act, S.P.E.I. 2024 c.66, Cap. E-6.3, in force June 30 2026, ss.59, 60, 61, 64 (notice table, 90-day rule, group termination, layoff, pay in lieu, 2-year complaint limit)",
+    "url": "https://www.princeedwardisland.ca/sites/default/files/b281/E-6.3-Employment%20Standards%20Act.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Prince Edward Island · Time to file a complaint (s.64): Within 2 years of the contravention (it was 1 year under the old Act).",
+   "source": {
+    "name": "Government of Prince Edward Island",
+    "section": "Employment Standards Act, S.P.E.I. 2024 c.66, Cap. E-6.3, in force June 30 2026, ss.59, 60, 61, 64 (notice table, 90-day rule, group termination, layoff, pay in lieu, 2-year complaint limit)",
+    "url": "https://www.princeedwardisland.ca/sites/default/files/b281/E-6.3-Employment%20Standards%20Act.pdf"
+   }
+  }
+ ],
+ "CA-SK": [
+  {
+   "kind": "region",
+   "text": "Saskatchewan · Notice or pay in lieu: 1 week up to 1 year, 2 weeks past 1 year, 4 weeks past 3 years, 6 weeks past 5 years, 8 weeks past 10 years.",
+   "source": {
+    "name": "Government of Saskatchewan",
+    "section": "Individual layoff or termination (notice table, 13-week rule, 6-day layoff rule, 13-week wage average, employee notice)",
+    "url": "https://saskatchewan.ca/business/employment-standards/layoffs-and-termination/individual-layoff-or-termination"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment lawyer is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Saskatchewan · Separate severance pay: None under the Act.",
+   "source": {
+    "name": "Government of Saskatchewan",
+    "section": "Individual layoff or termination (notice table, 13-week rule, 6-day layoff rule, 13-week wage average, employee notice)",
+    "url": "https://saskatchewan.ca/business/employment-standards/layoffs-and-termination/individual-layoff-or-termination"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "A few words in a contract's termination clause can change what applies to you in Saskatchewan. It's one of the first things a lawyer reads."
+  },
+  {
+   "kind": "region",
+   "text": "Saskatchewan · Group termination: 25 or more people within 4 weeks (the threshold was 10 before January 1, 2026): 4 weeks' notice for 25 to 49, 8 weeks for 50 to 99, 12 weeks for 100 or more, given to the Minister, employees and any union.",
+   "source": {
+    "name": "Government of Saskatchewan",
+    "section": "Group layoff or termination (25+ threshold from Jan 1 2026, 4/8/12 weeks) and news release of Sept 3 2025 on the amendments",
+    "url": "https://saskatchewan.ca/business/employment-standards/layoffs-and-termination/group-layoff-or-termination"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets a lawyer see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Saskatchewan · Layoff rule: A layoff longer than 6 consecutive work days needs full termination notice or pay; a layoff with no recall date, or lasting 26 weeks or more, is a termination.",
+   "source": {
+    "name": "Government of Saskatchewan",
+    "section": "Individual layoff or termination (notice table, 13-week rule, 6-day layoff rule, 13-week wage average, employee notice)",
+    "url": "https://saskatchewan.ca/business/employment-standards/layoffs-and-termination/individual-layoff-or-termination"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and a lawyer can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Saskatchewan · How pay in lieu is counted: Average wage over the last 13 weeks worked, not counting overtime. Earned vacation pay is paid out separately and cannot replace pay in lieu.",
+   "source": {
+    "name": "Government of Saskatchewan",
+    "section": "Individual layoff or termination (notice table, 13-week rule, 6-day layoff rule, 13-week wage average, employee notice)",
+    "url": "https://saskatchewan.ca/business/employment-standards/layoffs-and-termination/individual-layoff-or-termination"
+   }
+  }
+ ],
+ "US-AZ": [
+  {
+   "kind": "region",
+   "text": "Arizona · Final paycheck deadline: Within 7 working days of discharge or by the end of the next regular pay period, whichever is sooner (A.R.S. 23-353(A)).",
+   "source": {
+    "name": "Arizona State Legislature",
+    "section": "A.R.S. 23-353, payment of wages on discharge: 7 working days or end of next regular pay period",
+    "url": "https://www.azleg.gov/ars/23/00353.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Arizona · Unpaid-wage penalty: An employee may recover three times the unpaid wages (A.R.S. 23-355).",
+   "source": {
+    "name": "Arizona State Legislature",
+    "section": "A.R.S. 23-355, action to recover treble the unpaid wages",
+    "url": "https://www.azleg.gov/ars/23/00355.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Arizona · State age-discrimination law: The Arizona Civil Rights Act covers employers with 15 or more employees (A.R.S. 41-1461).",
+   "source": {
+    "name": "Arizona State Legislature",
+    "section": "A.R.S. 41-1461(7), employer means 15 or more employees",
+    "url": "https://www.azleg.gov/ars/41/01461.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  }
+ ],
+ "US-CA": [
+  {
+   "kind": "region",
+   "text": "California · Severance minimum: None. Only a written promise in a contract, offer letter or policy creates one.",
+   "source": {
+    "name": "California EDD",
+    "section": "Layoff Services, WARN (75 employees, 50 in 30 days, 60 days, Labor Code 1403 remedies)",
+    "url": "https://edd.ca.gov/en/jobs_and_training/Layoff_Services_WARN/"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "California · State layoff-notice law: Cal-WARN: employers with 75+ employees (part-time counted) must give 60 days' notice for 50+ layoffs in 30 days at one site, any closing, or a 100-mile move.",
+   "source": {
+    "name": "California EDD",
+    "section": "Layoff Services, WARN (75 employees, 50 in 30 days, 60 days, Labor Code 1403 remedies)",
+    "url": "https://edd.ca.gov/en/jobs_and_training/Layoff_Services_WARN/"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "California · Penalty for short notice: Back pay and benefits for up to 60 days, plus a civil penalty of $500 per day (Labor Code 1403).",
+   "source": {
+    "name": "California EDD",
+    "section": "Layoff Services, WARN (75 employees, 50 in 30 days, 60 days, Labor Code 1403 remedies)",
+    "url": "https://edd.ca.gov/en/jobs_and_training/Layoff_Services_WARN/"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "California · Final paycheck deadline: Immediately when you are discharged (Labor Code 201); up to 30 days' wages as a waiting-time penalty if late (203).",
+   "source": {
+    "name": "California DIR, Labor Commissioner",
+    "section": "Paydays, pay periods and final wages FAQ (Labor Code 201, 202, 203)",
+    "url": "https://www.dir.ca.gov/dlse/faq_paydays.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "California · Unused vacation: Must be paid at your final rate; use-it-or-lose-it policies are illegal (Labor Code 227.3).",
+   "source": {
+    "name": "California DIR, Labor Commissioner",
+    "section": "Vacation FAQ (Labor Code 227.3, use-it-or-lose-it illegal)",
+    "url": "https://www.dir.ca.gov/dlse/faq_vacation.htm"
+   }
+  }
+ ],
+ "US-DE": [
+  {
+   "kind": "region",
+   "text": "Delaware · Severance minimum: None. The Wage Payment and Collection Act requires agreed benefits to be paid on time, but creates no severance right of its own.",
+   "source": {
+    "name": "Delaware Code Online",
+    "section": "19 Del. C. s.1109, agreed benefits including vacation pay to be paid within 30 days of when due",
+    "url": "https://delcode.delaware.gov/title19/c011/index.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Delaware · State layoff-notice law: Delaware WARN (19 Del. C. ch. 19): employers with 100+ employees; mass layoff of 50+ making up 33% of the site, or 500+; 60 days' written notice.",
+   "source": {
+    "name": "Delaware Code Online",
+    "section": "19 Del. C. chapter 19, Delaware WARN: 100+ employees, 50 at 33% or 500+, 60 days' notice",
+    "url": "https://delcode.delaware.gov/title19/c019/index.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Delaware · Final paycheck deadline: The later of the next regular payday or 3 business days after the last day worked (19 Del. C. 1103(a)); liquidated damages apply if late.",
+   "source": {
+    "name": "Delaware Code Online",
+    "section": "19 Del. C. s.1103(a), payment of wages on termination: later of next payday or 3 business days; liquidated damages",
+    "url": "https://delcode.delaware.gov/title19/c011/index.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Delaware · Unused vacation: No payout mandate; but benefits the employer agreed to, including vacation pay, must be paid within 30 days of when they are due (1109).",
+   "source": {
+    "name": "Delaware Code Online",
+    "section": "19 Del. C. s.1109, agreed benefits including vacation pay to be paid within 30 days of when due",
+    "url": "https://delcode.delaware.gov/title19/c011/index.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Delaware · Severance and unemployment: 'Wages' for benefit purposes include dismissal payments (3302(27)); the Division of Unemployment Insurance says to file immediately and decides the effect case by case.",
+   "source": {
+    "name": "Delaware Code Online; Delaware Department of Labor",
+    "section": "19 Del. C. s.3302(27), wages include dismissal payments; Division of Unemployment Insurance claimant FAQ, file immediately, case by case",
+    "url": "https://labor.delaware.gov/divisions/unemployment-insurance/claimant-services/claimant-faqs/"
+   }
+  }
+ ],
+ "US-FL": [
+  {
+   "kind": "region",
+   "text": "Florida · Severance minimum: None. Severance exists only where an agreement or policy creates it.",
+   "source": {
+    "name": "Florida Senate (statute text)",
+    "section": "Florida Statutes chapter 448 (labor regulations): no section sets a final-pay deadline or requires vacation payout",
+    "url": "https://www.flsenate.gov/Laws/Statutes/2021/Chapter448/All"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Florida · State layoff-notice law: None. Federal WARN is the only notice rule.",
+   "source": {
+    "name": "Florida Senate (statute text)",
+    "section": "Florida Statutes chapter 448 (labor regulations): no section sets a final-pay deadline or requires vacation payout",
+    "url": "https://www.flsenate.gov/Laws/Statutes/2021/Chapter448/All"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Florida · CHOICE Act, from July 1, 2025: For employees earning over twice the county mean wage: non-competes up to 4 years, a mandatory preliminary injunction, 7 days to review and written notice of the right to counsel.",
+   "source": {
+    "name": "Florida Senate (statute text)",
+    "section": "F.S. 542.43 and 542.45, CHOICE Act (covered employees, 4-year limit, injunction, 7-day review)",
+    "url": "https://www.flsenate.gov/Laws/Statutes/2025/542.43"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  }
+ ],
+ "US-IL": [
+  {
+   "kind": "region",
+   "text": "Illinois · Severance minimum: None in statute. A promise in a contract, offer letter or handbook is the only source of a severance right.",
+   "source": {
+    "name": "Illinois Department of Labor",
+    "section": "Wage Payment and Collection FAQ (final pay timing; 820 ILCS 115/5)",
+    "url": "https://labor.illinois.gov/faqs/wage-payment-faq.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Illinois · State layoff-notice law: Illinois WARN: 75+ full-time employees; 60 days' notice for a mass layoff of 25+ (one third of the site) or 250+, or a plant closing affecting 25+.",
+   "source": {
+    "name": "Illinois DCEO",
+    "section": "Illinois WARN: 75 full-time employees, 60 days, 25/one-third or 250, plant closing 25",
+    "url": "https://dceo.illinois.gov/workforcedevelopment/warn.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Illinois · Penalty for short notice: Back pay and benefits for up to 60 days plus a civil penalty (820 ILCS 65/99).",
+   "source": {
+    "name": "Illinois General Assembly (statute text)",
+    "section": "820 ILCS 65/99, Illinois WARN remedies: back pay and benefits up to 60 days, civil penalty",
+    "url": "https://dceo.illinois.gov/workforcedevelopment/warn.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Illinois · Final paycheck deadline: At separation if possible, and no later than the next regular payday (820 ILCS 115/5).",
+   "source": {
+    "name": "Illinois Department of Labor",
+    "section": "Wage Payment and Collection FAQ (final pay timing; 820 ILCS 115/5)",
+    "url": "https://labor.illinois.gov/faqs/wage-payment-faq.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Illinois · Unused vacation: Earned vacation is final compensation, paid at your final rate; no policy may forfeit it.",
+   "source": {
+    "name": "Illinois General Assembly (statute text)",
+    "section": "820 ILCS 115/5, final compensation including earned vacation at the final rate; no forfeiture",
+    "url": "https://ilga.gov/Documents/legislation/ilcs/documents/082001150K5.htm"
+   }
+  }
+ ],
+ "US-IA": [
+  {
+   "kind": "region",
+   "text": "Iowa · Severance minimum: None. Iowa Code 91A.4 governs wages and agreed vacation only; severance is whatever the contract or plan says.",
+   "source": {
+    "name": "Iowa Legislature",
+    "section": "Iowa Code 91A.4, employment suspension or termination: wages by the next regular payday; pro rata vacation if due under agreement or policy",
+    "url": "https://www.legis.iowa.gov/docs/code/91A.4.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Iowa · State layoff-notice law: Iowa Code chapter 84C: employers with 25+ employees; 25+ job losses at a single site within 30 days; 30 days' written notice.",
+   "source": {
+    "name": "Iowa Legislature",
+    "section": "Iowa Code chapter 84C, Worker Adjustment and Retraining Notification: 25+ employees, 25+ job losses in 30 days, 30 days' notice, severance credit (84C.4(7)), $100-a-day penalty",
+    "url": "https://www.legis.iowa.gov/docs/code/84C.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Iowa · Severance can replace notice: The notice period is reduced by each day of severance the employer pays (84C.4(7)).",
+   "source": {
+    "name": "Iowa Legislature",
+    "section": "Iowa Code chapter 84C, Worker Adjustment and Retraining Notification: 25+ employees, 25+ job losses in 30 days, 30 days' notice, severance credit (84C.4(7)), $100-a-day penalty",
+    "url": "https://www.legis.iowa.gov/docs/code/84C.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Iowa · Penalty for short notice: Civil penalty of up to $100 a day.",
+   "source": {
+    "name": "Iowa Legislature",
+    "section": "Iowa Code chapter 84C, Worker Adjustment and Retraining Notification: 25+ employees, 25+ job losses in 30 days, 30 days' notice, severance credit (84C.4(7)), $100-a-day penalty",
+    "url": "https://www.legis.iowa.gov/docs/code/84C.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Iowa · Final paycheck deadline: By the next regular payday (91A.4).",
+   "source": {
+    "name": "Iowa Legislature",
+    "section": "Iowa Code 91A.4, employment suspension or termination: wages by the next regular payday; pro rata vacation if due under agreement or policy",
+    "url": "https://www.legis.iowa.gov/docs/code/91A.4.pdf"
+   }
+  }
+ ],
+ "US-ME": [
+  {
+   "kind": "region",
+   "text": "Maine · State layoff-notice law: 26 MRSA 625-B: a covered establishment is one that has employed 100 or more persons; 90 days' notice before a relocation or closing.",
+   "source": {
+    "name": "Maine Legislature",
+    "section": "26 MRSA s.625-B, severance pay due to relocation or closing: 100+ persons, 90 days' notice, one week per year for 3+ years' service",
+    "url": "https://legislature.maine.gov/statutes/26/title26sec625-B.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Maine · Final paycheck deadline: No later than the next established payday (26 MRSA 626).",
+   "source": {
+    "name": "Maine Legislature",
+    "section": "26 MRSA s.626, cessation of employment: final pay by the next established payday; unused vacation accrued on or after Jan 1, 2023 paid",
+    "url": "https://legislature.maine.gov/statutes/26/title26sec626.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Maine · Unused vacation: All unused vacation accrued on or after January 1, 2023 must be paid at separation, except by employers with 10 or fewer employees and public employers.",
+   "source": {
+    "name": "Maine Legislature",
+    "section": "26 MRSA s.626, cessation of employment: final pay by the next established payday; unused vacation accrued on or after Jan 1, 2023 paid",
+    "url": "https://legislature.maine.gov/statutes/26/title26sec626.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Maine · Severance and unemployment: Disqualified for any week you receive dismissal wages, wages in lieu of notice or terminal pay; a smaller amount reduces the benefit by that sum (26 MRSA 1193(5)).",
+   "source": {
+    "name": "Maine Legislature",
+    "section": "26 MRSA s.1193(5), disqualification for weeks receiving dismissal wages, wages in lieu of notice or terminal pay",
+    "url": "https://legislature.maine.gov/statutes/26/title26sec1193.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Maine · State age-discrimination law: The Maine Human Rights Act covers employers of any size (5 MRSA 4553).",
+   "source": {
+    "name": "Maine Legislature",
+    "section": "5 MRSA s.4553, Maine Human Rights Act definitions: employer of any number of employees",
+    "url": "https://legislature.maine.gov/statutes/5/title5sec4553.html"
+   }
+  }
+ ],
+ "US-MD": [
+  {
+   "kind": "region",
+   "text": "Maryland · Severance minimum: None. The Wage Payment and Collection Law covers wages and accrued leave, not pay for weeks after your job ends.",
+   "source": {
+    "name": "Maryland General Assembly",
+    "section": "Labor and Employment 3-505, payment on termination: by the regular payday; accrued leave unless written policy given at hire",
+    "url": "https://mgaleg.maryland.gov/mgawebsite/Laws/StatuteText?article=gle&section=3-505&enactments=false"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Maryland · State layoff-notice law: Economic Stabilization Act: employers with 50+ employees; a 'reduction in operations' is a relocation or shutdown that cuts 25% of a workforce or 15 employees over 3 months.",
+   "source": {
+    "name": "Maryland General Assembly",
+    "section": "Labor and Employment 11-301 to 11-305, Economic Stabilization Act: 50+ employees, 25% or 15 employees over 3 months, 60 days' notice",
+    "url": "https://mgaleg.maryland.gov/mgawebsite/Laws/StatuteText?article=gle&section=11-301&enactments=false"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Maryland · Notice period: 60 days' written notice, mandatory since 2020 (it was voluntary before).",
+   "source": {
+    "name": "Maryland General Assembly",
+    "section": "Labor and Employment 11-301 to 11-305, Economic Stabilization Act: 50+ employees, 25% or 15 employees over 3 months, 60 days' notice",
+    "url": "https://mgaleg.maryland.gov/mgawebsite/Laws/StatuteText?article=gle&section=11-301&enactments=false"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Maryland · Final paycheck deadline: On or before the day you would have been paid had you stayed (Lab. & Empl. 3-505(a)).",
+   "source": {
+    "name": "Maryland General Assembly",
+    "section": "Labor and Employment 3-505, payment on termination: by the regular payday; accrued leave unless written policy given at hire",
+    "url": "https://mgaleg.maryland.gov/mgawebsite/Laws/StatuteText?article=gle&section=3-505&enactments=false"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Maryland · Unused vacation: Accrued leave must be paid unless a written policy limiting payout was given to you when hired (3-505(b)).",
+   "source": {
+    "name": "Maryland General Assembly",
+    "section": "Labor and Employment 3-505, payment on termination: by the regular payday; accrued leave unless written policy given at hire",
+    "url": "https://mgaleg.maryland.gov/mgawebsite/Laws/StatuteText?article=gle&section=3-505&enactments=false"
+   }
+  }
+ ],
+ "US-MA": [
+  {
+   "kind": "region",
+   "text": "Massachusetts · Severance minimum: None. The Wage Act covers wages you have earned, not pay for weeks you will not work, so severance exists only if a contract or policy grants it.",
+   "source": {
+    "name": "Massachusetts Legislature",
+    "section": "G.L. c.149 s.148, payment of wages; discharged employee paid in full on the day of discharge; vacation payments are wages",
+    "url": "https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXXI/Chapter149/Section148"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Massachusetts · State layoff-notice law: None that binds. G.L. c.151A s.71A describes a voluntary advance-notice program, so only federal WARN (100+ employees) sets a notice duty.",
+   "source": {
+    "name": "Massachusetts Legislature",
+    "section": "G.L. c.151A s.71A, voluntary advance notification of plant closings",
+    "url": "https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXXI/Chapter151A/Section71A"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Massachusetts · Final paycheck deadline: A discharged employee must be paid in full on the day of discharge (G.L. c.149 s.148).",
+   "source": {
+    "name": "Massachusetts Legislature",
+    "section": "G.L. c.149 s.148, payment of wages; discharged employee paid in full on the day of discharge; vacation payments are wages",
+    "url": "https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXXI/Chapter149/Section148"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Massachusetts · Unused vacation: Must be paid. The Wage Act counts holiday and vacation pay due under an oral or written agreement as wages.",
+   "source": {
+    "name": "Massachusetts Legislature",
+    "section": "G.L. c.149 s.148, payment of wages; discharged employee paid in full on the day of discharge; vacation payments are wages",
+    "url": "https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXXI/Chapter149/Section148"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Massachusetts · Late-pay penalty: Mandatory treble damages plus attorneys' fees for Wage Act violations (G.L. c.149 s.150).",
+   "source": {
+    "name": "Massachusetts Legislature",
+    "section": "G.L. c.149 s.150, mandatory treble damages and attorneys' fees",
+    "url": "https://malegislature.gov/Laws/GeneralLaws/PartI/TitleXXI/Chapter149/Section150"
+   }
+  }
+ ],
+ "US-MI": [
+  {
+   "kind": "region",
+   "text": "Michigan · Severance minimum: None. Severance is a fringe benefit due only under a written contract or written policy.",
+   "source": {
+    "name": "Michigan Legislature (statute text)",
+    "section": "MCL 408.471(e), fringe benefits defined by written contract or written policy",
+    "url": "https://www.legislature.mi.gov/Laws/MCL?objectName=mcl-408-471"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Michigan · State layoff-notice law: None. Federal WARN applies; Michigan's Workforce Development agency posts the notices.",
+   "source": {
+    "name": "Michigan Department of Labor and Economic Opportunity",
+    "section": "WARN program page (federal WARN; notices posted)",
+    "url": "https://www.michigan.gov/leo/bureaus-agencies/wd/programs-services/worker-adjustment-and-retraining-notification-act-warn"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Michigan · Final paycheck deadline (discharged): Immediately, as soon as the amount can be determined with due diligence (MCL 408.475).",
+   "source": {
+    "name": "Michigan Legislature (statute text)",
+    "section": "MCL 408.475, payment to discharged employees as soon as the amount can be determined",
+    "url": "https://www.legislature.mi.gov/Laws/MCL?objectName=mcl-408-475"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Michigan · Unused vacation: Paid according to the written contract or written policy; the policy decides (MCL 408.473).",
+   "source": {
+    "name": "Michigan Legislature (statute text)",
+    "section": "MCL 408.473, payment of fringe benefits per written contract or policy",
+    "url": "https://www.legislature.mi.gov/Laws/MCL?objectName=mcl-408-473"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Michigan · Verbal promises: A fringe benefit must be in a written contract or written policy to be enforceable under the Act (MCL 408.471(e)).",
+   "source": {
+    "name": "Michigan Legislature (statute text)",
+    "section": "MCL 408.471(e), fringe benefits defined by written contract or written policy",
+    "url": "https://www.legislature.mi.gov/Laws/MCL?objectName=mcl-408-471"
+   }
+  }
+ ],
+ "US-MN": [
+  {
+   "kind": "region",
+   "text": "Minnesota · Severance minimum: None. Minnesota only penalizes an employer that fails to pay separation pay it already agreed to.",
+   "source": {
+    "name": "Minnesota Revisor of Statutes",
+    "section": "Minn. Stat. 181.74, failure to pay agreed vacation or separation pay within 30 days is a gross misdemeanor",
+    "url": "https://www.revisor.mn.gov/statutes/cite/181.74"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Minnesota · Final paycheck deadline: Due on demand after discharge; the employer must pay within 24 hours of your demand, or pay a penalty of up to 15 days' average earnings (181.13).",
+   "source": {
+    "name": "Minnesota Revisor of Statutes",
+    "section": "Minn. Stat. 181.13, wages due on demand after discharge; 24 hours; penalty up to 15 days",
+    "url": "https://www.revisor.mn.gov/statutes/cite/181.13"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Minnesota · Unused vacation: No payout mandate, but failing to pay agreed vacation or separation pay within 30 days is a gross misdemeanor (181.74).",
+   "source": {
+    "name": "Minnesota Revisor of Statutes",
+    "section": "Minn. Stat. 181.74, failure to pay agreed vacation or separation pay within 30 days is a gross misdemeanor",
+    "url": "https://www.revisor.mn.gov/statutes/cite/181.74"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Minnesota · Severance and unemployment: Ineligible for any week you receive separation, severance or bonus pay, applied to the weeks right after separation; when you sign the release does not change the timing (268.085 subd. 3b).",
+   "source": {
+    "name": "Minnesota Revisor of Statutes",
+    "section": "Minn. Stat. 268.085 subd. 3b, severance and separation pay: ineligibility applied to the period after separation",
+    "url": "https://www.revisor.mn.gov/statutes/cite/268.085"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Minnesota · Written reason for firing: Within 15 working days of termination you may demand the truthful reason in writing; the employer has 10 working days to answer (181.933).",
+   "source": {
+    "name": "Minnesota Revisor of Statutes",
+    "section": "Minn. Stat. 181.933, notice of termination: written reason on demand within 15 working days",
+    "url": "https://www.revisor.mn.gov/statutes/cite/181.933"
+   }
+  }
+ ],
+ "US-NH": [
+  {
+   "kind": "region",
+   "text": "New Hampshire · Severance minimum: None by statute. But severance that is 'a matter of policy' is wages when due (RSA 275:43(V)), so a promised amount is enforceable.",
+   "source": {
+    "name": "New Hampshire General Court",
+    "section": "RSA 275:43(V), vacation, severance and similar pay are wages when due if a matter of policy",
+    "url": "https://gc.nh.gov/rsa/html/XXIII/275/275-43.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "New Hampshire · State layoff-notice law: RSA 275-F: employers with 100+ employees; mass layoff of 250+, or 25+ making up 33% of the site; 60 days' written notice.",
+   "source": {
+    "name": "New Hampshire General Court",
+    "section": "RSA 275-F, Worker Adjustment and Retraining Notification: 100+ employees, 250 or 25 at 33%, 60 days",
+    "url": "https://gc.nh.gov/rsa/html/XXIII/275-F/275-F-mrg.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "New Hampshire · Final paycheck deadline: Discharged: paid in full within 72 hours. Laid off: by the next regular payday (RSA 275:44).",
+   "source": {
+    "name": "New Hampshire General Court",
+    "section": "RSA 275:44, employees separated from payroll: discharged paid within 72 hours; laid off by next regular payday",
+    "url": "https://gc.nh.gov/rsa/html/XXIII/275/275-44.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "New Hampshire · Unused vacation: Vacation pay is wages when due if it is a matter of employer policy; no payout without a policy.",
+   "source": {
+    "name": "New Hampshire General Court",
+    "section": "RSA 275:43(V), vacation, severance and similar pay are wages when due if a matter of policy",
+    "url": "https://gc.nh.gov/rsa/html/XXIII/275/275-43.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "New Hampshire · Severance and unemployment: Wages include payments in lieu of notice and separation allowances; your weekly benefit is reduced by wages above 30% of the benefit (RSA 282-A:14).",
+   "source": {
+    "name": "New Hampshire General Court",
+    "section": "RSA 282-A:14, wages include payments in lieu of notice and separation allowances; 30% disregard",
+    "url": "https://gc.nh.gov/rsa/html/XXIII/282-A/282-A-14.htm"
+   }
+  }
+ ],
+ "US-NJ": [
+  {
+   "kind": "region",
+   "text": "New Jersey · Severance minimum: Only in a covered NJ WARN event: 1 week's pay per full year of service, paid without needing to sign a release.",
+   "source": {
+    "name": "New Jersey Department of Labor",
+    "section": "N.J.S.A. 34:21-1 et seq. (NJ WARN, as amended 2023): 100+ employees, 50 or more terminated, 90 days' notice, 1 week of pay per full year, 4 extra weeks if notice is short, no waiver without the Commissioner or a court",
+    "url": "https://www.nj.gov/labor/assets/PDFs/WARN/NJ_WARN_ACT_2023law.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "New Jersey · State layoff-notice law: NJ WARN: employers with 100+ employees anywhere, 50+ terminations in New Jersey within 30 days (statewide, part-time counted), closing or transfer.",
+   "source": {
+    "name": "New Jersey Department of Labor",
+    "section": "N.J.S.A. 34:21-1 et seq. (NJ WARN, as amended 2023): 100+ employees, 50 or more terminated, 90 days' notice, 1 week of pay per full year, 4 extra weeks if notice is short, no waiver without the Commissioner or a court",
+    "url": "https://www.nj.gov/labor/assets/PDFs/WARN/NJ_WARN_ACT_2023law.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "New Jersey · Notice period: 90 days' written notice; if less, 4 more weeks of severance are due to each worker.",
+   "source": {
+    "name": "New Jersey Department of Labor",
+    "section": "N.J.S.A. 34:21-1 et seq. (NJ WARN, as amended 2023): 100+ employees, 50 or more terminated, 90 days' notice, 1 week of pay per full year, 4 extra weeks if notice is short, no waiver without the Commissioner or a court",
+    "url": "https://www.nj.gov/labor/assets/PDFs/WARN/NJ_WARN_ACT_2023law.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "New Jersey · Can a release waive it?: No. Statutory severance cannot be waived without approval from the Commissioner of Labor or a court.",
+   "source": {
+    "name": "New Jersey Department of Labor",
+    "section": "N.J.S.A. 34:21-1 et seq. (NJ WARN, as amended 2023): 100+ employees, 50 or more terminated, 90 days' notice, 1 week of pay per full year, 4 extra weeks if notice is short, no waiver without the Commissioner or a court",
+    "url": "https://www.nj.gov/labor/assets/PDFs/WARN/NJ_WARN_ACT_2023law.pdf"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "New Jersey · Final paycheck deadline: By the regular payday for the pay period in which you were let go (N.J.S.A. 34:11-4.3).",
+   "source": {
+    "name": "New Jersey State Library (statute text)",
+    "section": "N.J.S.A. 34:11-4.3, payment of wages on discharge or quitting by the regular payday",
+    "url": "https://repo.njstatelib.org//bitstreams/6aa0d53f-796e-4074-bb7f-8b02352318a8/download"
+   }
+  }
+ ],
+ "US-NY": [
+  {
+   "kind": "region",
+   "text": "New York · Severance minimum: None. Severance is due only if an agreement or a written policy promises it.",
+   "source": {
+    "name": "New York State Senate (statute text)",
+    "section": "Labor Law 198-c, benefits or wage supplements including vacation and separation pay; misdemeanor if unpaid 30 days after due",
+    "url": "https://www.nysenate.gov/legislation/laws/LAB/198-C"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "New York · State layoff-notice law: NY WARN: 50+ full-time employees; 90 days' notice for a plant closing affecting 25+, or a mass layoff of 25+ (if one third of the site) or 250+.",
+   "source": {
+    "name": "New York DOL and Labor Law 860-A, 860-B",
+    "section": "WARN: 50 full-time employees, 90 days, 25/33% or 250 thresholds",
+    "url": "https://dol.ny.gov/warn-worker-adjustment-and-retraining-notification"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "New York · Written notice of your end date: Within 5 working days of termination the employer must tell you in writing the exact end date and the date your benefits stop (Labor Law 195(6)).",
+   "source": {
+    "name": "New York State Senate (statute text)",
+    "section": "Labor Law 195(6), written notice of termination date and benefits-cancellation date within 5 working days",
+    "url": "https://www.nysenate.gov/legislation/laws/LAB/195"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "New York · Final paycheck deadline: No later than the regular payday for the pay period in which you were let go; mailed if you ask (Labor Law 191(3)).",
+   "source": {
+    "name": "New York State Senate (statute text)",
+    "section": "Labor Law 191(3), final wages by the regular payday, mailed on request",
+    "url": "https://www.nysenate.gov/legislation/laws/LAB/191"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "New York · Unused vacation: Treated as a wage supplement due under your agreement or policy; a written policy can forfeit it.",
+   "source": {
+    "name": "New York State Senate (statute text)",
+    "section": "Labor Law 198-c, benefits or wage supplements including vacation and separation pay; misdemeanor if unpaid 30 days after due",
+    "url": "https://www.nysenate.gov/legislation/laws/LAB/198-C"
+   }
+  }
+ ],
+ "US-NC": [
+  {
+   "kind": "region",
+   "text": "North Carolina · Severance minimum: None. Only a promise in writing or an established policy creates a severance right.",
+   "source": {
+    "name": "North Carolina Department of Labor",
+    "section": "Promised wages including vacation (G.S. 95-25.12, 95-25.13(2): forfeiture only with written notice)",
+    "url": "https://www.labor.nc.gov/workplace-rights/employee-rights-regarding-time-worked-and-wages-earned/promised-wages-including"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "North Carolina · State layoff-notice law: None. Federal WARN is the only notice requirement.",
+   "source": {
+    "name": "North Carolina General Assembly (statute text)",
+    "section": "G.S. 143-422.2, Equal Employment Practices Act (public policy, employers of 15 or more)",
+    "url": "https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_143/GS_143-422.2.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "North Carolina · Final paycheck deadline: On or before the next regular payday; mailed if you ask (G.S. 95-25.7).",
+   "source": {
+    "name": "North Carolina General Assembly (statute text)",
+    "section": "G.S. 95-25.7, payment to separated employees by the next regular payday; mailed on request",
+    "url": "https://www.ncleg.gov/EnactedLegislation/Statutes/HTML/BySection/Chapter_95/GS_95-25.7.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "North Carolina · Bonuses and commissions: Due on the first regular payday after the amount can be calculated (13 NCAC 12.0308).",
+   "source": {
+    "name": "North Carolina Department of Labor",
+    "section": "Payment of final wages (13 NCAC 12.0308): all wages by the next regular payday; bonuses and commissions on the first payday after they can be calculated",
+    "url": "https://www.labor.nc.gov/workplace-rights/employee-rights-regarding-time-worked-and-wages-earned/payment-final-wages"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "North Carolina · Unused vacation: Earned vacation is wages and must be paid out unless the employer gave you a written forfeiture clause beforehand (G.S. 95-25.12, 95-25.13).",
+   "source": {
+    "name": "North Carolina Department of Labor",
+    "section": "Promised wages including vacation (G.S. 95-25.12, 95-25.13(2): forfeiture only with written notice)",
+    "url": "https://www.labor.nc.gov/workplace-rights/employee-rights-regarding-time-worked-and-wages-earned/promised-wages-including"
+   }
+  }
+ ],
+ "US-OH": [
+  {
+   "kind": "region",
+   "text": "Ohio · Severance minimum: None. Ohio law collects wages that are due; it does not require severance.",
+   "source": {
+    "name": "Ohio Revised Code (codes.ohio.gov)",
+    "section": "R.C. 4113.15, semi-monthly payment of wages; liquidated damages 6% or $200",
+    "url": "https://codes.ohio.gov/ohio-revised-code/section-4113.15"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Ohio · Final paycheck deadline: No separate rule for departing workers; wages follow the regular semi-monthly schedule under R.C. 4113.15.",
+   "source": {
+    "name": "Ohio Revised Code (codes.ohio.gov)",
+    "section": "R.C. 4113.15, semi-monthly payment of wages; liquidated damages 6% or $200",
+    "url": "https://codes.ohio.gov/ohio-revised-code/section-4113.15"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Ohio · Late-pay damages: Wages unpaid 30 days past the payday carry liquidated damages of 6% or $200, whichever is greater.",
+   "source": {
+    "name": "Ohio Revised Code (codes.ohio.gov)",
+    "section": "R.C. 4113.15, semi-monthly payment of wages; liquidated damages 6% or $200",
+    "url": "https://codes.ohio.gov/ohio-revised-code/section-4113.15"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Ohio · Severance and unemployment: The weekly benefit is reduced by separation or termination pay; a lump sum not tied to specific weeks is attributed at your normal weekly wage to successive weeks until used up (R.C. 4141.31).",
+   "source": {
+    "name": "Ohio Revised Code (codes.ohio.gov)",
+    "section": "R.C. 4141.31(A)(2) and (B), reduction of benefits by separation pay; attribution of unallocated severance",
+    "url": "https://codes.ohio.gov/ohio-revised-code/section-4141.31"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Ohio · State age-discrimination law: Covers employers with 4 or more persons; age 40 and over; discharge without just cause of a worker 40+ is actionable under R.C. 4112.14.",
+   "source": {
+    "name": "Ohio Revised Code (codes.ohio.gov)",
+    "section": "R.C. 4112.01(A)(2) and 4112.14, employer of 4 or more; age 40+; discharge without just cause",
+    "url": "https://codes.ohio.gov/ohio-revised-code/section-4112.14"
+   }
+  }
+ ],
+ "US-PA": [
+  {
+   "kind": "region",
+   "text": "Pennsylvania · Severance minimum: None. The Wage Payment and Collection Law enforces promised pay; it does not create a severance right.",
+   "source": {
+    "name": "Pennsylvania General Assembly (statute text)",
+    "section": "Wage Payment and Collection Law, Act 329 of 1961, section 260.5 (next regular payday)",
+    "url": "https://www.palegis.us/statutes/unconsolidated/law-information?sessYr=1961&sessInd=0&actNum=329"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Pennsylvania · State layoff-notice law: None. Federal WARN applies; notices go to Labor and Industry's Rapid Response unit.",
+   "source": {
+    "name": "Commonwealth of Pennsylvania",
+    "section": "Submit a WARN notice (federal WARN; Rapid Response)",
+    "url": "https://www.pa.gov/services/dli/submit-a-worker-adjustment-and-retraining-notification--warn--no"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Pennsylvania · Final paycheck deadline: No later than the next regular payday after separation (43 P.S. 260.5).",
+   "source": {
+    "name": "Pennsylvania General Assembly (statute text)",
+    "section": "Wage Payment and Collection Law, Act 329 of 1961, section 260.5 (next regular payday)",
+    "url": "https://www.palegis.us/statutes/unconsolidated/law-information?sessYr=1961&sessInd=0&actNum=329"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Pennsylvania · Unused vacation: A fringe benefit paid only if the agreement or policy provides for it (43 P.S. 260.2a).",
+   "source": {
+    "name": "Pennsylvania General Assembly (statute text)",
+    "section": "Wage Payment and Collection Law, section 260.2a (fringe benefits per agreement or policy)",
+    "url": "https://www.palegis.us/statutes/unconsolidated/law-information?sessYr=1961&sessInd=0&actNum=329"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Pennsylvania · Late-pay penalty: If wages stay unpaid, liquidated damages of 25% or $500, whichever is greater, plus fees (43 P.S. 260.10).",
+   "source": {
+    "name": "Pennsylvania General Assembly (statute text)",
+    "section": "Wage Payment and Collection Law, section 260.10 (liquidated damages 25% or $500)",
+    "url": "https://www.palegis.us/statutes/unconsolidated/law-information?sessYr=1961&sessInd=0&actNum=329"
+   }
+  }
+ ],
+ "US-TN": [
+  {
+   "kind": "region",
+   "text": "Tennessee · State layoff-notice law: Plant Closing and Reduction in Operations Act (T.C.A. 50-1-601): employers with 50 to 99 employees, 50 or more jobs cut within 3 months; notice to the Commissioner and to employees.",
+   "source": {
+    "name": "Tennessee Department of Labor and Workforce Development",
+    "section": "WARN notices page: Plant Closing and Reduction in Operations Act, employers with 50 to 99 employees, 50+ affected in 3 months",
+    "url": "https://www.tn.gov/workforce/employers/staffing-redirect/layoffs---unemployment/warn-notices.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Tennessee · Notice period under state law: The statute sets no fixed number of days; it requires notice, not a 60-day count, unlike federal WARN.",
+   "source": {
+    "name": "Tennessee Department of Labor and Workforce Development",
+    "section": "WARN notices page: Plant Closing and Reduction in Operations Act, employers with 50 to 99 employees, 50+ affected in 3 months",
+    "url": "https://www.tn.gov/workforce/employers/staffing-redirect/layoffs---unemployment/warn-notices.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Tennessee · Final paycheck deadline: The next regular payday or 21 days after discharge, whichever is later (T.C.A. 50-2-103(g)).",
+   "source": {
+    "name": "Tennessee Department of Labor and Workforce Development",
+    "section": "Wages and Breaks: final pay by the next regular payday or 21 days (T.C.A. 50-2-103(g)); vacation only if policy requires",
+    "url": "https://www.tn.gov/workforce/employees/labor-laws/labor-laws-redirect/wages-breaks.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Tennessee · Unused vacation: Paid only when the employer's policy or a labor agreement specifically requires it.",
+   "source": {
+    "name": "Tennessee Department of Labor and Workforce Development",
+    "section": "Wages and Breaks: final pay by the next regular payday or 21 days (T.C.A. 50-2-103(g)); vacation only if policy requires",
+    "url": "https://www.tn.gov/workforce/employees/labor-laws/labor-laws-redirect/wages-breaks.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  }
+ ],
+ "US-TX": [
+  {
+   "kind": "region",
+   "text": "Texas · Severance minimum: None. The Texas Workforce Commission treats severance as due only when a written policy or agreement promises it.",
+   "source": {
+    "name": "Texas Workforce Commission",
+    "section": "Severance pay: owed only under a written policy; distinction from wages in lieu of notice",
+    "url": "https://efte.twc.texas.gov/severance_pay.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Texas · State layoff-notice law: None. Only federal WARN (100+ employees, 60 days) applies; TWC receives the notices.",
+   "source": {
+    "name": "Texas Workforce Commission",
+    "section": "WARN notices (federal WARN only; no Texas statute)",
+    "url": "https://www.twc.texas.gov/businesses/worker-adjustment-and-retraining-notification-warn-notices"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Texas · Final paycheck deadline: If you were fired or laid off: in full by the 6th day after discharge. If you quit: the next regular payday (Labor Code 61.014).",
+   "source": {
+    "name": "Texas Workforce Commission",
+    "section": "Final pay and severance benefits (Labor Code 61.014: 6 days after discharge, next payday after quitting)",
+    "url": "https://efte.twc.texas.gov/final_pay_severance_benefits.html"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Texas · Unused vacation: Paid only if a written agreement or written policy says so (Labor Code 61.001(7)).",
+   "source": {
+    "name": "Texas Legislature Online (statute text)",
+    "section": "Labor Code chapter 61, Payday Law, section 61.001(7) wages include vacation only under a written agreement or policy",
+    "url": "https://statutes.capitol.texas.gov/Docs/LA/htm/LA.61.htm"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Texas · Severance and unemployment: Disqualified for any benefit period in which you receive severance pay or wages in lieu of notice; a settlement of a legal claim is not counted (Labor Code 207.049).",
+   "source": {
+    "name": "Texas Workforce Commission and Labor Code 207.049",
+    "section": "How money from other sources can affect your benefits (severance and wages in lieu of notice)",
+    "url": "https://www.twc.texas.gov/programs/unemployment-benefits/how-money-other-sources-can-affect-your-benefits"
+   }
+  }
+ ],
+ "US-VT": [
+  {
+   "kind": "region",
+   "text": "Vermont · Severance minimum: None. Vermont's wage statutes fix when wages are paid, not whether anything is due past the last day.",
+   "source": {
+    "name": "Vermont General Assembly",
+    "section": "21 V.S.A. s.342(b)(2), weekly payment of wages: discharged employee paid within 72 hours",
+    "url": "https://legislature.vermont.gov/statutes/section/21/005/00342"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Vermont · State layoff-notice law: 21 V.S.A. 411 to 418: employers with 50+ full-time employees; 50+ permanent job losses within a 90-day period.",
+   "source": {
+    "name": "Vermont General Assembly",
+    "section": "21 V.S.A. ss.411 to 418, Notice of Potential Layoffs Act: 50+ full-time employees, 50+ losses in 90 days, 45 days to the state, 30 to employees (s.413(b))",
+    "url": "https://legislature.vermont.gov/statutes/section/21/005/00411"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Vermont · Notice period: 45 days' notice to the state; 30 days to employees, any union and the municipality (21 V.S.A. 413(b)).",
+   "source": {
+    "name": "Vermont General Assembly",
+    "section": "21 V.S.A. ss.411 to 418, Notice of Potential Layoffs Act: 50+ full-time employees, 50+ losses in 90 days, 45 days to the state, 30 to employees (s.413(b))",
+    "url": "https://legislature.vermont.gov/statutes/section/21/005/00411"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Vermont · Final paycheck deadline: Within 72 hours of discharge (21 V.S.A. 342(b)(2)).",
+   "source": {
+    "name": "Vermont General Assembly",
+    "section": "21 V.S.A. s.342(b)(2), weekly payment of wages: discharged employee paid within 72 hours",
+    "url": "https://legislature.vermont.gov/statutes/section/21/005/00342"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Vermont · Severance and unemployment: Remuneration includes wages in lieu of notice and severance, allocated to weeks as the agreement provides, and it reduces the weekly benefit (21 V.S.A. 1344).",
+   "source": {
+    "name": "Vermont General Assembly",
+    "section": "21 V.S.A. s.1344, remuneration includes wages in lieu of notice and severance pay, allocated per agreement",
+    "url": "https://legislature.vermont.gov/statutes/section/21/017/01344"
+   }
+  }
+ ],
+ "US-WA": [
+  {
+   "kind": "region",
+   "text": "Washington · Severance minimum: None. L&I lists severance as a voluntary benefit, so only your agreement or a company policy creates a right to it.",
+   "source": {
+    "name": "Washington Department of Labor and Industries",
+    "section": "Getting Paid: severance, personal holidays and vacation are voluntary benefits",
+    "url": "https://www.lni.wa.gov/workers-rights/wages/getting-paid/"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Washington · State layoff-notice law: Chapter 49.45 RCW (in force July 27, 2025): employers with 50+ employees, not counting part-time staff, must give 60 days' written notice of a closing or a layoff of 50+ within 30 days.",
+   "source": {
+    "name": "Washington State Legislature",
+    "section": "Chapter 49.45 RCW (2025 c 277), employer 50+, closing or mass layoff of 50+ in 30 days, 60 days' notice, leave-takers excluded",
+    "url": "https://app.leg.wa.gov/RCW/default.aspx?cite=49.45&full=true"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Washington · Who gets the notice: Each affected employee and the Employment Security Department; workers on paid family or medical leave cannot be counted in the layoff.",
+   "source": {
+    "name": "Washington State Legislature",
+    "section": "Chapter 49.45 RCW (2025 c 277), employer 50+, closing or mass layoff of 50+ in 30 days, 60 days' notice, leave-takers excluded",
+    "url": "https://app.leg.wa.gov/RCW/default.aspx?cite=49.45&full=true"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Washington · Final paycheck deadline: At the end of the established pay period in which you were discharged or quit (RCW 49.48.010).",
+   "source": {
+    "name": "Washington State Legislature",
+    "section": "RCW 49.48.010, payment of wages due at the end of the established pay period after discharge or quit",
+    "url": "https://app.leg.wa.gov/RCW/default.aspx?cite=49.48.010"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Washington · Unused vacation: No payout required by statute; vacation and personal holidays are voluntary benefits, so the policy decides.",
+   "source": {
+    "name": "Washington Department of Labor and Industries",
+    "section": "Getting Paid: severance, personal holidays and vacation are voluntary benefits",
+    "url": "https://www.lni.wa.gov/workers-rights/wages/getting-paid/"
+   }
+  }
+ ],
+ "US-WI": [
+  {
+   "kind": "region",
+   "text": "Wisconsin · Severance minimum: None by statute, but severance 'agreed upon or provided as established policy' is defined as wages and collectable under chapter 109.",
+   "source": {
+    "name": "Wisconsin Legislature",
+    "section": "Wis. Stat. 109.01(3), wages include vacation and severance pay agreed or provided as established policy",
+    "url": "https://docs.legis.wisconsin.gov/statutes/statutes/109/01"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Wisconsin · State layoff-notice law: Wis. Stat. 109.07: employers with 50+ persons in Wisconsin; a closing affecting 25+, or a mass layoff of 25% of the workforce or 25 employees, or 500+.",
+   "source": {
+    "name": "Wisconsin Legislature",
+    "section": "Wis. Stat. 109.07, business closing and mass layoff notice: 50+ persons, 25+ affected, 60 days",
+    "url": "https://docs.legis.wisconsin.gov/statutes/statutes/109/07"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Wisconsin · Notice period: 60 days' written notice to employees, the state and local officials.",
+   "source": {
+    "name": "Wisconsin Legislature",
+    "section": "Wis. Stat. 109.07, business closing and mass layoff notice: 50+ persons, 25+ affected, 60 days",
+    "url": "https://docs.legis.wisconsin.gov/statutes/statutes/109/07"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "region",
+   "text": "Wisconsin · Final paycheck deadline: No later than the date you would normally have been paid (109.03(2)).",
+   "source": {
+    "name": "Wisconsin Legislature",
+    "section": "Wis. Stat. 109.03(2), payment of wages on termination no later than the regular payday",
+    "url": "https://docs.legis.wisconsin.gov/statutes/statutes/109/03"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  },
+  {
+   "kind": "region",
+   "text": "Wisconsin · Unused vacation: Paid when the employer's agreement or established policy provides it; vacation pay is wages under 109.01(3).",
+   "source": {
+    "name": "Wisconsin Legislature",
+    "section": "Wis. Stat. 109.01(3), wages include vacation and severance pay agreed or provided as established policy",
+    "url": "https://docs.legis.wisconsin.gov/statutes/statutes/109/01"
+   }
+  }
+ ],
+ "US-*": [
+  {
+   "kind": "region",
+   "text": "Federal rule: if you are 40 or older and asked to release age claims, you get 21 days to consider it (45 in a group layoff) and 7 days to change your mind after signing.",
+   "source": {
+    "name": "U.S. Equal Employment Opportunity Commission",
+    "section": "Understanding waivers of discrimination claims in severance agreements",
+    "url": "https://www.eeoc.gov/laws/guidance/qa-understanding-waivers-discrimination-claims-employee-severance-agreements"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Many people don't realize the first call with an employment attorney is free where we're live, and there's no obligation."
+  },
+  {
+   "kind": "region",
+   "text": "Federal rule: no federal law requires severance pay. It comes from your agreement or your employer's written policy.",
+   "source": {
+    "name": "U.S. Department of Labor",
+    "section": "Severance pay",
+    "url": "https://www.dol.gov/general/topic/wages/severancepay"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "An attorney can check a separation agreement against the rules before you sign. Once it's signed, it's much harder to change."
+  },
+  {
+   "kind": "region",
+   "text": "Federal rule: under the WARN Act, an employer with 100+ staff generally owes 60 days' notice for a covered mass layoff or closing.",
+   "source": {
+    "name": "U.S. Department of Labor",
+    "section": "WARN Act",
+    "url": "https://www.dol.gov/agencies/eta/layoffs/warn"
+   }
+  },
+  {
+   "kind": "lawyer",
+   "text": "Your report is built to hand over. The report ID on the last page lets an attorney see what you've already done, so a first call starts further along."
+  },
+  {
+   "kind": "lawyer",
+   "text": "Most people sign their first offer without asking anyone. Your report lists the questions worth asking first, and an attorney can tell you which ones matter for you."
+  }
+ ]
+}

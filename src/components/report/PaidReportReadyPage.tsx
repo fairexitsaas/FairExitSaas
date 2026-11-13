@@ -10,6 +10,7 @@ import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
 import { startPollLoop } from "@/lib/reportPolling";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifySuccess, notifyError } from "@/lib/notifications";
+import FullScreenLoadingExperience from "@/components/report/loading/FullScreenLoadingExperience";
 
 interface PaidReportReadyPageProps {
   caseId?: string | null;
@@ -104,35 +105,14 @@ export default function PaidReportReadyPage({
             setFailureKind("pdf_failed");
             const msg = res.error || "Report calculations are saved, but PDF rendering was delayed. Click to generate your PDF.";
             setBuildError(msg);
-            showErrorModal({
-              title: "PDF Compilation Delayed",
-              message: msg,
-              stage: "PDF Compilation",
-              onRetry: handleDownload,
-              retryLabel: "Generate PDF Now",
-            });
           } else if (isClaudeErr) {
             setFailureKind("claude_failed");
             const msg = res.error || "The AI document analysis could not be completed for these documents. Please try again.";
             setBuildError(msg);
-            showErrorModal({
-              title: "AI Analysis Incomplete",
-              message: msg,
-              stage: "Claude AI Analysis",
-              onRetry: handleRetryBuild,
-              retryLabel: "Retry AI Analysis",
-            });
           } else {
             setFailureKind("generic_failed");
             const msg = res.error || "Report generation failed. Please try again.";
             setBuildError(msg);
-            showErrorModal({
-              title: "Report Generation Failed",
-              message: msg,
-              stage: stage || "Report Generation",
-              onRetry: handleRetryBuild,
-              retryLabel: "Retry Generation",
-            });
           }
         } else if (res.status === "building") {
           setBuildStatus("building");
@@ -147,13 +127,6 @@ export default function PaidReportReadyPage({
           setFailureKind("generic_failed");
           const msg = "The report build has not started. Please return to the review step and select Build my report.";
           setBuildError(msg);
-          showErrorModal({
-            title: "Report Not Started",
-            message: msg,
-            stage: "Report Generation",
-            onRetry: handleRetryBuild,
-            retryLabel: "Retry",
-          });
         }
       },
       onError: (error) => {
@@ -164,19 +137,6 @@ export default function PaidReportReadyPage({
             ? error
             : new FairExitApiError(0, error instanceof Error ? error.message : "Report status check timed out");
         setBuildError(apiErr.message);
-        showErrorModal({
-          title: "Connection Timed Out",
-          message: "We're taking longer than usual to check your report status. Your report may still be processing. Check status again to see if it has finished.",
-          stage: "Report Status Check",
-          statusCode: apiErr.status,
-          requestId: apiErr.requestId,
-          onRetry: () => {
-            setBuildStatus("building");
-            setBuildError("");
-            setPollVersion((v) => v + 1);
-          },
-          retryLabel: "Check Status Again",
-        });
       },
     });
 
@@ -398,6 +358,42 @@ export default function PaidReportReadyPage({
       onLawyer();
     }
   };
+
+  if (buildStatus === "building" || (buildStatus === "failed" && !cs?.report)) {
+    const hasContract = Boolean(
+      data.hasContract ?? (
+        ((cs?.documents as any)?.contractPages ? (cs?.documents as any).contractPages > 0 : false) ||
+        (Array.isArray((cs?.documents as any)?.uploaded) &&
+          (cs?.documents as any).uploaded.some((d: any) => d.kind === "contract")) ||
+        (Array.isArray(cs?.documents) && cs.documents.some((d: any) => d.kind === "contract"))
+      )
+    );
+
+    const regionName = cs?.jurisdiction?.name || (isCanada ? data.provinceName : data.state);
+    const regionCode =
+      (cs as any)?.jurisdiction_code ||
+      (cs?.jurisdiction as any)?.code ||
+      (!isCanada
+        ? data.state
+          ? `US-${data.state}`
+          : "US-*"
+        : data.province
+        ? `CA-${data.province}`
+        : "CA-ON");
+
+    return (
+      <FullScreenLoadingExperience
+        mode="building"
+        caseId={activeId}
+        hasContract={hasContract}
+        jurisdictionName={regionName}
+        jurisdictionCode={regionCode}
+        isUS={!isCanada}
+        error={buildStatus === "failed" ? buildError || "Report generation could not be completed." : null}
+        onRetry={handleRetryBuild}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F6F4EF] text-[#17242F] font-sans antialiased selection:bg-[#0EB28D]/20 pb-20">
@@ -681,143 +677,7 @@ export default function PaidReportReadyPage({
                   </div>
                 )}
               </>
-            ) : buildStatus === "building" ? (
-              <div className="w-full max-w-[540px] flex flex-col items-center">
-                {/* Step badge */}
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 bg-[#EEF8F3] border border-[#C7E6D6] rounded-full text-[12px] font-sans font-[700] text-[#0C8F72] mb-4">
-                  <span className="w-2 h-2 rounded-full bg-[#0EB28D] animate-ping" />
-                  <span>STEP 4 OF 4 · BUILDING YOUR REPORT</span>
-                </div>
-
-                {/* Title */}
-                <h2 className="font-serif font-[600] text-[23px] sm:text-[25px] leading-[32px] text-[#062C55] mb-2 text-center">
-                  Compiling your personalized severance report…
-                </h2>
-                <p className="font-sans text-[13.5px] leading-[21px] text-[#5A6B78] mb-6 text-center">
-                  {isCanada
-                    ? "Claude AI is evaluating your confirmed severance details against relevant employment standards, common law precedents, and benchmark ranges."
-                    : "Claude AI is evaluating your confirmed severance details against applicable federal and state labor standards, release rules, and key factors."}
-                </p>
-
-                {/* Animated progress bar */}
-                <div className="w-full h-[6px] bg-[#E7E4DD] rounded-full overflow-hidden mb-6 relative">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#0C8F72] via-[#0EB28D] to-[#12C79A] rounded-full transition-all duration-700 animate-pulse"
-                    style={{ width: buildProgressStep >= 3 ? "85%" : "45%" }}
-                  />
-                </div>
-
-                {/* Build stage items */}
-                <div className="w-full space-y-3 mb-6 text-left">
-                  <div className="flex items-center gap-3 p-3 rounded-[10px] bg-[#FAF9F5] border border-[#E7E4DD]">
-                    <span className="w-6 h-6 rounded-full bg-[#0EB28D] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                      ✓
-                    </span>
-                    <span className="font-sans text-[13.5px] font-[600] text-[#062C55]">
-                      Confirmed facts and document clauses verified
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3 rounded-[10px] bg-[#FAF9F5] border border-[#E7E4DD]">
-                    <span className="w-6 h-6 rounded-full border-2 border-[#0EB28D] border-t-transparent animate-spin shrink-0" />
-                    <span className="font-sans text-[13.5px] font-[600] text-[#062C55]">
-                      Claude AI legal entitlements &amp; range calculation
-                    </span>
-                  </div>
-
-                  <div className="flex items-center gap-3 p-3 rounded-[10px] bg-[#FAF9F5] border border-[#E7E4DD]">
-                    <span className="w-6 h-6 rounded-full border-2 border-[#D8D3C8] flex items-center justify-center text-[10px] text-[#5A6B78] shrink-0">
-                      3
-                    </span>
-                    <span className="font-sans text-[13.5px] font-[500] text-[#5A6B78]">
-                      Playwright PDF compilation &amp; secure delivery
-                    </span>
-                  </div>
-                </div>
-
-                {/* Reassurance text */}
-                <p className="font-sans text-[12.5px] text-[#5A6B78] text-center">
-                  This takes about 15–30 seconds. Please do not refresh; your report and download button will appear here automatically.
-                </p>
-              </div>
-            ) : (
-              /* Failed State: Tailored by Failure Kind */
-              <div className="w-full max-w-[500px] flex flex-col items-center">
-                <div className="w-12 h-12 rounded-full bg-[#FBECEB] border border-[#F5C2C0] flex items-center justify-center text-[#D42E2B] text-xl font-bold mb-3">
-                  !
-                </div>
-                {failureKind === "pdf_failed" ? (
-                  <>
-                    <h3 className="font-serif font-[600] text-[20px] text-[#062C55] mb-2">
-                      Report calculations saved · PDF compilation delayed
-                    </h3>
-                    <p className="font-sans text-[13.5px] text-[#5A6B78] leading-[21px] mb-5">
-                      Your legal entitlements and severance calculations are 100% saved! PDF rendering experienced a temporary delay. You can generate and download your PDF now.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleDownload}
-                      disabled={isDownloading}
-                      className="px-6 h-[44px] rounded-[10px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[15px] transition cursor-pointer"
-                    >
-                      {isDownloading ? "Generating PDF…" : "Generate PDF Now"}
-                    </button>
-                  </>
-                ) : failureKind === "polling_timeout" ? (
-                  <>
-                    <h3 className="font-serif font-[600] text-[20px] text-[#062C55] mb-2">
-                      Connection to status server timed out
-                    </h3>
-                    <p className="font-sans text-[13.5px] text-[#5A6B78] leading-[21px] mb-5">
-                      We were unable to reach the server to check your report status. Your report build may still be active in the cloud. Check status again to resume.
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setBuildStatus("building");
-                        setBuildError("");
-                        setPollVersion((v) => v + 1);
-                      }}
-                      className="px-6 h-[44px] rounded-[10px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[15px] transition cursor-pointer"
-                    >
-                      Check status again
-                    </button>
-                  </>
-                ) : failureKind === "claude_failed" ? (
-                  <>
-                    <h3 className="font-serif font-[600] text-[20px] text-[#062C55] mb-2">
-                      AI document analysis incomplete
-                    </h3>
-                    <p className="font-sans text-[13.5px] text-[#5A6B78] leading-[21px] mb-5">
-                      {buildError || "Claude AI encountered an issue evaluating your severance documents. Your confirmed facts are safely saved. Click below to retry the analysis."}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleRetryBuild}
-                      className="px-6 h-[44px] rounded-[10px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[15px] transition cursor-pointer"
-                    >
-                      Retry AI analysis
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <h3 className="font-serif font-[600] text-[20px] text-[#062C55] mb-2">
-                      We couldn&apos;t build your report
-                    </h3>
-                    <p className="font-sans text-[13.5px] text-[#5A6B78] leading-[21px] mb-5">
-                      {buildError || "An error occurred while compiling your report. Your confirmed answers are safely saved."}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={handleRetryBuild}
-                      className="px-6 h-[44px] rounded-[10px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[15px] transition cursor-pointer"
-                    >
-                      Try again
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
+            ) : null}
           </div>
 
           {/* ══════════════════════════════════════════════════

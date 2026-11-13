@@ -41,6 +41,7 @@ export interface ReportInputs {
   releaseRequired?: string;
   releaseRequiredSource?: "document";
   daysToDecide?: number | string;
+  hasContract?: boolean;
   documentsExtracted?: boolean;
   extractionStatus?: "none" | "reading" | "success" | "failed";
   documentOfferFound?: boolean;

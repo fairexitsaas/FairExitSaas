@@ -562,6 +562,10 @@ export default function ReportUploadPage({
           }
         }
 
+        saveReportInputs({
+          hasContract: currentHasContract,
+        });
+
         await fairexit.startRead(activeCaseId);
 
         setIsSubmitting(false);
