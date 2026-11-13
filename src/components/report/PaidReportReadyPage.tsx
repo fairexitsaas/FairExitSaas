@@ -58,6 +58,21 @@ export default function PaidReportReadyPage({
   const retryLock = useRef(false);
 
   // Email delivery & Private link state (Change 24)
+  const [emailMode, setEmailMode] = useState<"mock" | "live">(() => {
+    if (typeof process !== "undefined" && process.env.EMAIL_MODE === "live") return "live";
+    return "mock";
+  });
+
+  useEffect(() => {
+    fairexit
+      .config()
+      .then((cfg) => {
+        if (cfg?.email?.mode === "live") setEmailMode("live");
+        else if (cfg?.email?.mode === "mock") setEmailMode("mock");
+      })
+      .catch(() => {});
+  }, []);
+
   const initialDelivery = (cs?.reportDelivery as any) || null;
   const [emailSentState, setEmailSentState] = useState<"sent" | "failed" | "pending" | "none">(
     initialDelivery?.status === "sent" ? "sent" : initialDelivery?.status === "failed" ? "failed" : "none"
@@ -215,7 +230,7 @@ export default function PaidReportReadyPage({
   };
 
   const handleRetryEmail = async () => {
-    if (!activeId || isRetryingEmail) return;
+    if (!activeId || isRetryingEmail || emailMode === "mock") return;
     setIsRetryingEmail(true);
     setEmailError("");
     try {
@@ -223,6 +238,8 @@ export default function PaidReportReadyPage({
       if (res?.status === "sent") {
         setEmailSentState("sent");
         notifySuccess(`Report emailed to ${userEmail}!`);
+      } else if (res?.status === "disabled") {
+        setEmailSentState("none");
       } else {
         setEmailSentState("failed");
         setEmailError(res?.error || "Could not send report email");
@@ -272,6 +289,9 @@ export default function PaidReportReadyPage({
         } else if (res?.emailDelivery?.status === "failed") {
           setEmailSentState("failed");
           setEmailError(res.emailDelivery.error || "Email delivery failed");
+        } else {
+          setEmailSentState("none");
+          notifySuccess("Customer information saved!");
         }
       }
     } catch (err: unknown) {
@@ -579,7 +599,13 @@ export default function PaidReportReadyPage({
                 </button>
 
                 {/* Email delivery status & Private Report Link (Change 24) */}
-                {userEmail ? (
+                {emailMode === "mock" ? (
+                  <div className="w-full sm:w-[480px] p-3 rounded-[10px] bg-[#FAF9F5] border border-[#E7E4DD] text-left mb-3">
+                    <p className="font-sans font-[500] text-[13px] leading-[19px] text-[#5A6B78]">
+                      Email delivery is disabled in demo mode. You can access your report here.
+                    </p>
+                  </div>
+                ) : userEmail ? (
                   <div className="w-full flex flex-col items-center">
                     {emailSentState === "failed" ? (
                       <div className="w-full sm:w-[480px] p-3 rounded-[10px] bg-[#FBECEB] border border-[#F4CBC8] text-left mb-3">
@@ -600,12 +626,12 @@ export default function PaidReportReadyPage({
                           <p className="font-sans text-[11.5px] text-[#A3231F] mt-1">{emailError}</p>
                         )}
                       </div>
-                    ) : (
+                    ) : emailSentState === "sent" ? (
                       <p className="font-sans font-[400] text-[14px] leading-[22px] text-[#5A6B78]">
                         We also emailed your report to{" "}
                         <strong className="font-[700] text-[#062C55]">{userEmail}</strong>.
                       </p>
-                    )}
+                    ) : null}
 
                     {/* Private Report Link Box */}
                     {privateLink && (

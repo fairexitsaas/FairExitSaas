@@ -47,6 +47,9 @@ export const jobsService = {
 
   /** Emails 3 days and 1 day before a confirmed "Decide by" date (Canada) for people who asked. */
   async reminders() {
+    if (env.EMAIL_MODE !== 'live') {
+      return { remindersSent: 0, skipped: true }
+    }
     const rows = check(await db().from('cases').select('*').eq('remind', true).not('email', 'is', null).in('status', ['checking', 'building', 'ready']).limit(1000), 'cases') as CaseRow[]
     const today = new Date().toISOString().slice(0, 10)
     let sent = 0

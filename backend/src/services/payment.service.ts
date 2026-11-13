@@ -163,7 +163,7 @@ export const paymentService = {
       status: c.status === 'free_check' || c.status === 'pending_payment' ? 'paid' : c.status,
       paid_at: new Date().toISOString(), payment_provider: provider, amount_cents: amountCents, currency,
     })
-    if (updated.email) {
+    if (updated.email && env.EMAIL_MODE === 'live') {
       const token = await caseService.addToken(updated)
       emailService.paymentReceived(updated, token).catch((e) => logger.warn('payment email failed', { message: (e as Error).message }))
     }

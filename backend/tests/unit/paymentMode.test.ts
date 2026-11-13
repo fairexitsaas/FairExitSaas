@@ -242,7 +242,9 @@ describe('Payment Mode Configuration & Verification (Mock vs Live in Production)
     expect(delivery.reportReady).toBe(true)
     expect(delivery.customer.email).toBe('alex@example.com')
 
-    // Step D: Email report dispatch works in mock mode
+    // Step D: Email report dispatch works in live mode with mock transport
+    const origEmail = env.EMAIL_MODE
+    ;(env as any).EMAIL_MODE = 'live'
     let emailSent = false
     emailService.setMockTransport(async (to, subject) => {
       if (to === 'alex@example.com' && subject.includes('FairExit')) {
@@ -251,9 +253,13 @@ describe('Payment Mode Configuration & Verification (Mock vs Live in Production)
       return { sent: true, mocked: true }
     })
 
-    const emailResult = await caseService.deliverReportEmail(readyCase, 'secure_token_456')
-    expect(emailResult.status).toBe('sent')
-    expect(emailSent).toBe(true)
+    try {
+      const emailResult = await caseService.deliverReportEmail(readyCase, 'secure_token_456')
+      expect(emailResult.status).toBe('sent')
+      expect(emailSent).toBe(true)
+    } finally {
+      ;(env as any).EMAIL_MODE = origEmail
+    }
   })
 
   // -------------------------------------------------------------------------

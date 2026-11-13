@@ -137,7 +137,9 @@ export const leadService = {
     }
 
     const lead = check(insertRes, 'lead')
-    emailService.opsNewLead(lead.public_id, region).catch((e) => logger.warn('ops email failed', { message: (e as Error).message }))
+    if (env.EMAIL_MODE === 'live') {
+      emailService.opsNewLead(lead.public_id, region).catch((e) => logger.warn('ops email failed', { message: (e as Error).message }))
+    }
     return { ...leadView(lead), duplicate: false, contactWithinBusinessDays: 2, lawyerWord: country === 'US' ? 'attorney' : 'lawyer' }
   },
 

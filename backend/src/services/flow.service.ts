@@ -143,7 +143,7 @@ async function executeReportBuildJob(
       logger.warn('[REPORT][JSON_READY]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: false, stage: 'pdf_pending' })
     }
 
-    if (done?.email) {
+    if (done?.email && env.EMAIL_MODE === 'live') {
       try {
         const token = await caseService.addToken(done)
         await caseService.deliverReportEmail(done, token)

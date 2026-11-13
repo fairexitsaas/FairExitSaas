@@ -193,11 +193,12 @@ export const caseService = {
     const base = env.APP_WEB_URL.replace(/\/$/, '')
     const privateLink = `${base}/report?case=${c.id}&t=${encodeURIComponent(token)}`
 
-    let emailDelivery: { status: 'sent' | 'pending' | 'failed'; sentAt?: string; error?: string } = {
-      status: 'pending',
+    let emailDelivery: { status: 'sent' | 'pending' | 'failed' | 'disabled'; sentAt?: string; error?: string; message?: string } = {
+      status: env.EMAIL_MODE === 'mock' ? 'disabled' : 'pending',
+      ...(env.EMAIL_MODE === 'mock' ? { message: 'Email delivery is disabled in demo mode. You can access your report here.' } : {}),
     }
 
-    if (c.status === 'ready' && c.report_ready_at) {
+    if (env.EMAIL_MODE === 'live' && c.status === 'ready' && c.report_ready_at) {
       emailDelivery = await this.deliverReportEmail(updated, token, false)
     }
 
@@ -221,6 +222,15 @@ export const caseService = {
       return { status: 'pending' as const, message: 'Report is still being compiled' }
     }
 
+    if (env.EMAIL_MODE === 'mock') {
+      return {
+        status: 'disabled' as const,
+        message: 'Email delivery is disabled in demo mode. You can access your report here.',
+        to: c.email,
+        mocked: true,
+      }
+    }
+
     const deliveryRecord = (c.answers?.report_delivery as any) || (c.consent?.report_delivery as any)
     if (deliveryRecord?.status === 'sent' && deliveryRecord?.to === c.email && !forceRetry) {
       return {
@@ -240,7 +250,7 @@ export const caseService = {
           status: 'sent',
           sentAt: now,
           to: c.email,
-          mocked: Boolean((res as any).mocked),
+          mocked: false,
           attempts: (deliveryRecord?.attempts || 0) + 1,
         }
         await this.update(c.id, {
@@ -297,13 +307,15 @@ export const caseService = {
         to: delivery.to || c.email,
         alreadySent: delivery.status === 'sent',
       } : {
-        status: c.email ? 'pending' : 'no_email',
+        status: env.EMAIL_MODE === 'mock' ? 'disabled' : (c.email ? 'pending' : 'no_email'),
+        message: env.EMAIL_MODE === 'mock' ? 'Email delivery is disabled in demo mode. You can access your report here.' : undefined,
         sentAt: null,
         failedAt: null,
         error: null,
         to: c.email || null,
         alreadySent: false,
       },
+      emailMode: env.EMAIL_MODE,
     }
   },
 

@@ -108,7 +108,8 @@ const envSchema = z.object({
   GOOGLE_SERVICE_ACCOUNT_EMAIL: z.string().optional(),
   GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY: z.string().optional(),
 
-  // Email (Resend HTTP API). Without a key, emails are logged instead of sent.
+  // Email (Resend HTTP API). EMAIL_MODE controls 'live' vs 'mock' independently of payments.
+  EMAIL_MODE: z.enum(['live', 'mock']).default('mock'),
   RESEND_API_KEY: z.string().optional(),
   EMAIL_FROM: z.string().default('FairExit <reports@fairexit.io>'),
   OPS_EMAIL: z.string().optional(),

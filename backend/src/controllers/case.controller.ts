@@ -98,6 +98,14 @@ export const caseController = {
 
   sendReportEmail: async (req: Request, res: Response) => {
     const c = C(req)
+    if (env.EMAIL_MODE === 'mock') {
+      return ApiResponse.ok(res, {
+        status: 'disabled',
+        message: 'Email delivery is disabled in demo mode. You can access your report here.',
+        to: c.email || req.body?.email || null,
+        mocked: true,
+      }, 'Email delivery is disabled in demo mode')
+    }
     if (req.body?.email) {
       await caseService.update(c.id, { email: String(req.body.email).trim().toLowerCase() })
     }

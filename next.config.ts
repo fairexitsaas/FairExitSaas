@@ -3,6 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   env: {
     PAYMENTS_MODE: process.env.PAYMENTS_MODE,
+    EMAIL_MODE: process.env.EMAIL_MODE || 'mock',
   },
   /* config options here */
   devIndicators: false,

@@ -1,11 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { caseService } from '../../src/services/case.service'
 import { paymentService } from '../../src/services/payment.service'
 import { emailService } from '../../src/services/email.service'
+import { env } from '../../src/config/env'
 import { postPaymentCustomerSchema } from '../../src/validators/fairexit.validator'
 import type { CaseRow } from '../../src/fairexit/types'
 
 describe('Group 3, Change 24: Post-Payment Report Delivery Tests', () => {
+  const origEmailMode = env.EMAIL_MODE
   const baseCase: CaseRow = {
     id: '44444444-4444-4444-4444-444444444444',
     public_id: 'FX-0044',
@@ -56,6 +58,11 @@ describe('Group 3, Change 24: Post-Payment Report Delivery Tests', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     emailService.setMockTransport(null)
+    ;(env as any).EMAIL_MODE = 'live'
+  })
+
+  afterEach(() => {
+    ;(env as any).EMAIL_MODE = origEmailMode
   })
 
   // 1. Successful payment followed by name and email collection
@@ -142,8 +149,8 @@ describe('Group 3, Change 24: Post-Payment Report Delivery Tests', () => {
     expect(deliveryRes.to).toBe('client@example.com')
     expect(capturedEmail).not.toBeNull()
     expect(capturedEmail?.to).toBe('client@example.com')
-    expect(capturedEmail?.subject).toContain('RPT-TEST-044')
-    expect(capturedEmail?.text).toContain('Alex Morgan')
+    expect(capturedEmail?.subject).toContain('Your FairExit Report Is Ready')
+    expect(capturedEmail?.text).toContain('Your FairExit report is ready.')
     expect(capturedEmail?.text).toContain('secure_token_abc')
   })
 

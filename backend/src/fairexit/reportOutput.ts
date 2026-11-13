@@ -1206,34 +1206,65 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       adeaWaiverApplies = false
     }
 
-    // 4. Distinguish individual termination from a qualifying group termination program
-    // Do NOT use generated release_check text or disclosure mentions alone as proof.
+    // 4. Distinguish individual termination from an established group termination program
+    // Determine group-program status using verified facts about the actual employment program:
+    // additional consideration, 2+ employees, standardized package, established program.
+    // Do NOT classify based solely on employee count, 'list: Provided', Exhibit A/decisional-unit mentions in text, or generated release_check text.
     const isExplicitIndividual = a.others === 'me' || a.others_laid_off === 'me' || a.layoffType === 'individual' || a.layoff_type === 'individual'
 
-    // Verified group program (exit incentive program or group termination program covered by OWBPA)
-    const hasGroupProgram = !isExplicitIndividual && (
+    const isGroupProgramUndetermined = !isExplicitIndividual && (
+      a.group_program_status === 'unknown' || a.group_program_status === 'undetermined' || a.group_program_status === 'unsure' ||
+      a.group_program === 'unknown' || a.group_program === 'undetermined' || a.group_program === 'unsure' ||
+      a.program_status === 'unknown' || a.program_status === 'undetermined' || a.program_status === 'unsure' ||
+      a.group_program_undetermined === true ||
+      m.input?.confirmed_facts?.rows?.program_type?.value === 'unknown' ||
+      m.input?.confirmed_facts?.rows?.program_type?.value === 'undetermined'
+    )
+
+    const hasAdditionalConsideration = Boolean(
+      a.offer || a.severance || m.numbers?.offer || a.additional_consideration ||
+      (m.input?.confirmed_facts?.rows?.severance_amount?.value && m.input.confirmed_facts.rows.severance_amount.value !== '0') ||
+      (m.input?.confirmed_facts?.rows?.release_required?.value && m.input.confirmed_facts.rows.release_required.value !== 'no')
+    )
+
+    // Established group termination or exit incentive program under OWBPA & 29 CFR § 1625.22
+    const hasEstablishedGroupProgram = !isExplicitIndividual && !isGroupProgramUndetermined && (
       a.group_program === true || a.group_program === 'yes' ||
       a.exit_incentive === true || a.exit_incentive === 'yes' ||
+      a.group_program_established === true || a.group_program_established === 'yes' ||
       a.layoffType === 'group_program' || a.layoffType === 'exit_incentive' ||
       a.layoff_type === 'group_program' || a.layoff_type === 'exit_incentive' ||
       m.input?.confirmed_facts?.rows?.program_type?.value === 'group_program' ||
       m.input?.confirmed_facts?.rows?.program_type?.value === 'exit_incentive' ||
-      m.input?.confirmed_facts?.rows?.exit_incentive?.value === 'yes'
+      m.input?.confirmed_facts?.rows?.exit_incentive?.value === 'yes' ||
+      // Multiple employees offered standardized severance / exit-incentive package with additional consideration
+      ((a.others !== 'me' && a.others_laid_off !== 'me') &&
+       (a.standardized_package === true || a.standardized_package === 'yes' ||
+        a.standardized_program === true || a.standardized_program === 'yes' ||
+        a.group_package === true || a.group_package === 'yes' ||
+        m.input?.confirmed_facts?.rows?.standardized_package?.value === 'yes' ||
+        m.input?.confirmed_facts?.rows?.standardized_program?.value === 'yes') &&
+       hasAdditionalConsideration)
     )
 
-    // Complete OWBPA required program disclosures (decisional unit, eligibility factors, job titles/ages selected & not selected)
+    // 5. OWBPA required group-program disclosures (decisional unit, eligibility factors, job titles/ages selected & not selected)
+    // Separate compliance assessment: incomplete disclosures do NOT turn an established group program into an individual termination.
     const disclosuresIncomplete = a.disclosures_verified === false ||
       a.disclosures_complete === false ||
       a.owbpa_disclosures === 'incomplete' ||
       a.owbpa_disclosures === false ||
       a.disclosures === 'incomplete' ||
+      a.disclosures === 'missing' ||
       a.list === 'missing' ||
-      a.age_list === 'missing'
+      a.age_list === 'missing' ||
+      a.missing_disclosures === true ||
+      a.disclosures_missing === true
 
-    const hasVerifiedDisclosures = !disclosuresIncomplete && (
+    const hasVerifiedCompleteDisclosures = !disclosuresIncomplete && (
       a.disclosures_verified === true ||
       a.disclosures_verified === 'yes' ||
       a.disclosures_complete === true ||
+      a.disclosures_complete === 'yes' ||
       a.owbpa_disclosures === 'complete' ||
       a.owbpa_disclosures === true ||
       a.disclosures === 'complete' ||
@@ -1242,21 +1273,35 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       m.input?.confirmed_facts?.rows?.owbpa_disclosures?.value === 'verified'
     )
 
-    const isQualifyingGroupProgram = hasGroupProgram && hasVerifiedDisclosures
+    const hasDisclosureWarning = hasEstablishedGroupProgram && !hasVerifiedCompleteDisclosures
 
     let keyDays: string | null = null
     let keyKicker = 'YOUR KEY NUMBER'
     let keyDesc = ''
     let hasRevocation = false
+    let showReviewFlag = false
 
     if (isOver40 && adeaWaiverApplies) {
       hasRevocation = true
-      if (isQualifyingGroupProgram) {
+      if (hasEstablishedGroupProgram) {
         keyDays = '45 days'
-        keyDesc = 'The time federal rules give you to consider a release in a group layoff at your age (qualifying group termination or exit incentive program).'
+        keyDesc = 'The time federal rules give you to consider a release in an exit incentive or group termination program at your age (45 days under OWBPA rules).'
+      } else if (isGroupProgramUndetermined) {
+        // Group-program status cannot be determined: Do not guess statutory period; flag for review
+        showReviewFlag = true
+        if (docDaysNum !== null) {
+          keyDays = `${docDaysNum} days`
+          keyKicker = 'AGREEMENT DEADLINE'
+          keyDesc = 'The review deadline specified in your agreement. Because group-program status cannot be determined from your documents, statutory OWBPA consideration periods (21 days for individual terminations or 45 days for group programs) are flagged for attorney review.'
+        } else {
+          keyDays = null
+          keyKicker = 'FLAG FOR REVIEW'
+          keyDesc = 'Flag for review: Your documents do not establish whether your departure is part of an established group termination program or an individual separation. Have an attorney review whether group program rules apply to your agreement.'
+        }
       } else {
+        // Individual termination or ordinary layoff without an established group program
         keyDays = '21 days'
-        keyDesc = 'The time federal rules give you to consider a release at your age (21 days for an individual termination).'
+        keyDesc = 'The time federal rules give you to consider a release at your age (21 days for an individual termination or ordinary layoff without an established group program).'
       }
     } else if (hasAge && !isOver40) {
       // Under 40: statutory consideration and revocation periods under federal OWBPA rules do not apply
@@ -1305,6 +1350,17 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="feature-card-kicker">${esc(keyKicker)}</div>
           <div class="feature-card-amount">${keyDays}</div>
           <p class="feature-card-desc">${esc(keyDesc)}</p>
+          ${hasDisclosureWarning ? `
+          <div class="disclosure-warning-panel">
+            <div class="disclosure-warning-divider"></div>
+            <div class="disclosure-warning-header">
+              <span class="disclosure-warning-badge">DISCLOSURE WARNING</span>
+              <span class="disclosure-warning-title">Missing or incomplete disclosures</span>
+            </div>
+            <p class="disclosure-warning-desc">
+              Disclosure warning: Federal law (OWBPA, 29 U.S.C. § 626(f)(1)(H)) requires employers in group layoffs or exit-incentive programs to provide written disclosures detailing the decisional unit, eligibility criteria, and job titles and ages of all individuals selected and not selected. These disclosures appear missing or incomplete in your documents, which may affect the validity of the age discrimination release.
+            </p>
+          </div>` : ''}
           ${hasRevocation ? `
           <div class="revocation-panel">
             <div class="revocation-divider"></div>
@@ -1316,7 +1372,31 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
               Federal law gives you an additional <b>7 calendar days after you sign</b> to revoke an agreement waiving ADEA claims. This revocation period is separate from the consideration period and cannot be waived or shortened.
             </p>
           </div>` : ''}
-        </div>` : ''}
+        </div>` : (showReviewFlag ? `
+        <div class="navy-feature-card flag-for-review-card">
+          <div class="feature-card-kicker">FLAG FOR REVIEW</div>
+          <p class="feature-card-desc">${esc(keyDesc)}</p>
+          <div class="review-flag-panel">
+            <div class="review-flag-header">
+              <span class="review-flag-badge">FLAG FOR REVIEW</span>
+              <span class="review-flag-title">Group program status undetermined</span>
+            </div>
+            <p class="review-flag-desc">
+              Flag for review: Your documents do not establish whether your departure is part of an established group termination program or an individual separation. Have an attorney review whether group program rules apply to your agreement.
+            </p>
+          </div>
+          ${hasRevocation ? `
+          <div class="revocation-panel">
+            <div class="revocation-divider"></div>
+            <div class="revocation-header">
+              <span class="revocation-badge">REVOCATION PERIOD</span>
+              <span class="revocation-days">7 days after signing</span>
+            </div>
+            <p class="revocation-desc">
+              Federal law gives you an additional <b>7 calendar days after you sign</b> to revoke an agreement waiving ADEA claims. This revocation period is separate from the consideration period and cannot be waived or shortened.
+            </p>
+          </div>` : ''}
+        </div>` : '')}
 
         <div class="release-check-list">
           ${rc.map((item) => {
@@ -2563,6 +2643,79 @@ b, strong, .bold {
 .revocation-desc {
   font-size: 9pt;
   color: #D5DFEA;
+  line-height: 1.5;
+  margin: 0 auto;
+  max-width: 92%;
+}
+.disclosure-warning-panel {
+  margin-top: 14px;
+}
+.disclosure-warning-divider {
+  border-top: 1px solid rgba(254, 215, 215, 0.35);
+  margin: 14px auto 12px;
+  width: 90%;
+}
+.disclosure-warning-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.disclosure-warning-badge {
+  font-size: 7pt;
+  letter-spacing: 1.4px;
+  color: #FFF5F5;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(229, 62, 62, 0.35);
+  border: 1px solid rgba(229, 62, 62, 0.6);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.disclosure-warning-title {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 13pt;
+  font-weight: 600;
+  color: #FED7D7;
+}
+.disclosure-warning-desc {
+  font-size: 9pt;
+  color: #FED7D7;
+  line-height: 1.5;
+  margin: 0 auto;
+  max-width: 92%;
+}
+.review-flag-panel {
+  margin-top: 12px;
+}
+.review-flag-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.review-flag-badge {
+  font-size: 7pt;
+  letter-spacing: 1.4px;
+  color: #FFFDF0;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(214, 158, 46, 0.35);
+  border: 1px solid rgba(214, 158, 46, 0.7);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.review-flag-title {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 13pt;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.review-flag-desc {
+  font-size: 9pt;
+  color: #E6EDF3;
   line-height: 1.5;
   margin: 0 auto;
   max-width: 92%;
