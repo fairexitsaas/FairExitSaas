@@ -7,6 +7,7 @@ export interface TermsConditionsModalProps {
   onClose: () => void;
   onAllAccepted: () => void;
   country?: string;
+  initialAccepted?: boolean;
 }
 
 export interface TermDocument {
@@ -178,6 +179,7 @@ export default function TermsConditionsModal({
   onClose,
   onAllAccepted,
   country = "CA",
+  initialAccepted = false,
 }: TermsConditionsModalProps) {
   const [activeTab, setActiveTab] = useState(0);
   const [acceptedMap, setAcceptedMap] = useState<Record<string, boolean>>({});
@@ -185,6 +187,21 @@ export default function TermsConditionsModal({
   const [isDeclined, setIsDeclined] = useState(false);
 
   const docContainerRef = useRef<HTMLDivElement>(null);
+
+  // Reset or initialize state whenever modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setIsDeclined(false);
+      setActiveTab(0);
+      if (initialAccepted) {
+        setAcceptedMap({ terms: true, disclaimer: true, privacy: true });
+        setReachedBottomMap({ terms: true, disclaimer: true, privacy: true });
+      } else {
+        setAcceptedMap({});
+        setReachedBottomMap({});
+      }
+    }
+  }, [isOpen, initialAccepted]);
 
   const currentDoc = TC_DOCUMENTS[activeTab];
   const acceptedCount = TC_DOCUMENTS.filter((d) => acceptedMap[d.id]).length;
@@ -195,7 +212,7 @@ export default function TermsConditionsModal({
   const handleScroll = useCallback(() => {
     if (!docContainerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = docContainerRef.current;
-    if (scrollTop + clientHeight >= scrollHeight - 20) {
+    if (scrollTop + clientHeight >= scrollHeight - 25) {
       setReachedBottomMap((prev) => ({ ...prev, [currentDoc.id]: true }));
     }
   }, [currentDoc.id]);
@@ -310,7 +327,7 @@ export default function TermsConditionsModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-[34px] h-[34px] rounded-full border border-[#E7E4DD] bg-white hover:bg-[#F6F4EF] text-[#5A6B78] flex items-center justify-center text-[15px] font-bold transition shrink-0"
+            className="w-[34px] h-[34px] rounded-full border border-[#E7E4DD] bg-white hover:bg-[#F6F4EF] text-[#5A6B78] flex items-center justify-center text-[15px] font-bold transition shrink-0 cursor-pointer"
             aria-label="Close"
           >
             ✕
@@ -386,14 +403,14 @@ export default function TermsConditionsModal({
               <button
                 type="button"
                 onClick={() => setIsDeclined(false)}
-                className="px-5 py-2.5 rounded-[9px] border border-[#D8D3C8] bg-white font-sans font-[700] text-[14px] text-[#062C55] hover:bg-[#F6F4EF] transition"
+                className="px-5 py-2.5 rounded-[9px] border border-[#D8D3C8] bg-white font-sans font-[700] text-[14px] text-[#062C55] hover:bg-[#F6F4EF] transition cursor-pointer"
               >
                 ← Review the terms again
               </button>
               <button
                 type="button"
                 onClick={onClose}
-                className="px-6 py-2.5 rounded-[9px] bg-[#062C55] hover:bg-[#041D38] text-white font-sans font-[800] text-[14px] transition"
+                className="px-6 py-2.5 rounded-[9px] bg-[#062C55] hover:bg-[#041D38] text-white font-sans font-[800] text-[14px] transition cursor-pointer"
               >
                 Close
               </button>
@@ -413,7 +430,7 @@ export default function TermsConditionsModal({
                       key={doc.id}
                       type="button"
                       onClick={() => handleSelectTab(idx)}
-                      className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 rounded-[9px] text-[13px] font-sans leading-tight transition select-none ${
+                      className={`flex items-center gap-2.5 w-full text-left px-3 py-2.5 rounded-[9px] text-[13px] font-sans leading-tight transition select-none cursor-pointer ${
                         isActive
                           ? "bg-[#E7F2EC] text-[#062C55] font-[700]"
                           : "text-[#17242F] hover:bg-[#EEF4F0] font-normal"
@@ -505,7 +522,7 @@ export default function TermsConditionsModal({
                 <button
                   type="button"
                   onClick={() => setIsDeclined(true)}
-                  className="px-4 py-2.5 rounded-[9px] border border-[#D8D3C8] bg-white hover:border-[#C3CCD3] hover:text-[#062C55] text-[#5A6B78] font-sans font-[700] text-[13.5px] transition"
+                  className="px-4 py-2.5 rounded-[9px] border border-[#D8D3C8] bg-white hover:border-[#C3CCD3] hover:text-[#062C55] text-[#5A6B78] font-sans font-[700] text-[13.5px] transition cursor-pointer"
                 >
                   Decline
                 </button>
@@ -513,7 +530,7 @@ export default function TermsConditionsModal({
                 <button
                   type="button"
                   onClick={handleDownload}
-                  className="px-4 py-2.5 rounded-[9px] border border-[#D8D3C8] bg-white hover:border-[#0EB28D] text-[#062C55] font-sans font-[700] text-[13.5px] transition flex items-center gap-1.5"
+                  className="px-4 py-2.5 rounded-[9px] border border-[#D8D3C8] bg-white hover:border-[#0EB28D] text-[#062C55] font-sans font-[700] text-[13.5px] transition flex items-center gap-1.5 cursor-pointer"
                   title="Download a copy of this document"
                 >
                   <span>↓</span> Download
@@ -523,7 +540,7 @@ export default function TermsConditionsModal({
                   type="button"
                   disabled={!isCurrentScrolled && !isCurrentAccepted}
                   onClick={handleAcceptCurrent}
-                  className={`px-5 py-2.5 rounded-[9px] font-sans font-[800] text-[13.5px] transition-all disabled:opacity-40 disabled:cursor-not-allowed ${
+                  className={`px-5 py-2.5 rounded-[9px] font-sans font-[800] text-[13.5px] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer ${
                     isCurrentAccepted
                       ? "bg-gradient-to-b from-[#0EB28D] to-[#0C8F72] text-white"
                       : "bg-[#062C55] hover:bg-[#041D38] text-white"
@@ -539,4 +556,3 @@ export default function TermsConditionsModal({
     </div>
   );
 }
-

@@ -150,7 +150,7 @@ export function createFairExitClient(opts: FairExitClientOptions) {
 
     // payment
     price: (id: string) => call<any>('GET', `${c(id)}/price`, undefined, id, undefined, 'Price Check'),
-    prepareCheckout: (id: string, body: { email?: string; remind?: boolean; termsAccepted: boolean }) => call<any>('POST', `${c(id)}/checkout/prepare`, body, id, undefined, 'Prepare Checkout'),
+    prepareCheckout: (id: string, body: { email?: string; remind?: boolean; termsAccepted: boolean; consentVersion?: string }) => call<any>('POST', `${c(id)}/checkout/prepare`, body, id, undefined, 'Prepare Checkout'),
     stripeCheckout: (id: string, body: { successUrl?: string; cancelUrl?: string; mode?: 'checkout' | 'payment_intent' } = {}) =>
       call<{ url?: string; sessionId?: string; clientSecret?: string }>('POST', `${c(id)}/checkout/stripe`, body, id, undefined, 'Stripe Checkout'),
     stripeConfirm: (id: string, body: { sessionId?: string; paymentIntentId?: string }) => call<{ paid: boolean; case: any }>('POST', `${c(id)}/checkout/stripe/confirm`, body, id, undefined, 'Payment Confirmation'),

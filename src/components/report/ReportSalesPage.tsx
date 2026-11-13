@@ -240,10 +240,19 @@ export default function ReportSalesPage({
 
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!termsAccepted) {
-      setPayError("Please accept the Terms & Conditions to proceed.");
+    setPayError("");
+
+    if (email && email.trim() && !email.includes("@")) {
+      setPayError("Please enter a valid email address.");
       return;
     }
+
+    // Always require accepting all three documents in TermsConditionsModal first
+    if (!termsAccepted) {
+      setTermsModalOpen(true);
+      return;
+    }
+
     proceedToPayment();
   };
 
@@ -259,7 +268,7 @@ export default function ReportSalesPage({
 
     try {
       // 1. Prepare checkout on backend
-      await fairexit.prepareCheckout(activeCaseId, { termsAccepted: true });
+      await fairexit.prepareCheckout(activeCaseId, { termsAccepted: true, consentVersion: "2026-09-21" });
 
       // 2. Execute server-side mock payment (or stripe checkout)
       await fairexit.mockPay(activeCaseId);
@@ -957,7 +966,13 @@ export default function ReportSalesPage({
                   <input
                     type="checkbox"
                     checked={termsAccepted}
-                    onChange={(e) => setTermsAccepted(e.target.checked)}
+                    onChange={() => {
+                      if (!termsAccepted) {
+                        setTermsModalOpen(true);
+                      } else {
+                        setTermsAccepted(false);
+                      }
+                    }}
                     className="w-4 h-4 rounded-[3px] border-[1.5px] border-[#8A96A0] text-[#0EB28D] focus:ring-[#0EB28D] mt-0.5"
                   />
                   <span className="font-sans font-normal text-[13px] leading-[19px] text-[#2B3A45]">
@@ -1213,7 +1228,8 @@ export default function ReportSalesPage({
       <TermsConditionsModal
         isOpen={termsModalOpen}
         onClose={() => setTermsModalOpen(false)}
-        country={data.country === "US" ? "US" : "CA"}
+        country={isUS ? "US" : "CA"}
+        initialAccepted={termsAccepted}
         onAllAccepted={() => {
           setTermsAccepted(true);
           setTermsModalOpen(false);
