@@ -146,7 +146,7 @@ async function executeReportBuildJob(
     if (done?.email) {
       try {
         const token = await caseService.addToken(done)
-        await emailService.reportReady(done, token)
+        await caseService.deliverReportEmail(done, token)
       } catch (error) {
         logger.warn('[REPORT][EMAIL_ERROR]', { requestId, caseId: c.id, reportId, generationId, message: (error as Error).message })
       }

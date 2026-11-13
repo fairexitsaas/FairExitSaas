@@ -78,10 +78,21 @@ export const docParams = z.object({ caseId: uuid, docId: uuid })
 export const rowParams = z.object({ caseId: uuid, key: z.string().regex(/^[a-z_]{2,40}$/) })
 
 export const checkoutPrepareSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().optional(),
   remind: z.boolean().optional(),
   termsAccepted: z.literal(true, { errorMap: () => ({ message: 'Accept the terms to continue' }) }),
   consentVersion: z.string().max(40).optional(),
+})
+
+export const postPaymentCustomerSchema = z.object({
+  name: z.string().trim().min(1, { message: 'Name is required' }).max(150),
+  email: z.string().trim().email({ message: 'Valid email is required' }),
+  consentNews: z.boolean().optional(),
+})
+
+export const sendReportEmailSchema = z.object({
+  email: z.string().trim().email().optional(),
+  forceRetry: z.boolean().optional(),
 })
 
 export const stripeCheckoutSchema = z.object({

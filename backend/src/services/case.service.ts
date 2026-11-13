@@ -6,6 +6,9 @@ import { computeFreeResult } from '../fairexit/freeCheck'
 import { buildJurisdiction, codeFromAnswers, Country } from '../fairexit/jurisdictions'
 import { RULES_VERSION } from '../fairexit/severanceRules'
 import type { CaseRow, CaseDocumentRow, Platform, CaseStatus } from '../fairexit/types'
+import { PAID_STATUSES } from '../fairexit/types'
+import { env } from '../config/env'
+import { emailService } from './email.service'
 
 
 // Must be longer than a real Call B (Opus, 2-5 min) plus the PDF, or live jobs get marked failed.
@@ -130,21 +133,21 @@ export const caseService = {
     ) as CaseDocumentRow[]
   },
 
-  isPaid(row: CaseRow) {
-    return true
+  isPaid(row: CaseRow): boolean {
+    return Boolean(row.paid_at && row.payment_provider) || PAID_STATUSES.includes(row.status)
   },
 
   nextStep(row: CaseRow, docs: CaseDocumentRow[]): string {
     if (!row.covered) return 'not_covered'
     const s: CaseStatus = row.status
-    if (s === 'free_check' || s === 'pending_payment') return 'upload'
+    if (!this.isPaid(row) && (s === 'free_check' || s === 'pending_payment')) return 'pay'
     if (s === 'paid') return 'upload'
     if (s === 'reading') return 'reading'
     if (s === 'checking') return 'check'
     if (s === 'building') return 'building'
     if (s === 'ready') return 'ready'
     if (s === 'failed') return row.status_detail === 'build_failed' ? 'check' : 'upload'
-    return 'upload'
+    return docs.length ? 'upload' : 'pay'
   },
 
   readiness(row: CaseRow, docs: CaseDocumentRow[]) {
@@ -152,7 +155,156 @@ export const caseService = {
     const letterPages = uploaded.filter((d) => d.kind === 'letter').length
     const contractPages = uploaded.filter((d) => d.kind === 'contract').length
     const contractOk = contractPages > 0 || row.contract_status === 'never' || row.contract_status === 'missing'
-    return { letterPages, contractPages, contractOk, canRead: letterPages > 0 && contractOk }
+    return { letterPages, contractPages, contractOk, canRead: this.isPaid(row) && letterPages > 0 && contractOk }
+  },
+
+  async submitCustomerInfo(caseId: string, input: { name: string; email: string; consentNews?: boolean }) {
+    const c = await this.get(caseId)
+    if (!this.isPaid(c)) {
+      throw ApiError.badRequest('Payment required before submitting customer details')
+    }
+    const cleanName = input.name.trim()
+    const cleanEmail = input.email.trim().toLowerCase()
+
+    const answers = {
+      ...(c.answers || {}),
+      customer_name: cleanName,
+      name: cleanName,
+      ...(c.answers?.employee_name ? {} : { employee_name: cleanName }),
+    }
+
+    const consent = {
+      ...(c.consent || {}),
+      name: cleanName,
+      email: cleanEmail,
+      remind: !!input.consentNews,
+      submitted_at: new Date().toISOString(),
+      source: 'post-payment-collection',
+    }
+
+    const token = await this.addToken(c)
+    const updated = await this.update(caseId, {
+      email: cleanEmail,
+      answers,
+      consent,
+      remind: !!input.consentNews,
+    })
+
+    const base = env.APP_WEB_URL.replace(/\/$/, '')
+    const privateLink = `${base}/report?case=${c.id}&t=${encodeURIComponent(token)}`
+
+    let emailDelivery: { status: 'sent' | 'pending' | 'failed'; sentAt?: string; error?: string } = {
+      status: 'pending',
+    }
+
+    if (c.status === 'ready' && c.report_ready_at) {
+      emailDelivery = await this.deliverReportEmail(updated, token, false)
+    }
+
+    return {
+      success: true,
+      case: updated,
+      customer: { name: cleanName, email: cleanEmail },
+      privateLink,
+      emailDelivery,
+    }
+  },
+
+  async deliverReportEmail(c: CaseRow, token?: string, forceRetry = false) {
+    if (!this.isPaid(c)) {
+      throw ApiError.badRequest('Payment required before report delivery')
+    }
+    if (!c.email) {
+      throw ApiError.unprocessable('Customer email is required for report delivery')
+    }
+    if (c.status !== 'ready' || !c.report_ready_at) {
+      return { status: 'pending' as const, message: 'Report is still being compiled' }
+    }
+
+    const deliveryRecord = (c.answers?.report_delivery as any) || (c.consent?.report_delivery as any)
+    if (deliveryRecord?.status === 'sent' && deliveryRecord?.to === c.email && !forceRetry) {
+      return {
+        status: 'sent' as const,
+        sentAt: deliveryRecord.sentAt,
+        alreadySent: true,
+        to: deliveryRecord.to,
+      }
+    }
+
+    const activeToken = token || (await this.addToken(c))
+    try {
+      const res = await emailService.reportReady(c, activeToken)
+      const now = new Date().toISOString()
+      if (res.sent) {
+        const reportDelivery = {
+          status: 'sent',
+          sentAt: now,
+          to: c.email,
+          mocked: Boolean((res as any).mocked),
+          attempts: (deliveryRecord?.attempts || 0) + 1,
+        }
+        await this.update(c.id, {
+          answers: { ...(c.answers || {}), report_delivery: reportDelivery },
+          consent: { ...(c.consent || {}), report_delivery: reportDelivery },
+        })
+        return { status: 'sent' as const, sentAt: now, to: c.email }
+      } else {
+        const reportDelivery = {
+          status: 'failed',
+          failedAt: now,
+          error: (res as any).error || (res as any).reason || 'Email provider could not send',
+          to: c.email,
+          attempts: (deliveryRecord?.attempts || 0) + 1,
+        }
+        await this.update(c.id, {
+          answers: { ...(c.answers || {}), report_delivery: reportDelivery },
+          consent: { ...(c.consent || {}), report_delivery: reportDelivery },
+        })
+        return { status: 'failed' as const, error: reportDelivery.error, to: c.email }
+      }
+    } catch (err: any) {
+      const now = new Date().toISOString()
+      const reportDelivery = {
+        status: 'failed',
+        failedAt: now,
+        error: err.message || 'Email delivery failed',
+        to: c.email,
+        attempts: (deliveryRecord?.attempts || 0) + 1,
+      }
+      await this.update(c.id, {
+        answers: { ...(c.answers || {}), report_delivery: reportDelivery },
+        consent: { ...(c.consent || {}), report_delivery: reportDelivery },
+      })
+      return { status: 'failed' as const, error: reportDelivery.error, to: c.email }
+    }
+  },
+
+  async getDeliveryStatus(caseId: string) {
+    const c = await this.get(caseId)
+    const delivery = (c.answers?.report_delivery as any) || (c.consent?.report_delivery as any) || null
+    return {
+      paid: this.isPaid(c),
+      reportReady: c.status === 'ready' && !!c.report_ready_at,
+      customer: {
+        name: c.answers?.customer_name || c.answers?.name || null,
+        email: c.email || null,
+      },
+      delivery: delivery ? {
+        status: delivery.status,
+        sentAt: delivery.sentAt || null,
+        failedAt: delivery.failedAt || null,
+        error: delivery.error || null,
+        to: delivery.to || c.email,
+        alreadySent: delivery.status === 'sent',
+      } : {
+        status: c.email ? 'pending' : 'no_email',
+        sentAt: null,
+        failedAt: null,
+        error: null,
+        to: c.email || null,
+        alreadySent: false,
+      },
+    }
   },
 
   view(row: CaseRow, docs: CaseDocumentRow[] = []) {
@@ -173,6 +325,8 @@ export const caseService = {
       paidAt: row.paid_at,
       payment: row.paid_at ? { provider: row.payment_provider, amountCents: row.amount_cents, currency: row.currency } : null,
       email: row.email,
+      customerName: row.answers?.customer_name || row.answers?.name || null,
+      reportDelivery: (row.answers?.report_delivery as any) || (row.consent?.report_delivery as any) || null,
       remind: row.remind,
       contractStatus: row.contract_status,
       documents: {

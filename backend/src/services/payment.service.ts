@@ -52,13 +52,26 @@ export const paymentService = {
     return { amountCents: env.REPORT_PRICE_CENTS, currency: currencyFor(c).toUpperCase(), label: `$${(env.REPORT_PRICE_CENTS / 100).toFixed(0)} ${currencyFor(c).toUpperCase()}`, taxNote: 'plus applicable tax' }
   },
 
-  /** Saves email + consent (the checkout form) before sending the person to pay. */
-  async prepare(c: CaseRow, input: { email: string; remind?: boolean; termsAccepted: boolean; consentVersion?: string }) {
+  /** Saves terms acceptance (and optional email + consent) before sending the person to pay. */
+  async prepare(c: CaseRow, input: { email?: string; remind?: boolean; termsAccepted: boolean; consentVersion?: string }) {
     if (!c.covered) throw ApiError.badRequest('jurisdiction_not_covered')
     if (caseService.isPaid(c)) throw ApiError.conflict('This report is already paid')
     if (!input.termsAccepted) throw ApiError.unprocessable('Accept the terms to continue')
-    const consent = { email: input.email, at: new Date().toISOString(), source: 'report-checkout', version: input.consentVersion || '2026-09-21', items: [{ type: 'transactional', basis: 'requested product' }] }
-    return caseService.update(c.id, { email: input.email.trim().toLowerCase(), remind: !!input.remind, consent, status: 'pending_payment' })
+    const email = input.email ? input.email.trim().toLowerCase() : null
+    const consent = {
+      ...(c.consent || {}),
+      email,
+      at: new Date().toISOString(),
+      source: 'report-checkout',
+      version: input.consentVersion || '2026-09-21',
+      items: [{ type: 'transactional', basis: 'requested product' }],
+    }
+    return caseService.update(c.id, {
+      ...(email ? { email } : {}),
+      remind: !!input.remind,
+      consent,
+      status: 'pending_payment',
+    })
   },
 
   async stripeCheckout(c: CaseRow, input: { successUrl: string; cancelUrl: string }) {

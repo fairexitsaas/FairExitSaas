@@ -19,6 +19,7 @@ import ReportVideoPlayer from "./ReportVideoPlayer";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import TermsConditionsModal from "@/components/dialogs/TermsConditionsModal";
 import CheckoutDialog from "@/components/dialogs/CheckoutDialog";
+import PostPaymentCustomerModal from "./PostPaymentCustomerModal";
 import { triggerGetApp } from "@/context/GetAppContext";
 
 interface ReportSalesPageProps {
@@ -56,6 +57,7 @@ export default function ReportSalesPage({
   const [termsModalOpen, setTermsModalOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
 
   // Country detection: check explicit prop, cs object, jurisdiction, stored inputs, or URL params
   const isUS = Boolean(
@@ -231,33 +233,51 @@ export default function ReportSalesPage({
     ? (data.state || data.provinceName || "New York")
     : (data.provinceName || "Ontario");
 
+  const proceedToPayment = () => {
+    setPayError("");
+    setCheckoutDialogOpen(true);
+  };
+
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !/.+@.+\..+/.test(email)) {
-      setPayError("Please enter a valid email address so we can send your report.");
-      emailInputRef.current?.focus();
+    if (!termsAccepted) {
+      setPayError("Please accept the Terms & Conditions to proceed.");
       return;
     }
-
-    setPayError("");
-    saveReportInputs({ email, remindMe: subscribeNews });
-
     proceedToPayment();
   };
 
-  const proceedToPayment = async () => {
+  const handleDialogPay = async () => {
     setIsPaying(true);
     setPayError("");
-    setTermsAccepted(true);
-    saveReportInputs({ email, termsAccepted: true, remindMe: subscribeNews });
-
     const activeCaseId = caseId || cs?.id;
+    if (!activeCaseId) {
+      setPayError("Case identifier missing. Please refresh and try again.");
+      setIsPaying(false);
+      return;
+    }
 
-    setIsPaying(false);
-    setCheckoutDialogOpen(false);
-    setTermsModalOpen(false);
+    try {
+      // 1. Prepare checkout on backend
+      await fairexit.prepareCheckout(activeCaseId, { termsAccepted: true });
 
-    // Directly navigate to the upload step without checking payments or details
+      // 2. Execute server-side mock payment (or stripe checkout)
+      await fairexit.mockPay(activeCaseId);
+
+      // 3. Payment confirmed! Close dialog and open customer info modal (Change 24)
+      setIsPaying(false);
+      setCheckoutDialogOpen(false);
+      setCustomerModalOpen(true);
+    } catch (err: unknown) {
+      setIsPaying(false);
+      const msg = err instanceof Error ? err.message : "Payment could not be completed. Please try again.";
+      setPayError(msg);
+    }
+  };
+
+  const handleCustomerSuccess = (customerData: { name: string; email: string; privateLink?: string }) => {
+    setCustomerModalOpen(false);
+    const activeCaseId = caseId || cs?.id;
     if (onPaySuccess) {
       onPaySuccess(activeCaseId || undefined);
     }
@@ -932,46 +952,27 @@ export default function ReportSalesPage({
 
               {/* Checkout Form */}
               <form onSubmit={handleCheckoutSubmit} className="space-y-4">
-                <div>
-                  <label
-                    htmlFor="report-email-input"
-                    className="block font-sans font-[800] text-[13.5px] leading-[21px] text-[#062C55] mb-2"
-                  >
-                    Where should we send your report?
-                  </label>
-
-                  {/* Input container with left amber/gold accent bar */}
-                  <div className="relative flex items-center rounded-[10px] bg-[#FFFDF5] border border-[#CFD8DF] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] overflow-hidden focus-within:border-[#0EB28D] transition-colors">
-                    {/* Left yellow bar */}
-                    <div className="w-[3px] self-stretch bg-[#E7B74D] shrink-0" />
-                    <input
-                      id="report-email-input"
-                      ref={emailInputRef}
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      required
-                      className="w-full px-3.5 py-3 bg-transparent font-sans text-[15px] text-[#062C55] placeholder-[#9AA3AB] outline-none"
-                    />
-                  </div>
-                  <p className="font-sans font-normal text-[13px] leading-[19px] text-[#5A6B78] mt-2">
-                    We&apos;ll email your report and receipt here.
-                  </p>
-                </div>
-
-                <div className="w-full h-[1px] bg-[#DFECE6]" />
-
-                {/* Newsletter & tips checkbox */}
+                {/* Terms and conditions acceptance */}
                 <label className="flex items-start gap-2.5 cursor-pointer select-none">
                   <input
                     type="checkbox"
-                    checked={subscribeNews}
-                    onChange={(e) => setSubscribeNews(e.target.checked)}
+                    checked={termsAccepted}
+                    onChange={(e) => setTermsAccepted(e.target.checked)}
                     className="w-4 h-4 rounded-[3px] border-[1.5px] border-[#8A96A0] text-[#0EB28D] focus:ring-[#0EB28D] mt-0.5"
                   />
-                  <span className="font-sans font-normal text-[13.5px] leading-[20px] text-[#2B3A45]">
-                    Also send me severance tips and FairExit news. Unsubscribe any time.
+                  <span className="font-sans font-normal text-[13px] leading-[19px] text-[#2B3A45]">
+                    I accept the{" "}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setTermsModalOpen(true);
+                      }}
+                      className="underline text-[#0EB28D] hover:text-[#0C8F72] font-semibold"
+                    >
+                      Terms &amp; Conditions
+                    </button>
+                    {" "}and acknowledge that FairExit provides legal information, not legal advice or representation.
                   </span>
                 </label>
 
@@ -1224,13 +1225,23 @@ export default function ReportSalesPage({
       <CheckoutDialog
         isOpen={checkoutDialogOpen}
         onClose={() => setCheckoutDialogOpen(false)}
-        email={email}
-        amount="$59.00"
+        email=""
+        amount={isUS ? "$59.00 USD" : "$59.00 CAD"}
         isProcessing={isPaying}
         errorMessage={payError}
         onPay={async () => {
-          await proceedToPayment();
+          await handleDialogPay();
         }}
+      />
+
+      {/* ── STEP 4: POST-PAYMENT CUSTOMER INFORMATION (Change 24) ── */}
+      <PostPaymentCustomerModal
+        isOpen={customerModalOpen}
+        caseId={caseId || cs?.id || null}
+        initialName={data.employee_name || ""}
+        initialEmail={data.email || ""}
+        onSuccess={handleCustomerSuccess}
+        onClose={() => setCustomerModalOpen(false)}
       />
 
       {/* ── MOBILE STICKY BOTTOM BAR (as shown in phone screenshot) ── */}

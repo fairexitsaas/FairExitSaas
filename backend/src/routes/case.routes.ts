@@ -1,4 +1,4 @@
-﻿import { Router } from 'express'
+import { Router } from 'express'
 import { caseController as cc } from '../controllers/case.controller'
 import { optionalAuthenticate, caseAccess } from '../middleware/caseAccess'
 import { validate } from '../middleware/validate'
@@ -30,6 +30,11 @@ one.post('/checkout/stripe/confirm', validate({ body: V.stripeConfirmSchema }), 
 one.post('/checkout/apple', validate({ body: V.appleIapSchema }), h(cc.appleIap))
 one.post('/checkout/google', validate({ body: V.googleIapSchema }), h(cc.googleIap))
 one.post('/checkout/mock', h(cc.mockPay))
+
+// post-payment customer details & report delivery (Change 24)
+one.post('/customer-info', validate({ body: V.postPaymentCustomerSchema }), h(cc.submitCustomerInfo))
+one.post('/report/email', validate({ body: V.sendReportEmailSchema }), h(cc.sendReportEmail))
+one.get('/report/delivery', h(cc.reportDelivery))
 
 // documents (only two: letter and contract; a scan may have several pages)
 one.get('/documents', h(cc.listDocs))

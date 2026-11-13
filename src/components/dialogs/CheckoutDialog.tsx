@@ -6,7 +6,7 @@ import Image from "next/image";
 export interface CheckoutDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  email: string;
+  email?: string;
   amount?: string;
   onPay: (paymentMethod: "apple_pay" | "card", cardDetails?: { number: string; exp: string; cvc: string }) => Promise<void>;
   isProcessing?: boolean;
@@ -16,7 +16,7 @@ export interface CheckoutDialogProps {
 export default function CheckoutDialog({
   isOpen,
   onClose,
-  email,
+  email = "",
   amount = "$59.00",
   onPay,
   isProcessing = false,
@@ -84,8 +84,7 @@ export default function CheckoutDialog({
 
         {/* Subtitle */}
         <div className="font-sans text-[13px] leading-[18px] text-[#5A6B78] mb-4">
-          FairExit Severance Report · one-time · receipt to{" "}
-          <b className="text-[#062C55] break-all">{email || "you@example.com"}</b>
+          FairExit Severance Report · one-time · encrypted &amp; secure
         </div>
 
         {/* Apple Pay Button */}

@@ -15,6 +15,7 @@ import ReadingLetterPage from "@/components/report/reading/ReadingLetterPage";
 import CanadaReviewPage from "@/components/report/ca/CanadaReviewPage";
 import USReviewPage from "@/components/report/us/USReviewPage";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
+import PostPaymentCustomerModal from "@/components/report/PostPaymentCustomerModal";
 
 /* ── palette (same tokens as the prototype) ── */
 const C = {
@@ -94,6 +95,7 @@ export default function ReportFlow() {
   const [view, setView] = useState<string | null>(null); // local override, e.g. "upload" for "Add a clearer copy"
   const [error, setError] = useState("");
   const [lawyerOpen, setLawyerOpen] = useState(false);
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
 
   // resolve the case from ?case=&t= (email link) or the last case in this browser
   useEffect(() => {
@@ -110,10 +112,13 @@ export default function ReportFlow() {
   const refresh = useCallback(async () => {
     if (!caseId) return;
     try {
-      setCs(await fairexit.getCase(caseId));
+      const updated = await fairexit.getCase(caseId);
+      setCs(updated);
       setError("");
+      return updated;
     } catch (e) {
       setError(errText(e));
+      return null;
     }
   }, [caseId]);
 
@@ -123,7 +128,14 @@ export default function ReportFlow() {
     const sessionId = sp?.get("session_id");
     (async () => {
       if (sessionId) {
-        try { await fairexit.stripeConfirm(caseId, { sessionId }); } catch (e) { setError(errText(e)); }
+        try {
+          const res = await fairexit.stripeConfirm(caseId, { sessionId });
+          if (res?.paid && !res?.case?.email) {
+            setCustomerModalOpen(true);
+          }
+        } catch (e) {
+          setError(errText(e));
+        }
       }
       await refresh();
     })();
@@ -282,6 +294,17 @@ export default function ReportFlow() {
         </Card>
       )}
       <AskLawyerModal isOpen={lawyerOpen} onClose={() => setLawyerOpen(false)} country={country} regionName={cs.jurisdiction?.name} caseId={caseId || undefined} sourcePage="/report" enquiryType="ask_lawyer" />
+      <PostPaymentCustomerModal
+        isOpen={customerModalOpen}
+        caseId={caseId || cs?.id || null}
+        initialName={cs?.customerName || (cs?.answers as any)?.customer_name || ""}
+        initialEmail={cs?.email || ""}
+        onSuccess={async () => {
+          setCustomerModalOpen(false);
+          await refresh();
+        }}
+        onClose={() => setCustomerModalOpen(false)}
+      />
     </Shell>
   );
 }

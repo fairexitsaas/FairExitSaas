@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
-import { getReportInputs, ReportInputs } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs } from "@/lib/report-storage";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
 import { startPollLoop } from "@/lib/reportPolling";
@@ -55,6 +55,19 @@ export default function PaidReportReadyPage({
   const [buildProgressStep, setBuildProgressStep] = useState<number>(2);
   const [pollVersion, setPollVersion] = useState(0);
   const retryLock = useRef(false);
+
+  // Email delivery & Private link state (Change 24)
+  const initialDelivery = (cs?.reportDelivery as any) || null;
+  const [emailSentState, setEmailSentState] = useState<"sent" | "failed" | "pending" | "none">(
+    initialDelivery?.status === "sent" ? "sent" : initialDelivery?.status === "failed" ? "failed" : "none"
+  );
+  const [emailError, setEmailError] = useState(initialDelivery?.error || "");
+  const [isRetryingEmail, setIsRetryingEmail] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [postPayName, setPostPayName] = useState(() => (cs?.customerName || (cs?.answers as any)?.customer_name || data.employee_name || ""));
+  const [postPayEmail, setPostPayEmail] = useState(() => (cs?.email || data.email || ""));
+  const [isSubmittingCustomer, setIsSubmittingCustomer] = useState(false);
+  const [postPayError, setPostPayError] = useState("");
 
   const activeId = caseId || cs?.id;
 
@@ -212,8 +225,93 @@ export default function PaidReportReadyPage({
 
   const isCanada = cs?.country ? cs.country === "CA" : data.country !== "US";
   const answers = (cs?.answers as Record<string, unknown>) || {};
-  const userEmail = cs?.email || data.email || "alex@example.com";
+  const userEmail = postPayEmail || cs?.email || data.email || "";
   const priceCurrency = isCanada ? "$59 CAD" : "$59 USD";
+
+  const token = typeof window !== "undefined" ? (activeId ? caseStore.get(activeId) || "" : "") : "";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const privateLink = activeId && token
+    ? `${origin}/report?case=${activeId}&t=${encodeURIComponent(token)}`
+    : activeId
+    ? `${origin}/report?case=${activeId}`
+    : "";
+
+  const handleCopyLink = () => {
+    if (privateLink) {
+      navigator.clipboard.writeText(privateLink).then(() => {
+        setCopiedLink(true);
+        notifySuccess("Copied private report link to clipboard!");
+        setTimeout(() => setCopiedLink(false), 3000);
+      });
+    }
+  };
+
+  const handleRetryEmail = async () => {
+    if (!activeId || isRetryingEmail) return;
+    setIsRetryingEmail(true);
+    setEmailError("");
+    try {
+      const res = await fairexit.sendReportEmail(activeId, { forceRetry: true, email: userEmail });
+      if (res?.status === "sent") {
+        setEmailSentState("sent");
+        notifySuccess(`Report emailed to ${userEmail}!`);
+      } else {
+        setEmailSentState("failed");
+        setEmailError(res?.error || "Could not send report email");
+      }
+    } catch (err: unknown) {
+      setEmailSentState("failed");
+      setEmailError(err instanceof Error ? err.message : "Could not send report email");
+    } finally {
+      setIsRetryingEmail(false);
+    }
+  };
+
+  const handlePostPaySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmittingCustomer) return;
+    const trimmedName = postPayName.trim();
+    const trimmedEmail = postPayEmail.trim();
+
+    if (!trimmedName) {
+      setPostPayError("Please enter your name.");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!trimmedEmail || !emailRegex.test(trimmedEmail)) {
+      setPostPayError("Please enter a valid email address.");
+      return;
+    }
+
+    setPostPayError("");
+    setIsSubmittingCustomer(true);
+
+    try {
+      if (activeId) {
+        const res = await fairexit.submitCustomerInfo(activeId, {
+          name: trimmedName,
+          email: trimmedEmail,
+        });
+        saveReportInputs({
+          employee_name: trimmedName,
+          email: trimmedEmail,
+        });
+        setPostPayName(trimmedName);
+        setPostPayEmail(trimmedEmail);
+        if (res?.emailDelivery?.status === "sent") {
+          setEmailSentState("sent");
+          notifySuccess(`Report sent to ${trimmedEmail}!`);
+        } else if (res?.emailDelivery?.status === "failed") {
+          setEmailSentState("failed");
+          setEmailError(res.emailDelivery.error || "Email delivery failed");
+        }
+      }
+    } catch (err: unknown) {
+      setPostPayError(err instanceof Error ? err.message : "Failed to save details");
+    } finally {
+      setIsSubmittingCustomer(false);
+    }
+  };
 
   // Sidebar detail values (dynamically resolved from answers, props, then storage)
   const provinceOrState =
@@ -476,11 +574,112 @@ export default function PaidReportReadyPage({
                   {isCanada ? "Talk to a lawyer, free" : "Talk to an attorney, free"}
                 </button>
 
-                {/* Email note */}
-                <p className="font-sans font-[400] text-[14px] leading-[22px] text-[#5A6B78]">
-                  We also emailed it to{" "}
-                  <strong className="font-[700] text-[#5A6B78]">{userEmail}</strong>.
-                </p>
+                {/* Email delivery status & Private Report Link (Change 24) */}
+                {userEmail ? (
+                  <div className="w-full flex flex-col items-center">
+                    {emailSentState === "failed" ? (
+                      <div className="w-full sm:w-[480px] p-3 rounded-[10px] bg-[#FBECEB] border border-[#F4CBC8] text-left mb-3">
+                        <div className="flex items-center justify-between">
+                          <span className="font-sans font-[700] text-[13px] text-[#A3231F]">
+                            Email delivery failed to {userEmail}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={handleRetryEmail}
+                            disabled={isRetryingEmail}
+                            className="px-3 py-1 bg-[#A3231F] hover:bg-[#821B18] text-white rounded-[6px] font-sans font-[700] text-[12px] transition cursor-pointer disabled:opacity-50"
+                          >
+                            {isRetryingEmail ? "Retrying…" : "Retry sending"}
+                          </button>
+                        </div>
+                        {emailError && (
+                          <p className="font-sans text-[11.5px] text-[#A3231F] mt-1">{emailError}</p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="font-sans font-[400] text-[14px] leading-[22px] text-[#5A6B78]">
+                        We also emailed your report to{" "}
+                        <strong className="font-[700] text-[#062C55]">{userEmail}</strong>.
+                      </p>
+                    )}
+
+                    {/* Private Report Link Box */}
+                    {privateLink && (
+                      <div className="w-full sm:w-[480px] mt-4 p-4 rounded-[12px] bg-[#FAF9F5] border border-[#E7E4DD] text-left">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="font-sans font-[700] text-[12px] uppercase tracking-wider text-[#062C55]">
+                            Your private report link
+                          </span>
+                          <span className="text-[11px] font-semibold text-[#0C8F72] bg-[#E5F5EE] px-2 py-0.5 rounded">
+                            No sign-in needed
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          <input
+                            type="text"
+                            readOnly
+                            value={privateLink}
+                            className="w-full bg-white border border-[#CFD8DF] rounded-[8px] px-3 py-2 text-[12px] font-mono text-[#062C55] outline-none select-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleCopyLink}
+                            className="px-3.5 py-2 bg-[#0EB28D] hover:bg-[#0C8F72] text-white rounded-[8px] font-sans font-[700] text-[12px] whitespace-nowrap transition cursor-pointer shrink-0"
+                          >
+                            {copiedLink ? "Copied! ✓" : "Copy link"}
+                          </button>
+                        </div>
+                        <p className="font-sans text-[11.5px] leading-[17px] text-[#5A6B78] mt-2">
+                          Only someone with this secret link can access your report. Your documents are deleted after 30 days; your report is kept for 12 months.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  /* Form if customer info was not entered yet */
+                  <div className="w-full sm:w-[480px] mt-4 p-5 rounded-[14px] bg-[#FAF9F5] border border-[#E7E4DD] text-left">
+                    <h3 className="font-serif font-[600] text-[18px] text-[#062C55] mb-1">
+                      Your payment is confirmed. Enter your name and email so we can send you your report.
+                    </h3>
+                    <p className="font-sans text-[12.5px] text-[#5A6B78] mb-3">
+                      Enter your details below to receive your official severance report and private link.
+                    </p>
+                    <form onSubmit={handlePostPaySubmit} className="space-y-3">
+                      <div>
+                        <label className="block font-sans text-[12px] font-bold text-[#062C55] mb-1">Your name</label>
+                        <input
+                          type="text"
+                          value={postPayName}
+                          onChange={(e) => setPostPayName(e.target.value)}
+                          placeholder="e.g. Avery Morgan"
+                          disabled={isSubmittingCustomer}
+                          className="w-full px-3 py-2 bg-white border border-[#CFD8DF] rounded-[8px] text-[14px] text-[#062C55] outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-sans text-[12px] font-bold text-[#062C55] mb-1">Email address</label>
+                        <input
+                          type="email"
+                          value={postPayEmail}
+                          onChange={(e) => setPostPayEmail(e.target.value)}
+                          placeholder="you@example.com"
+                          disabled={isSubmittingCustomer}
+                          className="w-full px-3 py-2 bg-white border border-[#CFD8DF] rounded-[8px] text-[14px] text-[#062C55] outline-none"
+                        />
+                      </div>
+                      {postPayError && (
+                        <p className="text-[12px] text-[#A3231F] font-semibold">{postPayError}</p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={isSubmittingCustomer}
+                        className="w-full h-[46px] bg-[#12C79A] hover:bg-[#0EB28D] text-white font-sans font-[700] text-[15px] rounded-[10px] transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isSubmittingCustomer ? "Sending report…" : "Send my report"}
+                      </button>
+                    </form>
+                  </div>
+                )}
               </>
             ) : buildStatus === "building" ? (
               <div className="w-full max-w-[540px] flex flex-col items-center">

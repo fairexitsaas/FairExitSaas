@@ -73,8 +73,9 @@ export const caseController = {
 
   stripeCheckout: async (req: Request, res: Response) => {
     let c = C(req)
-    if (req.body.email) c = await paymentService.prepare(c, { email: req.body.email, remind: req.body.remind, termsAccepted: req.body.termsAccepted === true })
-    if (!c.email) throw ApiError.unprocessable('Add your email first (POST /checkout/prepare or send email + termsAccepted here)')
+    if (req.body.email || req.body.termsAccepted) {
+      c = await paymentService.prepare(c, { email: req.body.email, remind: req.body.remind, termsAccepted: req.body.termsAccepted === true })
+    }
     if (req.body.mode === 'payment_intent') return ApiResponse.ok(res, await paymentService.stripePaymentIntent(c))
     const base = env.APP_WEB_URL.replace(/\/$/, '')
     return ApiResponse.ok(res, await paymentService.stripeCheckout(c, {
@@ -87,6 +88,27 @@ export const caseController = {
     const r = await paymentService.confirmStripe(C(req), req.body)
     const fresh = await caseService.get(C(req).id)
     return ApiResponse.ok(res, { paid: r.paid, case: await fullView(fresh) })
+  },
+
+  submitCustomerInfo: async (req: Request, res: Response) => {
+    const c = C(req)
+    const result = await caseService.submitCustomerInfo(c.id, req.body)
+    return ApiResponse.ok(res, result, 'Customer delivery information saved')
+  },
+
+  sendReportEmail: async (req: Request, res: Response) => {
+    const c = C(req)
+    if (req.body?.email) {
+      await caseService.update(c.id, { email: String(req.body.email).trim().toLowerCase() })
+    }
+    const fresh = await caseService.get(c.id)
+    const result = await caseService.deliverReportEmail(fresh, undefined, req.body?.forceRetry === true)
+    return ApiResponse.ok(res, result, result.status === 'sent' ? 'Report emailed successfully' : 'Email delivery could not be completed')
+  },
+
+  reportDelivery: async (req: Request, res: Response) => {
+    const status = await caseService.getDeliveryStatus(C(req).id)
+    return ApiResponse.ok(res, status)
   },
 
   appleIap: async (req: Request, res: Response) => {
@@ -148,7 +170,9 @@ export const caseController = {
 
   // ---------------------------------------------------------------- report
   startBuild: async (req: Request, res: Response) => {
-    const r = await flowService.startBuild(C(req), req.id)
+    const c = C(req)
+    if (!caseService.isPaid(c)) throw ApiError.badRequest('Payment required before building severance report')
+    const r = await flowService.startBuild(c, req.id)
     const statusCode = r.status === 'ready' ? 200 : 202
     return res.status(statusCode).json({ success: true, statusCode, message: r.started ? 'Building your report' : r.status === 'ready' ? 'Report is already ready' : 'Report is already processing', data: r })
   },
@@ -158,14 +182,21 @@ export const caseController = {
     logger.info('[STATUS][POLL]', { requestId: req.id, caseId: c.id, reportId: status.reportId, generationId: status.generationId, status: status.status, stage: status.stage })
     return ApiResponse.ok(res, status)
   },
-  report: async (req: Request, res: Response) => ApiResponse.ok(res, flowService.report(C(req))),
+  report: async (req: Request, res: Response) => {
+    const c = C(req)
+    if (!caseService.isPaid(c)) throw ApiError.badRequest('Payment required before accessing purchased report')
+    return ApiResponse.ok(res, flowService.report(c))
+  },
   reportHtml: async (req: Request, res: Response) => {
+    const c = C(req)
+    if (!caseService.isPaid(c)) throw ApiError.badRequest('Payment required before accessing purchased report')
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
     res.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'unsafe-inline'; img-src data:")
-    res.send(flowService.html(C(req)))
+    res.send(flowService.html(c))
   },
   reportPdf: async (req: Request, res: Response) => {
     const c = C(req)
+    if (!caseService.isPaid(c)) throw ApiError.badRequest('Payment required before downloading purchased report')
     const buf = await flowService.pdf(c, req.id)
     res.setHeader('Content-Type', 'application/pdf')
     res.setHeader('Content-Disposition', `${req.query.download === '0' ? 'inline' : 'attachment'}; filename="FairExit-Severance-Report-${c.report_id}.pdf"`)

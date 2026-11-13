@@ -150,13 +150,21 @@ export function createFairExitClient(opts: FairExitClientOptions) {
 
     // payment
     price: (id: string) => call<any>('GET', `${c(id)}/price`, undefined, id, undefined, 'Price Check'),
-    prepareCheckout: (id: string, body: { email: string; remind?: boolean; termsAccepted: true }) => call<any>('POST', `${c(id)}/checkout/prepare`, body, id, undefined, 'Prepare Checkout'),
+    prepareCheckout: (id: string, body: { email?: string; remind?: boolean; termsAccepted: boolean }) => call<any>('POST', `${c(id)}/checkout/prepare`, body, id, undefined, 'Prepare Checkout'),
     stripeCheckout: (id: string, body: { successUrl?: string; cancelUrl?: string; mode?: 'checkout' | 'payment_intent' } = {}) =>
       call<{ url?: string; sessionId?: string; clientSecret?: string }>('POST', `${c(id)}/checkout/stripe`, body, id, undefined, 'Stripe Checkout'),
     stripeConfirm: (id: string, body: { sessionId?: string; paymentIntentId?: string }) => call<{ paid: boolean; case: any }>('POST', `${c(id)}/checkout/stripe/confirm`, body, id, undefined, 'Payment Confirmation'),
     applePurchase: (id: string, transactionId: string) => call<any>('POST', `${c(id)}/checkout/apple`, { transactionId }, id, undefined, 'Apple In-App Purchase'),
     googlePurchase: (id: string, purchaseToken: string, productId?: string) => call<any>('POST', `${c(id)}/checkout/google`, { purchaseToken, productId }, id, undefined, 'Google Play Purchase'),
     mockPay: (id: string) => call<any>('POST', `${c(id)}/checkout/mock`, {}, id, undefined, 'Payment'),
+
+    // post-payment customer information & report delivery (Change 24)
+    submitCustomerInfo: (id: string, body: { name: string; email: string; consentNews?: boolean }) =>
+      call<{ success: boolean; customer: { name: string; email: string }; privateLink: string; emailDelivery: any; case: any }>('POST', `${c(id)}/customer-info`, body, id, undefined, 'Customer Info'),
+    sendReportEmail: (id: string, body?: { email?: string; forceRetry?: boolean }) =>
+      call<{ success: boolean; status?: string; sentAt?: string; error?: string }>('POST', `${c(id)}/report/email`, body || {}, id, undefined, 'Send Report Email'),
+    getReportDelivery: (id: string) =>
+      call<{ paid: boolean; reportReady: boolean; customer: { name: string | null; email: string | null }; delivery: any }>('GET', `${c(id)}/report/delivery`, undefined, id, undefined, 'Report Delivery Status'),
 
     // documents
     documents: (id: string) => call<any>('GET', `${c(id)}/documents`, undefined, id, undefined, 'Document Retrieval'),

@@ -48,31 +48,49 @@ describe('Direct Unpaid Workflow Verification', () => {
     updated_at: new Date().toISOString(),
   }
 
-  it('treats unpaid cases as paid without payment requirement', () => {
-    expect(caseService.isPaid(unpaidCase)).toBe(true)
+  it('identifies unconfirmed/unpaid cases correctly', () => {
+    expect(caseService.isPaid(unpaidCase)).toBe(false)
+    const paidCase = { ...unpaidCase, status: 'paid' as const, paid_at: new Date().toISOString(), payment_provider: 'mock' }
+    expect(caseService.isPaid(paidCase)).toBe(true)
   })
 
-  it('directs nextStep to upload instead of pay for free_check and pending_payment', () => {
-    expect(caseService.nextStep(unpaidCase, [])).toBe('upload')
+  it('directs nextStep to pay for unpaid free_check and pending_payment', () => {
+    expect(caseService.nextStep(unpaidCase, [])).toBe('pay')
     const pendingCase = { ...unpaidCase, status: 'pending_payment' as const }
-    expect(caseService.nextStep(pendingCase, [])).toBe('upload')
+    expect(caseService.nextStep(pendingCase, [])).toBe('pay')
+    const paidCase = { ...unpaidCase, status: 'paid' as const, paid_at: new Date().toISOString(), payment_provider: 'mock' }
+    expect(caseService.nextStep(paidCase, [])).toBe('upload')
   })
 
-  it('allows canRead in readiness check once documents are satisfied', () => {
+  it('allows canRead in readiness check once case is paid and documents are satisfied', () => {
     const docs = [
       { id: 'doc-1', kind: 'letter', status: 'uploaded', page: 1 },
     ] as CaseDocumentRow[]
-    const withNeverContract = { ...unpaidCase, contract_status: 'never' as const }
-    const ready = caseService.readiness(withNeverContract, docs)
+    const paidWithNeverContract = {
+      ...unpaidCase,
+      status: 'paid' as const,
+      paid_at: new Date().toISOString(),
+      payment_provider: 'mock',
+      contract_status: 'never' as const,
+    }
+    const ready = caseService.readiness(paidWithNeverContract, docs)
     expect(ready.canRead).toBe(true)
     expect(ready.letterPages).toBe(1)
     expect(ready.contractOk).toBe(true)
+
+    const unpaidReady = caseService.readiness(unpaidCase, docs)
+    expect(unpaidReady.canRead).toBe(false)
   })
 
-  it('returns paid: true in case view so frontend does not block navigation', () => {
-    const view = caseService.view(unpaidCase, [])
-    expect(view.paid).toBe(true)
-    expect(view.nextStep).toBe('upload')
+  it('returns paid: false in case view for unpaid cases and paid: true once paid', () => {
+    const unpaidView = caseService.view(unpaidCase, [])
+    expect(unpaidView.paid).toBe(false)
+    expect(unpaidView.nextStep).toBe('pay')
+
+    const paidCase = { ...unpaidCase, status: 'paid' as const, paid_at: new Date().toISOString(), payment_provider: 'mock' }
+    const paidView = caseService.view(paidCase, [])
+    expect(paidView.paid).toBe(true)
+    expect(paidView.nextStep).toBe('upload')
   })
 
   it('does not throw 402 on setContractStatus for unpaid cases', async () => {
