@@ -122,22 +122,33 @@ export default function ReportFlow() {
     }
   }, [caseId]);
 
-  // Stripe redirect back: confirm the payment, then load the case
+  const confirmedSessionRef = useRef<string | null>(null);
+
+  // Stripe redirect back: exactly one component handles Stripe Checkout session confirmation
   useEffect(() => {
     if (!caseId) return;
     const sessionId = sp?.get("session_id");
+    if (!sessionId) return;
+    // Prevent duplicate confirmation requests for the same session
+    if (confirmedSessionRef.current === sessionId) return;
+    confirmedSessionRef.current = sessionId;
+
     (async () => {
-      if (sessionId) {
-        try {
-          const res = await fairexit.stripeConfirm(caseId, { sessionId });
-          if (res?.paid && !res?.case?.email) {
+      try {
+        const res = await fairexit.stripeConfirm(caseId, { sessionId });
+        // Only open the customer modal after backend confirms payment was successful
+        if (res?.paid) {
+          if (!res?.case?.email) {
             setCustomerModalOpen(true);
           }
-        } catch (e) {
-          setError(errText(e));
+        } else {
+          setError("Payment confirmation was unsuccessful. Please check with your bank or contact support.");
         }
+      } catch (e) {
+        setError(errText(e));
+      } finally {
+        await refresh();
       }
-      await refresh();
     })();
   }, [caseId, sp, refresh]);
 
@@ -349,9 +360,12 @@ function PayStep({ cs, cfg, onDone }: { cs: any; cfg: any; onDone: () => void })
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const cur = cs.country === "US" ? "USD" : "CAD";
-  const mock = cfg?.payments?.mode === "mock";
+  const rawMode = cfg?.payments?.mode;
+  const isResolved = rawMode === "mock" || rawMode === "live";
+  const mock = rawMode === "mock";
 
   async function pay() {
+    if (!isResolved) return setErr("Payment configuration is still loading. Please wait a moment.");
     if (!/.+@.+\..+/.test(email)) return setErr("Enter a valid email so we can send your report.");
     if (!terms) return setErr("Tick the box to accept the terms.");
     setBusy(true); setErr("");
@@ -378,7 +392,7 @@ function PayStep({ cs, cfg, onDone }: { cs: any; cfg: any; onDone: () => void })
         className="w-full min-h-[44px] rounded-xl border border-[#d5dde4] px-3 mb-3" placeholder="you@example.com" />
       <label className="flex gap-2 text-[13.5px] mb-2 items-start"><input type="checkbox" className="mt-1" checked={remind} onChange={(e) => setRemind(e.target.checked)} /> Remind me before my deadline</label>
       <label className="flex gap-2 text-[13.5px] mb-4 items-start"><input type="checkbox" className="mt-1" checked={terms} onChange={(e) => setTerms(e.target.checked)} /> I agree to the <NextLink href="/legal" className="underline text-[#0c8f72]">terms and privacy policy</NextLink>. FairExit gives information, not legal advice.</label>
-      <Btn onClick={pay} disabled={busy} className="w-full">{busy ? "Working…" : `Pay $59.00 ${cur} + applicable tax →`}</Btn>
+      <Btn onClick={pay} disabled={busy || !isResolved} className="w-full">{!isResolved ? "Connecting to checkout…" : busy ? "Working…" : `Pay $59.00 ${cur} + applicable tax →`}</Btn>
       {mock && <p className="text-[12px] text-[#b07a00] mt-2">Test mode: no card is charged (PAYMENTS_MODE=mock).</p>}
       <ErrorBox text={err} />
     </Card>

@@ -4,6 +4,8 @@ import { buildJurisdiction } from '../../src/fairexit/jurisdictions'
 
 describe('US Release Check - Key Number and Consideration Period', () => {
   const usJurisdiction = buildJurisdiction('US-NY')!
+  const caJurisdiction = buildJurisdiction('CA-ON')!
+
   const mockSources = [
     { id: 'SRC-1', rule: 'EEOC OWBPA Q&A', section: 'Consideration period', url: 'https://example.com/owbpa', status: 'verified' as const, checked: '2026-10-01' },
     { id: 'SRC-2', rule: 'NY Labor Law', section: 'Wage Notice', url: 'https://example.com/nylaw', status: 'verified' as const, checked: '2026-10-01' },
@@ -50,16 +52,16 @@ describe('US Release Check - Key Number and Consideration Period', () => {
     citations_used: ['SRC-1'],
   }
 
-  const createMeta = (answers: Record<string, any>, offer: number = 12500): RenderMeta => ({
+  const createMeta = (answers: Record<string, any>, offer: number = 12500, jurisdiction = usJurisdiction): RenderMeta => ({
     reportId: 'RPT-US-TEST',
-    jurisdiction: usJurisdiction,
+    jurisdiction,
     sources: mockSources,
     rulesAsOf: '2026-10-01',
     attestedAt: '2026-10-15T12:00:00Z',
     generatedAt: '2026-10-15T12:05:00Z',
     answers,
     numbers: {
-      country: 'US',
+      country: jurisdiction.country as 'CA' | 'US',
       minimum: { amount: null, weeks: null, none: true },
       range: null,
       offer,
@@ -68,11 +70,13 @@ describe('US Release Check - Key Number and Consideration Period', () => {
     },
   })
 
-  it('1. Individual termination displays 21 days when applicable (age >= 40, individual termination)', () => {
+  // 1. Age 45, individual termination, confirmed ADEA waiver -> 21 days and separate 7-day revocation
+  it('1. Age 45, individual termination, confirmed ADEA waiver -> 21 days and separate 7-day revocation', () => {
     const meta = createMeta({
       age: 45,
       others: 'me',
       layoffType: 'individual',
+      adea_waiver: true,
       offer: 12500,
     })
 
@@ -86,204 +90,392 @@ describe('US Release Check - Key Number and Consideration Period', () => {
     expect(html).toContain('<div class="feature-card-amount">21 days</div>')
     expect(html).toContain('The time federal rules give you to consider a release at your age (21 days for an individual termination)')
 
-    // Must NOT display "21 or 45 days"
-    expect(html).not.toContain('21 or 45 days')
-    // Must NOT display offer amount as key number
-    expect(html).not.toContain('<div class="feature-card-amount">$12,500</div>')
-  })
-
-  it('2. Group termination displays 45 days when applicable (age >= 40, group layoff / exit incentive)', () => {
-    const meta = createMeta({
-      age: 52,
-      others: '50',
-      ended: 'mass',
-      offer: 12500,
-    })
-
-    const groupReport: ReportJson = {
-      ...baseReport,
-      release_check: [
-        {
-          status: 'bad',
-          point: '45 days to consider (group layoff)',
-          detail: 'Under the Older Workers Benefit Protection Act (OWBPA), group reductions in force involving employees 40 years of age or older require at least 45 days to consider.',
-          source_id: 'SRC-1',
-        },
-        {
-          status: 'ok',
-          point: '7 days to revoke',
-          detail: 'Your agreement correctly gives you 7 days after signing to revoke.',
-          source_id: 'SRC-1',
-        },
-      ],
-    }
-
-    const sections = reportSections(groupReport, meta)
-    const releaseSec = sections.find((s) => s.id === 's1_release')
-    expect(releaseSec).toBeDefined()
-    const html = releaseSec!.html
-
-    // Must display "45 days" as the key number
-    expect(html).toContain('<div class="feature-card-kicker">YOUR KEY NUMBER</div>')
-    expect(html).toContain('<div class="feature-card-amount">45 days</div>')
-    expect(html).toContain('The time federal rules give you to consider a release in a group layoff at your age')
-
-    // Must NOT display "21 or 45 days"
-    expect(html).not.toContain('21 or 45 days')
-    // Must NOT display offer amount as key number
-    expect(html).not.toContain('<div class="feature-card-amount">$12,500</div>')
-  })
-
-  it('3. The offer amount never appears as the key number in this section', () => {
-    // Test multiple scenarios where offer amount could have previously leaked as key number:
-    // (a) No deadline specified, age 45, individual
-    const metaA = createMeta({ age: 45, offer: 12500 })
-    const secA = reportSections(baseReport, metaA).find((s) => s.id === 's1_release')!
-    expect(secA.html).not.toContain('<div class="feature-card-amount">$12,500</div>')
-    expect(secA.html).toContain('<div class="feature-card-amount">21 days</div>')
-
-    // (b) Custom offer amount ($250,000), age 50, ordinary group layoff (others: 'few' without qualifying program)
-    const metaB = createMeta({ age: 50, others: 'few', offer: 250000 }, 250000)
-    const secB = reportSections(baseReport, metaB).find((s) => s.id === 's1_release')!
-    expect(secB.html).not.toContain('<div class="feature-card-amount">$250,000</div>')
-    // Ordinary group layoff does NOT assume 45 days; individual termination rules apply (21 days)
-    expect(secB.html).toContain('<div class="feature-card-amount">21 days</div>')
-
-    // (b2) Custom offer amount ($250,000), age 50, qualifying exit incentive / group termination program
-    const metaB2 = createMeta({ age: 50, others: 'few', exit_incentive: true, offer: 250000 }, 250000)
-    const secB2 = reportSections(baseReport, metaB2).find((s) => s.id === 's1_release')!
-    expect(secB2.html).not.toContain('<div class="feature-card-amount">$250,000</div>')
-    expect(secB2.html).toContain('<div class="feature-card-amount">45 days</div>')
-
-    // (c) Age under 40 (age 28) with no statutory OWBPA period and no agreement deadline
-    const metaC = createMeta({ age: 28, others: 'me', offer: 15000 }, 15000)
-    const simpleRcReport: ReportJson = {
-      ...baseReport,
-      release_check: [
-        { status: 'info', point: 'Release scope', detail: 'General waiver of employment claims.', source_id: 'SRC-1' },
-      ],
-    }
-    const secC = reportSections(simpleRcReport, metaC).find((s) => s.id === 's1_release')!
-    // Must NEVER show offer amount as key number
-    expect(secC.html).not.toContain('<div class="feature-card-amount">$15,000</div>')
-    expect(secC.html).not.toContain('YOUR KEY NUMBER')
-  })
-
-  it('4. Existing payment sections still display the correct offer amount', () => {
-    const meta = createMeta({
-      age: 48,
-      others: 'me',
-      offer: 12500,
-    })
-
-    const sections = reportSections(baseReport, meta)
-
-    // Check Section 4.1 "Your offer, at a glance" (s1_glance)
-    const glanceSec = sections.find((s) => s.id === 's1_glance')
-    expect(glanceSec).toBeDefined()
-    expect(glanceSec!.html).toContain('<span class="glance-col-label">They offered</span>')
-    expect(glanceSec!.html).toContain('<span class="glance-col-val bold">$12,500</span>')
-    expect(glanceSec!.html).toContain('<b>$12,500</b>')
-
-    // Check checks section (s1_checks)
-    const checksSec = sections.find((s) => s.id === 's1_checks')
-    expect(checksSec).toBeDefined()
-    expect(checksSec!.html).toContain('$12,500')
-
-    // Check complete HTML render
-    const fullHtml = renderReportHtml(baseReport, meta)
-    expect(fullHtml).toContain('<span class="glance-col-val bold">$12,500</span>')
-    // In full HTML, verify release check card has 21 days and not $12,500
-    expect(fullHtml).toContain('<div class="feature-card-amount">21 days</div>')
-    expect(fullHtml).not.toContain('<div class="feature-card-amount">$12,500</div>')
-  })
-
-  it('5. Revocation period of 7 days is displayed separately from consideration period', () => {
-    const meta = createMeta({
-      age: 42,
-      others: 'me',
-      offer: 10000,
-    })
-
-    const sections = reportSections(baseReport, meta)
-    const releaseSec = sections.find((s) => s.id === 's1_release')!
-    const html = releaseSec.html
-
-    // Consideration period is the primary key number
-    expect(html).toContain('<div class="feature-card-amount">21 days</div>')
-
     // 7-day revocation period is rendered in its own dedicated panel/badge
     expect(html).toContain('class="revocation-panel"')
     expect(html).toContain('REVOCATION PERIOD')
     expect(html).toContain('7 days after signing')
     expect(html).toContain('7 calendar days after you sign')
     expect(html).toContain('separate from the consideration period')
+
+    // Must NOT display "21 or 45 days"
+    expect(html).not.toContain('21 or 45 days')
+    // Must NOT display offer amount as key number
+    expect(html).not.toContain('<div class="feature-card-amount">$12,500</div>')
   })
 
-  it('6. Does not assume every group layoff qualifies for 45 days (requires qualifying program)', () => {
-    // Ordinary layoff where others were let go (e.g. 5 people), but no exit incentive or group program
-    const ordinaryGroupMeta = createMeta({
-      age: 46,
+  // 2. Age 45, ordinary layoff of a few employees -> 21 days
+  it('2. Age 45, ordinary layoff of a few employees -> 21 days', () => {
+    const meta = createMeta({
+      age: 45,
       others: 'few',
       ended: 'layoff',
-      offer: 20000,
+      adea_waiver: true,
+      offer: 12500,
     })
 
-    const secOrdinary = reportSections(baseReport, ordinaryGroupMeta).find((s) => s.id === 's1_release')!
-    // Must NOT assume 45 days without a qualifying group termination program
-    expect(secOrdinary.html).toContain('<div class="feature-card-amount">21 days</div>')
-    expect(secOrdinary.html).not.toContain('<div class="feature-card-amount">45 days</div>')
+    const sections = reportSections(baseReport, meta)
+    const releaseSec = sections.find((s) => s.id === 's1_release')!
+    const html = releaseSec.html
 
-    // Qualifying group program with demographic disclosure (Exhibit A / age list)
-    const qualifyingGroupMeta = createMeta({
-      age: 46,
+    expect(html).toContain('<div class="feature-card-kicker">YOUR KEY NUMBER</div>')
+    expect(html).toContain('<div class="feature-card-amount">21 days</div>')
+    expect(html).not.toContain('<div class="feature-card-amount">45 days</div>')
+    expect(html).toContain('class="revocation-panel"')
+  })
+
+  // 3. Age 45, qualifying group termination program with verified required disclosures -> 45 days and separate 7-day revocation
+  it('3. Age 45, qualifying group termination program with verified required disclosures -> 45 days and separate 7-day revocation', () => {
+    const meta = createMeta({
+      age: 45,
+      others: 'few',
+      group_program: true,
+      disclosures_verified: true,
+      adea_waiver: true,
+      offer: 12500,
+    })
+
+    const sections = reportSections(baseReport, meta)
+    const releaseSec = sections.find((s) => s.id === 's1_release')!
+    const html = releaseSec.html
+
+    expect(html).toContain('<div class="feature-card-kicker">YOUR KEY NUMBER</div>')
+    expect(html).toContain('<div class="feature-card-amount">45 days</div>')
+    expect(html).toContain('qualifying group termination or exit incentive program')
+    expect(html).toContain('class="revocation-panel"')
+    expect(html).toContain('7 days after signing')
+  })
+
+  // 4. Age 45, list: 'Provided' alone -> must not trigger 45 days
+  it('4. Age 45, list: "Provided" alone -> must not trigger 45 days', () => {
+    const meta = createMeta({
+      age: 45,
       others: 'few',
       list: 'Provided',
-      offer: 20000,
+      adea_waiver: true,
+      offer: 12500,
     })
 
-    const secQualifying = reportSections(baseReport, qualifyingGroupMeta).find((s) => s.id === 's1_release')!
-    expect(secQualifying.html).toContain('<div class="feature-card-amount">45 days</div>')
-    expect(secQualifying.html).toContain('qualifying group termination or exit incentive program')
+    const sections = reportSections(baseReport, meta)
+    const releaseSec = sections.find((s) => s.id === 's1_release')!
+    const html = releaseSec.html
+
+    expect(html).toContain('<div class="feature-card-amount">21 days</div>')
+    expect(html).not.toContain('<div class="feature-card-amount">45 days</div>')
   })
 
-  it('7. Handles under 40 and missing age appropriately without guessing unsupported statutory periods', () => {
-    // (a) Under 40 (age 32) with no document deadline
-    const under40MetaNoDeadline = createMeta({ age: 32, others: 'me' })
-    const simpleReport: ReportJson = {
+  // 5. Age 45, Exhibit A mentioned in report text alone -> must not trigger 45 days
+  it('5. Age 45, Exhibit A mentioned in report text alone -> must not trigger 45 days', () => {
+    const reportWithExhibitA: ReportJson = {
       ...baseReport,
-      release_check: [
-        { status: 'info', point: 'Release scope', detail: 'General waiver of employment claims.', source_id: 'SRC-1' },
+      glance: 'Your employer provided an Exhibit A referencing employee demographic disclosures.',
+      checks: [
+        {
+          topic: 'Exhibit A',
+          letter_says: 'Exhibit A attached',
+          contract_says: 'None',
+          rule_says: 'Disclosure schedule',
+          status: 'info',
+          why: 'Exhibit A demographic disclosure schedule was provided.',
+          source_id: 'SRC-1',
+          from_answers: false,
+        },
       ],
     }
-    const secUnder40NoDeadline = reportSections(simpleReport, under40MetaNoDeadline).find((s) => s.id === 's1_release')!
-    expect(secUnder40NoDeadline.html).not.toContain('YOUR KEY NUMBER')
-    expect(secUnder40NoDeadline.html).not.toContain('21 days')
-    expect(secUnder40NoDeadline.html).not.toContain('45 days')
-    expect(secUnder40NoDeadline.html).not.toContain('revocation-panel')
 
-    // (b) Under 40 (age 32) with a contractual deadline in document (14 days)
-    const under40MetaWithDeadline = createMeta({ age: 32, others: 'me', days_to_decide: 14 })
-    const secUnder40WithDeadline = reportSections(simpleReport, under40MetaWithDeadline).find((s) => s.id === 's1_release')!
-    expect(secUnder40WithDeadline.html).toContain('AGREEMENT DEADLINE')
-    expect(secUnder40WithDeadline.html).toContain('<div class="feature-card-amount">14 days</div>')
-    expect(secUnder40WithDeadline.html).toContain('Because you are under 40, statutory consideration periods under federal OWBPA rules do not apply')
-    // No statutory 7-day ADEA revocation for under 40
-    expect(secUnder40WithDeadline.html).not.toContain('revocation-panel')
+    const meta = createMeta({
+      age: 45,
+      others: 'few',
+      adea_waiver: true,
+      offer: 12500,
+    })
 
-    // (c) Missing age with no document deadline
-    const missingAgeMetaNoDeadline = createMeta({ others: 'me' })
-    const secMissingAgeNoDeadline = reportSections(simpleReport, missingAgeMetaNoDeadline).find((s) => s.id === 's1_release')!
-    expect(secMissingAgeNoDeadline.html).not.toContain('YOUR KEY NUMBER')
-    expect(secMissingAgeNoDeadline.html).not.toContain('21 days')
-    expect(secMissingAgeNoDeadline.html).not.toContain('45 days')
+    const sections = reportSections(reportWithExhibitA, meta)
+    const releaseSec = sections.find((s) => s.id === 's1_release')!
+    const html = releaseSec.html
 
-    // (d) Missing age with document deadline (21 days)
-    const missingAgeMetaWithDeadline = createMeta({ others: 'me', days_to_decide: 21 })
-    const secMissingAgeWithDeadline = reportSections(simpleReport, missingAgeMetaWithDeadline).find((s) => s.id === 's1_release')!
-    expect(secMissingAgeWithDeadline.html).toContain('AGREEMENT DEADLINE')
-    expect(secMissingAgeWithDeadline.html).toContain('<div class="feature-card-amount">21 days</div>')
-    expect(secMissingAgeWithDeadline.html).toContain('Federal statutory consideration periods (21 days for individual terminations or 45 days for group programs) apply if you are age 40 or older')
+    expect(html).toContain('<div class="feature-card-amount">21 days</div>')
+    expect(html).not.toContain('<div class="feature-card-amount">45 days</div>')
+  })
+
+  // 6. Age 45, generated release-check text mentioning 45 days alone -> must not trigger 45 days
+  it('6. Age 45, generated release-check text mentioning 45 days alone -> must not trigger 45 days', () => {
+    const reportWith45Check: ReportJson = {
+      ...baseReport,
+      release_check: [
+        {
+          status: 'bad',
+          point: '45 days to consider',
+          detail: 'Under OWBPA rules, group layoffs require 45 days to consider.',
+          source_id: 'SRC-1',
+        },
+      ],
+    }
+
+    const meta = createMeta({
+      age: 45,
+      others: 'few',
+      adea_waiver: true,
+      offer: 12500,
+    })
+
+    const sections = reportSections(reportWith45Check, meta)
+    const releaseSec = sections.find((s) => s.id === 's1_release')!
+    const html = releaseSec.html
+
+    // Circular release_check text must not trigger 45 days; falls back to 21 days
+    expect(html).toContain('<div class="feature-card-amount">21 days</div>')
+    expect(html).not.toContain('<div class="feature-card-amount">45 days</div>')
+  })
+
+  // Clean report for non-OWBPA tests where release_check does not contain OWBPA-specific detail text
+  const reportWithoutOwbpa: ReportJson = {
+    ...baseReport,
+    release_check: [
+      {
+        status: 'info',
+        point: 'General release',
+        detail: 'Agreement contains a release of claims.',
+        source_id: 'SRC-1',
+      },
+    ],
+  }
+
+  // 7. Age 45, general release present but ADEA waiver not established -> must not assert OWBPA periods
+  it('7. Age 45, general release present but ADEA waiver not established -> must not assert OWBPA periods', () => {
+    const meta = createMeta({
+      age: 45,
+      release: 'yes',
+      others: 'me',
+      offer: 12500,
+    })
+
+    const sections = reportSections(reportWithoutOwbpa, meta)
+    const releaseSec = sections.find((s) => s.id === 's1_release')!
+    const html = releaseSec.html
+
+    // When ADEA waiver is not established, do not assert OWBPA statutory periods or 7-day revocation
+    expect(html).not.toContain('YOUR KEY NUMBER')
+    expect(html).not.toContain('<div class="feature-card-amount">21 days</div>')
+    expect(html).not.toContain('<div class="feature-card-amount">45 days</div>')
+    expect(html).not.toContain('21 days')
+    expect(html).not.toContain('45 days')
+    expect(html).not.toContain('revocation-panel')
+  })
+
+  // 8. Age 35, release present -> no OWBPA statutory period or 7-day revocation panel
+  it('8. Age 35, release present -> no OWBPA statutory period or 7-day revocation panel', () => {
+    const meta = createMeta({
+      age: 35,
+      release: 'yes',
+      others: 'me',
+      adea_waiver: true,
+      offer: 12500,
+    })
+
+    const sections = reportSections(reportWithoutOwbpa, meta)
+    const releaseSec = sections.find((s) => s.id === 's1_release')!
+    const html = releaseSec.html
+
+    expect(html).not.toContain('YOUR KEY NUMBER')
+    expect(html).not.toContain('<div class="feature-card-amount">21 days</div>')
+    expect(html).not.toContain('<div class="feature-card-amount">45 days</div>')
+    expect(html).not.toContain('21 days')
+    expect(html).not.toContain('45 days')
+    expect(html).not.toContain('revocation-panel')
+  })
+
+  // 9. Unknown or ambiguous age -> no guessed statutory period
+  it('9. Unknown or ambiguous age -> no guessed statutory period', () => {
+    // (a) Ambiguous text "under 40"
+    const metaUnder40Text = createMeta({
+      age: 'under 40',
+      release: 'yes',
+      others: 'me',
+      adea_waiver: true,
+      offer: 12500,
+    })
+    const secUnder40 = reportSections(reportWithoutOwbpa, metaUnder40Text).find((s) => s.id === 's1_release')!
+    expect(secUnder40.html).not.toContain('YOUR KEY NUMBER')
+    expect(secUnder40.html).not.toContain('<div class="feature-card-amount">21 days</div>')
+    expect(secUnder40.html).not.toContain('21 days')
+    expect(secUnder40.html).not.toContain('45 days')
+    expect(secUnder40.html).not.toContain('revocation-panel')
+
+    // (b) Text "unknown"
+    const metaUnknown = createMeta({
+      age: 'unknown',
+      release: 'yes',
+      others: 'me',
+      adea_waiver: true,
+      offer: 12500,
+    })
+    const secUnknown = reportSections(reportWithoutOwbpa, metaUnknown).find((s) => s.id === 's1_release')!
+    expect(secUnknown.html).not.toContain('YOUR KEY NUMBER')
+    expect(secUnknown.html).not.toContain('<div class="feature-card-amount">21 days</div>')
+    expect(secUnknown.html).not.toContain('21 days')
+    expect(secUnknown.html).not.toContain('45 days')
+    expect(secUnknown.html).not.toContain('revocation-panel')
+
+    // (c) Omitted age
+    const metaMissing = createMeta({
+      release: 'yes',
+      others: 'me',
+      adea_waiver: true,
+      offer: 12500,
+    })
+    const secMissing = reportSections(reportWithoutOwbpa, metaMissing).find((s) => s.id === 's1_release')!
+    expect(secMissing.html).not.toContain('YOUR KEY NUMBER')
+    expect(secMissing.html).not.toContain('<div class="feature-card-amount">21 days</div>')
+    expect(secMissing.html).not.toContain('21 days')
+    expect(secMissing.html).not.toContain('45 days')
+    expect(secMissing.html).not.toContain('revocation-panel')
+  })
+
+  // 10. Agreement explicitly specifies 14 days -> show 14 days as AGREEMENT DEADLINE when supported by the agreement
+  it('10. Agreement explicitly specifies 14 days -> show 14 days as AGREEMENT DEADLINE when supported by the agreement', () => {
+    // Under-40 employee whose agreement specifies 14 days
+    const meta = createMeta({
+      age: 35,
+      days_to_decide: 14,
+      release: 'yes',
+      others: 'me',
+      offer: 12500,
+    })
+
+    const sections = reportSections(baseReport, meta)
+    const releaseSec = sections.find((s) => s.id === 's1_release')!
+    const html = releaseSec.html
+
+    expect(html).toContain('<div class="feature-card-kicker">AGREEMENT DEADLINE</div>')
+    expect(html).toContain('<div class="feature-card-amount">14 days</div>')
+    expect(html).toContain('The review deadline specified in your agreement. Because you are under 40, statutory consideration periods under federal OWBPA rules do not apply')
+    // No statutory 7-day ADEA revocation for under 40 or purely contractual deadlines
+    expect(html).not.toContain('revocation-panel')
+  })
+
+  // 11. Missing or incomplete group-program disclosures -> must not trigger 45 days
+  it('11. Missing or incomplete group-program disclosures -> must not trigger 45 days', () => {
+    // Group program indicated, but disclosures marked incomplete
+    const metaIncomplete = createMeta({
+      age: 45,
+      others: 'few',
+      group_program: true,
+      disclosures_verified: false,
+      adea_waiver: true,
+      offer: 12500,
+    })
+
+    const secIncomplete = reportSections(baseReport, metaIncomplete).find((s) => s.id === 's1_release')!
+    expect(secIncomplete.html).toContain('<div class="feature-card-amount">21 days</div>')
+    expect(secIncomplete.html).not.toContain('<div class="feature-card-amount">45 days</div>')
+
+    // Group program indicated, but owbpa_disclosures explicitly 'incomplete'
+    const metaExplicitIncomplete = createMeta({
+      age: 45,
+      others: 'few',
+      group_program: true,
+      owbpa_disclosures: 'incomplete',
+      adea_waiver: true,
+      offer: 12500,
+    })
+
+    const secExplicit = reportSections(baseReport, metaExplicitIncomplete).find((s) => s.id === 's1_release')!
+    expect(secExplicit.html).toContain('<div class="feature-card-amount">21 days</div>')
+    expect(secExplicit.html).not.toContain('<div class="feature-card-amount">45 days</div>')
+  })
+
+  // 12. Offer amounts must never appear as the key number
+  it('12. Offer amounts must never appear as the key number', () => {
+    // (a) Age 45 with offer $12,500
+    const metaA = createMeta({ age: 45, adea_waiver: true, offer: 12500 })
+    const secA = reportSections(baseReport, metaA).find((s) => s.id === 's1_release')!
+    expect(secA.html).not.toContain('<div class="feature-card-amount">$12,500</div>')
+    expect(secA.html).toContain('<div class="feature-card-amount">21 days</div>')
+
+    // (b) Custom offer amount ($250,000), qualifying group program
+    const metaB = createMeta(
+      { age: 50, others: 'few', group_program: true, disclosures_verified: true, adea_waiver: true, offer: 250000 },
+      250000
+    )
+    const secB = reportSections(baseReport, metaB).find((s) => s.id === 's1_release')!
+    expect(secB.html).not.toContain('<div class="feature-card-amount">$250,000</div>')
+    expect(secB.html).toContain('<div class="feature-card-amount">45 days</div>')
+
+    // (c) Payment sections still display the correct offer amount
+    const glanceSec = reportSections(baseReport, metaA).find((s) => s.id === 's1_glance')!
+    expect(glanceSec.html).toContain('<span class="glance-col-val bold">$12,500</span>')
+
+    // (d) Complete HTML render
+    const fullHtml = renderReportHtml(baseReport, metaA)
+    expect(fullHtml).toContain('<span class="glance-col-val bold">$12,500</span>')
+    expect(fullHtml).toContain('<div class="feature-card-amount">21 days</div>')
+    expect(fullHtml).not.toContain('<div class="feature-card-amount">$12,500</div>')
+  })
+
+  // 13. Canadian reports must remain unchanged
+  it('13. Canadian reports must remain unchanged', () => {
+    const caReport: ReportJson = {
+      cover: {
+        name_line: 'Alex Tremblay',
+        role_line: 'Operations Lead · 10 years',
+        place_line: 'Ontario',
+      },
+      glance: 'Your employer offered you $40,000 in exchange for signing a release.',
+      confirmed_line: 'Built on the details you confirmed on October 15, 2026.',
+      checks: [
+        {
+          topic: 'Notice you already worked',
+          letter_says: 'None',
+          contract_says: 'None',
+          rule_says: 'Statutory minimum',
+          status: 'ok',
+          why: 'Notice calculation verified.',
+          source_id: 'SRC-1',
+          from_answers: false,
+        },
+      ],
+      factors: {
+        service: 0.8,
+        age: 0.7,
+        job_level: 0.6,
+        similar_jobs: 0.5,
+        reasons: {
+          service: '10 years of service is substantial',
+          age: 'Age 50 is a significant factor',
+          job_level: 'Management role',
+          similar_jobs: 'Moderate availability',
+        },
+      },
+      myths: [],
+      clauses: [],
+      questions: ['Ask about vacation pay payout.'],
+      next_steps: ['Do not sign before reviewing.'],
+      citations_used: ['SRC-1'],
+    }
+
+    const caMeta = createMeta(
+      {
+        province: 'ON',
+        age: 50,
+        years: 10,
+        salary: 100000,
+        offer: 40000,
+      },
+      40000,
+      caJurisdiction
+    )
+
+    const sections = reportSections(caReport, caMeta)
+
+    // Canadian reports have factors section, NEVER a release_check section
+    const releaseSec = sections.find((s) => s.id === 's1_release')
+    expect(releaseSec).toBeUndefined()
+
+    const factorsSec = sections.find((s) => s.id === 's1_factors')
+    expect(factorsSec).toBeDefined()
+    expect(factorsSec!.html).toContain('What lifts your <i>range.</i>')
+    expect(factorsSec!.html).not.toContain('YOUR KEY NUMBER')
+    expect(factorsSec!.html).not.toContain('OWBPA')
+    expect(factorsSec!.html).not.toContain('revocation-panel')
   })
 })
-

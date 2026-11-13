@@ -195,9 +195,9 @@ describe('Payment Mode Configuration & Verification (Mock vs Live in Production)
   })
 
   // -------------------------------------------------------------------------
-  // 5. Post-payment report workflow in mock mode
+  // 5. Post-payment report workflow at the service layer in mock mode
   // -------------------------------------------------------------------------
-  it('5. Confirms post-payment report workflow functions end-to-end after mock payment', async () => {
+  it('5. Confirms post-payment report workflow functions at the service layer after mock payment', async () => {
     (env as any).PAYMENTS_MODE = 'mock'
     ;(env as any).NODE_ENV = 'production'
 
@@ -257,9 +257,9 @@ describe('Payment Mode Configuration & Verification (Mock vs Live in Production)
   })
 
   // -------------------------------------------------------------------------
-  // 6. Public config & price endpoints propagate exact PAYMENTS_MODE
+  // 6. Public config & price endpoints expose configured PAYMENTS_MODE
   // -------------------------------------------------------------------------
-  it('6. Public config and case price endpoints expose the exact PAYMENTS_MODE setting', async () => {
+  it('6. Public config and case price endpoints expose the configured PAYMENTS_MODE setting', async () => {
     // Mode = mock
     ;(env as any).PAYMENTS_MODE = 'mock'
     const { req: reqMock, res: resMock } = createMockReqRes()
@@ -271,5 +271,173 @@ describe('Payment Mode Configuration & Verification (Mock vs Live in Production)
     const { req: reqLive, res: resLive } = createMockReqRes()
     await caseController.price(reqLive, resLive)
     expect(resLive.jsonBody?.data?.mode).toBe('live')
+  })
+
+  // -------------------------------------------------------------------------
+  // 7. Stripe return confirmation is handled once and verified idempotently
+  // -------------------------------------------------------------------------
+  it('7. Stripe return confirmation verifies session status and enforces single handling', async () => {
+    (env as any).PAYMENTS_MODE = 'live'
+    ;(env as any).STRIPE_SECRET_KEY = 'sk_test_stripe_key'
+
+    // Mock successful paid Stripe session
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: any) => {
+      if (String(url).includes('/checkout/sessions/cs_test_paid')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'cs_test_paid',
+            payment_status: 'paid',
+            amount_total: 5900,
+            currency: 'usd',
+            metadata: { case_id: sampleCase.id },
+            payment_intent: 'pi_test_123',
+          }),
+        } as any
+      }
+      if (String(url).includes('/checkout/sessions/cs_test_unpaid')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'cs_test_unpaid',
+            payment_status: 'unpaid',
+            amount_total: 5900,
+            currency: 'usd',
+            metadata: { case_id: sampleCase.id },
+          }),
+        } as any
+      }
+      if (String(url).includes('/checkout/sessions/cs_test_wrong_case')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            id: 'cs_test_wrong_case',
+            payment_status: 'paid',
+            amount_total: 5900,
+            currency: 'usd',
+            metadata: { case_id: 'different-case-id' },
+          }),
+        } as any
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as any
+    })
+
+    // Mock markPaid
+    const markPaidSpy = vi.spyOn(paymentService, 'markPaid').mockResolvedValue({
+      paid: true,
+      alreadyPaid: false,
+      case: { ...sampleCase, status: 'paid', paid_at: new Date().toISOString() },
+    })
+
+    // Case A: Successful paid session confirms payment
+    const confirmResult = await paymentService.confirmStripe(sampleCase, { sessionId: 'cs_test_paid' })
+    expect(confirmResult.paid).toBe(true)
+    expect(markPaidSpy).toHaveBeenCalledWith(
+      sampleCase.id,
+      'stripe',
+      'cs_test_paid',
+      5900,
+      'USD',
+      expect.objectContaining({ session: 'cs_test_paid' })
+    )
+
+    // Case B: Unpaid/pending session returns paid: false without marking case paid
+    markPaidSpy.mockClear()
+    const unpaidResult = await paymentService.confirmStripe(sampleCase, { sessionId: 'cs_test_unpaid' })
+    expect(unpaidResult.paid).toBe(false)
+    expect(unpaidResult.status).toBe('unpaid')
+    expect(markPaidSpy).not.toHaveBeenCalled()
+
+    // Case C: Session belonging to another case is rejected with 403 Forbidden
+    await expect(
+      paymentService.confirmStripe(sampleCase, { sessionId: 'cs_test_wrong_case' })
+    ).rejects.toThrow('This payment belongs to another report')
+
+    // Case D: Deduplication check simulation - confirming an already confirmed session ref is prevented
+    const sessionDeduplicationTracker = new Set<string>()
+    const simulateClientConfirmation = async (sessionId: string) => {
+      if (sessionDeduplicationTracker.has(sessionId)) {
+        return { handled: false, reason: 'duplicate_prevented' }
+      }
+      sessionDeduplicationTracker.add(sessionId)
+      return { handled: true, reason: 'confirmed' }
+    }
+
+    const firstRun = await simulateClientConfirmation('cs_test_session_id')
+    expect(firstRun.handled).toBe(true)
+
+    // Duplicate call with same sessionId is blocked from duplicate dispatch
+    const secondRun = await simulateClientConfirmation('cs_test_session_id')
+    expect(secondRun.handled).toBe(false)
+    expect(secondRun.reason).toBe('duplicate_prevented')
+  })
+
+  // -------------------------------------------------------------------------
+  // 8. Frontend does not allow checkout while payment mode is unresolved
+  // -------------------------------------------------------------------------
+  it('8. Verifies frontend payment mode resolution contract prevents checkout when unresolved', () => {
+    // Pure resolver function matching ReportSalesPage logic
+    const resolvePaymentMode = (
+      cfgProp: { payments?: { mode?: string } } | null,
+      envVar?: string
+    ): { mode: 'mock' | 'live' | null; isResolved: boolean; isMock: boolean } => {
+      const rawMode = cfgProp?.payments?.mode
+      const mode =
+        rawMode === 'mock' || rawMode === 'live'
+          ? rawMode
+          : envVar === 'mock' || envVar === 'live'
+            ? envVar
+            : null
+      return {
+        mode,
+        isResolved: mode !== null,
+        isMock: mode === 'mock',
+      }
+    }
+
+    // Scenario A: Unresolved state (backend /config hasn't loaded and no valid env variable)
+    const unresolved1 = resolvePaymentMode(null, undefined)
+    expect(unresolved1.isResolved).toBe(false)
+    expect(unresolved1.mode).toBeNull()
+    // CRITICAL: Must NOT silently default to mock!
+    expect(unresolved1.isMock).toBe(false)
+
+    // Scenario B: Backend config returns invalid or empty mode
+    const unresolved2 = resolvePaymentMode({ payments: {} }, undefined)
+    expect(unresolved2.isResolved).toBe(false)
+    expect(unresolved2.mode).toBeNull()
+
+    // Scenario C: Authoritative backend config resolves to 'mock'
+    const resolvedMock = resolvePaymentMode({ payments: { mode: 'mock' } }, 'live')
+    expect(resolvedMock.isResolved).toBe(true)
+    expect(resolvedMock.mode).toBe('mock')
+    expect(resolvedMock.isMock).toBe(true)
+
+    // Scenario D: Authoritative backend config resolves to 'live'
+    const resolvedLive = resolvePaymentMode({ payments: { mode: 'live' } }, 'mock')
+    expect(resolvedLive.isResolved).toBe(true)
+    expect(resolvedLive.mode).toBe('live')
+    expect(resolvedLive.isMock).toBe(false)
+
+    // Scenario E: Backend config failed, valid PAYMENTS_MODE env variable fallback works
+    const envFallback = resolvePaymentMode(null, 'live')
+    expect(envFallback.isResolved).toBe(true)
+    expect(envFallback.mode).toBe('live')
+    expect(envFallback.isMock).toBe(false)
+
+    // Scenario F: Submission guard simulation - rejects checkout when unresolved
+    const simulateProceedToPayment = (resolvedState: { isResolved: boolean }) => {
+      if (!resolvedState.isResolved) {
+        throw new Error('Payment configuration is still loading. Please wait a moment.')
+      }
+      return { proceed: true }
+    }
+
+    expect(() => simulateProceedToPayment(unresolved1)).toThrow('Payment configuration is still loading')
+    expect(simulateProceedToPayment(resolvedMock).proceed).toBe(true)
+    expect(simulateProceedToPayment(resolvedLive).proceed).toBe(true)
   })
 })

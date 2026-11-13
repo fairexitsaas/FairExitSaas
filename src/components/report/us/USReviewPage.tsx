@@ -1195,58 +1195,69 @@ export default function USReviewPage({
         </div>
       </header>
 
-      {/* ── Stepper Navigation ── */}
+      {/* ── Stepper Navigation (Original FairExit Design) ── */}
       <div className="w-full max-w-[720px] mx-auto px-4 pt-6 pb-2">
-        <div className="relative flex items-center justify-between pb-3">
-          <div
-            className={`absolute left-[15px] right-[15px] top-[9px] rounded-full -z-0 transition-all duration-500 ${
-              isAllConfirmed
-                ? "h-[6px] bg-gradient-to-r from-[#0C8F72] to-[#0EB28D]"
-                : "h-[2px] bg-[#0EB28D]"
-            }`}
-          />
-
-
-          {[
-            { label: "Eligible", done: true },
-            { label: "Basics", done: true },
-            { label: "Money", done: true },
-            { label: "Key questions", done: true },
-            { label: "Details", done: true },
-            { label: "Your results", active: true },
-          ].map((st, i) => (
-            <div key={i} className="relative z-10 flex flex-col items-center">
-              {st.active ? (
-                <div className="relative flex items-center justify-center w-[18px] h-[18px]">
-                  <div className="absolute w-[28px] h-[28px] rounded-full border-[4px] border-[#062C55]/10 pointer-events-none" />
-                  <div className="w-[20px] h-[20px] rounded-full bg-[#062C55] text-white flex items-center justify-center text-[10px] font-extrabold z-10">
-                    ★
-                  </div>
-                </div>
-              ) : (
-                <div
-                  className={`w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-extrabold ${
-                    st.done
-                      ? "bg-[#0EB28D] text-white border border-[#0EB28D]"
-                      : "bg-white text-[#8A96A0] border border-[#D8D3C8]"
+        <div className="mb-4">
+          <ol
+            className="grid grid-cols-6 gap-1.5 list-none m-0 p-0 mb-2 text-center"
+            id="stepsBar"
+          >
+            {[
+              { num: "1", label: "Eligible", done: true },
+              { num: "2", label: "Basics", done: true },
+              { num: "3", label: "Money", done: true },
+              { num: "4", label: "Key questions", done: true },
+              { num: "5", label: "Details", done: true },
+              { num: "★", label: "Your results", active: true },
+            ].map((s) => {
+              const isDone = s.done;
+              const isCur = s.active;
+              return (
+                <li
+                  key={s.label}
+                  className={`relative pt-6 text-[11px] font-semibold transition-colors ${
+                    isDone
+                      ? "text-[#0c8f72]"
+                      : isCur
+                        ? "text-[#062c55] font-extrabold"
+                        : "text-[#a7b0b8]"
                   }`}
                 >
-                  {st.done ? "✓" : ""}
-                </div>
-              )}
+                  <i
+                    className={`absolute top-0 left-1/2 -translate-x-1/2 w-[18px] h-[18px] rounded-full border-[1.5px] flex items-center justify-center not-italic text-[10px] font-extrabold transition-all duration-300 ${
+                      isDone
+                        ? "bg-[#0eb28d] border-[#0eb28d] text-white"
+                        : isCur
+                          ? "bg-[#062c55] border-[#062c55] text-white shadow-[0_0_0_4px_rgba(6,44,85,0.1)] scale-110"
+                          : "bg-white border-[#d3cfc5] text-[#b7b1a6]"
+                    }`}
+                  >
+                    {isDone ? "✓" : s.num}
+                  </i>
+                  <span
+                    className={`block text-[10.5px] sm:text-[11px] leading-[14px] sm:leading-[17px] truncate ${
+                      isCur ? "font-extrabold" : ""
+                    }`}
+                  >
+                    {s.label}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+
+          {/* Progress bar track */}
+          <div className="h-1.5 bg-[#e9e5dc] rounded-full relative mx-2">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-[#0c8f72] to-[#0eb28d] transition-all duration-500 relative"
+              style={{ width: "100%" }}
+            >
               <span
-                className={`font-sans font-[600] text-[11px] leading-[17px] mt-1.5 ${
-                  st.done
-                    ? "text-[#0C8F72]"
-                    : st.active
-                    ? "text-[#062C55] font-extrabold"
-                    : "text-[#8A96A0]"
-                }`}
-              >
-                {st.label}
-              </span>
+                className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-3.5 h-3.5 rounded-full bg-[#0eb28d] border-2 border-white shadow-[0_1px_4px_rgba(6,44,85,0.25)] transition-all duration-500 pointer-events-none"
+                aria-hidden="true"
+              />
             </div>
-          ))}
+          </div>
         </div>
 
         <div className="flex items-center justify-between mt-3 text-[12px] text-[#5A6B78] border-b border-[#E7E4DD] pb-3">

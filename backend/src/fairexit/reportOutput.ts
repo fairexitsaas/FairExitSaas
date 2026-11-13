@@ -1030,19 +1030,28 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     curPage += 1
   } else if (isUS) {
     const rc = r.release_check || []
-    const rcText = rc.map((x) => `${x.point} ${x.detail}`).join(' ')
     // "Your key number": the federal release consideration period (21 or 45 days under OWBPA rules).
     // The severance/offer amount ($12,500 or any amount) must NEVER appear as the key number.
 
     // 1. Parse employee age (ADEA/OWBPA statutory protection applies to employees aged 40 and older)
+    // Accept a validated numeric age; reject ambiguous text (e.g. "under 40", "unknown") or unrelated numbers.
     const rawAge = a.age ?? a.raw?.age ?? m.input?.answers?.age ?? m.input?.confirmed_facts?.rows?.age?.value
     let ageNum: number | null = null
-    if (rawAge !== null && rawAge !== undefined && rawAge !== '') {
-      const match = String(rawAge).match(/\d+/)
-      if (match) {
-        const val = parseInt(match[0], 10)
-        if (!isNaN(val) && val > 0 && val < 120) {
-          ageNum = val
+    if (typeof rawAge === 'number') {
+      if (Number.isInteger(rawAge) && rawAge >= 16 && rawAge <= 120) {
+        ageNum = rawAge
+      }
+    } else if (typeof rawAge === 'string') {
+      const s = rawAge.trim()
+      const isAmbiguous = /^(unknown|unsure|not\s+sure|n\/?a|none|\?)$/i.test(s) ||
+        /\b(under|below|less\s+than|over|above|more\s+than)\b/i.test(s)
+      if (!isAmbiguous) {
+        const match = s.match(/^(?:age\s*)?(\d{1,3})(?:\s*(?:years|yrs|yo|y\.?o\.?|years\s+old))?$/i)
+        if (match) {
+          const val = parseInt(match[1], 10)
+          if (!isNaN(val) && val >= 16 && val <= 120) {
+            ageNum = val
+          }
         }
       }
     }
@@ -1050,61 +1059,190 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     const isOver40 = ageNum !== null && ageNum >= 40
 
     // 2. Document specified review period (if any)
-    const rawDeadline = a.days_to_decide ?? a.deadline ?? a.daysToDecide ?? a.raw?.deadline ?? a.raw?.daysToDecide ?? m.input?.confirmed_facts?.rows?.days_to_decide?.value
-    let docDaysNum: number | null = null
-    if (rawDeadline !== null && rawDeadline !== undefined && rawDeadline !== '') {
-      const match = String(rawDeadline).match(/\d+/)
-      if (match) {
-        const val = parseInt(match[0], 10)
-        if (!isNaN(val) && val > 0 && val < 365) {
-          docDaysNum = val
+    // Parse verified contract deadline from answers, confirmed facts, or Call A facts (NOT from generated release_check text)
+    const parseDeadlineDays = (raw: unknown): number | null => {
+      if (raw === null || raw === undefined) return null
+      if (typeof raw === 'number' && Number.isInteger(raw) && raw > 0 && raw < 365) {
+        return raw
+      }
+      if (typeof raw === 'string') {
+        const s = raw.trim()
+        if (/^(short|mid|full)$/i.test(s)) return null // questionnaire category bucket, not contract days
+        const m = s.match(/^(?:within\s+)?(\d{1,3})(?:\s*days?)?$/i)
+        if (m) {
+          const val = parseInt(m[1], 10)
+          if (!isNaN(val) && val > 0 && val < 365) return val
         }
+      }
+      return null
+    }
+
+    let docDaysNum: number | null = null
+    const deadlineCandidates = [
+      a.days_to_decide,
+      a.daysToDecide,
+      a.raw?.days_to_decide,
+      a.raw?.daysToDecide,
+      a.deadline,
+      a.raw?.deadline,
+      m.input?.confirmed_facts?.rows?.days_to_decide?.value,
+      m.input?.confirmed_facts?.rows?.days_to_decide?.doc_value,
+    ]
+    for (const cand of deadlineCandidates) {
+      const parsed = parseDeadlineDays(cand)
+      if (parsed !== null) {
+        docDaysNum = parsed
+        break
       }
     }
     if (docDaysNum === null) {
-      const docMatch = rcText.match(/(?:given|provided|specifies|grants|allows|has)\s+(\d+)\s+days/i)
-      if (docMatch) {
-        const val = parseInt(docMatch[1], 10)
-        if (!isNaN(val) && val > 0 && val < 365) {
-          docDaysNum = val
+      const cfQuote = m.input?.confirmed_facts?.rows?.days_to_decide?.quote
+      if (typeof cfQuote === 'string') {
+        const qm = cfQuote.match(/\b(\d{1,3})\s+days?\b/i)
+        if (qm) {
+          const val = parseInt(qm[1], 10)
+          if (!isNaN(val) && val > 0 && val < 365) docDaysNum = val
+        }
+      }
+    }
+    if (docDaysNum === null && Array.isArray(m.input?.call_a?.facts)) {
+      const f = m.input.call_a.facts.find((x: any) => x.key === 'days_to_decide')
+      if (f) {
+        const parsedVal = parseDeadlineDays(f.value)
+        if (parsedVal !== null) {
+          docDaysNum = parsedVal
+        } else if (typeof f.quote === 'string') {
+          const qm = f.quote.match(/\b(\d{1,3})\s+days?\b/i)
+          if (qm) {
+            const val = parseInt(qm[1], 10)
+            if (!isNaN(val) && val > 0 && val < 365) docDaysNum = val
+          }
         }
       }
     }
 
     // 3. Release & ADEA waiver applicability
-    const releaseRequested = a.release !== 'no' && (rc.length > 0 || a.release === 'yes')
-    const adeaWaiverApplies = releaseRequested && !/\b(adea (is )?excluded|no adea waiver|does not waive adea|adea claims preserved)\b/i.test(rcText)
+    // Determine ADEA waiver applicability from verified agreement facts or extracted document content.
+    // Do NOT infer an ADEA waiver merely because a general release exists.
+    const isExplicitAdeaExclusion = (text: string) =>
+      /\b(adea (is )?excluded|no adea waiver|does not waive adea|adea claims preserved|excluding adea|except.*adea)\b/i.test(text)
+
+    let adeaWaiverApplies = false
+
+    // (a) Verified answer flags
+    const hasAdeaAnswer = a.adea_waiver === true || a.adea_waiver === 'yes' ||
+      a.adea === 'yes' || a.adea === true ||
+      a.waives_adea === true || a.waives_adea === 'yes' ||
+      a.adea_claims_waived === true || a.adea_claims_waived === 'yes' ||
+      a.raw?.adea_waiver === true || a.raw?.adea === 'yes' || a.raw?.waives_adea === true
+
+    if (hasAdeaAnswer) {
+      adeaWaiverApplies = true
+    }
+
+    // (b) Confirmed facts from review state
+    if (!adeaWaiverApplies && m.input?.confirmed_facts?.rows) {
+      const cfRows = m.input.confirmed_facts.rows
+      const adeaRow = cfRows.adea_waiver || cfRows.adea || cfRows.waives_adea
+      if (adeaRow && (adeaRow.value === 'yes' || adeaRow.value === true)) {
+        adeaWaiverApplies = true
+      } else {
+        const relRow = cfRows.release_required
+        if (relRow) {
+          const relQuote = String(relRow.quote || relRow.doc_value || '')
+          if (isExplicitAdeaExclusion(relQuote)) {
+            adeaWaiverApplies = false
+          } else if (/\b(adea|age discrimination in employment act)\b/i.test(relQuote) &&
+                     /\b(waiv|release|settle|discharge|give up|relinquish)\b/i.test(relQuote)) {
+            adeaWaiverApplies = true
+          }
+        }
+      }
+    }
+
+    // (c) Extracted document facts from Call A
+    if (!adeaWaiverApplies && Array.isArray(m.input?.call_a?.facts)) {
+      for (const f of m.input.call_a.facts) {
+        if (f.key === 'adea_waiver' || f.key === 'adea') {
+          if (f.value === 'yes' || f.value === true || /yes|waived|included/i.test(String(f.value))) {
+            adeaWaiverApplies = true
+            break
+          }
+        }
+        const text = `${f.value || ''} ${f.quote || ''}`
+        if (isExplicitAdeaExclusion(text)) {
+          adeaWaiverApplies = false
+          break
+        }
+        if (
+          /\b(adea|age discrimination in employment act)\b/i.test(text) &&
+          /\b(waiv|release|settle|discharge|give up|relinquish)\b/i.test(text)
+        ) {
+          adeaWaiverApplies = true
+          break
+        }
+      }
+    }
+
+    // (d) Agreement clauses in report
+    if (!adeaWaiverApplies && Array.isArray(r.clauses)) {
+      for (const c of r.clauses) {
+        const text = `${c.title || ''} ${c.what_it_says || ''} ${c.what_it_means || ''}`
+        if (isExplicitAdeaExclusion(text)) {
+          adeaWaiverApplies = false
+          break
+        }
+        if (
+          /\b(adea|age discrimination in employment act)\b/i.test(text) &&
+          /\b(waiv|release|settle|discharge|give up|relinquish)\b/i.test(text)
+        ) {
+          adeaWaiverApplies = true
+          break
+        }
+      }
+    }
+
+    if (adeaWaiverApplies && (a.adea_waiver === false || a.adea === 'no' || a.waives_adea === false)) {
+      adeaWaiverApplies = false
+    }
 
     // 4. Distinguish individual termination from a qualifying group termination program
-    // Do not assume that every group layoff automatically qualifies for the 45-day period.
+    // Do NOT use generated release_check text or disclosure mentions alone as proof.
     const isExplicitIndividual = a.others === 'me' || a.others_laid_off === 'me' || a.layoffType === 'individual' || a.layoff_type === 'individual'
 
-    const hasExitIncentive = a.exit_incentive === true || a.exit_incentive === 'yes' ||
-      a.exitIncentive === true || a.exitIncentive === 'yes' ||
-      a.program === true || a.program === 'yes' ||
-      a.layoffType === 'exit_incentive' || a.layoff_type === 'exit_incentive' ||
-      a.layoffType === 'group_program' || a.layoff_type === 'group_program' ||
-      /\b(exit incentive|voluntary separation program|voluntary retirement program)\b/i.test(rcText)
-
-    const hasOwbpaDisclosures = a.list === 'Provided' || a.list === 'yes' ||
-      a.age_list === 'yes' || a.agesTitlesList === 'Provided' ||
-      /\b(decisional unit|demographic disclosure|exhibit a|ages and job titles|job titles and ages|eligibility factors)\b/i.test(rcText)
-
-    const hasGroupProgramCheck = rc.some((item) =>
-      /\b45 days\b/i.test(item.point) ||
-      (/\b45 days\b/i.test(item.detail) && /\b(group|program|incentive|reduction in force|rif)\b/i.test(item.detail)) ||
-      /\b(group termination program|exit incentive program)\b/i.test(`${item.point} ${item.detail}`)
+    // Verified group program (exit incentive program or group termination program covered by OWBPA)
+    const hasGroupProgram = !isExplicitIndividual && (
+      a.group_program === true || a.group_program === 'yes' ||
+      a.exit_incentive === true || a.exit_incentive === 'yes' ||
+      a.layoffType === 'group_program' || a.layoffType === 'exit_incentive' ||
+      a.layoff_type === 'group_program' || a.layoff_type === 'exit_incentive' ||
+      m.input?.confirmed_facts?.rows?.program_type?.value === 'group_program' ||
+      m.input?.confirmed_facts?.rows?.program_type?.value === 'exit_incentive' ||
+      m.input?.confirmed_facts?.rows?.exit_incentive?.value === 'yes'
     )
 
-    const isQualifyingGroupProgram = !isExplicitIndividual && (
-      hasExitIncentive ||
-      hasOwbpaDisclosures ||
-      hasGroupProgramCheck ||
-      (
-        (a.mass === true || a.mass === 'yes' || a.ended === 'mass' || a.reason === 'mass' || a.how_it_ended === 'mass' || a.others === '50' || a.others_laid_off === '50') &&
-        (a.list === 'Provided' || a.list === 'yes' || hasOwbpaDisclosures || hasGroupProgramCheck)
-      )
+    // Complete OWBPA required program disclosures (decisional unit, eligibility factors, job titles/ages selected & not selected)
+    const disclosuresIncomplete = a.disclosures_verified === false ||
+      a.disclosures_complete === false ||
+      a.owbpa_disclosures === 'incomplete' ||
+      a.owbpa_disclosures === false ||
+      a.disclosures === 'incomplete' ||
+      a.list === 'missing' ||
+      a.age_list === 'missing'
+
+    const hasVerifiedDisclosures = !disclosuresIncomplete && (
+      a.disclosures_verified === true ||
+      a.disclosures_verified === 'yes' ||
+      a.disclosures_complete === true ||
+      a.owbpa_disclosures === 'complete' ||
+      a.owbpa_disclosures === true ||
+      a.disclosures === 'complete' ||
+      Boolean(a.has_decisional_unit && a.has_eligibility_factors && a.has_selected_ages_titles && a.has_unselected_ages_titles) ||
+      m.input?.confirmed_facts?.rows?.owbpa_disclosures?.value === 'complete' ||
+      m.input?.confirmed_facts?.rows?.owbpa_disclosures?.value === 'verified'
     )
+
+    const isQualifyingGroupProgram = hasGroupProgram && hasVerifiedDisclosures
 
     let keyDays: string | null = null
     let keyKicker = 'YOUR KEY NUMBER'
@@ -1131,7 +1269,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         keyDays = null
       }
     } else if (!hasAge) {
-      // Age not specified: do not guess federal statutory periods
+      // Age not specified / unknown / ambiguous: do not guess federal statutory periods
       hasRevocation = false
       if (docDaysNum !== null) {
         keyDays = `${docDaysNum} days`
@@ -1141,7 +1279,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         keyDays = null
       }
     } else {
-      // Age 40+ but ADEA waiver does not apply
+      // Age 40+ but ADEA waiver does not apply or is not established
       hasRevocation = false
       if (docDaysNum !== null) {
         keyDays = `${docDaysNum} days`
@@ -1151,6 +1289,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         keyDays = null
       }
     }
+
     const releaseHtml = `
       <div class="page release-page">
         <div class="section-kicker-bar">

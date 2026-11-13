@@ -59,19 +59,87 @@ export default function ReportSalesPage({
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
 
-  // Payment mode configuration: respects existing PAYMENTS_MODE from backend config or env
-  const [configData, setConfigData] = useState<any>(cfg || null);
+  // Payment mode resolution: unresolved ('loading' | null) until authoritative runtime config is available
+  const [configData, setConfigData] = useState<any>(() => {
+    if (cfg?.payments?.mode === "mock" || cfg?.payments?.mode === "live") {
+      return cfg;
+    }
+    return null;
+  });
+  const [isConfigLoading, setIsConfigLoading] = useState<boolean>(() => {
+    return !(cfg?.payments?.mode === "mock" || cfg?.payments?.mode === "live");
+  });
+  const [configError, setConfigError] = useState<string>("");
 
   useEffect(() => {
-    if (cfg) {
+    // If valid mode is already provided via prop, use it as authoritative
+    if (cfg?.payments?.mode === "mock" || cfg?.payments?.mode === "live") {
       setConfigData(cfg);
-    } else {
-      fairexit.config().then(setConfigData).catch(() => undefined);
+      setIsConfigLoading(false);
+      setConfigError("");
+      return;
     }
+
+    // Otherwise, fetch authoritative runtime config from backend /config
+    let isCancelled = false;
+    setIsConfigLoading(true);
+
+    fairexit
+      .config()
+      .then((res) => {
+        if (isCancelled) return;
+        const mode = res?.payments?.mode;
+        if (mode === "mock" || mode === "live") {
+          setConfigData(res);
+          setIsConfigLoading(false);
+          setConfigError("");
+        } else {
+          // Fallback to existing PAYMENTS_MODE env variable only if valid
+          const envFallback = process.env.PAYMENTS_MODE;
+          if (envFallback === "mock" || envFallback === "live") {
+            setConfigData({ payments: { mode: envFallback } });
+            setIsConfigLoading(false);
+            setConfigError("");
+          } else {
+            // Unresolved mode: do NOT silently default to mock!
+            setConfigData(null);
+            setIsConfigLoading(false);
+            setConfigError("Payment configuration is unavailable. Please refresh the page to continue.");
+          }
+        }
+      })
+      .catch(() => {
+        if (isCancelled) return;
+        // On network/API failure, attempt fallback to existing PAYMENTS_MODE env variable if valid
+        const envFallback = process.env.PAYMENTS_MODE;
+        if (envFallback === "mock" || envFallback === "live") {
+          setConfigData({ payments: { mode: envFallback } });
+          setIsConfigLoading(false);
+          setConfigError("");
+        } else {
+          // Unresolved mode: do NOT silently default to mock!
+          setConfigData(null);
+          setIsConfigLoading(false);
+          setConfigError("Unable to load payment configuration. Please refresh the page to try again.");
+        }
+      });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [cfg]);
 
-  const paymentMode = configData?.payments?.mode || process.env.PAYMENTS_MODE || "mock";
-  const isMockPayment = paymentMode !== "live";
+  // Authoritative payment mode: null when unresolved
+  const rawMode = configData?.payments?.mode;
+  const paymentMode: "mock" | "live" | null =
+    rawMode === "mock" || rawMode === "live"
+      ? rawMode
+      : (process.env.PAYMENTS_MODE === "mock" || process.env.PAYMENTS_MODE === "live"
+        ? process.env.PAYMENTS_MODE
+        : null);
+
+  const isPaymentModeResolved = paymentMode !== null;
+  const isMockPayment = paymentMode === "mock";
 
   // Country detection: check explicit prop, cs object, jurisdiction, stored inputs, or URL params
   const isUS = Boolean(
@@ -261,6 +329,12 @@ export default function ReportSalesPage({
       return;
     }
 
+    // Do not allow proceeding while payment mode is unresolved
+    if (!isPaymentModeResolved) {
+      setPayError(configError || "Payment configuration is still loading. Please wait a moment.");
+      return;
+    }
+
     // Always require accepting all three documents in TermsConditionsModal first
     if (!termsAccepted) {
       setTermsModalOpen(true);
@@ -270,29 +344,13 @@ export default function ReportSalesPage({
     proceedToPayment();
   };
 
-  // Handle return from Stripe redirect in live mode
-  useEffect(() => {
-    const activeCaseId = caseId || cs?.id;
-    if (!activeCaseId) return;
-    const sp = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
-    const sessionId = sp?.get("session_id");
-    if (sessionId && !cs?.paid) {
-      setIsPaying(true);
-      fairexit.stripeConfirm(activeCaseId, { sessionId })
-        .then((res) => {
-          setIsPaying(false);
-          if (res?.paid) {
-            setCustomerModalOpen(true);
-          }
-        })
-        .catch((err) => {
-          setIsPaying(false);
-          setPayError(err instanceof Error ? err.message : "Payment confirmation failed.");
-        });
-    }
-  }, [caseId, cs?.id, cs?.paid]);
-
   const handleDialogPay = async () => {
+    // Prevent checkout submission while payment mode is unresolved
+    if (!isPaymentModeResolved || !paymentMode) {
+      setPayError(configError || "Payment configuration is unavailable. Please refresh and try again.");
+      return;
+    }
+
     setIsPaying(true);
     setPayError("");
     const activeCaseId = caseId || cs?.id;
@@ -1042,6 +1100,13 @@ export default function ReportSalesPage({
                   </span>
                 </label>
 
+                {/* Configuration error if mode is unavailable */}
+                {configError && (
+                  <div className="p-3 bg-[#FBECEB] text-[#A3231F] text-[13px] rounded-lg">
+                    {configError}
+                  </div>
+                )}
+
                 {payError && (
                   <div className="p-3 bg-[#FBECEB] text-[#A3231F] text-[13px] rounded-lg">
                     {payError}
@@ -1051,10 +1116,23 @@ export default function ReportSalesPage({
                 {/* Main Submit Button */}
                 <button
                   type="submit"
-                  disabled={isPaying}
+                  disabled={isPaying || !isPaymentModeResolved}
                   className="w-full h-[55px] rounded-[12px] bg-[#12C79A] hover:bg-[#0EB28D] text-white font-sans font-[800] text-[17.5px] leading-[27px] transition-all shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer flex items-center justify-center disabled:opacity-50"
                 >
-                  {isPaying ? "Preparing checkout…" : "Get my report · $59"}
+                  {!isPaymentModeResolved ? (
+                    isConfigLoading ? (
+                      <span className="flex items-center gap-2">
+                        <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Connecting to checkout…
+                      </span>
+                    ) : (
+                      "Checkout unavailable"
+                    )
+                  ) : isPaying ? (
+                    "Preparing checkout…"
+                  ) : (
+                    "Get my report · $59"
+                  )}
                 </button>
 
                 {/* Subtitle / Guarantees */}
@@ -1294,8 +1372,8 @@ export default function ReportSalesPage({
         onClose={() => setCheckoutDialogOpen(false)}
         email=""
         amount={isUS ? "$59.00 USD" : "$59.00 CAD"}
-        isProcessing={isPaying}
-        errorMessage={payError}
+        isProcessing={isPaying || !isPaymentModeResolved}
+        errorMessage={payError || configError}
         onPay={async () => {
           await handleDialogPay();
         }}
