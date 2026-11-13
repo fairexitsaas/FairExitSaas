@@ -185,6 +185,8 @@ export const caseService = {
       report: row.report_id
         ? { reportId: row.report_id, readyAt: row.report_ready_at, deleteAfter: row.report_delete_after, available: !!row.report }
         : null,
+      hasExtractedDocs: Boolean(row.call_a?.facts && row.call_a.facts.length > 0),
+      extractedFacts: row.call_a?.facts || null,
       attestedAt: row.attested_at,
       createdAt: row.created_at,
       updatedAt: row.updated_at,

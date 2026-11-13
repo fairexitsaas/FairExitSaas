@@ -234,8 +234,23 @@ export default function PaidReportReadyPage({
 
   const roleVal = answers.role || data.role || "Middle management / Senior / Director";
 
-  const rawOffer = Number(answers.offer ?? data.offer ?? 24000);
-  const offerVal = `$${rawOffer >= 1000 ? `${Math.round(rawOffer / 1000)}k` : rawOffer}`;
+  const hasOffer =
+    answers.offer !== undefined &&
+    answers.offer !== null &&
+    answers.offer !== "" &&
+    answers.offer !== "—"
+      ? Number(answers.offer) > 0
+      : typeof data.offer === "number"
+        ? data.offer > 0
+        : Boolean(data.offer && data.offer !== "—");
+
+  const rawOffer = hasOffer ? Number(answers.offer ?? data.offer) : null;
+  const offerVal =
+    rawOffer !== null
+      ? `$${rawOffer >= 1000 ? `${Math.round(rawOffer / 1000)}k` : rawOffer}`
+      : data.documentsExtracted
+        ? "Not in documents"
+        : "From your documents";
 
   const handleDownload = async () => {
     if (onDownload) {
@@ -667,8 +682,17 @@ export default function PaidReportReadyPage({
                   {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
                 </div>
                 <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mt-0.5">
-                  <span className="font-[700]">Your offer {offerVal}</span>
-                  <span className="font-[400]"> — near the floor</span>
+                  {hasOffer ? (
+                    <>
+                      <span className="font-[700]">Your offer {offerVal}</span>
+                      <span className="font-[400]"> — near the floor</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-[700]">Your offer</span>
+                      <span className="font-[400]"> — {data.documentsExtracted ? "not specified in documents" : "will be added from your documents"}</span>
+                    </>
+                  )}
                 </div>
 
                 {/* Enough badge */}

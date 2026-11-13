@@ -6,7 +6,7 @@ import Link from "next/link";
 import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getReportInputs, ReportInputs } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
@@ -550,6 +550,40 @@ export default function USReviewPage({
       } else {
         setHasOfferConflict(false);
       }
+
+      // Sync extracted document facts into storage
+      const fSignBy = facts.find((f: any) => f.key === 'sign_by');
+      const fDays = facts.find((f: any) => f.key === 'days_to_decide');
+      const fRelease = facts.find((f: any) => f.key === 'release_required');
+      const fName = facts.find((f: any) => f.key === 'employee_name');
+      const fEmployer = facts.find((f: any) => f.key === 'employer_name');
+      const dOfferNum = fOffer?.value ? Number(String(fOffer.value).replace(/[^0-9.]/g, '')) : null;
+      const syncUpdates: Partial<ReportInputs> = {
+        documentsExtracted: true,
+        extractionStatus: "success",
+        documentOfferFound: Boolean(dOfferNum && dOfferNum > 0),
+        documentReleaseFound: Boolean(fRelease?.value),
+        documentSignByFound: Boolean(fSignBy?.value || fDays?.value),
+      };
+      if (dOfferNum !== null && dOfferNum > 0) {
+        syncUpdates.offer = dOfferNum;
+        syncUpdates.offerSource = "document";
+      }
+      if (fSignBy?.value) {
+        syncUpdates.signByDays = String(fSignBy.value);
+        syncUpdates.signBySource = "document";
+      } else if (fDays?.value) {
+        syncUpdates.signByDays = `${fDays.value} days to decide`;
+        syncUpdates.signBySource = "document";
+      }
+      if (fDays?.value) syncUpdates.daysToDecide = fDays.value;
+      if (fRelease?.value) {
+        syncUpdates.releaseRequired = String(fRelease.value);
+        syncUpdates.releaseRequiredSource = "document";
+      }
+      if (fName?.value) syncUpdates.employee_name = String(fName.value);
+      if (fEmployer?.value) syncUpdates.employer_name = String(fEmployer.value);
+      saveReportInputs(syncUpdates);
 
       // 2. Process Notice Conflict
       const confNotice = conflicts.find((c: any) => c.key === 'advance_notice');

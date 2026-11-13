@@ -5,7 +5,7 @@ import Link from "next/link";
 import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getReportInputs, ReportInputs } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifySuccess } from "@/lib/notifications";
@@ -184,7 +184,15 @@ export default function ReportUploadPage({
       : String(data.salary)
     : "$110k/yr";
 
-  const offerFormatted = formatDollars(data.offer, 24000);
+  const hasOffer =
+    typeof data.offer === "number"
+      ? data.offer > 0
+      : Boolean(data.offer && data.offer !== "—");
+  const offerFormatted = hasOffer
+    ? formatDollars(data.offer)
+    : data.documentsExtracted
+      ? "Not in documents"
+      : "From your documents";
   const minFormatted = formatDollars(data.statutoryMin, 17000);
   const courtHighFormatted = formatDollars(data.courtAwardHigh, 193000);
 
@@ -218,6 +226,19 @@ export default function ReportUploadPage({
       clearTimeout(autoProceedTimeoutRef.current);
       autoProceedTimeoutRef.current = null;
     }
+
+    // Reset document-derived facts when new files are being added
+    saveReportInputs({
+      documentsExtracted: false,
+      extractionStatus: "none",
+      documentOfferFound: false,
+      documentReleaseFound: false,
+      documentSignByFound: false,
+      signByDays: undefined,
+      releaseRequired: undefined,
+      ...(data.offerSource === "document" ? { offer: undefined } : {}),
+    });
+
     setIsUploading(true);
 
     const activeCaseId = caseId || cs?.id;
@@ -399,6 +420,18 @@ export default function ReportUploadPage({
 
     const targetFile = files.find((f) => f.id === id);
     setFiles((prev) => prev.filter((f) => f.id !== id));
+
+    // Reset document-derived facts when files are removed
+    saveReportInputs({
+      documentsExtracted: false,
+      extractionStatus: "none",
+      documentOfferFound: false,
+      documentReleaseFound: false,
+      documentSignByFound: false,
+      signByDays: undefined,
+      releaseRequired: undefined,
+      ...(data.offerSource === "document" ? { offer: undefined } : {}),
+    });
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId && targetFile?.serverDocId) {
       try {
@@ -1498,8 +1531,17 @@ export default function ReportUploadPage({
                   {data.courtMonths || "15–21 mo"}
                 </div>
                 <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-[12px]">
-                  <span className="font-[700]">Your offer {offerFormatted}</span>{" "}
-                  — near the floor
+                  {hasOffer ? (
+                    <>
+                      <span className="font-[700]">Your offer {offerFormatted}</span>{" "}
+                      — near the floor
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-[700]">Your offer</span>{" "}
+                      — {data.documentsExtracted ? "not specified in documents" : "will be added from your documents"}
+                    </>
+                  )}
                 </div>
 
                 {/* Status pill */}

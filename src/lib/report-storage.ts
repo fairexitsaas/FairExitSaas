@@ -34,6 +34,18 @@ export interface ReportInputs {
   userAnswers?: Record<string, string>;
   fullState?: Record<string, unknown>;
   timestamp?: number;
+
+  // Document-derived fields & tracking (Change 23)
+  offerSource?: "questionnaire" | "document" | "user";
+  signBySource?: "document";
+  releaseRequired?: string;
+  releaseRequiredSource?: "document";
+  daysToDecide?: number | string;
+  documentsExtracted?: boolean;
+  extractionStatus?: "none" | "reading" | "success" | "failed";
+  documentOfferFound?: boolean;
+  documentReleaseFound?: boolean;
+  documentSignByFound?: boolean;
 }
 
 const STORAGE_KEY = "fairexit_temp_report_inputs";
@@ -45,7 +57,7 @@ export const defaultMockReportInputs: ReportInputs = {
   age: 52,
   years: 14,
   salary: 110000,
-  offer: 24000,
+  offer: undefined,
   role: "Middle management / Senior / Director",
   union: "No",
   employment: "Regular employee",
@@ -64,7 +76,8 @@ export const defaultMockReportInputs: ReportInputs = {
   courtAwardHigh: 193000,
   noticeWeeks: 8,
   courtMonths: "15–21 mo",
-  signByDays: "14 days from your last day",
+  signByDays: undefined,
+  documentsExtracted: false,
 };
 
 export function saveReportInputs(data: Partial<ReportInputs>): void {

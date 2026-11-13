@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReportInputs, getReportInputs, saveReportInputs, defaultMockReportInputs } from "@/lib/report-storage";
+import { fairexit } from "@/lib/api/fairexit";
 import {
   ApplePayBadge,
   GooglePayBadge,
@@ -98,6 +99,48 @@ export default function ReportSalesPage({
         "CA";
       const isCaseUS = detectedCountry === "US";
 
+      const facts = cs.extractedFacts || cs.call_a?.facts || [];
+      const hasExtractedDocs = Boolean(
+        cs.hasExtractedDocs ||
+        facts.length > 0 ||
+        stored.documentsExtracted
+      );
+
+      const fOffer = facts.find((f: any) => f.key === "offer_amount");
+      const fSignBy = facts.find((f: any) => f.key === "sign_by");
+      const fDays = facts.find((f: any) => f.key === "days_to_decide");
+      const fRelease = facts.find((f: any) => f.key === "release_required");
+
+      let extractedOffer: number | undefined = undefined;
+      if (fOffer?.value) {
+        const parsed = typeof fOffer.value === "number" ? fOffer.value : parseFloat(String(fOffer.value).replace(/[^0-9.]/g, ""));
+        if (parsed > 0) extractedOffer = parsed;
+      }
+
+      let extractedSignBy: string | undefined = undefined;
+      if (fSignBy?.value) {
+        extractedSignBy = String(fSignBy.value);
+      } else if (fDays?.value) {
+        extractedSignBy = `${fDays.value} days to decide`;
+      }
+
+      const resolvedOffer =
+        extractedOffer !== undefined
+          ? extractedOffer
+          : (cs.offerAmount !== undefined
+              ? cs.offerAmount
+              : (stored.offer !== undefined ? stored.offer : undefined));
+
+      const resolvedSignBy =
+        extractedSignBy !== undefined
+          ? extractedSignBy
+          : (stored.signByDays || undefined);
+
+      const resolvedRelease =
+        fRelease?.value !== undefined
+          ? String(fRelease.value)
+          : (stored.releaseRequired || undefined);
+
       const updated: ReportInputs = {
         ...stored,
         country: isCaseUS ? "US" : "CA",
@@ -105,7 +148,11 @@ export default function ReportSalesPage({
         province: isCaseUS ? (cs.region || stored.state || stored.province) : (cs.region || stored.province),
         provinceName: jurisdiction.name || (isCaseUS ? stored.state : stored.provinceName),
         state: isCaseUS ? (jurisdiction.name || cs.region || stored.state) : undefined,
-        offer: cs.offerAmount !== undefined ? cs.offerAmount : stored.offer,
+        offer: resolvedOffer,
+        signByDays: resolvedSignBy,
+        releaseRequired: resolvedRelease,
+        daysToDecide: fDays?.value ? (fDays.value as number | string) : stored.daysToDecide,
+        documentsExtracted: hasExtractedDocs,
         salary: cs.annualSalary !== undefined ? cs.annualSalary : stored.salary,
         years: cs.tenureYears !== undefined ? cs.tenureYears : stored.years,
         age: cs.age !== undefined ? cs.age : stored.age,
@@ -120,7 +167,35 @@ export default function ReportSalesPage({
       setData(stored);
       if (stored.email && !email) setEmail(stored.email);
     }
-  }, [cs, country]);
+
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      fairexit.getExtractedFacts(activeCaseId).then((res: any) => {
+        if (res?.facts && res.facts.length > 0) {
+          const fOffer = res.facts.find((f: any) => f.key === "offer_amount");
+          const fSignBy = res.facts.find((f: any) => f.key === "sign_by");
+          const fDays = res.facts.find((f: any) => f.key === "days_to_decide");
+          const fRelease = res.facts.find((f: any) => f.key === "release_required");
+
+          setData((prev) => {
+            const updates: Partial<ReportInputs> = { documentsExtracted: true };
+            if (fOffer?.value) {
+              const num = typeof fOffer.value === "number" ? fOffer.value : parseFloat(String(fOffer.value).replace(/[^0-9.]/g, ""));
+              if (num > 0) updates.offer = num;
+            }
+            if (fSignBy?.value) {
+              updates.signByDays = String(fSignBy.value);
+            } else if (fDays?.value) {
+              updates.signByDays = `${fDays.value} days to decide`;
+            }
+            if (fRelease?.value) updates.releaseRequired = String(fRelease.value);
+            if (fDays?.value) updates.daysToDecide = fDays.value as number | string;
+            return { ...prev, ...updates };
+          });
+        }
+      }).catch(() => {});
+    }
+  }, [cs, country, caseId]);
 
   const toggleFaq = (idx: number) => {
     setOpenFaq((prev) => ({ ...prev, [idx]: !prev[idx] }));
@@ -144,7 +219,9 @@ export default function ReportSalesPage({
     return `$${num.toLocaleString()}`;
   };
 
-  const offerFormatted = data.offer ? formatK(data.offer) : (isUS ? "—" : "$24k");
+  const hasExtractedDocs = Boolean(data.documentsExtracted);
+  const hasOffer = typeof data.offer === "number" ? data.offer > 0 : Boolean(data.offer && data.offer !== "—");
+  const offerFormatted = hasOffer ? formatK(data.offer) : "—";
   const minFormatted = isUS ? "None" : formatK(data.statutoryMin, 17000);
   const courtLowFormatted = formatK(data.courtAwardLow, 138000);
   const courtHighFormatted = formatK(data.courtAwardHigh, 193000);
@@ -456,14 +533,18 @@ export default function ReportSalesPage({
             <h1 suppressHydrationWarning className="font-serif font-[500] text-[22px] sm:text-[24px] leading-[27px] text-[#062C55] tracking-[-0.5px] mb-2.5">
               {isUS
                 ? "Your offer, organized — before you sign."
-                : `Your offer is ${offerFormatted}. Courts often award people with a profile like yours ${courtRangeFormatted}.`}
+                : hasOffer
+                  ? `Your offer is ${offerFormatted}. Courts often award people with a profile like yours ${courtRangeFormatted}.`
+                  : `Courts often award people with a profile like yours ${courtRangeFormatted}.`}
             </h1>
 
             {/* Subtitle */}
             <p className="font-sans font-normal text-[14.5px] sm:text-[15px] leading-[24px] text-[#5A6B78] mb-6">
               {isUS
                 ? "Your report turns your separation agreement into plain English: your terms, your deadlines, and the questions to ask before you sign."
-                : "That gap is what your report helps you talk about: what's in your offer, what it leaves out, and exactly what to ask before you sign."}
+                : hasOffer
+                  ? "That gap is what your report helps you talk about: what's in your offer, what it leaves out, and exactly what to ask before you sign."
+                  : "Your report shows what applies to you: what to look for in your severance package, and exactly what to ask before you sign."}
             </p>
 
             {/* ── VISUAL RANGE BAR CARD (CA only - US hides dollar range) ── */}
@@ -471,16 +552,18 @@ export default function ReportSalesPage({
               <div className="border border-[#E7E4DD] rounded-[14px] p-4 sm:p-5 mb-5 bg-white">
                 {/* Range indicator track */}
                 <div className="relative pt-6 pb-2">
-                  {/* Floating offer pin/badge */}
-                  <div
-                    className="absolute top-0 transform -translate-x-1/2 flex flex-col items-center z-20 pointer-events-none"
-                    style={{ left: "28%" }}
-                  >
-                    <div className="px-2.5 py-0.5 bg-[#062C55] rounded-[6px] text-white font-sans font-[800] text-[11.5px] leading-[18px] whitespace-nowrap shadow-xs">
-                      Your offer · <span suppressHydrationWarning>{offerFormatted}</span>
+                  {/* Floating offer pin/badge - only shown when offer is known */}
+                  {hasOffer && (
+                    <div
+                      className="absolute top-0 transform -translate-x-1/2 flex flex-col items-center z-20 pointer-events-none"
+                      style={{ left: "28%" }}
+                    >
+                      <div className="px-2.5 py-0.5 bg-[#062C55] rounded-[6px] text-white font-sans font-[800] text-[11.5px] leading-[18px] whitespace-nowrap shadow-xs">
+                        Your offer · <span suppressHydrationWarning>{offerFormatted}</span>
+                      </div>
+                      <div className="w-[3px] h-[14px] bg-[#062C55] rounded-[2px]" />
                     </div>
-                    <div className="w-[3px] h-[14px] bg-[#062C55] rounded-[2px]" />
-                  </div>
+                  )}
 
                   {/* Base Progress Bar */}
                   <div className="w-full h-[12px] rounded-[6px] bg-[#EEF1F4] relative overflow-hidden flex items-center">
@@ -513,6 +596,12 @@ export default function ReportSalesPage({
                   </div>
                 </div>
 
+                {!hasOffer && (
+                  <p className="font-sans text-[12px] text-[#0C8F72] mt-2 font-medium">
+                    Add your severance letter after payment to see where your offer sits on this range.
+                  </p>
+                )}
+
                 {/* Disclaimer */}
                 <p className="font-sans italic text-[11.5px] text-[#5A6B78] mt-2 leading-[18px]">
                   An estimate from a general model, not what you&apos;re owed. Only a lawyer can tell you that.
@@ -523,10 +612,20 @@ export default function ReportSalesPage({
             {/* ── TAGS ROW ── */}
             <div className="flex flex-wrap gap-2.5 mb-6">
               <div className="px-3.5 py-1.5 rounded-[8px] bg-[#FFF8E8] border border-[#ECDCA6] font-sans font-[700] text-[12.5px] text-[#6B4F00]">
-                Sign-by: {data.signByDays || (isUS ? "21 days from receipt" : "14 days from your last day")}
+                {data.signByDays
+                  ? `Sign-by: ${data.signByDays}`
+                  : (hasExtractedDocs
+                      ? "Sign-by: Not specified in document"
+                      : "Sign-by: Added from your documents")}
               </div>
               <div className="px-3.5 py-1.5 rounded-[8px] bg-white border border-[#E7E4DD] font-sans font-[700] text-[12.5px] text-[#062C55]">
-                {isUS ? "Separation agreement read with your offer" : "Contract read with your letter"}
+                {hasExtractedDocs
+                  ? (isUS
+                      ? "Separation agreement read with your offer"
+                      : "Contract read with your letter")
+                  : (isUS
+                      ? "Add your separation agreement & offer letter"
+                      : "Add your severance letter & employment contract")}
               </div>
             </div>
 
@@ -552,8 +651,13 @@ export default function ReportSalesPage({
                     YOUR OFFER
                   </div>
                   <div className="font-sans font-[700] text-[18px] leading-[28px] text-[#062C55]">
-                    {data.offer ? offerFormatted : (isUS ? "—" : offerFormatted)}
+                    {hasOffer ? offerFormatted : "—"}
                   </div>
+                  {!hasOffer && (
+                    <span className="font-sans text-[11px] text-[#5A6B78] block mt-0.5">
+                      {hasExtractedDocs ? "Not in documents" : "Added with documents"}
+                    </span>
+                  )}
                 </div>
 
                 {/* Col 2: Statutory Legal Min (CA) / US Legal Status */}
@@ -620,7 +724,19 @@ export default function ReportSalesPage({
                       {isUS ? "Your agreement, in plain English" : "Your letter, in plain English"}
                     </h3>
                     <p className="font-sans font-normal text-[13.5px] leading-[21px] text-[#5A6B78]">
-                      Release required: Yes — full release of claims.
+                      {hasExtractedDocs
+                        ? (data.releaseRequired
+                            ? (data.releaseRequired.toLowerCase().includes("no")
+                                ? "Release required: No release required."
+                                : data.releaseRequired.toLowerCase().includes("not_mentioned")
+                                  ? "Release terms: Not mentioned in uploaded documents."
+                                  : (isUS && data.daysToDecide
+                                      ? `Release required: Yes — ${data.daysToDecide} days to review, full release of claims.`
+                                      : "Release required: Yes — full release of claims."))
+                            : "Release terms: Not found in uploaded documents.")
+                        : (isUS
+                            ? "Analyzed from your documents: release requirements, 21/45-day review periods, and revocation rights."
+                            : "Analyzed from your documents: release requirements, restrictive covenants, and claim waivers.")}
                     </p>
                     {explainEach && (
                       <p className="font-sans text-[12px] text-[#0C8F72] mt-1">
@@ -670,9 +786,11 @@ export default function ReportSalesPage({
                       What to do this week
                     </h3>
                     <p className="font-sans font-normal text-[13.5px] leading-[21px] text-[#5A6B78]">
-                      {isUS
-                        ? `You usually don't have to decide on the spot — your agreement says ${data.signByDays || "21 days to consider"}.`
-                        : `You usually don't have to decide on the spot — your letter says ${data.signByDays || "14 days from your last day"}.`}
+                      {hasExtractedDocs
+                        ? (data.signByDays
+                            ? `You usually don't have to decide on the spot — your ${isUS ? "agreement" : "letter"} says ${data.signByDays}.`
+                            : `You usually don't have to decide on the spot — no signing deadline was specified in your ${isUS ? "agreement" : "letter"}.`)
+                        : `You usually don't have to decide on the spot — deadlines and review windows will be extracted from your ${isUS ? "agreement" : "letter"}.`}
                     </p>
                     {explainEach && (
                       <p className="font-sans text-[12px] text-[#0C8F72] mt-1">
@@ -1026,7 +1144,9 @@ export default function ReportSalesPage({
 
               <div className="flex items-center justify-between pt-2">
                 <span className="text-[#5A6B78]">Offer</span>
-                <span className="font-bold text-[#062C55]">{offerFormatted}</span>
+                <span className="font-bold text-[#062C55]">
+                  {hasOffer ? offerFormatted : (hasExtractedDocs ? "Not in documents" : "From your documents")}
+                </span>
               </div>
             </div>
 
@@ -1043,7 +1163,15 @@ export default function ReportSalesPage({
                   {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
                 </div>
                 <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-3">
-                  <span className="font-bold">Your offer {offerFormatted}</span> — near the floor
+                  {hasOffer ? (
+                    <>
+                      <span className="font-bold">Your offer {offerFormatted}</span> — near the floor
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-bold">Your offer</span> — {hasExtractedDocs ? "not found in documents" : "added from your documents"}
+                    </>
+                  )}
                 </div>
 
                 {/* Status pill */}
@@ -1057,7 +1185,7 @@ export default function ReportSalesPage({
                   SEVERANCE REVIEW READY
                 </div>
                 <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mb-1">
-                  {offerFormatted}
+                  {hasOffer ? offerFormatted : (hasExtractedDocs ? "Not in documents" : "From your documents")}
                 </div>
                 <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-3">
                   Federal &amp; state rules · Release terms &amp; deadlines

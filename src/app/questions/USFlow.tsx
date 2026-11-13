@@ -347,7 +347,11 @@ export default function USFlow() {
         age: Number(state.age) || 0,
         years: Number(state.years) || 0,
         salary: Number(state.salary) || 0,
-        offer: Number(state.offer) || 0,
+        ...(Number(state.offer) > 0
+          ? { offer: Number(state.offer), offerSource: "questionnaire" as const }
+          : { offer: undefined, offerSource: undefined }),
+        documentsExtracted: false,
+        extractionStatus: "none",
         role: "Middle management / Senior / Director",
         union: state.union === "yes" ? "Yes" : state.union === "no" ? "No" : "Not sure",
         employment: "Regular employee",
@@ -364,7 +368,7 @@ export default function USFlow() {
         courtAwardHigh: 0,
         noticeWeeks: 0,
         courtMonths: "—",
-        signByDays: state.deadline === "21" ? "21 days" : state.deadline === "45" ? "45 days" : state.deadline === "short" ? "Under 21 days" : "—",
+        signByDays: undefined,
         fullState: state,
       });
 

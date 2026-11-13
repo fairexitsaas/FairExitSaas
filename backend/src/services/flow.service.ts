@@ -229,6 +229,7 @@ export const flowService = {
           status: 'failed',
           status_detail: 'read_failed',
           job_started_at: null,
+          call_a: null,
           report_inputs: {
             ...(c.report_inputs || {}),
             lastError: (err as Error).message || 'Scanner could not read documents',

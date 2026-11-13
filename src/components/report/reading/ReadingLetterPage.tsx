@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
-import { getReportInputs, ReportInputs } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { startPollLoop } from "@/lib/reportPolling";
 import { useErrorModal } from "@/context/ErrorModalContext";
@@ -55,7 +55,8 @@ export default function ReadingLetterPage({
       : String(data.salary)
     : "$110k/yr";
 
-  const offerFormatted = formatDollars(data.offer, 24000);
+  const hasOffer = typeof data.offer === "number" ? data.offer > 0 : Boolean(data.offer && data.offer !== "—");
+  const offerFormatted = hasOffer ? formatDollars(data.offer) : "From your documents";
   const minFormatted = formatDollars(data.statutoryMin, 17000);
   const courtHighFormatted = formatDollars(data.courtAwardHigh, 193000);
 
@@ -85,8 +86,77 @@ export default function ReadingLetterPage({
         if (res.done) {
           setReadState({ done: true, failed: false });
           notifySuccess("Documents read and analyzed successfully!");
-          if (onDone) onDone();
+
+          // Change 23: Sync extracted facts to persistent storage
+          fairexit
+            .getExtractedFacts(activeCaseId)
+            .then((factsRes) => {
+              const facts = factsRes?.facts || [];
+              const fOffer = facts.find((f: any) => f.key === "offer_amount");
+              const fSignBy = facts.find((f: any) => f.key === "sign_by");
+              const fDays = facts.find((f: any) => f.key === "days_to_decide");
+              const fRelease = facts.find((f: any) => f.key === "release_required");
+              const fName = facts.find((f: any) => f.key === "employee_name");
+              const fEmployer = facts.find((f: any) => f.key === "employer_name");
+
+              let extractedSignBy: string | undefined = undefined;
+              if (fSignBy?.value) {
+                extractedSignBy = String(fSignBy.value);
+              } else if (fDays?.value) {
+                extractedSignBy = `${fDays.value} days to decide`;
+              }
+
+              const updates: Partial<ReportInputs> = {
+                documentsExtracted: true,
+                extractionStatus: "success",
+                documentOfferFound: Boolean(fOffer?.value),
+                documentReleaseFound: Boolean(fRelease?.value),
+                documentSignByFound: Boolean(extractedSignBy),
+              };
+
+              if (fOffer?.value) {
+                const num =
+                  typeof fOffer.value === "number"
+                    ? fOffer.value
+                    : parseFloat(String(fOffer.value).replace(/[^0-9.]/g, ""));
+                if (num > 0) {
+                  updates.offer = num;
+                  updates.offerSource = "document";
+                }
+              }
+              if (extractedSignBy) {
+                updates.signByDays = extractedSignBy;
+                updates.signBySource = "document";
+              }
+              if (fRelease?.value) {
+                updates.releaseRequired = String(fRelease.value);
+                updates.releaseRequiredSource = "document";
+              }
+              if (fDays?.value) {
+                updates.daysToDecide = fDays.value as number | string;
+              }
+              if (fName?.value) updates.employee_name = String(fName.value);
+              if (fEmployer?.value) updates.employer_name = String(fEmployer.value);
+
+              saveReportInputs(updates);
+            })
+            .catch((err) => {
+              console.warn("Could not sync extracted facts", err);
+            })
+            .finally(() => {
+              if (onDone) onDone();
+            });
         } else if (res.failed) {
+          saveReportInputs({
+            documentsExtracted: false,
+            extractionStatus: "failed",
+            documentOfferFound: false,
+            documentReleaseFound: false,
+            documentSignByFound: false,
+            signByDays: undefined,
+            releaseRequired: undefined,
+            ...(data.offerSource === "document" ? { offer: undefined } : {}),
+          });
           const msg = res.error || res.statusDetail || "Scanner could not read documents. Please ensure clear, readable pages.";
           setReadState({ done: false, failed: true, error: msg });
           showErrorModal({
@@ -607,7 +677,9 @@ export default function ReadingLetterPage({
 
               <div className="flex items-center justify-between py-[7px]">
                 <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Offer</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{offerFormatted}</span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {hasOffer ? offerFormatted : "Reading from documents"}
+                </span>
               </div>
             </div>
 
@@ -624,7 +696,15 @@ export default function ReadingLetterPage({
                   {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
                 </div>
                 <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-[12px]">
-                  <span className="font-[700]">Your offer {offerFormatted}</span> — near the floor
+                  {hasOffer ? (
+                    <>
+                      <span className="font-[700]">Your offer {offerFormatted}</span> — near the floor
+                    </>
+                  ) : (
+                    <>
+                      <span className="font-[700]">Your offer</span> — reading from your documents
+                    </>
+                  )}
                 </div>
 
                 {/* Status pill */}
@@ -638,7 +718,7 @@ export default function ReadingLetterPage({
                   SEVERANCE REVIEW READY
                 </div>
                 <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mb-[3px]">
-                  {offerFormatted}
+                  {hasOffer ? offerFormatted : "Reading from documents"}
                 </div>
                 <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-[12px]">
                   Federal &amp; state rules · Release terms &amp; deadlines

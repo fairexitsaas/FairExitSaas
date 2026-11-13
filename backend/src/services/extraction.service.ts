@@ -137,6 +137,7 @@ export const extractionService = {
       await caseService.update(c.id, {
         status: 'failed',
         status_detail: 'read_failed',
+        call_a: null,
         job_started_at: null,
       })
 

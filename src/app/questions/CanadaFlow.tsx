@@ -426,7 +426,11 @@ function QuestionsContent() {
         age: Number(state.age) || 0,
         years: Number(state.years) || 0,
         salary: Number(state.salary) || 0,
-        offer: Number(state.offer) || 0,
+        ...(Number(state.offer) > 0
+          ? { offer: Number(state.offer), offerSource: "questionnaire" as const }
+          : { offer: undefined, offerSource: undefined }),
+        documentsExtracted: false,
+        extractionStatus: "none",
         role: userAnswers.role || "Middle management / Senior / Director",
         union: state.union === "yes" ? "Yes" : "No",
         employment: state.emptype || "Regular employee",
