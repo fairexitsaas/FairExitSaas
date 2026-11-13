@@ -151,7 +151,7 @@ export default function AskLawyerModal({
           <div>
             {/* Tagline */}
             <div className="font-sans font-[800] text-[11px] uppercase tracking-[0.8px] text-[#0C8F72] mb-1.5">
-              TALK TO A {isUS ? "LAWYER" : "LAWYER"} · FREE
+              {isUS ? "TALK TO AN ATTORNEY · FREE" : "TALK TO A LAWYER · FREE"}
             </div>
 
             {/* Heading */}

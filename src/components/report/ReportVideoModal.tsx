@@ -7,13 +7,16 @@ interface ReportVideoModalProps {
   isOpen: boolean;
   onClose: () => void;
   onUnlock: () => void;
+  country?: string;
 }
 
 export default function ReportVideoModal({
   isOpen,
   onClose,
   onUnlock,
+  country = "CA",
 }: ReportVideoModalProps) {
+  const isUS = country === "US";
   const dialogRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -67,7 +70,9 @@ export default function ReportVideoModal({
           <ReportVideoPlayer autoPlay={true} isModal={true} />
         </div>
         <p className="font-sans text-[14px] sm:text-[15px] text-[#5A6B78] leading-relaxed mb-6">
-          Every report is custom-compiled from your answers, severance letter, and employment contract.
+          {isUS
+            ? "Every report is custom-compiled from your answers, separation agreement, and offer letter."
+            : "Every report is custom-compiled from your answers, severance letter, and employment contract."}{" "}
           Here are the four high-leverage sections you unlock:
         </p>
 
@@ -76,10 +81,14 @@ export default function ReportVideoModal({
           <div className="p-3.5 rounded-xl bg-[#F6F8FA] border border-[#E3E8ED]">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-5 h-5 rounded-full bg-[#062C55] text-white flex items-center justify-center text-[10px] font-bold">1</span>
-              <h4 className="font-sans font-[700] text-[13.5px] text-[#062C55]">What lifts your range</h4>
+              <h4 className="font-sans font-[700] text-[13.5px] text-[#062C55]">
+                {isUS ? "Key factors for your situation" : "What lifts your range"}
+              </h4>
             </div>
             <p className="font-sans text-[12px] text-[#5A6B78] leading-normal">
-              Bardal court factors analysis calculating your notice period range based on age, tenure, and role.
+              {isUS
+                ? "Analysis of federal and state protection rules, consideration timelines, and key factors based on age, tenure, and role."
+                : "Bardal court factors analysis calculating your notice period range based on age, tenure, and role."}
             </p>
           </div>
 
@@ -96,7 +105,9 @@ export default function ReportVideoModal({
           <div className="p-3.5 rounded-xl bg-[#F6F8FA] border border-[#E3E8ED]">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-5 h-5 rounded-full bg-[#062C55] text-white flex items-center justify-center text-[10px] font-bold">3</span>
-              <h4 className="font-sans font-[700] text-[13.5px] text-[#062C55]">For HR, or a lawyer</h4>
+              <h4 className="font-sans font-[700] text-[13.5px] text-[#062C55]">
+                {isUS ? "For HR, or an attorney" : "For HR, or a lawyer"}
+              </h4>
             </div>
             <p className="font-sans text-[12px] text-[#5A6B78] leading-normal">
               Precise, high-leverage questions and calculation inquiries prepared for your HR talk or initial consultation.

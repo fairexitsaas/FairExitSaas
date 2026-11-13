@@ -1316,7 +1316,7 @@ export default function USReviewPage({
                     {locationMismatch.message || `Your documents mention ${locationMismatch.documentPlace || locationMismatch.docPlace}. Is ${locationMismatch.selectedPlace || locationMismatch.chosen} right?`}
                   </h4>
                   <p className="font-sans text-[13px] text-[#5A6B78] mt-0.5">
-                    Severance laws and regulations differ by state. If you worked in ${locationMismatch.documentPlace || locationMismatch.docPlace}, please update your state before generating the report.
+                    Severance laws and regulations differ by state. If you worked in {locationMismatch.documentPlace || locationMismatch.docPlace}, please update your state before generating the report.
                   </p>
                 </div>
               </div>

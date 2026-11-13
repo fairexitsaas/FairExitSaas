@@ -24,13 +24,26 @@ interface ReportSalesPageProps {
   caseId?: string | null;
   cs?: any;
   cfg?: any;
+  country?: string;
   onPaySuccess?: (newCaseId?: string) => void;
 }
+
+const US_STATE_SET = new Set([
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+  "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan",
+  "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire",
+  "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
+  "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia",
+  "Wisconsin", "Wyoming"
+]);
 
 export default function ReportSalesPage({
   caseId,
   cs,
   cfg,
+  country,
   onPaySuccess,
 }: ReportSalesPageProps) {
   const router = useRouter();
@@ -42,6 +55,20 @@ export default function ReportSalesPage({
   const [termsModalOpen, setTermsModalOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
+
+  // Country detection: check explicit prop, cs object, jurisdiction, stored inputs, or URL params
+  const isUS = Boolean(
+    country === "US" ||
+    cs?.country === "US" ||
+    cs?.jurisdiction?.country === "US" ||
+    data.country === "US" ||
+    (data.province && String(data.province).toLowerCase().startsWith("us")) ||
+    (cs?.region && String(cs.region).toLowerCase().startsWith("us")) ||
+    (data.state && US_STATE_SET.has(data.state)) ||
+    (data.provinceName && US_STATE_SET.has(data.provinceName)) ||
+    (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("country") === "US")
+  );
+  const isCanada = !isUS;
 
   // Checkout form state
   const [email, setEmail] = useState(() => data.email || cs?.email || "");
@@ -61,18 +88,31 @@ export default function ReportSalesPage({
     if (cs) {
       const freeRes = cs.freeResult || {};
       const jurisdiction = cs.jurisdiction || {};
+      const detectedCountry =
+        country ||
+        cs.country ||
+        jurisdiction.country ||
+        (cs.region && String(cs.region).toLowerCase().startsWith("us") ? "US" : null) ||
+        (jurisdiction.name && US_STATE_SET.has(jurisdiction.name) ? "US" : null) ||
+        stored.country ||
+        "CA";
+      const isCaseUS = detectedCountry === "US";
+
       const updated: ReportInputs = {
         ...stored,
+        country: isCaseUS ? "US" : "CA",
         email: cs.email || stored.email || "",
-        province: cs.region || stored.province,
-        provinceName: jurisdiction.name || stored.provinceName,
-        offer: cs.offerAmount || stored.offer,
-        salary: cs.annualSalary || stored.salary,
-        years: cs.tenureYears || stored.years,
-        age: cs.age || stored.age,
-        statutoryMin: freeRes.statutoryMin || stored.statutoryMin,
-        courtAwardLow: freeRes.courtLow || stored.courtAwardLow,
-        courtAwardHigh: freeRes.courtHigh || stored.courtAwardHigh,
+        province: isCaseUS ? (cs.region || stored.state || stored.province) : (cs.region || stored.province),
+        provinceName: jurisdiction.name || (isCaseUS ? stored.state : stored.provinceName),
+        state: isCaseUS ? (jurisdiction.name || cs.region || stored.state) : undefined,
+        offer: cs.offerAmount !== undefined ? cs.offerAmount : stored.offer,
+        salary: cs.annualSalary !== undefined ? cs.annualSalary : stored.salary,
+        years: cs.tenureYears !== undefined ? cs.tenureYears : stored.years,
+        age: cs.age !== undefined ? cs.age : stored.age,
+        // In the US, there are no statutory min or court awarded common-law dollar ranges
+        statutoryMin: isCaseUS ? 0 : (freeRes.statutoryMin !== undefined ? freeRes.statutoryMin : stored.statutoryMin),
+        courtAwardLow: isCaseUS ? 0 : (freeRes.courtLow !== undefined ? freeRes.courtLow : stored.courtAwardLow),
+        courtAwardHigh: isCaseUS ? 0 : (freeRes.courtHigh !== undefined ? freeRes.courtHigh : stored.courtAwardHigh),
       };
       setData(updated);
       if (cs.email && !email) setEmail(cs.email);
@@ -80,7 +120,7 @@ export default function ReportSalesPage({
       setData(stored);
       if (stored.email && !email) setEmail(stored.email);
     }
-  }, [cs]);
+  }, [cs, country]);
 
   const toggleFaq = (idx: number) => {
     setOpenFaq((prev) => ({ ...prev, [idx]: !prev[idx] }));
@@ -104,12 +144,15 @@ export default function ReportSalesPage({
     return `$${num.toLocaleString()}`;
   };
 
-  const offerFormatted = formatK(data.offer, 24000);
-  const minFormatted = formatK(data.statutoryMin, 17000);
+  const offerFormatted = data.offer ? formatK(data.offer) : (isUS ? "—" : "$24k");
+  const minFormatted = isUS ? "None" : formatK(data.statutoryMin, 17000);
   const courtLowFormatted = formatK(data.courtAwardLow, 138000);
   const courtHighFormatted = formatK(data.courtAwardHigh, 193000);
   const courtRangeFormatted = `${courtLowFormatted}–${courtHighFormatted}`;
   const payFormatted = data.salary ? `$${Math.round(Number(data.salary) / 1000)}k/yr` : "$110k/yr";
+  const stateOrProvinceName = isUS
+    ? (data.state || data.provinceName || "New York")
+    : (data.provinceName || "Ontario");
 
   const handleCheckoutSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -411,73 +454,79 @@ export default function ReportSalesPage({
 
             {/* Headline */}
             <h1 suppressHydrationWarning className="font-serif font-[500] text-[22px] sm:text-[24px] leading-[27px] text-[#062C55] tracking-[-0.5px] mb-2.5">
-              Your offer is {offerFormatted}. Courts often award people with a profile like yours {courtRangeFormatted}.
+              {isUS
+                ? "Your offer, organized — before you sign."
+                : `Your offer is ${offerFormatted}. Courts often award people with a profile like yours ${courtRangeFormatted}.`}
             </h1>
 
             {/* Subtitle */}
             <p className="font-sans font-normal text-[14.5px] sm:text-[15px] leading-[24px] text-[#5A6B78] mb-6">
-              That gap is what your report helps you talk about: what&apos;s in your offer, what it leaves out, and exactly what to ask before you sign.
+              {isUS
+                ? "Your report turns your separation agreement into plain English: your terms, your deadlines, and the questions to ask before you sign."
+                : "That gap is what your report helps you talk about: what's in your offer, what it leaves out, and exactly what to ask before you sign."}
             </p>
 
-            {/* ── VISUAL RANGE BAR CARD (656px x 122.5px) ── */}
-            <div className="border border-[#E7E4DD] rounded-[14px] p-4 sm:p-5 mb-5 bg-white">
-              {/* Range indicator track */}
-              <div className="relative pt-6 pb-2">
-                {/* Floating offer pin/badge */}
-                <div
-                  className="absolute top-0 transform -translate-x-1/2 flex flex-col items-center z-20 pointer-events-none"
-                  style={{ left: "28%" }}
-                >
-                  <div className="px-2.5 py-0.5 bg-[#062C55] rounded-[6px] text-white font-sans font-[800] text-[11.5px] leading-[18px] whitespace-nowrap shadow-xs">
-                    Your offer · <span suppressHydrationWarning>{offerFormatted}</span>
+            {/* ── VISUAL RANGE BAR CARD (CA only - US hides dollar range) ── */}
+            {isCanada && (
+              <div className="border border-[#E7E4DD] rounded-[14px] p-4 sm:p-5 mb-5 bg-white">
+                {/* Range indicator track */}
+                <div className="relative pt-6 pb-2">
+                  {/* Floating offer pin/badge */}
+                  <div
+                    className="absolute top-0 transform -translate-x-1/2 flex flex-col items-center z-20 pointer-events-none"
+                    style={{ left: "28%" }}
+                  >
+                    <div className="px-2.5 py-0.5 bg-[#062C55] rounded-[6px] text-white font-sans font-[800] text-[11.5px] leading-[18px] whitespace-nowrap shadow-xs">
+                      Your offer · <span suppressHydrationWarning>{offerFormatted}</span>
+                    </div>
+                    <div className="w-[3px] h-[14px] bg-[#062C55] rounded-[2px]" />
                   </div>
-                  <div className="w-[3px] h-[14px] bg-[#062C55] rounded-[2px]" />
+
+                  {/* Base Progress Bar */}
+                  <div className="w-full h-[12px] rounded-[6px] bg-[#EEF1F4] relative overflow-hidden flex items-center">
+                    {/* Legal minimum segment */}
+                    <div
+                      className="h-full bg-[#B9C5CF] rounded-l-[6px]"
+                      style={{ width: "16%" }}
+                      title={`Legal minimum: ${minFormatted}`}
+                    />
+                    {/* Empty gap */}
+                    <div className="h-full" style={{ width: "50%" }} />
+                    {/* Court Awarded Range */}
+                    <div
+                      className="h-full bg-gradient-to-r from-[#B7E3D1] to-[#5FC9A6] rounded-[6px] border border-[#0EB28D]/20 shadow-xs"
+                      style={{ width: "34%" }}
+                      title={`What courts award: ${courtRangeFormatted}`}
+                    />
+                  </div>
                 </div>
 
-                {/* Base Progress Bar */}
-                <div className="w-full h-[12px] rounded-[6px] bg-[#EEF1F4] relative overflow-hidden flex items-center">
-                  {/* Legal minimum segment */}
-                  <div
-                    className="h-full bg-[#B9C5CF] rounded-l-[6px]"
-                    style={{ width: "16%" }}
-                    title={`Legal minimum: ${minFormatted}`}
-                  />
-                  {/* Empty gap */}
-                  <div className="h-full" style={{ width: "50%" }} />
-                  {/* Court Awarded Range */}
-                  <div
-                    className="h-full bg-gradient-to-r from-[#B7E3D1] to-[#5FC9A6] rounded-[6px] border border-[#0EB28D]/20 shadow-xs"
-                    style={{ width: "34%" }}
-                    title={`What courts award: ${courtRangeFormatted}`}
-                  />
+                {/* Legend Row */}
+                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3 pt-1 text-[12px] text-[#5A6B78]">
+                  <div className="flex items-center gap-2">
+                    <span className="w-[10px] h-[10px] rounded-[3px] bg-[#B9C5CF] shrink-0" />
+                    <span>Legal minimum · {minFormatted}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-[10px] h-[10px] rounded-[3px] bg-[#0EB28D] shrink-0" />
+                    <span>What courts often award · {courtRangeFormatted}</span>
+                  </div>
                 </div>
+
+                {/* Disclaimer */}
+                <p className="font-sans italic text-[11.5px] text-[#5A6B78] mt-2 leading-[18px]">
+                  An estimate from a general model, not what you&apos;re owed. Only a lawyer can tell you that.
+                </p>
               </div>
-
-              {/* Legend Row */}
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mt-3 pt-1 text-[12px] text-[#5A6B78]">
-                <div className="flex items-center gap-2">
-                  <span className="w-[10px] h-[10px] rounded-[3px] bg-[#B9C5CF] shrink-0" />
-                  <span>Legal minimum · {minFormatted}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="w-[10px] h-[10px] rounded-[3px] bg-[#0EB28D] shrink-0" />
-                  <span>What courts often award · {courtRangeFormatted}</span>
-                </div>
-              </div>
-
-              {/* Disclaimer */}
-              <p className="font-sans italic text-[11.5px] text-[#5A6B78] mt-2 leading-[18px]">
-                An estimate from a general model, not what you&apos;re owed. Only a lawyer can tell you that.
-              </p>
-            </div>
+            )}
 
             {/* ── TAGS ROW ── */}
             <div className="flex flex-wrap gap-2.5 mb-6">
               <div className="px-3.5 py-1.5 rounded-[8px] bg-[#FFF8E8] border border-[#ECDCA6] font-sans font-[700] text-[12.5px] text-[#6B4F00]">
-                Sign-by: {data.signByDays || "14 days from your last day"}
+                Sign-by: {data.signByDays || (isUS ? "21 days from receipt" : "14 days from your last day")}
               </div>
               <div className="px-3.5 py-1.5 rounded-[8px] bg-white border border-[#E7E4DD] font-sans font-[700] text-[12.5px] text-[#062C55]">
-                Contract read with your letter
+                {isUS ? "Separation agreement read with your offer" : "Contract read with your letter"}
               </div>
             </div>
 
@@ -503,27 +552,27 @@ export default function ReportSalesPage({
                     YOUR OFFER
                   </div>
                   <div className="font-sans font-[700] text-[18px] leading-[28px] text-[#062C55]">
-                    {offerFormatted}
+                    {data.offer ? offerFormatted : (isUS ? "—" : offerFormatted)}
                   </div>
                 </div>
 
-                {/* Col 2: Statutory Legal Min */}
+                {/* Col 2: Statutory Legal Min (CA) / US Legal Status */}
                 <div className="p-3.5 rounded-[10px] bg-[#F6F8FA] border border-[#E3E8ED]">
                   <div className="font-sans font-normal text-[11px] text-[#5A6B78] uppercase tracking-[0.5px] mb-1">
-                    {data.provinceName?.toUpperCase() || "ONTARIO"} LEGAL MINIMUM
+                    {isUS ? "LEGAL MINIMUM" : `${data.provinceName?.toUpperCase() || "ONTARIO"} LEGAL MINIMUM`}
                   </div>
                   <div className="font-sans font-[700] text-[18px] leading-[28px] text-[#062C55]">
-                    {minFormatted}
+                    {isUS ? "None required by law" : minFormatted}
                   </div>
                 </div>
 
-                {/* Col 3: What Courts Award */}
+                {/* Col 3: What Courts Award (CA) / What to Check (US) */}
                 <div className="p-3.5 rounded-[10px] bg-[#FFF8E8] border border-[#ECDCA6]">
                   <div className="font-sans font-normal text-[11px] text-[#5A6B78] uppercase tracking-[0.5px] mb-1">
-                    WHAT COURTS AWARD
+                    {isUS ? "WHAT TO CHECK" : "WHAT COURTS AWARD"}
                   </div>
                   <div className="font-sans font-[700] text-[18px] leading-[28px] text-[#7A5A00]">
-                    {courtRangeFormatted}
+                    {isUS ? "Release terms & deadlines" : courtRangeFormatted}
                   </div>
                 </div>
               </div>
@@ -541,14 +590,18 @@ export default function ReportSalesPage({
                 <div className="py-3 flex items-center justify-between gap-3">
                   <div>
                     <h3 className="font-sans font-[700] text-[14.5px] leading-[22px] text-[#062C55]">
-                      What lifts your range
+                      {isUS ? "Key factors for your situation" : "What lifts your range"}
                     </h3>
                     <p className="font-sans font-normal text-[13.5px] leading-[21px] text-[#5A6B78]">
-                      Your {data.years || 14} years, your age and your role are the three biggest drivers.
+                      {isUS
+                        ? `Your ${data.years || 9} years of service, your age and your role are key factors in evaluating your agreement.`
+                        : `Your ${data.years || 14} years, your age and your role are the three biggest drivers.`}
                     </p>
                     {explainEach && (
                       <p className="font-sans text-[12px] text-[#0C8F72] mt-1">
-                        • Breaks down the Bardal factors applied by judges in {data.provinceName || "Ontario"}.
+                        {isUS
+                          ? "• Analyzes consideration timelines, OWBPA age rules, and federal layoff protections."
+                          : `• Breaks down the Bardal factors applied by judges in ${data.provinceName || "Ontario"}.`}
                       </p>
                     )}
                   </div>
@@ -564,14 +617,16 @@ export default function ReportSalesPage({
                 <div className="py-3 flex items-center justify-between gap-3">
                   <div>
                     <h3 className="font-sans font-[700] text-[14.5px] leading-[22px] text-[#062C55]">
-                      Your letter, in plain English
+                      {isUS ? "Your agreement, in plain English" : "Your letter, in plain English"}
                     </h3>
                     <p className="font-sans font-normal text-[13.5px] leading-[21px] text-[#5A6B78]">
                       Release required: Yes — full release of claims.
                     </p>
                     {explainEach && (
                       <p className="font-sans text-[12px] text-[#0C8F72] mt-1">
-                        • Translates release covenants, confidentiality restrictions, and clawback clauses.
+                        {isUS
+                          ? "• Translates release covenants, 21/45-day review periods, revocation rights, and non-competes."
+                          : "• Translates release covenants, confidentiality restrictions, and clawback clauses."}
                       </p>
                     )}
                   </div>
@@ -587,14 +642,16 @@ export default function ReportSalesPage({
                 <div className="py-3 flex items-center justify-between gap-3">
                   <div>
                     <h3 className="font-sans font-[700] text-[14.5px] leading-[22px] text-[#062C55]">
-                      For HR, or a lawyer
+                      {isUS ? "For HR, or an attorney" : "For HR, or a lawyer"}
                     </h3>
                     <p className="font-sans font-normal text-[13.5px] leading-[21px] text-[#5A6B78]">
                       1. How did you calculate the offer, and which pay did you include?
                     </p>
                     {explainEach && (
                       <p className="font-sans text-[12px] text-[#0C8F72] mt-1">
-                        • 5 ready-to-ask questions to ensure variable pay, bonuses, and benefits are accounted for.
+                        {isUS
+                          ? "• 5 ready-to-ask questions to ensure earned bonuses, PTO payout, COBRA, and release timelines are addressed."
+                          : "• 5 ready-to-ask questions to ensure variable pay, bonuses, and benefits are accounted for."}
                       </p>
                     )}
                   </div>
@@ -613,7 +670,9 @@ export default function ReportSalesPage({
                       What to do this week
                     </h3>
                     <p className="font-sans font-normal text-[13.5px] leading-[21px] text-[#5A6B78]">
-                      You usually don&apos;t have to decide on the spot — your letter says {data.signByDays || "14 days from your last day"}.
+                      {isUS
+                        ? `You usually don't have to decide on the spot — your agreement says ${data.signByDays || "21 days to consider"}.`
+                        : `You usually don't have to decide on the spot — your letter says ${data.signByDays || "14 days from your last day"}.`}
                     </p>
                     {explainEach && (
                       <p className="font-sans text-[12px] text-[#0C8F72] mt-1">
@@ -645,13 +704,15 @@ export default function ReportSalesPage({
               </div>
             </div>
 
-            {/* ── GREEN CALLOUT: WORKS WITH A LAWYER ── */}
+            {/* ── GREEN CALLOUT: WORKS WITH A LAWYER / ATTORNEY ── */}
             <div className="w-full rounded-[8px] bg-[#F3FAF6] border-y border-r border-[#CFE8DD] border-l-[4px] border-l-[#0EB28D] p-4 mb-6">
               <h4 className="font-sans font-[700] text-[13.5px] leading-[20px] text-[#062C55] mb-1">
-                Works with a lawyer, not instead of one.
+                {isUS ? "Works with an attorney, not instead of one." : "Works with a lawyer, not instead of one."}
               </h4>
               <p className="font-sans font-normal text-[13.5px] leading-[20px] text-[#1F3B32]">
-                Take your report to a free first call and the lawyer starts from your facts, not from scratch. Connecting is free, and you choose if you go further.
+                {isUS
+                  ? "Take your report to a free first call and the attorney starts from your facts, not from scratch. Connecting is free, and you choose if you go further."
+                  : "Take your report to a free first call and the lawyer starts from your facts, not from scratch. Connecting is free, and you choose if you go further."}
               </p>
             </div>
 
@@ -671,7 +732,9 @@ export default function ReportSalesPage({
                 </button>
                 {openFaq[1] && (
                   <div className="px-4 pb-3 pt-1 text-[13px] text-[#5A6B78] leading-relaxed border-t border-[#E7E4DD]/60">
-                    No. FairExit provides legal information and mathematical analysis based on provincial employment standards and court precedent, not legal advice. Every employment situation has unique nuances, and only a qualified lawyer can give legal advice on your specific agreement.
+                    {isUS
+                      ? "No. FairExit provides legal information based on federal and state labor laws and public rules, not legal advice. Every employment situation has unique nuances, and only a qualified attorney can give legal advice on your specific agreement."
+                      : "No. FairExit provides legal information and mathematical analysis based on provincial employment standards and court precedent, not legal advice. Every employment situation has unique nuances, and only a qualified lawyer can give legal advice on your specific agreement."}
                   </div>
                 )}
               </div>
@@ -690,7 +753,9 @@ export default function ReportSalesPage({
                 </button>
                 {openFaq[2] && (
                   <div className="px-4 pb-3 pt-1 text-[13px] text-[#5A6B78] leading-relaxed border-t border-[#E7E4DD]/60">
-                    Before your final report is generated, you get to check and verify every single fact we extracted from your severance letter and employment contract. If anything is unclear, you can edit it or upload a clearer copy.
+                    {isUS
+                      ? "Before your final report is generated, you get to check and verify every single fact we extracted from your separation agreement and offer letter. If anything is unclear, you can edit it or upload a clearer copy."
+                      : "Before your final report is generated, you get to check and verify every single fact we extracted from your severance letter and employment contract. If anything is unclear, you can edit it or upload a clearer copy."}
                   </div>
                 )}
               </div>
@@ -709,7 +774,9 @@ export default function ReportSalesPage({
                 </button>
                 {openFaq[3] && (
                   <div className="px-4 pb-3 pt-1 text-[13px] text-[#5A6B78] leading-relaxed border-t border-[#E7E4DD]/60">
-                    You receive an immediate, downloadable 13+ page PDF severance report on screen and sent to your email. It includes full common law calculations, clause interpretations, tailored negotiation questions, and tactical next steps to keep or share with counsel.
+                    {isUS
+                      ? "You receive an immediate, downloadable PDF severance report on screen and sent to your email. It includes federal and state rule checks, clause-by-clause interpretations, tailored negotiation questions, and tactical next steps to keep or share with counsel."
+                      : "You receive an immediate, downloadable 13+ page PDF severance report on screen and sent to your email. It includes full common law calculations, clause interpretations, tailored negotiation questions, and tactical next steps to keep or share with counsel."}
                   </div>
                 )}
               </div>
@@ -737,7 +804,12 @@ export default function ReportSalesPage({
               </div>
 
               <p className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78] mb-5">
-                The four locked sections above, built from your answers plus your letter and contract (you add them right after paying). Yours to keep, print or share with a lawyer.
+                The four locked sections above, built from your answers plus your{" "}
+                {isUS
+                  ? "separation agreement and offer letter"
+                  : "letter and contract"}{" "}
+                (you add them right after paying). Yours to keep, print or share with{" "}
+                {isUS ? "an attorney" : "a lawyer"}.
               </p>
 
               {/* Checkout Form */}
@@ -822,7 +894,7 @@ export default function ReportSalesPage({
                   <VisaBadge />
                   <MastercardBadge />
                   <AmexBadge />
-                  <InteracBadge />
+                  {isCanada && <InteracBadge />}
                 </div>
               </form>
             </div>
@@ -835,7 +907,9 @@ export default function ReportSalesPage({
                 onClick={() => setLawyerModalOpen(true)}
                 className="font-[700] text-[#0C8F72] hover:underline cursor-pointer ml-1 inline-block"
               >
-                Talking to a lawyer is still free →
+                {isUS
+                  ? "Talking to an attorney is still free →"
+                  : "Talking to a lawyer is still free →"}
               </button>
             </div>
           </div>
@@ -870,7 +944,7 @@ export default function ReportSalesPage({
                 </div>
               )}
 
-              {Boolean(data.federal) && (
+              {Boolean(data.federal) && isCanada && (
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-[#5A6B78]">Federally regulated</span>
                   <span className="font-bold text-[#062C55]">{data.federal}</span>
@@ -878,8 +952,10 @@ export default function ReportSalesPage({
               )}
 
               <div className="flex items-center justify-between pt-2">
-                <span className="text-[#5A6B78]">Province</span>
-                <span className="font-bold text-[#062C55]">{data.provinceName || "Ontario"}</span>
+                <span className="text-[#5A6B78]">{isUS ? "State" : "Province"}</span>
+                <span className="font-bold text-[#062C55]">
+                  {data.provinceName || (isUS ? "New York" : "Ontario")}
+                </span>
               </div>
 
               <div className="flex items-center justify-between pt-2">
@@ -889,7 +965,7 @@ export default function ReportSalesPage({
 
               <div className="flex items-center justify-between pt-2">
                 <span className="text-[#5A6B78]">Years of service</span>
-                <span className="font-bold text-[#062C55]">{data.years || 14} yrs</span>
+                <span className="font-bold text-[#062C55]">{data.years || (isUS ? 9 : 14)} yrs</span>
               </div>
 
               <div className="flex items-center justify-between pt-2">
@@ -905,8 +981,12 @@ export default function ReportSalesPage({
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <span className="text-[#5A6B78]">Employer payroll ≥ $2.5M</span>
-                <span className="font-bold text-[#062C55]">{data.payroll || "Not sure"}</span>
+                <span className="text-[#5A6B78]">
+                  {isUS ? "Employer size (100+ employees)" : "Employer payroll ≥ $2.5M"}
+                </span>
+                <span className="font-bold text-[#062C55]">
+                  {data.payroll || (isUS ? "100+" : "Not sure")}
+                </span>
               </div>
 
               <div className="flex items-center justify-between pt-2">
@@ -950,26 +1030,45 @@ export default function ReportSalesPage({
               </div>
             </div>
 
-            {/* Bottom LIVE ESTIMATE Box */}
-            <div className="mt-5 pt-4 border-t border-[#D3DAE1]">
-              <div className="font-sans font-[800] text-[10.5px] leading-[16px] tracking-[0.5px] text-[#5A6B78] uppercase mb-1">
-                LIVE ESTIMATE · NOT WHAT YOU&apos;RE OWED
-              </div>
-              <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mb-1">
-                {minFormatted} – {courtHighFormatted}
-              </div>
-              <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-1">
-                {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
-              </div>
-              <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-3">
-                <span className="font-bold">Your offer {offerFormatted}</span> — near the floor
-              </div>
+            {/* Bottom LIVE ESTIMATE Box (Canada) or SEVERANCE REVIEW READY Box (US) */}
+            {isCanada ? (
+              <div className="mt-5 pt-4 border-t border-[#D3DAE1]">
+                <div className="font-sans font-[800] text-[10.5px] leading-[16px] tracking-[0.5px] text-[#5A6B78] uppercase mb-1">
+                  LIVE ESTIMATE · NOT WHAT YOU&apos;RE OWED
+                </div>
+                <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mb-1">
+                  {minFormatted} – {courtHighFormatted}
+                </div>
+                <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-1">
+                  {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
+                </div>
+                <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-3">
+                  <span className="font-bold">Your offer {offerFormatted}</span> — near the floor
+                </div>
 
-              {/* Status pill */}
-              <div className="w-full py-2 px-3 rounded-[9px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center text-[#0C8F72] font-sans font-[700] text-[12px] leading-[18px]">
-                ✓ Enough to show your results
+                {/* Status pill */}
+                <div className="w-full py-2 px-3 rounded-[9px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center text-[#0C8F72] font-sans font-[700] text-[12px] leading-[18px]">
+                  ✓ Enough to show your results
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="mt-5 pt-4 border-t border-[#D3DAE1]">
+                <div className="font-sans font-[800] text-[10.5px] leading-[16px] tracking-[0.5px] text-[#5A6B78] uppercase mb-1">
+                  SEVERANCE REVIEW READY
+                </div>
+                <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mb-1">
+                  {offerFormatted}
+                </div>
+                <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-3">
+                  Federal &amp; state rules · Release terms &amp; deadlines
+                </div>
+
+                {/* Status pill */}
+                <div className="w-full py-2 px-3 rounded-[9px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center text-[#0C8F72] font-sans font-[700] text-[12px] leading-[18px]">
+                  ✓ Enough to show your results
+                </div>
+              </div>
+            )}
           </aside>
         </div>
       </main>
@@ -979,6 +1078,7 @@ export default function ReportSalesPage({
         isOpen={videoModalOpen}
         onClose={() => setVideoModalOpen(false)}
         onUnlock={scrollToCheckout}
+        country={isUS ? "US" : "CA"}
       />
 
       <TermsConditionsModal

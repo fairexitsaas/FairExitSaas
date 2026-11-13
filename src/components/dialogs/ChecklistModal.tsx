@@ -74,7 +74,9 @@ export default function ChecklistModal({
 
   const clauseText =
     contractType === "none"
-      ? "You told us there's no written contract — that usually means the minimum is not the ceiling. Worth one free call before you sign."
+      ? (isUS
+          ? "You told us there's no written contract — separation agreements often contain broad claims waivers. Worth one free call before you sign."
+          : "You told us there's no written contract — that usually means the minimum is not the ceiling. Worth one free call before you sign.")
       : "A signed release is usually final. Read the release paragraph twice.";
 
   return (
@@ -122,11 +124,12 @@ export default function ChecklistModal({
 
           <div>
             <div className="font-sans font-[800] text-[11px] uppercase tracking-[0.6px] text-[#0c7a60] mb-0.5">
-              3 · Floor vs. range
+              {isUS ? "3 · Your release rights" : "3 · Floor vs. range"}
             </div>
             <div className="font-sans font-normal text-[12.5px] leading-[18px] text-[#12523f]">
-              The legal minimum is a floor, not a ceiling. Your results above shows
-              where your offer sits.
+              {isUS
+                ? "Federal and state laws govern consideration and revocation periods (e.g. 21 or 45 days under OWBPA). Review all release terms before you sign."
+                : "The legal minimum is a floor, not a ceiling. Your results above shows where your offer sits."}
             </div>
           </div>
         </div>

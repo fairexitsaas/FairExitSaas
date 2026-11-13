@@ -131,7 +131,8 @@ export default function ReportFlow() {
 
   const urlStep = sp?.get("step");
   const step = view || urlStep || cs?.nextStep;
-  const country = cs?.country || "CA";
+  const countryParam = sp?.get("country")?.toUpperCase();
+  const country = cs?.country || (countryParam === "US" ? "US" : "CA");
   const words = cs?.jurisdiction?.words || (country === "US"
     ? { lawyer: "attorney", region: "state", letter: "separation agreement", contract: "offer letter or employment contract" }
     : { lawyer: "lawyer", region: "province", letter: "severance letter", contract: "employment contract" });
@@ -179,6 +180,7 @@ export default function ReportFlow() {
         caseId={caseId}
         cs={cs}
         cfg={cfg}
+        country={country}
         onPaySuccess={handlePaySuccess}
       />
     );

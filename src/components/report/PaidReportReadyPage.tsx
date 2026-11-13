@@ -458,7 +458,7 @@ export default function PaidReportReadyPage({
                   onClick={handleTalkToLawyer}
                   className="w-full sm:w-[380px] h-[53px] rounded-[12px] bg-white hover:bg-[#FAF9F5] border border-[#CFD8DF] text-[#062C55] font-sans font-[700] text-[16px] leading-[22px] transition flex items-center justify-center cursor-pointer mb-5 sm:mb-6"
                 >
-                  Talk to a lawyer, free
+                  {isCanada ? "Talk to a lawyer, free" : "Talk to an attorney, free"}
                 </button>
 
                 {/* Email note */}
@@ -480,7 +480,9 @@ export default function PaidReportReadyPage({
                   Compiling your personalized severance report…
                 </h2>
                 <p className="font-sans text-[13.5px] leading-[21px] text-[#5A6B78] mb-6 text-center">
-                  Claude AI is evaluating your confirmed severance details against relevant employment standards, common law precedents, and benchmark ranges.
+                  {isCanada
+                    ? "Claude AI is evaluating your confirmed severance details against relevant employment standards, common law precedents, and benchmark ranges."
+                    : "Claude AI is evaluating your confirmed severance details against applicable federal and state labor standards, release rules, and key factors."}
                 </p>
 
                 {/* Animated progress bar */}
@@ -622,13 +624,13 @@ export default function PaidReportReadyPage({
                 { label: "Union member", value: data.union || "No" },
                 { label: "Employment", value: data.employment || "Regular employee" },
                 ...(data.signed ? [{ label: "Signed yet?", value: data.signed }] : []),
-                ...(data.federal ? [{ label: "Federally regulated", value: data.federal }] : []),
+                ...(data.federal && isCanada ? [{ label: "Federally regulated", value: data.federal }] : []),
                 { label: isCanada ? "Province" : "State", value: provinceOrState },
                 { label: "Age", value: ageVal },
                 { label: "Years of service", value: yearsVal },
                 { label: "Pay", value: salaryVal },
                 { label: "Occupation", value: roleVal },
-                { label: "Employer payroll ≥ $2.5M", value: data.payroll || "Not sure" },
+                { label: isCanada ? "Employer payroll ≥ $2.5M" : "Employer size (100+ employees)", value: data.payroll || (isCanada ? "Not sure" : "100+") },
                 { label: "Other pay", value: data.otherPay || "None" },
                 { label: "New job yet?", value: data.newJob || "Not yet" },
                 { label: "Min-only clause", value: data.minClause || "No" },
@@ -652,29 +654,50 @@ export default function PaidReportReadyPage({
               ))}
             </div>
 
-            {/* Live Estimate Card */}
-            <div className="pt-3.5">
-              <span className="font-sans font-[800] text-[10.5px] leading-[16px] tracking-[0.5px] uppercase text-[#5A6B78] block">
-                LIVE ESTIMATE · NOT WHAT YOU&apos;RE OWED
-              </span>
-              <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mt-1 mb-1">
-                ${Math.round(Number(data.statutoryMin || 17000) / 1000)}k – ${Math.round(Number(data.courtAwardHigh || 193000) / 1000)}k
-              </div>
-              <div className="font-sans font-[400] text-[11.5px] leading-[16px] text-[#5A6B78]">
-                {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
-              </div>
-              <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mt-0.5">
-                <span className="font-[700]">Your offer {offerVal}</span>
-                <span className="font-[400]"> — near the floor</span>
-              </div>
-
-              {/* Enough badge */}
-              <div className="bg-[#E5F5EE] border border-[#C7E6D6] rounded-[9px] h-[36.5px] flex items-center px-3 gap-1.5 mt-3">
-                <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#0C8F72]">
-                  ✓ Enough to show your results
+            {/* Live Estimate Card (Canada) or Severance Summary Card (US) */}
+            {isCanada ? (
+              <div className="pt-3.5">
+                <span className="font-sans font-[800] text-[10.5px] leading-[16px] tracking-[0.5px] uppercase text-[#5A6B78] block">
+                  LIVE ESTIMATE · NOT WHAT YOU&apos;RE OWED
                 </span>
+                <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mt-1 mb-1">
+                  ${Math.round(Number(data.statutoryMin || 17000) / 1000)}k – ${Math.round(Number(data.courtAwardHigh || 193000) / 1000)}k
+                </div>
+                <div className="font-sans font-[400] text-[11.5px] leading-[16px] text-[#5A6B78]">
+                  {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
+                </div>
+                <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mt-0.5">
+                  <span className="font-[700]">Your offer {offerVal}</span>
+                  <span className="font-[400]"> — near the floor</span>
+                </div>
+
+                {/* Enough badge */}
+                <div className="bg-[#E5F5EE] border border-[#C7E6D6] rounded-[9px] h-[36.5px] flex items-center px-3 gap-1.5 mt-3">
+                  <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#0C8F72]">
+                    ✓ Enough to show your results
+                  </span>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="pt-3.5">
+                <span className="font-sans font-[800] text-[10.5px] leading-[16px] tracking-[0.5px] uppercase text-[#5A6B78] block">
+                  SEVERANCE REVIEW READY
+                </span>
+                <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mt-1 mb-1">
+                  {offerVal}
+                </div>
+                <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mt-0.5">
+                  Federal &amp; state rules · Release terms &amp; deadlines
+                </div>
+
+                {/* Enough badge */}
+                <div className="bg-[#E5F5EE] border border-[#C7E6D6] rounded-[9px] h-[36.5px] flex items-center px-3 gap-1.5 mt-3">
+                  <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#0C8F72]">
+                    ✓ Enough to show your results
+                  </span>
+                </div>
+              </div>
+            )}
           </aside>
         </div>
       </div>

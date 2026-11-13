@@ -35,7 +35,13 @@ export default function ReadingLetterPage({
   const [explainEach, setExplainEach] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const isUS = data.country === "US" || cs?.country === "US";
+  const isUS =
+    data.country === "US" ||
+    cs?.country === "US" ||
+    (typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("country")?.toUpperCase() ===
+        "US");
+  const isCanada = !isUS;
 
   // Stepper labels based on country
   const stepLabels = isUS
@@ -519,7 +525,7 @@ export default function ReadingLetterPage({
                 </div>
               )}
 
-              {Boolean(data.federal) && (
+              {Boolean(data.federal) && isCanada && (
                 <div className="flex items-center justify-between py-[7px]">
                   <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Federally regulated</span>
                   <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.federal}</span>
@@ -556,8 +562,12 @@ export default function ReadingLetterPage({
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
-                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">Employer payroll ≥ $2.5M</span>
-                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">{data.payroll || "Not sure"}</span>
+                <span className="font-sans font-normal text-[13px] leading-[20px] text-[#5A6B78]">
+                  {isUS ? "Employer size (100+ employees)" : "Employer payroll ≥ $2.5M"}
+                </span>
+                <span className="font-sans font-[700] text-[13px] leading-[20px] text-[#062C55]">
+                  {data.payroll || (isUS ? "100+" : "Not sure")}
+                </span>
               </div>
 
               <div className="flex items-center justify-between py-[7px]">
@@ -601,26 +611,45 @@ export default function ReadingLetterPage({
               </div>
             </div>
 
-            {/* Bottom LIVE ESTIMATE Box */}
-            <div className="mt-[16px] pt-[12px] border-t border-[#D3DAE1]">
-              <div className="font-sans font-[800] text-[10.5px] leading-[16px] tracking-[0.5px] text-[#5A6B78] uppercase mb-[2px]">
-                LIVE ESTIMATE · NOT WHAT YOU&apos;RE OWED
-              </div>
-              <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mb-[3px]">
-                {minFormatted} – {courtHighFormatted}
-              </div>
-              <div className="font-sans font-normal text-[11.5px] leading-[16px] text-[#5A6B78] mb-[2px]">
-                {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
-              </div>
-              <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-[12px]">
-                <span className="font-[700]">Your offer {offerFormatted}</span> — near the floor
-              </div>
+            {/* Bottom LIVE ESTIMATE Box (Canada) or SEVERANCE REVIEW READY Box (US) */}
+            {isCanada ? (
+              <div className="mt-[16px] pt-[12px] border-t border-[#D3DAE1]">
+                <div className="font-sans font-[800] text-[10.5px] leading-[16px] tracking-[0.5px] text-[#5A6B78] uppercase mb-[2px]">
+                  LIVE ESTIMATE · NOT WHAT YOU&apos;RE OWED
+                </div>
+                <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mb-[3px]">
+                  {minFormatted} – {courtHighFormatted}
+                </div>
+                <div className="font-sans font-normal text-[11.5px] leading-[16px] text-[#5A6B78] mb-[2px]">
+                  {data.noticeWeeks || 8} wks notice · court-awarded {data.courtMonths || "15–21 mo"}
+                </div>
+                <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-[12px]">
+                  <span className="font-[700]">Your offer {offerFormatted}</span> — near the floor
+                </div>
 
-              {/* Status pill */}
-              <div className="w-full h-[36.5px] rounded-[9px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center text-[#0C8F72] font-sans font-[700] text-[12px] leading-[18px]">
-                ✓ Enough to show your results
+                {/* Status pill */}
+                <div className="w-full h-[36.5px] rounded-[9px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center text-[#0C8F72] font-sans font-[700] text-[12px] leading-[18px]">
+                  ✓ Enough to show your results
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="mt-[16px] pt-[12px] border-t border-[#D3DAE1]">
+                <div className="font-sans font-[800] text-[10.5px] leading-[16px] tracking-[0.5px] text-[#5A6B78] uppercase mb-[2px]">
+                  SEVERANCE REVIEW READY
+                </div>
+                <div className="font-serif font-[600] text-[20px] leading-[23px] text-[#0C8F72] mb-[3px]">
+                  {offerFormatted}
+                </div>
+                <div className="font-sans text-[11.5px] leading-[16px] text-[#5A6B78] mb-[12px]">
+                  Federal &amp; state rules · Release terms &amp; deadlines
+                </div>
+
+                {/* Status pill */}
+                <div className="w-full h-[36.5px] rounded-[9px] bg-[#E5F5EE] border border-[#C7E6D6] flex items-center justify-center text-[#0C8F72] font-sans font-[700] text-[12px] leading-[18px]">
+                  ✓ Enough to show your results
+                </div>
+              </div>
+            )}
           </aside>
         </div>
       </main>

@@ -119,7 +119,7 @@ const CA_FAQS: FaqItem[] = [
     category: "Using FairExit",
     question: "What's in the $59 Severance Report?",
     answer:
-      "A one-time $59 CAD report built from your answers, and your letter and contract if you add them. It covers your offer in plain English, your estimated range, what lifts your number, the terms to understand, questions to ask, a ready-to-send email, and your deadlines. It's yours to keep, print or share with a lawyer.",
+      "A one-time $59 ($59 CAD in Canada, $59 USD in the US) report built from your answers, and your documents if you add them. It covers your offer in plain English, applicable standards and ranges, the terms to understand, questions to ask, a ready-to-send email, and your deadlines. It's yours to keep, print or share with counsel.",
   },
   {
     id: "do-i-need-an-account",
