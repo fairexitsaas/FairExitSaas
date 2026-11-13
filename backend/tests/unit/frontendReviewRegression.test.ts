@@ -363,5 +363,83 @@ describe('Group 2 Frontend Regression Tests', () => {
       expect(modalContent).toContain('{errorMessage && (')
     })
   })
+
+  // ═════════════════════════════════════════════════════════════════════════
+  // 4. BONUS CARD DISPLAY CONDITION (ONLY WHEN BONUS TICKED IN OTHER PAY)
+  // ═════════════════════════════════════════════════════════════════════════
+  describe('4. Bonus Option in Other Pay Condition', () => {
+    it('CanadaReviewPage exports isBonusInOtherPay and binds hasBonusQuestion to it', () => {
+      expect(caContent).toContain('isBonusInOtherPay')
+      expect(caContent).toContain('const isBonusSelected = useMemo(() => isBonusInOtherPay(answers, data), [answers, data]);')
+      expect(caContent).toContain('const [hasBonusQuestion, setHasBonusQuestion] = useState<boolean>(isBonusSelected);')
+    })
+
+    it('CanadaReviewPage wraps the bonus card strictly with {hasBonusQuestion && ...}', () => {
+      expect(caContent).toContain('{hasBonusQuestion && (')
+      expect(caContent).toContain('About how much was your bonus each year?')
+    })
+
+    it('CanadaReviewPage does not use missingKeys or missingList to artificially show bonus card', () => {
+      expect(caContent).not.toContain("missingKeys?.includes('bonus_amount')")
+      expect(caContent).not.toContain("m.key === 'bonus_amount'")
+    })
+
+    it('isBonusInOtherPay logic accurately detects bonus selection across all payload variants', async () => {
+      const { isBonusInOtherPay } = await import('../../../src/lib/report-storage')
+
+      // 1. Explicit pay object with bonus: true -> true
+      expect(isBonusInOtherPay({ pay: { bonus: true } }, null)).toBe(true)
+      expect(isBonusInOtherPay({ fullState: { pay: { bonus: true } } }, null)).toBe(true)
+
+      // 2. Explicit pay object with bonus: false -> false (even if otherPay string contains text)
+      expect(isBonusInOtherPay({ pay: { bonus: false } }, null)).toBe(false)
+      expect(isBonusInOtherPay({ pay: { bonus: false, benefits: true } }, null)).toBe(false)
+
+      // 3. otherPay string in answers
+      expect(isBonusInOtherPay({ otherPay: 'Bonus' }, null)).toBe(true)
+      expect(isBonusInOtherPay({ otherPay: 'bonus' }, null)).toBe(true)
+      expect(isBonusInOtherPay({ otherPay: 'Bonus, Stock' }, null)).toBe(true)
+      expect(isBonusInOtherPay({ otherPay: 'Benefits, bonus' }, null)).toBe(true)
+
+      // 4. otherPay is None or non-bonus
+      expect(isBonusInOtherPay({ otherPay: 'None' }, null)).toBe(false)
+      expect(isBonusInOtherPay({ otherPay: 'Benefits' }, null)).toBe(false)
+      expect(isBonusInOtherPay({ otherPay: 'Stock, Benefits' }, null)).toBe(false)
+      expect(isBonusInOtherPay({ otherPay: 'No bonus' }, null)).toBe(false)
+
+      // 5. Unpaid bonus / wages in redflags/reasons must NOT trigger bonus card when otherPay is None
+      expect(
+        isBonusInOtherPay(
+          {
+            otherPay: 'None',
+            redflag: 'unpaid',
+            flagged: 'Unpaid bonus / wages',
+            reasons: [['Unpaid bonus / wages may be owed', 1]],
+          },
+          null
+        )
+      ).toBe(false)
+
+      // 6. Stale localStorage with bonus is overridden by current case answers
+      expect(
+        isBonusInOtherPay(
+          { otherPay: 'None' },
+          { otherPay: 'Bonus' } as any
+        )
+      ).toBe(false)
+
+      expect(
+        isBonusInOtherPay(
+          { pay: { bonus: false } },
+          { otherPay: 'Bonus' } as any
+        )
+      ).toBe(false)
+
+      // 7. Local data fallback when no remote case answers exist
+      expect(isBonusInOtherPay(null, { otherPay: 'Bonus' } as any)).toBe(true)
+      expect(isBonusInOtherPay(null, { otherPay: 'None' } as any)).toBe(false)
+      expect(isBonusInOtherPay(null, { otherPay: 'Benefits' } as any)).toBe(false)
+    })
+  })
 })
 

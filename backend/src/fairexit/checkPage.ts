@@ -233,7 +233,17 @@ const CA_ROWS: RowDef[] = [
   { key: 'job_title_contract', group: 'contract', label: 'Job title when hired', type: 'text', source: 'contract', required: () => false },
   {
     key: 'bonus_amount', group: 'contract', label: 'Bonus per year', type: 'money', source: 'contract',
-    ask: 'About how much was your bonus each year?', only: (ctx) => !!ctx.answers?.pay?.bonus,
+    ask: 'About how much was your bonus each year?',
+    only: (ctx) => {
+      const a = ctx.answers as Record<string, any> | undefined
+      if (!a) return false
+      if (a.pay && typeof a.pay === 'object') {
+        if (a.pay.bonus === true || a.pay.bonus === 'true' || a.pay.bonus === 1 || a.pay.bonus === '1') return true
+        if (a.pay.bonus === false || a.pay.bonus === 'false' || a.pay.bonus === 0 || a.pay.bonus === '0') return false
+      }
+      const other = typeof a.otherPay === 'string' ? a.otherPay : typeof a.other_pay === 'string' ? a.other_pay : ''
+      return /\bbonus\b/i.test(other) && !/\bno\s+bonus\b/i.test(other)
+    },
     display: (v, ctx) => (Number(v) === 0 ? 'No bonus' : fmtMoney(v, ctx.country)),
   },
 ]

@@ -123,6 +123,7 @@ export const reviewService = {
       correctedFacts,
       checkState: c.check_state || { rows: {}, attested: false },
       reviewModel: checkModel,
+      answers: c.answers,
     }
   },
 

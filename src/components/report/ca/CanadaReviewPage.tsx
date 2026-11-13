@@ -1,12 +1,13 @@
 "use client";
 "use no memo";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getReportInputs, saveReportInputs, ReportInputs } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs, isBonusInOtherPay } from "@/lib/report-storage";
+export { isBonusInOtherPay };
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
@@ -308,13 +309,13 @@ export default function CanadaReviewPage({
   const [workingWeeks, setWorkingWeeks] = useState<string>("");
   const [workingWeeksSaved, setWorkingWeeksSaved] = useState<boolean>(false);
 
-  // Bonus question (Canada only, when person had bonus on step 2)
-  const [hasBonusQuestion, setHasBonusQuestion] = useState<boolean>(
-    Boolean(
-      (typeof answers.otherPay === "string" && answers.otherPay.toLowerCase().includes("bonus")) ||
-      (typeof data.otherPay === "string" && data.otherPay.toLowerCase().includes("bonus"))
-    )
-  );
+  // Bonus question (Canada only, when person had bonus in other pay)
+  const isBonusSelected = useMemo(() => isBonusInOtherPay(answers, data), [answers, data]);
+  const [hasBonusQuestion, setHasBonusQuestion] = useState<boolean>(isBonusSelected);
+
+  useEffect(() => {
+    setHasBonusQuestion(isBonusSelected);
+  }, [isBonusSelected]);
   const [bonusAmount, setBonusAmount] = useState<string>("");
   const [bonusSaved, setBonusSaved] = useState<boolean>(false);
 
@@ -628,14 +629,9 @@ export default function CanadaReviewPage({
         setHasContractConflict(false);
       }
 
-      // 3. Process Bonus Question
-      const hadBonus = Boolean(
-        (typeof answers.otherPay === 'string' && answers.otherPay.toLowerCase().includes('bonus')) ||
-        (typeof data.otherPay === 'string' && data.otherPay.toLowerCase().includes('bonus')) ||
-        (typeof answers.bonus === 'string' && answers.bonus.toLowerCase() === 'yes') ||
-        res?.missingKeys?.includes('bonus_amount') ||
-        missingList.some((m: any) => m.key === 'bonus_amount')
-      );
+      // 3. Process Bonus Question (strictly only if bonus option was selected in other pay)
+      const activeAnswers = res?.answers || answers;
+      const hadBonus = isBonusInOtherPay(activeAnswers, data);
       setHasBonusQuestion(hadBonus);
 
       // 4. Update items from extracted facts and review rows
@@ -881,6 +877,16 @@ export default function CanadaReviewPage({
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
       fairexit.saveReviewData(activeCaseId, { key: 'working_notice_weeks', action: 'change', value: displayVal }).catch(() => {});
+    }
+  };
+
+  const handleSaveBonus = (amount: string) => {
+    setBonusAmount(amount);
+    setBonusSaved(true);
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      const clean = Number(String(amount).replace(/[^0-9.]/g, "")) || 0;
+      fairexit.saveReviewData(activeCaseId, { key: 'bonus_amount', action: 'confirm', value: clean }).catch(() => {});
     }
   };
 
@@ -1709,7 +1715,7 @@ export default function CanadaReviewPage({
                         </div>
                         <button
                           type="button"
-                          onClick={() => setBonusSaved(true)}
+                          onClick={() => handleSaveBonus(bonusAmount)}
                           className={`h-[45.5px] px-5 rounded-[10px] font-sans font-[700] text-[14px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
                             bonusSaved
                               ? "bg-[#0C8F72] text-white"
@@ -1720,10 +1726,7 @@ export default function CanadaReviewPage({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            setBonusAmount("0");
-                            setBonusSaved(true);
-                          }}
+                          onClick={() => handleSaveBonus("0")}
                           className="h-[45.5px] px-5 rounded-[10px] bg-white border border-[#D8D3C8] text-[#062C55] font-sans font-[700] text-[14px] hover:bg-[#F6F4EF] transition cursor-pointer"
                         >
                           Not sure

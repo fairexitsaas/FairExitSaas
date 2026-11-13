@@ -1033,62 +1033,122 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     const rcText = rc.map((x) => `${x.point} ${x.detail}`).join(' ')
     // "Your key number": the federal release consideration period (21 or 45 days under OWBPA rules).
     // The severance/offer amount ($12,500 or any amount) must NEVER appear as the key number.
+
+    // 1. Parse employee age (ADEA/OWBPA statutory protection applies to employees aged 40 and older)
     const rawAge = a.age ?? a.raw?.age ?? m.input?.answers?.age ?? m.input?.confirmed_facts?.rows?.age?.value
-    const ageNum = Number(rawAge)
-    const hasAge = Number.isFinite(ageNum)
-
-    // Check if group termination or exit incentive program applies
-    const isExplicitIndividual = a.others === 'me' || a.others_laid_off === 'me' || a.layoffType === 'individual' || a.layoff_type === 'individual'
-    const hasGroupFlag = a.mass === true || a.mass === 'yes' ||
-      a.closure === true || a.closure === 'yes' ||
-      a.group_layoff === true || a.group_layoff === 'yes' ||
-      a.groupLayoff === true || a.groupLayoff === 'yes' ||
-      a.others === '50' || a.others === 'few' ||
-      a.others_laid_off === '50' || a.others_laid_off === 'few' || a.others_laid_off === 'yes' ||
-      a.ended === 'mass' || a.ended === 'closure' ||
-      a.reason === 'mass' || a.reason === 'closure' ||
-      a.how_it_ended === 'mass' || a.how_it_ended === 'closure' ||
-      (typeof a.how_it_ended === 'string' && /\b(group|mass|closure|reduction in force|rif)\b/i.test(a.how_it_ended)) ||
-      a.layoffType === 'group' || a.layoff_type === 'group' ||
-      (a.raw && typeof a.raw === 'object' && (
-        a.raw.mass === true || a.raw.closure === true ||
-        a.raw.groupLayoff === 'yes' || a.raw.groupLayoff === true ||
-        a.raw.others === '50' || a.raw.others === 'few' ||
-        a.raw.ended === 'mass' || a.raw.ended === 'closure'
-      ))
-    const rcIndicatesGroup = /\b45 days\b/i.test(rcText) || /\b(group layoff|group termination|group reduction|exit incentive|decisional unit)\b/i.test(rcText)
-    const isGroupTermination = hasGroupFlag || rcIndicatesGroup || (!isExplicitIndividual && hasGroupFlag)
-
-    let keyDays: '21 days' | '45 days' | null = null
-    let keyDesc = ''
-
-    if (hasAge) {
-      if (ageNum >= 40) {
-        if (isGroupTermination && (!isExplicitIndividual || rcIndicatesGroup)) {
-          keyDays = '45 days'
-          keyDesc = 'The time federal rules give you to consider a release in a group layoff at your age. 7 more days to take it back after you sign.'
-        } else {
-          keyDays = '21 days'
-          keyDesc = 'The time federal rules give you to consider a release at your age (21 days for an individual termination). 7 more days to take it back after you sign.'
-        }
-      } else {
-        // Under 40: OWBPA statutory periods do not generally apply unless specified in document/checks
-        if (rcIndicatesGroup || /\b45 days\b/i.test(rcText)) {
-          keyDays = '45 days'
-          keyDesc = 'The consideration period given to review a release in a group layoff. 7 more days to take it back after you sign.'
-        } else if (/\b21 days\b/i.test(rcText)) {
-          keyDays = '21 days'
-          keyDesc = 'The consideration period given to review a release for an individual termination. 7 more days to take it back after you sign.'
+    let ageNum: number | null = null
+    if (rawAge !== null && rawAge !== undefined && rawAge !== '') {
+      const match = String(rawAge).match(/\d+/)
+      if (match) {
+        const val = parseInt(match[0], 10)
+        if (!isNaN(val) && val > 0 && val < 120) {
+          ageNum = val
         }
       }
-    } else {
-      // Age not specified: check group status or release checks
-      if (isGroupTermination && (!isExplicitIndividual || rcIndicatesGroup)) {
+    }
+    const hasAge = ageNum !== null
+    const isOver40 = ageNum !== null && ageNum >= 40
+
+    // 2. Document specified review period (if any)
+    const rawDeadline = a.days_to_decide ?? a.deadline ?? a.daysToDecide ?? a.raw?.deadline ?? a.raw?.daysToDecide ?? m.input?.confirmed_facts?.rows?.days_to_decide?.value
+    let docDaysNum: number | null = null
+    if (rawDeadline !== null && rawDeadline !== undefined && rawDeadline !== '') {
+      const match = String(rawDeadline).match(/\d+/)
+      if (match) {
+        const val = parseInt(match[0], 10)
+        if (!isNaN(val) && val > 0 && val < 365) {
+          docDaysNum = val
+        }
+      }
+    }
+    if (docDaysNum === null) {
+      const docMatch = rcText.match(/(?:given|provided|specifies|grants|allows|has)\s+(\d+)\s+days/i)
+      if (docMatch) {
+        const val = parseInt(docMatch[1], 10)
+        if (!isNaN(val) && val > 0 && val < 365) {
+          docDaysNum = val
+        }
+      }
+    }
+
+    // 3. Release & ADEA waiver applicability
+    const releaseRequested = a.release !== 'no' && (rc.length > 0 || a.release === 'yes')
+    const adeaWaiverApplies = releaseRequested && !/\b(adea (is )?excluded|no adea waiver|does not waive adea|adea claims preserved)\b/i.test(rcText)
+
+    // 4. Distinguish individual termination from a qualifying group termination program
+    // Do not assume that every group layoff automatically qualifies for the 45-day period.
+    const isExplicitIndividual = a.others === 'me' || a.others_laid_off === 'me' || a.layoffType === 'individual' || a.layoff_type === 'individual'
+
+    const hasExitIncentive = a.exit_incentive === true || a.exit_incentive === 'yes' ||
+      a.exitIncentive === true || a.exitIncentive === 'yes' ||
+      a.program === true || a.program === 'yes' ||
+      a.layoffType === 'exit_incentive' || a.layoff_type === 'exit_incentive' ||
+      a.layoffType === 'group_program' || a.layoff_type === 'group_program' ||
+      /\b(exit incentive|voluntary separation program|voluntary retirement program)\b/i.test(rcText)
+
+    const hasOwbpaDisclosures = a.list === 'Provided' || a.list === 'yes' ||
+      a.age_list === 'yes' || a.agesTitlesList === 'Provided' ||
+      /\b(decisional unit|demographic disclosure|exhibit a|ages and job titles|job titles and ages|eligibility factors)\b/i.test(rcText)
+
+    const hasGroupProgramCheck = rc.some((item) =>
+      /\b45 days\b/i.test(item.point) ||
+      (/\b45 days\b/i.test(item.detail) && /\b(group|program|incentive|reduction in force|rif)\b/i.test(item.detail)) ||
+      /\b(group termination program|exit incentive program)\b/i.test(`${item.point} ${item.detail}`)
+    )
+
+    const isQualifyingGroupProgram = !isExplicitIndividual && (
+      hasExitIncentive ||
+      hasOwbpaDisclosures ||
+      hasGroupProgramCheck ||
+      (
+        (a.mass === true || a.mass === 'yes' || a.ended === 'mass' || a.reason === 'mass' || a.how_it_ended === 'mass' || a.others === '50' || a.others_laid_off === '50') &&
+        (a.list === 'Provided' || a.list === 'yes' || hasOwbpaDisclosures || hasGroupProgramCheck)
+      )
+    )
+
+    let keyDays: string | null = null
+    let keyKicker = 'YOUR KEY NUMBER'
+    let keyDesc = ''
+    let hasRevocation = false
+
+    if (isOver40 && adeaWaiverApplies) {
+      hasRevocation = true
+      if (isQualifyingGroupProgram) {
         keyDays = '45 days'
-        keyDesc = 'The time federal rules give you to consider a release in a group layoff at your age. 7 more days to take it back after you sign.'
+        keyDesc = 'The time federal rules give you to consider a release in a group layoff at your age (qualifying group termination or exit incentive program).'
       } else {
         keyDays = '21 days'
-        keyDesc = 'The time federal rules give you to consider a release at your age (21 days for an individual termination). 7 more days to take it back after you sign.'
+        keyDesc = 'The time federal rules give you to consider a release at your age (21 days for an individual termination).'
+      }
+    } else if (hasAge && !isOver40) {
+      // Under 40: statutory consideration and revocation periods under federal OWBPA rules do not apply
+      hasRevocation = false
+      if (docDaysNum !== null) {
+        keyDays = `${docDaysNum} days`
+        keyKicker = 'AGREEMENT DEADLINE'
+        keyDesc = 'The review deadline specified in your agreement. Because you are under 40, statutory consideration periods under federal OWBPA rules do not apply; your deadline is governed by contract terms and state law.'
+      } else {
+        keyDays = null
+      }
+    } else if (!hasAge) {
+      // Age not specified: do not guess federal statutory periods
+      hasRevocation = false
+      if (docDaysNum !== null) {
+        keyDays = `${docDaysNum} days`
+        keyKicker = 'AGREEMENT DEADLINE'
+        keyDesc = 'The consideration period specified in your agreement. Federal statutory consideration periods (21 days for individual terminations or 45 days for group programs) apply if you are age 40 or older and waiving ADEA claims.'
+      } else {
+        keyDays = null
+      }
+    } else {
+      // Age 40+ but ADEA waiver does not apply
+      hasRevocation = false
+      if (docDaysNum !== null) {
+        keyDays = `${docDaysNum} days`
+        keyKicker = 'AGREEMENT DEADLINE'
+        keyDesc = 'The consideration period specified in your agreement. Because age discrimination (ADEA) claims are not waived, statutory consideration periods under OWBPA do not apply.'
+      } else {
+        keyDays = null
       }
     }
     const releaseHtml = `
@@ -1103,9 +1163,20 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
         ${keyDays ? `
         <div class="navy-feature-card">
-          <div class="feature-card-kicker">YOUR KEY NUMBER</div>
+          <div class="feature-card-kicker">${esc(keyKicker)}</div>
           <div class="feature-card-amount">${keyDays}</div>
           <p class="feature-card-desc">${esc(keyDesc)}</p>
+          ${hasRevocation ? `
+          <div class="revocation-panel">
+            <div class="revocation-divider"></div>
+            <div class="revocation-header">
+              <span class="revocation-badge">REVOCATION PERIOD</span>
+              <span class="revocation-days">7 days after signing</span>
+            </div>
+            <p class="revocation-desc">
+              Federal law gives you an additional <b>7 calendar days after you sign</b> to revoke an agreement waiving ADEA claims. This revocation period is separate from the consideration period and cannot be waived or shortened.
+            </p>
+          </div>` : ''}
         </div>` : ''}
 
         <div class="release-check-list">
@@ -2318,6 +2389,44 @@ b, strong, .bold {
   line-height: 1.55;
   margin: 0 auto;
   max-width: 94%;
+}
+.revocation-panel {
+  margin-top: 14px;
+}
+.revocation-divider {
+  border-top: 1px solid rgba(213, 223, 234, 0.25);
+  margin: 14px auto 12px;
+  width: 90%;
+}
+.revocation-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.revocation-badge {
+  font-size: 7pt;
+  letter-spacing: 1.4px;
+  color: #D5DFEA;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.revocation-days {
+  font-family: "Newsreader", Georgia, serif;
+  font-size: 14pt;
+  font-weight: 600;
+  color: #FFFFFF;
+}
+.revocation-desc {
+  font-size: 9pt;
+  color: #D5DFEA;
+  line-height: 1.5;
+  margin: 0 auto;
+  max-width: 92%;
 }
 .gauge-container {
   text-align: center;

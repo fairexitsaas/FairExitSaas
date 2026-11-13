@@ -111,3 +111,72 @@ export function getReportInputs(): ReportInputs {
   return defaultMockReportInputs;
 }
 
+/**
+ * Determines whether the user selected the bonus option under "Other pay" during intake.
+ * Strictly checks the pay object (state.pay.bonus) and otherPay string representations.
+ */
+export function isBonusInOtherPay(
+  answers?: Record<string, any> | null,
+  data?: ReportInputs | null
+): boolean {
+  // 1. Explicit pay object (from CanadaFlow state.pay: { bonus: boolean, ... })
+  const payCandidates = [
+    answers?.pay,
+    (answers?.fullState as any)?.pay,
+    (data?.fullState as any)?.pay,
+    (data as any)?.pay,
+  ];
+
+  for (const payObj of payCandidates) {
+    if (payObj && typeof payObj === "object") {
+      if (payObj.bonus === true || payObj.bonus === "true" || payObj.bonus === 1 || payObj.bonus === "1") {
+        return true;
+      }
+      if (payObj.bonus === false || payObj.bonus === "false" || payObj.bonus === 0 || payObj.bonus === "0") {
+        return false;
+      }
+    }
+  }
+
+  // 2. String check helper: strictly match the word "bonus" in otherPay, but reject negative/empty forms
+  const isBonusWord = (val: unknown): boolean => {
+    if (!val) return false;
+    if (Array.isArray(val)) {
+      return val.some((v) => isBonusWord(v));
+    }
+    if (typeof val === "string") {
+      const s = val.trim().toLowerCase();
+      if (!s || s === "none" || s === "no" || s === "n/a" || s === "false" || s === "0") return false;
+      if (s.includes("no bonus")) return false;
+      return /\bbonus\b/i.test(s);
+    }
+    return false;
+  };
+
+  // If case answers exist and define otherPay/other_pay, prioritize them over local storage
+  if (answers) {
+    if (isBonusWord(answers.otherPay) || isBonusWord(answers.other_pay) || isBonusWord(answers.userAnswers?.otherPay)) {
+      return true;
+    }
+    if (
+      typeof answers.otherPay === "string" ||
+      typeof answers.other_pay === "string" ||
+      typeof answers.userAnswers?.otherPay === "string"
+    ) {
+      return false;
+    }
+  }
+
+  // Fallback to local report inputs data (e.g. before remote case is loaded)
+  if (data) {
+    if (isBonusWord(data.otherPay) || isBonusWord(data.userAnswers?.otherPay)) {
+      return true;
+    }
+    if (typeof data.otherPay === "string" && data.otherPay.trim().length > 0) {
+      return false;
+    }
+  }
+
+  return false;
+}
+
