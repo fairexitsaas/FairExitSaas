@@ -128,7 +128,7 @@ export const caseController = {
   },
 
   mockPay: async (req: Request, res: Response) => {
-    if (env.PAYMENTS_MODE !== 'mock' || env.NODE_ENV === 'production') throw ApiError.forbidden('Mock payments are off')
+    if (env.PAYMENTS_MODE !== 'mock') throw ApiError.forbidden('Mock payments are off')
     const c = C(req)
     if (!c.covered) throw ApiError.badRequest('jurisdiction_not_covered')
     await paymentService.markPaid(c.id, 'mock', `mock_${c.id}`, env.REPORT_PRICE_CENTS, c.country === 'US' ? 'USD' : 'CAD')

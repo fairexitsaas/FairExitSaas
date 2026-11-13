@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  env: {
+    PAYMENTS_MODE: process.env.PAYMENTS_MODE,
+  },
   /* config options here */
   devIndicators: false,
   cacheComponents: true,

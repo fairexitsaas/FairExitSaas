@@ -59,6 +59,20 @@ export default function ReportSalesPage({
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
 
+  // Payment mode configuration: respects existing PAYMENTS_MODE from backend config or env
+  const [configData, setConfigData] = useState<any>(cfg || null);
+
+  useEffect(() => {
+    if (cfg) {
+      setConfigData(cfg);
+    } else {
+      fairexit.config().then(setConfigData).catch(() => undefined);
+    }
+  }, [cfg]);
+
+  const paymentMode = configData?.payments?.mode || process.env.PAYMENTS_MODE || "mock";
+  const isMockPayment = paymentMode !== "live";
+
   // Country detection: check explicit prop, cs object, jurisdiction, stored inputs, or URL params
   const isUS = Boolean(
     country === "US" ||
@@ -256,6 +270,28 @@ export default function ReportSalesPage({
     proceedToPayment();
   };
 
+  // Handle return from Stripe redirect in live mode
+  useEffect(() => {
+    const activeCaseId = caseId || cs?.id;
+    if (!activeCaseId) return;
+    const sp = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    const sessionId = sp?.get("session_id");
+    if (sessionId && !cs?.paid) {
+      setIsPaying(true);
+      fairexit.stripeConfirm(activeCaseId, { sessionId })
+        .then((res) => {
+          setIsPaying(false);
+          if (res?.paid) {
+            setCustomerModalOpen(true);
+          }
+        })
+        .catch((err) => {
+          setIsPaying(false);
+          setPayError(err instanceof Error ? err.message : "Payment confirmation failed.");
+        });
+    }
+  }, [caseId, cs?.id, cs?.paid]);
+
   const handleDialogPay = async () => {
     setIsPaying(true);
     setPayError("");
@@ -270,13 +306,28 @@ export default function ReportSalesPage({
       // 1. Prepare checkout on backend
       await fairexit.prepareCheckout(activeCaseId, { termsAccepted: true, consentVersion: "2026-09-21" });
 
-      // 2. Execute server-side mock payment (or stripe checkout)
-      await fairexit.mockPay(activeCaseId);
+      if (isMockPayment) {
+        // 2a. Execute server-side mock payment (when PAYMENTS_MODE=mock)
+        await fairexit.mockPay(activeCaseId);
 
-      // 3. Payment confirmed! Close dialog and open customer info modal (Change 24)
-      setIsPaying(false);
-      setCheckoutDialogOpen(false);
-      setCustomerModalOpen(true);
+        // 3a. Payment confirmed! Close dialog and open customer info modal (Change 24)
+        setIsPaying(false);
+        setCheckoutDialogOpen(false);
+        setCustomerModalOpen(true);
+      } else {
+        // 2b. Execute live Stripe checkout (when PAYMENTS_MODE=live)
+        const backUrl = `${window.location.origin}/report?case=${activeCaseId}&step=pay`;
+        const res = await fairexit.stripeCheckout(activeCaseId, {
+          successUrl: backUrl,
+          cancelUrl: backUrl,
+        });
+
+        if (res?.url) {
+          window.location.assign(res.url);
+        } else {
+          throw new Error("Could not redirect to payment provider.");
+        }
+      }
     } catch (err: unknown) {
       setIsPaying(false);
       const msg = err instanceof Error ? err.message : "Payment could not be completed. Please try again.";

@@ -75,7 +75,7 @@ export const paymentService = {
   },
 
   async stripeCheckout(c: CaseRow, input: { successUrl: string; cancelUrl: string }) {
-    if (env.PAYMENTS_MODE === 'mock') throw ApiError.badRequest('PAYMENTS_MODE=mock: use POST /cases/:id/payment/mock')
+    if (env.PAYMENTS_MODE === 'mock') throw ApiError.badRequest('PAYMENTS_MODE=mock: use POST /cases/:id/checkout/mock')
     const session = await stripe('POST', '/checkout/sessions', {
       mode: 'payment',
       client_reference_id: c.id,
@@ -93,7 +93,7 @@ export const paymentService = {
 
   /** For an embedded Stripe Payment Element (web) — note: Stripe Tax is applied only on Checkout. */
   async stripePaymentIntent(c: CaseRow) {
-    if (env.PAYMENTS_MODE === 'mock') throw ApiError.badRequest('PAYMENTS_MODE=mock: use POST /cases/:id/payment/mock')
+    if (env.PAYMENTS_MODE === 'mock') throw ApiError.badRequest('PAYMENTS_MODE=mock: use POST /cases/:id/checkout/mock')
     const pi = await stripe('POST', '/payment_intents', {
       amount: env.REPORT_PRICE_CENTS, currency: currencyFor(c), automatic_payment_methods: { enabled: true },
       receipt_email: c.email || undefined, metadata: { case_id: c.id, public_id: c.public_id }, description: 'FairExit Severance Report',
