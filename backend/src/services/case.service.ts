@@ -198,7 +198,7 @@ export const caseService = {
       ...(env.EMAIL_MODE === 'mock' ? { message: 'Email delivery is disabled in demo mode. You can access your report here.' } : {}),
     }
 
-    if (env.EMAIL_MODE === 'live' && c.status === 'ready' && c.report_ready_at) {
+    if (env.EMAIL_MODE === 'live' && c.status === 'ready' && c.report_ready_at && c.report_pdf_path) {
       emailDelivery = await this.deliverReportEmail(updated, token, false)
     }
 
@@ -221,6 +221,9 @@ export const caseService = {
     if (c.status !== 'ready' || !c.report_ready_at) {
       return { status: 'pending' as const, message: 'Report is still being compiled' }
     }
+    if (!c.report_pdf_path) {
+      return { status: 'pending' as const, message: 'PDF report is still being generated' }
+    }
 
     if (env.EMAIL_MODE === 'mock') {
       return {
@@ -241,7 +244,7 @@ export const caseService = {
       }
     }
 
-    const activeToken = token || (await this.addToken(c))
+    const activeToken = typeof token === 'string' && token.trim() ? token : (await this.addToken(c))
     try {
       const res = await emailService.reportReady(c, activeToken)
       const now = new Date().toISOString()
@@ -249,6 +252,7 @@ export const caseService = {
         const reportDelivery = {
           status: 'sent',
           sentAt: now,
+          resendId: res.id || null,
           to: c.email,
           mocked: false,
           attempts: (deliveryRecord?.attempts || 0) + 1,
@@ -257,7 +261,7 @@ export const caseService = {
           answers: { ...(c.answers || {}), report_delivery: reportDelivery },
           consent: { ...(c.consent || {}), report_delivery: reportDelivery },
         })
-        return { status: 'sent' as const, sentAt: now, to: c.email }
+        return { status: 'sent' as const, sentAt: now, to: c.email, resendId: res.id }
       } else {
         const reportDelivery = {
           status: 'failed',

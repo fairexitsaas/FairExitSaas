@@ -16,7 +16,7 @@ import ChangeJurisdictionModal from "@/components/report/ChangeJurisdictionModal
 interface CanadaReviewPageProps {
   caseId?: string | null;
   cs?: { id?: string; [key: string]: unknown } | null;
-  onContinue?: () => void;
+  onContinue?: (targetStep?: string) => void;
 }
 
 interface ReviewItem {
@@ -259,6 +259,7 @@ export default function CanadaReviewPage({
   const [explainQuestions, setExplainQuestions] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [buildError, setBuildError] = useState("");
+  const [isBuilding, setIsBuilding] = useState(false);
   const buildSubmitLock = useRef(false);
   // Change 21: Location mismatch state & modal
   const [locationMismatch, setLocationMismatch] = useState<{
@@ -1893,9 +1894,9 @@ export default function CanadaReviewPage({
             {buildError && <p role="alert" className="mb-3 text-sm text-[#A3231F]">{buildError}</p>}
             <button
               type="button"
-              disabled={!canBuild}
+              disabled={!canBuild || isBuilding}
               onClick={async () => {
-                if (buildSubmitLock.current) return;
+                if (buildSubmitLock.current || isBuilding) return;
                 const activeCaseId = caseId || cs?.id;
                 if (!activeCaseId) {
                   showErrorModal({
@@ -1906,30 +1907,59 @@ export default function CanadaReviewPage({
                   return;
                 }
                 buildSubmitLock.current = true;
+                setIsBuilding(true);
+                setBuildError("");
 
-                // Await attest first so backend saves check_state.attested = true before buildReport runs
                 try {
+                  // Keep attestation requirement before building report
                   await fairexit.attest(activeCaseId);
-                  await fairexit.buildReport(activeCaseId);
-                } catch (err) {
-                  console.warn("Background report build trigger error:", err);
-                }
+                  const buildRes = await fairexit.buildReport(activeCaseId);
 
-                // Immediately transition to the loading page for generating report
-                if (onContinue) {
-                  onContinue();
-                } else {
-                  setIsDone(true);
-                  router.push(`/report?step=ready${activeCaseId ? `&case=${activeCaseId}` : ""}`);
+                  // Navigate to the existing step=building experience as soon as build starts or is already processing
+                  if (buildRes?.status === "ready" && buildRes?.pdfReady) {
+                    if (onContinue) {
+                      onContinue("ready");
+                    } else {
+                      setIsDone(true);
+                      router.push(`/report?step=ready${activeCaseId ? `&case=${activeCaseId}` : ""}`);
+                    }
+                  } else {
+                    if (onContinue) {
+                      onContinue("building");
+                    } else {
+                      setIsDone(true);
+                      router.push(`/report?step=building${activeCaseId ? `&case=${activeCaseId}` : ""}`);
+                    }
+                  }
+                } catch (err) {
+                  buildSubmitLock.current = false;
+                  setIsBuilding(false);
+                  const apiErr =
+                    err instanceof FairExitApiError
+                      ? err
+                      : new FairExitApiError(0, err instanceof Error ? err.message : "Failed to start report generation");
+                  setBuildError(apiErr.message);
+                  showErrorModal({
+                    title: "Report Generation Failed",
+                    message: apiErr.message,
+                    stage: "Report Generation",
+                    statusCode: apiErr.status,
+                    requestId: apiErr.requestId,
+                  });
                 }
               }}
               className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] transition flex items-center justify-center ${
-                canBuild
+                canBuild && !isBuilding
                   ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
                   : "bg-[#C9D1D7] text-white cursor-not-allowed opacity-90"
               }`}
             >
-              {canBuild ? (
+              {isBuilding ? (
+                <div className="flex items-center gap-2">
+                  <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  <span>Building your report…</span>
+                </div>
+              ) : canBuild ? (
                 "Build my report (PDF) →"
               ) : remainingCount > 0 ? (
                 `Confirm ${remainingCount} more to build your report`

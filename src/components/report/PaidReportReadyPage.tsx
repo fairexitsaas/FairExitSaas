@@ -45,7 +45,7 @@ export default function PaidReportReadyPage({
   const [downloadError, setDownloadError] = useState("");
 
   // Build state: 'building' | 'ready' | 'failed'
-  const isInitiallyReady = cs?.status === "ready" && !!cs?.report;
+  const isInitiallyReady = cs?.status === "ready" && !!cs?.report && !!cs?.report_pdf_path;
   const [buildStatus, setBuildStatus] = useState<"building" | "ready" | "failed">(
     isInitiallyReady ? "ready" : "building"
   );
@@ -87,14 +87,32 @@ export default function PaidReportReadyPage({
 
   const activeId = caseId || cs?.id;
 
+  // Sync actual email delivery status from backend in live mode when report is ready
+  useEffect(() => {
+    if (!activeId || emailMode !== "live" || buildStatus !== "ready") return;
+    fairexit
+      .getReportDelivery(activeId)
+      .then((res) => {
+        if (res?.delivery?.status === "sent") {
+          setEmailSentState("sent");
+        } else if (res?.delivery?.status === "failed") {
+          setEmailSentState("failed");
+          setEmailError(res.delivery.error || "Email delivery failed");
+        } else if (res?.delivery?.status === "pending") {
+          setEmailSentState("pending");
+        }
+      })
+      .catch(() => {});
+  }, [activeId, emailMode, buildStatus]);
+
   // Poll only the report status endpoint while a build is active.
   useEffect(() => {
     if (!activeId) return;
 
-    // If report is already marked ready in the initial case data, don't start a poll
-    if (cs?.status === "ready" && !!cs?.report) {
+    // If report and PDF are already marked ready in the initial case data, don't start a poll
+    if (cs?.status === "ready" && !!cs?.report && !!cs?.report_pdf_path) {
       setBuildStatus("ready");
-      setPdfPending(!cs?.report_pdf_path);
+      setPdfPending(false);
       return;
     }
 
@@ -114,12 +132,12 @@ export default function PaidReportReadyPage({
       poll: (signal) => fairexit.reportStatus(activeId, signal),
       intervalMs: 3000,
       maxRetries: 3,
-      isTerminal: (res) => res.ready || res.failed,
+      isTerminal: (res) => (res.ready && res.pdfReady) || res.failed,
       onValue: (res) => {
-        if (res.ready) {
+        if (res.ready && res.pdfReady) {
           setBuildStatus("ready");
           setFailureKind(null);
-          setPdfPending(!res.pdfReady);
+          setPdfPending(false);
           notifySuccess("Your severance report is ready!");
           onDone?.();
         } else if (res.failed) {
@@ -142,10 +160,10 @@ export default function PaidReportReadyPage({
             setBuildError(msg);
           }
         } else {
-          // Status is 'building', 'preparing', 'checking', etc. Keep in building loading state.
+          // Status is 'building', 'preparing', 'checking', or PDF pending: keep full-screen loading active
           setBuildStatus("building");
           setFailureKind(null);
-          if (res.stage === "pdf" || res.statusDetail === "pdf") {
+          if (res.stage === "pdf" || res.stage === "pdf_pending" || res.statusDetail === "pdf" || (res.ready && !res.pdfReady)) {
             setBuildProgressStep(3);
           } else {
             setBuildProgressStep(2);

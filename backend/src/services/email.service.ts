@@ -9,16 +9,28 @@ import { env } from '../config/env'
 import { logger } from '../utils/logger'
 import type { CaseRow } from '../fairexit/types'
 import { fmtLongDate } from '../fairexit/values'
+import { storageService } from './storage.service'
 
-let mockTransport: ((to: string, subject: string, text: string) => Promise<{ sent: boolean; error?: string; mocked?: boolean; reason?: string }>) | null = null
+export interface EmailAttachment {
+  filename: string
+  content: string // Base64-encoded file content
+  content_type?: string
+}
+
+let mockTransport: ((to: string, subject: string, text: string, attachments?: EmailAttachment[]) => Promise<{ sent: boolean; error?: string; mocked?: boolean; reason?: string; id?: string }>) | null = null
 
 function link(c: CaseRow, token: string, path = '') {
   return `${env.APP_WEB_URL.replace(/\/$/, '')}/report${path}?case=${c.id}&t=${encodeURIComponent(token)}`
 }
 
-async function send(to: string, subject: string, text: string): Promise<{ sent: boolean; error?: string; mocked?: boolean; reason?: string; id?: string }> {
+async function send(
+  to: string,
+  subject: string,
+  text: string,
+  attachments?: EmailAttachment[]
+): Promise<{ sent: boolean; error?: string; mocked?: boolean; reason?: string; id?: string }> {
   if (mockTransport) {
-    return mockTransport(to, subject, text)
+    return mockTransport(to, subject, text, attachments)
   }
 
   // 1. Mock mode: Skip all Resend API calls and email dispatches
@@ -46,18 +58,24 @@ async function send(to: string, subject: string, text: string): Promise<{ sent: 
 
   // 3. Live mode: Call Resend HTTP API
   try {
+    const payload: Record<string, any> = {
+      from: env.EMAIL_FROM,
+      to: [to.trim()],
+      subject,
+      text,
+    }
+
+    if (attachments && attachments.length > 0) {
+      payload.attachments = attachments
+    }
+
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         authorization: `Bearer ${env.RESEND_API_KEY.trim()}`,
         'content-type': 'application/json',
       },
-      body: JSON.stringify({
-        from: env.EMAIL_FROM,
-        to: [to.trim()],
-        subject,
-        text,
-      }),
+      body: JSON.stringify(payload),
     })
 
     if (!res.ok) {
@@ -74,8 +92,12 @@ async function send(to: string, subject: string, text: string): Promise<{ sent: 
     }
 
     const data = (await res.json().catch(() => ({}))) as Record<string, any>
-    logger.info('[email:sent]', { to, subject, id: data?.id })
-    return { sent: true, id: data?.id }
+    if (!data?.id || typeof data.id !== 'string' || !data.id.trim()) {
+      logger.error('[email:invalid_response]', { to, subject, data })
+      return { sent: false, error: 'Resend response did not contain a valid email ID', reason: 'invalid_response' }
+    }
+    logger.info('[email:sent]', { to, subject, id: data.id })
+    return { sent: true, id: data.id }
   } catch (err: any) {
     logger.error('[email:network_error]', { to, subject, error: err.message })
     return { sent: false, error: err.message || 'Network error communicating with Resend', reason: 'network_error' }
@@ -97,13 +119,56 @@ export const emailService = {
       `Thanks. Your $59 Severance Report is paid.\n\nNext: add your ${w} so we can build your report.\n\nYour private link (no account needed):\n${link(c, token)}\n\nFairExit gives information, not legal advice.`)
   },
 
-  reportReady(c: CaseRow, token: string) {
-    if (!c.email) return Promise.resolve({ sent: false, reason: 'no_email' })
-    const privateReportUrl = link(c, token)
+  async reportReady(
+    c: CaseRow,
+    tokenOrPdf?: string | Buffer,
+    explicitPdfBuffer?: Buffer
+  ): Promise<{ sent: boolean; error?: string; mocked?: boolean; reason?: string; id?: string }> {
+    if (!c.email) return { sent: false, reason: 'no_email' }
+
+    let pdfBytes: Buffer | null = null
+    if (Buffer.isBuffer(tokenOrPdf)) {
+      pdfBytes = tokenOrPdf
+    } else if (Buffer.isBuffer(explicitPdfBuffer)) {
+      pdfBytes = explicitPdfBuffer
+    } else if (c.report_pdf_path) {
+      try {
+        pdfBytes = await storageService.download(env.REPORTS_BUCKET, c.report_pdf_path)
+      } catch (err: any) {
+        if (mockTransport) {
+          pdfBytes = Buffer.from('%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n%%EOF')
+        } else {
+          logger.error('[email:pdf_download_error]', { caseId: c.id, path: c.report_pdf_path, error: err.message })
+          return { sent: false, reason: 'missing_pdf', error: `Could not retrieve PDF report from storage: ${err.message}` }
+        }
+      }
+    }
+
+    if (!pdfBytes || pdfBytes.byteLength === 0) {
+      return { sent: false, reason: 'missing_pdf', error: 'PDF report attachment is required but was not found or is empty' }
+    }
+
+    const MAX_ATTACHMENT_SIZE = 25 * 1024 * 1024 // 25 MB raw buffer limit
+    if (pdfBytes.byteLength > MAX_ATTACHMENT_SIZE) {
+      logger.error('[email:attachment_too_large]', { caseId: c.id, size: pdfBytes.byteLength })
+      return {
+        sent: false,
+        reason: 'attachment_too_large',
+        error: `PDF report size (${(pdfBytes.byteLength / (1024 * 1024)).toFixed(1)}MB) exceeds maximum email attachment limit of 25MB`,
+      }
+    }
+
+    const attachment: EmailAttachment = {
+      filename: 'FairExit-Report.pdf',
+      content_type: 'application/pdf',
+      content: pdfBytes.toString('base64'),
+    }
+
     return send(
       c.email,
       'Your FairExit Report Is Ready',
-      `Your FairExit report is ready.\n\nAccess your report here:\n\n${privateReportUrl}`,
+      'Your FairExit report is ready. Please find your PDF report attached to this email.',
+      [attachment]
     )
   },
 

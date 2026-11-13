@@ -247,12 +247,12 @@ export default function ReportFlow() {
         <USReviewPage
           caseId={caseId}
           cs={cs}
-          onContinue={() => {
-            setView("ready");
+          onContinue={(targetStep = "building") => {
+            setView(targetStep);
             if (caseId) {
-              router.push(`/report?step=ready&case=${caseId}`);
+              router.push(`/report?step=${targetStep}&case=${caseId}`);
             } else {
-              router.push(`/report?step=ready`);
+              router.push(`/report?step=${targetStep}`);
             }
             refresh();
           }}
@@ -263,12 +263,12 @@ export default function ReportFlow() {
       <CanadaReviewPage
         caseId={caseId}
         cs={cs}
-        onContinue={() => {
-          setView("ready");
+        onContinue={(targetStep = "building") => {
+          setView(targetStep);
           if (caseId) {
-            router.push(`/report?step=ready&case=${caseId}`);
+            router.push(`/report?step=${targetStep}&case=${caseId}`);
           } else {
-            router.push(`/report?step=ready`);
+            router.push(`/report?step=${targetStep}`);
           }
           refresh();
         }}

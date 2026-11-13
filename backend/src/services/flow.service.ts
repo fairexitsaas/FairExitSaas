@@ -6,7 +6,7 @@ import crypto from 'crypto'
 import { env } from '../config/env'
 import { ApiError } from '../utils/ApiError'
 import { logger } from '../utils/logger'
-import { reserveBackground, releaseBackground, runInBackground } from '../utils/background'
+import { reserveBackground, releaseBackground, runInBackground, runReservedBackground } from '../utils/background'
 import { caseService } from './case.service'
 import { aiService, assertDailyLimit } from './ai.service'
 import { emailService } from './email.service'
@@ -139,17 +139,17 @@ async function executeReportBuildJob(
     const pdfResult = await renderAndStorePdf(done, report, flowService.renderMeta(done), generationId, requestId)
     if (pdfResult.stored) {
       logger.info('[REPORT][COMPLETE]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: true })
+      const completedCase = await caseService.get(c.id).catch(() => null)
+      if (completedCase?.email && env.EMAIL_MODE === 'live') {
+        try {
+          const token = await caseService.addToken(completedCase)
+          await caseService.deliverReportEmail(completedCase, token)
+        } catch (error) {
+          logger.warn('[REPORT][EMAIL_ERROR]', { requestId, caseId: c.id, reportId, generationId, message: (error as Error).message })
+        }
+      }
     } else {
       logger.warn('[REPORT][JSON_READY]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: false, stage: 'pdf_pending' })
-    }
-
-    if (done?.email && env.EMAIL_MODE === 'live') {
-      try {
-        const token = await caseService.addToken(done)
-        await caseService.deliverReportEmail(done, token)
-      } catch (error) {
-        logger.warn('[REPORT][EMAIL_ERROR]', { requestId, caseId: c.id, reportId, generationId, message: (error as Error).message })
-      }
     }
 
     return {
@@ -632,29 +632,30 @@ export const flowService = {
       throw error
     }
 
-    try {
-      const result = await executeReportBuildJob(
-        c,
-        claimed,
-        input,
-        rulesAsOf,
-        generationId,
-        reportId,
-        requestedAt,
-        requestId,
-      )
-      releaseBackground(generationKey)
-      return {
-        started: true,
-        status: result.status,
-        reportId,
-        generationId,
-        readyAt: result.readyAt,
-        pdfReady: result.pdfReady,
+    runReservedBackground(generationKey, 'Call B', async () => {
+      try {
+        await executeReportBuildJob(
+          c,
+          claimed!,
+          input,
+          rulesAsOf,
+          generationId,
+          reportId,
+          requestedAt,
+          requestId,
+        )
+      } catch (err) {
+        logger.error('[REPORT][BACKGROUND_JOB_ERROR]', { requestId, caseId: c.id, reportId, generationId, message: (err as Error).message })
+      } finally {
+        releaseBackground(generationKey)
       }
-    } catch (err) {
-      releaseBackground(generationKey)
-      throw err
+    })
+
+    return {
+      started: true,
+      status: 'building',
+      reportId,
+      generationId,
     }
   },
 

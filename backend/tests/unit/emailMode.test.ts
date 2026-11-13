@@ -3,6 +3,7 @@ import { env } from '../../src/config/env'
 import { emailService } from '../../src/services/email.service'
 import { caseService } from '../../src/services/case.service'
 import { flowService } from '../../src/services/flow.service'
+import { storageService } from '../../src/services/storage.service'
 import { caseController } from '../../src/controllers/case.controller'
 import publicRoutes from '../../src/routes/public.routes'
 import type { CaseRow } from '../../src/fairexit/types'
@@ -232,54 +233,158 @@ describe('EMAIL_MODE: Independent Mock & Live Resend Integration Tests', () => {
     expect(capturedBody.to).toEqual(['recipient@example.com'])
   })
 
-  it('8. Live mode: Email content contains strictly subject, short message, and private report URL without sensitive data', async () => {
+  // =========================================================================
+  // Section B: Live Email Mode with PDF Report Attachment
+  // =========================================================================
+
+  const mockPdfBytes = Buffer.from('%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R >>\nendobj\nxref\n0 4\n0000000000 65535 f \n0000000010 00000 n \n0000000060 00000 n \n0000000120 00000 n \ntrailer\n<< /Size 4 /Root 1 0 R >>\nstartxref\n170\n%%EOF')
+
+  it('8. Live mode: A valid generated PDF is attached to a live Resend email', async () => {
     ;(env as any).EMAIL_MODE = 'live'
     ;(env as any).RESEND_API_KEY = 're_live_key'
+    ;(env as any).EMAIL_FROM = 'FairExit <onboarding@resend.dev>'
 
-    let capturedSubject = ''
-    let capturedText = ''
     let capturedBody: any = {}
 
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: any, opts: any) => {
       capturedBody = JSON.parse(opts?.body || '{}')
-      capturedSubject = capturedBody.subject
-      capturedText = capturedBody.text
       return {
         ok: true,
         status: 200,
-        json: async () => ({ id: 'resend_123' }),
+        json: async () => ({ id: 'resend_attachment_123' }),
       } as any
     })
 
-    const res = await emailService.reportReady(sampleCase, 'secret_token_live')
+    const res = await emailService.reportReady(sampleCase, mockPdfBytes)
 
     expect(res.sent).toBe(true)
-    expect(capturedSubject).toBe('Your FairExit Report Is Ready')
-    expect(capturedText).toContain('Your FairExit report is ready.')
-    expect(capturedText).toContain('Access your report here:')
-    expect(capturedText).toContain(`/report?case=${sampleCase.id}&t=secret_token_live`)
+    expect(res.id).toBe('resend_attachment_123')
 
-    // Content restrictions: No severance amounts, no executive summary, no attachments
-    expect(capturedText).not.toContain('$30,000')
-    expect(capturedText).not.toContain('30000')
-    expect(capturedText).not.toContain('executiveSummary')
-    expect(capturedText).not.toContain('California severance assessment')
-    expect(capturedBody.attachments).toBeUndefined()
+    // Attachments verification
+    expect(capturedBody.attachments).toBeDefined()
+    expect(capturedBody.attachments.length).toBe(1)
+    expect(capturedBody.attachments[0].filename).toBe('FairExit-Report.pdf')
+    expect(capturedBody.attachments[0].content_type).toBe('application/pdf')
+    expect(capturedBody.attachments[0].content).toBe(mockPdfBytes.toString('base64'))
+
+    // Email content verification: exact subject and clean body without URLs or private tokens
+    expect(capturedBody.subject).toBe('Your FairExit Report Is Ready')
+    expect(capturedBody.text).toBe('Your FairExit report is ready. Please find your PDF report attached to this email.')
+    expect(capturedBody.text).not.toContain('http')
+    expect(capturedBody.text).not.toContain('case=')
+    expect(capturedBody.text).not.toContain('supabase')
+    expect(capturedBody.text).not.toContain('token')
   })
 
-  it('9. Live mode: Delivery requires confirmed payment and compiled report', async () => {
+  it('8b. The attachment opens and contains the complete report bytes (offline accessible)', async () => {
     ;(env as any).EMAIL_MODE = 'live'
+    let capturedBody: any = {}
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: any, opts: any) => {
+      capturedBody = JSON.parse(opts?.body || '{}')
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'resend_attach_ok' }),
+      } as any
+    })
+
+    await emailService.reportReady(sampleCase, mockPdfBytes)
+
+    const base64Content = capturedBody.attachments[0].content
+    const recoveredBuffer = Buffer.from(base64Content, 'base64')
+
+    expect(recoveredBuffer.equals(mockPdfBytes)).toBe(true)
+    expect(recoveredBuffer.toString('utf-8')).toContain('%PDF-1.7')
+    expect(recoveredBuffer.toString('utf-8')).toContain('%%EOF')
+  })
+
+  it('8c. Missing PDF produces a clear failure and does not call Resend', async () => {
+    ;(env as any).EMAIL_MODE = 'live'
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    const caseWithoutPdf: CaseRow = { ...sampleCase, report_pdf_path: null }
+    const res = await emailService.reportReady(caseWithoutPdf)
+
+    expect(res.sent).toBe(false)
+    expect(res.reason).toBe('missing_pdf')
+    expect(res.error).toContain('PDF report attachment is required')
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('8d. Oversized PDF produces a clear failure and does not call Resend', async () => {
+    ;(env as any).EMAIL_MODE = 'live'
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+
+    // Allocate 26MB buffer (exceeds 25MB limit)
+    const oversizedPdf = Buffer.alloc(26 * 1024 * 1024, 0)
+    const res = await emailService.reportReady(sampleCase, oversizedPdf)
+
+    expect(res.sent).toBe(false)
+    expect(res.reason).toBe('attachment_too_large')
+    expect(res.error).toContain('exceeds maximum email attachment limit of 25MB')
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('9. Live mode: Delivery requires confirmed payment, compiled report, and PDF readiness', async () => {
+    ;(env as any).EMAIL_MODE = 'live'
+    vi.spyOn(storageService, 'download').mockResolvedValue(mockPdfBytes)
 
     // Unpaid case throws badRequest
     const unpaidCase: CaseRow = { ...sampleCase, status: 'free_check', paid_at: null, payment_provider: null }
-    await expect(caseService.deliverReportEmail(unpaidCase, 'token')).rejects.toThrow('Payment required')
+    await expect(caseService.deliverReportEmail(unpaidCase, 'token_xyz')).rejects.toThrow('Payment required')
 
     // Building case returns pending without sending
     const fetchSpy = vi.spyOn(globalThis, 'fetch')
     const buildingCase: CaseRow = { ...sampleCase, status: 'building', report_ready_at: null }
-    const buildingRes = await caseService.deliverReportEmail(buildingCase, 'token')
+    const buildingRes = await caseService.deliverReportEmail(buildingCase, 'token_xyz')
     expect(buildingRes.status).toBe('pending')
     expect(fetchSpy).not.toHaveBeenCalled()
+
+    // Ready case without PDF path returns pending
+    const noPdfCase: CaseRow = { ...sampleCase, status: 'ready', report_ready_at: new Date().toISOString(), report_pdf_path: null }
+    const noPdfRes = await caseService.deliverReportEmail(noPdfCase)
+    expect(noPdfRes.status).toBe('pending')
+    expect(noPdfRes.message).toContain('PDF report is still being generated')
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('9b. Failed delivery can be retried with forceRetry', async () => {
+    ;(env as any).EMAIL_MODE = 'live'
+    vi.spyOn(storageService, 'download').mockResolvedValue(mockPdfBytes)
+
+    let attemptCount = 0
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      attemptCount++
+      if (attemptCount === 1) {
+        return {
+          ok: false,
+          status: 500,
+          json: async () => ({ message: 'Temporary Resend outage' }),
+        } as any
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ id: 'resend_retry_success_999' }),
+      } as any
+    })
+
+    vi.spyOn(caseService, 'update').mockImplementation(async (_id: string, patch: any) => {
+      Object.assign(sampleCase, patch)
+      return sampleCase
+    })
+
+    // Attempt 1: Fails
+    const res1 = await caseService.deliverReportEmail(sampleCase, 'token_xyz', false)
+    expect(res1.status).toBe('failed')
+    expect((res1 as any).error).toContain('Temporary Resend outage')
+
+    // Attempt 2: Retry succeeds
+    const res2 = await caseService.deliverReportEmail(sampleCase, 'token_xyz', true)
+    expect(res2.status).toBe('sent')
+    expect((res2 as any).resendId).toBe('resend_retry_success_999')
   })
 
   it('10. Live mode: Refreshing report page does not send duplicate emails (idempotent)', async () => {

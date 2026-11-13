@@ -151,7 +151,11 @@ describe('Report Lifecycle, Interruption, Stale Jobs, and Recovery', () => {
     mocks.callB.mockRejectedValueOnce(new Error('Claude API stream timed out after 50s'))
     mocks.update.mockResolvedValue({})
 
-    await expect(flowService.startBuild(baseCase)).rejects.toThrow('Claude API stream timed out after 50s')
+    const startResult = await flowService.startBuild(baseCase)
+    expect(startResult).toMatchObject({ started: true, status: 'building' })
+
+    // Wait for the background job to finish its work
+    await new Promise((resolve) => setTimeout(resolve, 50))
 
     expect(mocks.update).toHaveBeenCalledWith(
       baseCase.id,
