@@ -92,19 +92,34 @@ export default function AdminModals() {
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="font-serif text-[20px] sm:text-[22px] text-[#062c55] font-semibold mb-2">
-              Summary sent to lawyer · {summaryModalReq.id}
+              Summary sent to lawyer · {summaryModalReq.request || summaryModalReq.id}
             </h3>
             <p className="text-[13.5px] text-[#5a6b78] mb-3">
               Only structured, anonymized facts from their check are sent. Never the original severance document or report PDF.
             </p>
 
             <ul className="list-disc ml-[18px] mb-3.5 text-[13px] space-y-1 text-[#17242f]">
-              <li><b>Client:</b> {summaryModalReq.name} ({summaryModalReq.email})</li>
-              <li><b>Region:</b> {summaryModalReq.region}</li>
+              <li><b>Client:</b> {summaryModalReq.name || 'Anonymous'} ({summaryModalReq.email})</li>
+              <li><b>Phone:</b> {summaryModalReq.phone || '—'}</li>
+              <li><b>Region:</b> {summaryModalReq.region} ({summaryModalReq.country === 'US' ? 'United States' : 'Canada'})</li>
               <li><b>Assigned:</b> {summaryModalReq.lawyer || 'Unassigned'}</li>
-              <li><b>Tenure:</b> 4 years, 8 months</li>
-              <li><b>Severance offered:</b> 8 weeks</li>
-              <li><b>Issue flagged:</b> Below statutory / common law estimate</li>
+              <li><b>Enquiry Type:</b> {summaryModalReq.enquiryType === '3_point_checklist' ? '3-Point Checklist' : 'Ask a Lawyer'}</li>
+              <li><b>Source Page:</b> {summaryModalReq.sourcePage || '—'}</li>
+              <li><b>Case ID:</b> {summaryModalReq.caseId || '—'}</li>
+              <li><b>Consent:</b> {summaryModalReq.consent ? 'Consented ✓' : 'Not recorded'}</li>
+              {summaryModalReq.summary && typeof summaryModalReq.summary === 'object' && (
+                <>
+                  {(summaryModalReq.summary as any).years_with_employer != null && (
+                    <li><b>Tenure:</b> {(summaryModalReq.summary as any).years_with_employer} years</li>
+                  )}
+                  {(summaryModalReq.summary as any).amount_offered != null && (
+                    <li><b>Severance offered:</b> {String((summaryModalReq.summary as any).amount_offered)}</li>
+                  )}
+                  {(summaryModalReq.summary as any).role_level && (
+                    <li><b>Role level:</b> {String((summaryModalReq.summary as any).role_level)}</li>
+                  )}
+                </>
+              )}
             </ul>
 
             <div className="flex justify-end gap-2 mt-4">

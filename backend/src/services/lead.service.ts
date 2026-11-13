@@ -52,26 +52,91 @@ function leadView(l: any) {
 }
 
 export const leadService = {
-  async create(input: { caseRow: CaseRow | null; country?: Country; jurisdictionCode?: string; name: string; email: string; phone: string; bestTime?: string; consent: boolean; platform: Platform }) {
-    if (!input.consent) throw ApiError.unprocessable('Tick the box so we can share your details.')
-    if (input.phone.replace(/\D/g, '').length < 10) throw ApiError.unprocessable('Add your name, a valid email and a 10-digit phone number.')
+  async create(input: {
+    caseRow: CaseRow | null
+    caseId?: string
+    country?: Country
+    jurisdictionCode?: string
+    regionName?: string
+    name?: string
+    email: string
+    phone?: string
+    bestTime?: string
+    enquiryType?: string
+    sourcePage?: string
+    consent?: boolean
+    platform: Platform
+  }) {
+    if (input.consent === false) throw ApiError.unprocessable('Consent is required to submit your enquiry.')
+    const email = input.email.trim().toLowerCase()
+    if (!email || !email.includes('@')) throw ApiError.unprocessable('Please enter a valid email address.')
+
+    const enquiryType = input.enquiryType?.trim() || 'ask_lawyer'
+    const isChecklist = enquiryType === '3_point_checklist'
+
+    // If phone is provided, validate length; only require 10 digits when phone is given
+    if (input.phone && input.phone.replace(/\D/g, '').length < 10) {
+      throw ApiError.unprocessable('Add your name, a valid email and a 10-digit phone number.')
+    }
+
     const c = input.caseRow
-    const country: Country = c?.country || input.country || 'CA'
+    const country: Country = c?.country || (input.country === 'US' ? 'US' : 'CA')
     const code = c?.jurisdiction_code || (input.jurisdictionCode ? normalizeCode(input.jurisdictionCode, country) : null)
     const j = code ? buildJurisdiction(code) : null
-    const region = j?.name || (country === 'US' ? 'your state' : 'your province')
+    const region = input.regionName || j?.name || (country === 'US' ? 'United States' : 'Canada')
+
+    // Check duplicate by case
     if (c) {
       const open = await db().from('leads').select('*').eq('case_id', c.id).in('status', ['new', 'sent']).maybeSingle()
       if (open.data) return { ...leadView(open.data), duplicate: true }
     }
-    const lead = check(
-      await db().from('leads').insert({
-        case_id: c?.id || null, name: input.name.trim(), email: input.email.trim().toLowerCase(), phone: input.phone.trim(),
-        best_time: input.bestTime || null, country, jurisdiction_code: code, region_name: region,
-        summary: leadSummary(c), consent_text: consentText(country, region), platform: input.platform,
-      }).select('*').single(),
-      'lead',
-    )
+
+    // Check duplicate by email & enquiry type
+    const openByEmail = await db().from('leads').select('*').eq('email', email).in('status', ['new', 'sent']).maybeSingle()
+    if (openByEmail.data) {
+      const existingType = openByEmail.data.enquiry_type || openByEmail.data.summary?.enquiry_type || 'ask_lawyer'
+      if (existingType === enquiryType) {
+        return { ...leadView(openByEmail.data), duplicate: true }
+      }
+    }
+
+    const consentStatus = input.consent ?? true
+    const textConsent = isChecklist ? 'Consent to receive 3-point checklist by email.' : consentText(country, region)
+    const baseSummary = leadSummary(c)
+    const summary = {
+      ...baseSummary,
+      enquiry_type: enquiryType,
+      source_page: input.sourcePage || null,
+      consent: consentStatus,
+    }
+
+    const basePayload = {
+      case_id: c?.id || input.caseId || null,
+      name: input.name ? input.name.trim() : null,
+      email,
+      phone: input.phone ? input.phone.trim() : null,
+      best_time: input.bestTime || null,
+      country,
+      jurisdiction_code: code,
+      region_name: region,
+      summary,
+      consent_text: textConsent,
+      platform: input.platform || 'web',
+    }
+
+    let insertRes = await db().from('leads').insert({
+      ...basePayload,
+      enquiry_type: enquiryType,
+      source_page: input.sourcePage || null,
+      consent: consentStatus,
+    }).select('*').single()
+
+    if (insertRes.error && insertRes.error.code === 'PGRST204') {
+      // Schema cache missing column: fallback safely to JSONB summary
+      insertRes = await db().from('leads').insert(basePayload).select('*').single()
+    }
+
+    const lead = check(insertRes, 'lead')
     emailService.opsNewLead(lead.public_id, region).catch((e) => logger.warn('ops email failed', { message: (e as Error).message }))
     return { ...leadView(lead), duplicate: false, contactWithinBusinessDays: 2, lawyerWord: country === 'US' ? 'attorney' : 'lawyer' }
   },

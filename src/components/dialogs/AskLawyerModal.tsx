@@ -11,6 +11,8 @@ export interface AskLawyerModalProps {
   regionName?: string;
   /** Free-check case, when there is one (sends the case summary, never documents) */
   caseId?: string | null;
+  sourcePage?: string;
+  enquiryType?: string;
 }
 
 export default function AskLawyerModal({
@@ -19,6 +21,8 @@ export default function AskLawyerModal({
   country = "CA",
   regionName = "Ontario",
   caseId = null,
+  sourcePage,
+  enquiryType = "ask_lawyer",
 }: AskLawyerModalProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -36,12 +40,16 @@ export default function AskLawyerModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (sending) return;
+
     if (!name.trim()) {
       setError("Please add your name.");
       return;
     }
-    if (!email.includes("@")) {
-      setError("Please enter a valid email.");
+    const trimmedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError("Please enter a valid email address.");
       return;
     }
     if (phone.replace(/\D/g, "").length < 10) {
@@ -56,13 +64,20 @@ export default function AskLawyerModal({
     setError("");
     setSending(true);
     const targetCountry: Country = country === "US" ? "US" : "CA";
+    const currentPath = sourcePage || (typeof window !== "undefined" ? window.location.pathname : "");
+
     try {
       await fairexit.askLawyer({
-        ...(caseId ? { caseId } : { country: targetCountry, jurisdictionCode: regionName }),
+        caseId: caseId || undefined,
+        country: targetCountry,
+        jurisdictionCode: regionName,
+        regionName,
         name: name.trim(),
-        email: email.trim(),
+        email: trimmedEmail,
         phone: phone.trim(),
         consent: true,
+        enquiryType,
+        sourcePage: currentPath,
       });
       setSubmitted(true);
       notifySuccess("Inquiry sent successfully!");

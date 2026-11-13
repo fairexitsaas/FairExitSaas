@@ -4,44 +4,49 @@ import React from 'react'
 import { useAdmin } from '../AdminContext'
 
 export default function ReportsPage() {
-  const { reports, handleExportCSV } = useAdmin()
+  const { reports, overview, loading, error, handleExportCSV } = useAdmin()
 
   const onExportCSV = () => {
     handleExportCSV(
       'reports',
       ['Report ID', 'User', 'Region', 'Status', 'Paid via', 'Amount', 'Date'],
-      reports.map((r) => [r.id, r.user, r.region, r.status, r.paidVia, r.amount, r.date])
+      reports.map((r) => [r.reportId, r.user, r.region || '—', r.status, r.paidVia, r.amount || '—', r.date || '—'])
     )
   }
 
   const getStatusChip = (status: string) => {
-    switch (status) {
-      case 'Completed':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#eef8f3] text-[#0c8f72] whitespace-nowrap">
-            Completed
-          </span>
-        )
-      case 'Processing':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#fbf3df] text-[#b07a00] whitespace-nowrap">
-            Processing
-          </span>
-        )
-      case 'Failed · scan unreadable':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#fbeceb] text-[#d42e2b] whitespace-nowrap">
-            Failed · scan unreadable
-          </span>
-        )
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#eef0f2] text-[#44525e] whitespace-nowrap">
-            {status}
-          </span>
-        )
+    if (status.includes('Completed')) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#eef8f3] text-[#0c8f72] whitespace-nowrap">
+          Completed
+        </span>
+      )
     }
+    if (status.includes('Processing')) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#fbf3df] text-[#b07a00] whitespace-nowrap">
+          Processing
+        </span>
+      )
+    }
+    if (status.includes('Failed')) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#fbeceb] text-[#d42e2b] whitespace-nowrap">
+          {status}
+        </span>
+      )
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#eef0f2] text-[#44525e] whitespace-nowrap">
+        {status}
+      </span>
+    )
   }
+
+  const totalRevenueCents = overview?.kpis.revenueCents
+    ? Object.values(overview.kpis.revenueCents).reduce((sum, val) => sum + val, 0)
+    : 0
+  const formattedRevenue = `$${Math.round(totalRevenueCents / 100).toLocaleString()}`
 
   return (
     <section>
@@ -65,6 +70,12 @@ export default function ReportsPage() {
         </button>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3.5 rounded-[10px] bg-red-50 border border-red-200 text-red-700 text-[13px] font-semibold">
+          {error}
+        </div>
+      )}
+
       {/* 4 KPIs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-[18px]">
         <div className="bg-white border border-[#e7e4dd] rounded-[12px] p-[14px_16px]">
@@ -72,7 +83,7 @@ export default function ReportsPage() {
             Sold this month
           </div>
           <div className="text-[26px] font-extrabold text-[#062c55] mt-1 tabular-nums tracking-[-0.5px]">
-            37
+            {loading ? '…' : (overview?.kpis.reportsBought ?? reports.length)}
           </div>
         </div>
 
@@ -81,7 +92,7 @@ export default function ReportsPage() {
             Revenue
           </div>
           <div className="text-[26px] font-extrabold text-[#062c55] mt-1 tabular-nums tracking-[-0.5px]">
-            $2,183
+            {loading ? '…' : formattedRevenue}
           </div>
         </div>
 
@@ -90,7 +101,7 @@ export default function ReportsPage() {
             Refunds
           </div>
           <div className="text-[26px] font-extrabold text-[#062c55] mt-1 tabular-nums tracking-[-0.5px]">
-            1
+            {loading ? '…' : (overview?.kpis.refunds ?? 0)}
           </div>
         </div>
 
@@ -99,7 +110,7 @@ export default function ReportsPage() {
             Failed builds
           </div>
           <div className="text-[26px] font-extrabold text-[#062c55] mt-1 tabular-nums tracking-[-0.5px]">
-            1
+            {loading ? '…' : (overview?.reportStatus.failed ?? 0)}
           </div>
         </div>
       </div>
@@ -134,36 +145,42 @@ export default function ReportsPage() {
               </tr>
             </thead>
             <tbody>
-              {reports.map((report, idx) => (
-                <tr
-                  key={report.id}
-                  className={`hover:bg-[#f7fbf9] transition-colors ${
-                    idx < reports.length - 1 ? 'border-b border-[#f0ede6]' : ''
-                  }`}
-                >
-                  <td className="p-[10px_12px] tabular-nums font-bold text-[#062c55] whitespace-nowrap">
-                    {report.id}
-                  </td>
-                  <td className="p-[10px_12px] tabular-nums font-bold text-[#062c55] whitespace-nowrap">
-                    {report.user}
-                  </td>
-                  <td className="p-[10px_12px] text-[#17242f] whitespace-nowrap">
-                    {report.region}
-                  </td>
-                  <td className="p-[10px_12px] whitespace-nowrap">
-                    {getStatusChip(report.status)}
-                  </td>
-                  <td className="p-[10px_12px] text-[#17242f] whitespace-nowrap">
-                    {report.paidVia}
-                  </td>
-                  <td className="p-[10px_12px] text-right tabular-nums text-[#17242f] whitespace-nowrap">
-                    {report.amount}
-                  </td>
-                  <td className="p-[10px_12px] text-right tabular-nums text-[#5a6b78] whitespace-nowrap">
-                    {report.date}
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-[#5a6b78]">
+                    Loading reports…
                   </td>
                 </tr>
-              ))}
+              ) : reports.length > 0 ? (
+                reports.map((report, idx) => (
+                  <tr
+                    key={report.reportId || idx}
+                    className={`hover:bg-[#f7fbf9] transition-colors ${
+                      idx < reports.length - 1 ? 'border-b border-[#f0ede6]' : ''
+                    }`}
+                  >
+                    <td className="p-[10px_12px] tabular-nums font-bold text-[#062c55] whitespace-nowrap">
+                      {report.reportId}
+                    </td>
+                    <td className="p-[10px_12px] text-[#17242f] font-mono">{report.user}</td>
+                    <td className="p-[10px_12px] text-[#17242f]">{report.region || '—'}</td>
+                    <td className="p-[10px_12px]">{getStatusChip(report.status)}</td>
+                    <td className="p-[10px_12px] text-[#5a6b78]">{report.paidVia}</td>
+                    <td className="p-[10px_12px] text-right tabular-nums text-[#17242f] font-medium">
+                      {report.amount || '—'}
+                    </td>
+                    <td className="p-[10px_12px] text-right tabular-nums text-[#5a6b78]">
+                      {report.date ? new Date(report.date).toLocaleDateString() : '—'}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-[#5a6b78]">
+                    No severance reports purchased yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

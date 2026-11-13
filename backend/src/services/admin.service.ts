@@ -105,15 +105,78 @@ export const adminService = {
     }))
   },
 
-  async leads(country: CountryFilter, status?: string) {
-    let q = filterCountry(db().from('leads').select('*, lawyers(name, firm)') as any, country).order('created_at', { ascending: false }).limit(500)
+  async leads(
+    country: CountryFilter,
+    filters?: {
+      status?: string
+      enquiryType?: string
+      search?: string
+      region?: string
+      limit?: number
+      offset?: number
+    }
+  ) {
+    const status = typeof filters === 'string' ? filters : filters?.status
+    const enquiryType = typeof filters === 'object' ? filters?.enquiryType : undefined
+    const search = typeof filters === 'object' ? filters?.search?.trim().toLowerCase() : undefined
+    const region = typeof filters === 'object' ? filters?.region : undefined
+    const limit = typeof filters === 'object' && filters?.limit ? filters.limit : 500
+    const offset = typeof filters === 'object' && filters?.offset ? filters.offset : 0
+
+    let q = filterCountry(db().from('leads').select('*, lawyers(name, firm)') as any, country)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
+
     if (status) q = q.eq('status', status)
+    if (region && region !== 'all') q = q.eq('region_name', region)
+
     const rows = check(await q, 'leads') as any[]
-    return rows.map((l) => ({
-      id: l.id, request: l.public_id, region: l.region_name, country: l.country, name: l.name, email: l.email, phone: l.phone, bestTime: l.best_time,
-      status: l.status, lawyerId: l.lawyer_id, lawyer: l.lawyers ? `${l.lawyers.name}${l.lawyers.firm ? ' · ' + l.lawyers.firm : ''}` : null,
-      dateSent: l.sent_at, how: l.sent_how, by: l.sent_by, whatWeSent: 'Summary · no documents', summary: l.summary, notes: l.notes, createdAt: l.created_at,
-    }))
+    let mapped = rows.map((l) => {
+      const eType = l.enquiry_type || l.summary?.enquiry_type || 'ask_lawyer'
+      const sPage = l.source_page || l.summary?.source_page || null
+      const cStatus = l.consent !== undefined && l.consent !== null ? l.consent : (l.summary?.consent !== undefined ? l.summary.consent : true)
+      return {
+        id: l.id,
+        request: l.public_id,
+        caseId: l.case_id,
+        region: l.region_name,
+        country: l.country,
+        jurisdictionCode: l.jurisdiction_code,
+        name: l.name,
+        email: l.email,
+        phone: l.phone,
+        bestTime: l.best_time,
+        enquiryType: eType,
+        sourcePage: sPage,
+        consent: cStatus,
+        status: l.status,
+        lawyerId: l.lawyer_id,
+        lawyer: l.lawyers ? `${l.lawyers.name}${l.lawyers.firm ? ' · ' + l.lawyers.firm : ''}` : null,
+        dateSent: l.sent_at,
+        how: l.sent_how,
+        by: l.sent_by,
+        whatWeSent: 'Summary · no documents',
+        summary: l.summary,
+        notes: l.notes,
+        createdAt: l.created_at,
+      }
+    })
+
+    if (enquiryType && enquiryType !== 'all') {
+      mapped = mapped.filter((r) => r.enquiryType === enquiryType)
+    }
+
+    if (search) {
+      mapped = mapped.filter(
+        (r) =>
+          (r.email && r.email.toLowerCase().includes(search)) ||
+          (r.name && r.name.toLowerCase().includes(search)) ||
+          (r.request && r.request.toLowerCase().includes(search)) ||
+          (r.region && r.region.toLowerCase().includes(search))
+      )
+    }
+
+    return mapped
   },
 
   async updateLead(id: string, patch: { status?: string; lawyerId?: string | null; sentHow?: string; sentBy?: string; notes?: string }) {

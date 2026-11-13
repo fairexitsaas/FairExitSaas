@@ -686,6 +686,8 @@ export default function PaidReportReadyPage({
         country={isCanada ? "CA" : "US"}
         regionName={String(provinceOrState)}
         caseId={caseId || cs?.id}
+        sourcePage="/report/ready"
+        enquiryType="ask_lawyer"
       />
     </div>
   );

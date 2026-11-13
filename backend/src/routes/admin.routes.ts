@@ -26,7 +26,22 @@ function out(req: Request, res: Response, rows: Array<Record<string, unknown>>, 
 
 router.get('/overview', validate({ query: V.adminListQuery }), h(async (req, res) => ApiResponse.ok(res, await adminService.overview(req.query.country as any, req.query.month as string | undefined))))
 router.get('/users', validate({ query: V.adminListQuery }), h(async (req, res) => out(req, res, await adminService.users(req.query.country as any, Number(req.query.limit), Number(req.query.offset)), 'users')))
-router.get('/leads', validate({ query: V.adminListQuery }), h(async (req, res) => out(req, res, await adminService.leads(req.query.country as any, req.query.status as string | undefined), 'lawyer-requests')))
+router.get('/leads', validate({ query: V.adminListQuery }), h(async (req, res) => out(req, res, await adminService.leads(req.query.country as any, {
+  status: req.query.status as string | undefined,
+  enquiryType: req.query.enquiryType as string | undefined,
+  search: req.query.search as string | undefined,
+  region: req.query.region as string | undefined,
+  limit: Number(req.query.limit) || 200,
+  offset: Number(req.query.offset) || 0,
+}), 'lawyer-requests')))
+router.get('/enquiries', validate({ query: V.adminListQuery }), h(async (req, res) => out(req, res, await adminService.leads(req.query.country as any, {
+  status: req.query.status as string | undefined,
+  enquiryType: req.query.enquiryType as string | undefined,
+  search: req.query.search as string | undefined,
+  region: req.query.region as string | undefined,
+  limit: Number(req.query.limit) || 200,
+  offset: Number(req.query.offset) || 0,
+}), 'lawyer-enquiries')))
 router.patch('/leads/:id', validate({ params: V.idParams, body: V.adminLeadPatch }), h(async (req, res) => ApiResponse.ok(res, await adminService.updateLead(req.params.id, req.body))))
 router.get('/reports', validate({ query: V.adminListQuery }), h(async (req, res) => out(req, res, await adminService.reports(req.query.country as any), 'reports')))
 router.get('/cases/:id', validate({ params: V.idParams }), h(async (req, res) => ApiResponse.ok(res, await adminService.caseDetail(req.params.id))))

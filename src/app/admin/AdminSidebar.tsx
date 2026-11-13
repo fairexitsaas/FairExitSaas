@@ -3,6 +3,7 @@
 import React from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useAdmin } from './AdminContext'
 
 export default function AdminSidebar({
   onClose,
@@ -12,6 +13,8 @@ export default function AdminSidebar({
   isMobileDrawer?: boolean
 } = {}) {
   const pathname = usePathname()
+  const { lawyerRequests } = useAdmin()
+  const newRequestsCount = lawyerRequests.filter((r) => r.status === 'new').length
 
   const navLinks = [
     {
@@ -32,7 +35,7 @@ export default function AdminSidebar({
       href: '/admin/lawyer-requests',
       label: 'Lawyer requests',
       icon: '↗',
-      badge: '2',
+      badge: newRequestsCount > 0 ? String(newRequestsCount) : null,
       isActive: pathname === '/admin/lawyer-requests' || pathname === '/admin/requests',
     },
     {

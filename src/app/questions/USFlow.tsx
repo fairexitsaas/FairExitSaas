@@ -4050,6 +4050,9 @@ export default function USFlow() {
         onOpenLawyerModal={() => setAskLawyerOpen(true)}
         country="US"
         contractType={state.contract === "none" ? "none" : "signed"}
+        caseId={caseId}
+        regionName={state.usState || "your state"}
+        sourcePage="/questions"
       />
 
       {/* ── ASK AN ATTORNEY TO CONTACT ME MODAL (PHOTO 2) ── */}
@@ -4059,6 +4062,8 @@ export default function USFlow() {
         country="US"
         regionName={state.usState || "your state"}
         caseId={caseId}
+        sourcePage="/questions"
+        enquiryType="ask_lawyer"
       />
 
       {/* ── EMAIL ME MY FREE RESULTS MODAL ── */}

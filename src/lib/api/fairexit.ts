@@ -133,7 +133,19 @@ export function createFairExitClient(opts: FairExitClientOptions) {
     deleteCase: (id: string) => call<any>('DELETE', c(id), undefined, id, undefined, 'Delete Case'),
 
     // lawyer request
-    askLawyer: (body: { caseId?: string; country?: Country; jurisdictionCode?: string; name: string; email: string; phone: string; bestTime?: string; consent: true }) =>
+    askLawyer: (body: {
+      caseId?: string
+      country?: Country
+      jurisdictionCode?: string
+      regionName?: string
+      name?: string
+      email: string
+      phone?: string
+      bestTime?: string
+      enquiryType?: string
+      sourcePage?: string
+      consent?: boolean
+    }) =>
       call<any>('POST', '/leads', { ...body, platform: opts.platform || 'web' }, body.caseId, undefined, 'Lawyer Consultation Request'),
 
     // payment

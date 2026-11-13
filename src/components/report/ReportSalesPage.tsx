@@ -1026,6 +1026,8 @@ export default function ReportSalesPage({
         country={data.country === "US" ? "US" : "CA"}
         regionName={data.provinceName}
         caseId={caseId || undefined}
+        sourcePage="/report/pricing"
+        enquiryType="ask_lawyer"
       />
     </div>
   );

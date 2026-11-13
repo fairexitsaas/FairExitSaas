@@ -4,29 +4,29 @@ import React from 'react'
 import { useAdmin } from '../AdminContext'
 
 export default function LawyersPage() {
-  const { lawyers, setAddLawyerModalOpen } = useAdmin()
+  const { lawyers, loading, error, setAddLawyerModalOpen } = useAdmin()
 
   const getStatusChip = (status: string) => {
-    switch (status) {
-      case 'Active':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#eef8f3] text-[#0c8f72] whitespace-nowrap">
-            Active
-          </span>
-        )
-      case 'Paused · at monthly max':
-        return (
-          <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#fbf3df] text-[#b07a00] whitespace-nowrap">
-            Paused · at monthly max
-          </span>
-        )
-      default:
-        return (
-          <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#eef0f2] text-[#44525e] whitespace-nowrap">
-            {status}
-          </span>
-        )
+    const s = (status || '').toLowerCase()
+    if (s === 'active') {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#eef8f3] text-[#0c8f72] whitespace-nowrap">
+          Active
+        </span>
+      )
     }
+    if (s.includes('paused')) {
+      return (
+        <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#fbf3df] text-[#b07a00] whitespace-nowrap">
+          Paused · at monthly max
+        </span>
+      )
+    }
+    return (
+      <span className="inline-flex items-center gap-1 text-[11.5px] font-bold py-0.5 px-2.5 rounded-full bg-[#eef0f2] text-[#44525e] whitespace-nowrap">
+        {status}
+      </span>
+    )
   }
 
   return (
@@ -50,6 +50,12 @@ export default function LawyersPage() {
           Add a lawyer
         </button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3.5 rounded-[10px] bg-red-50 border border-red-200 text-red-700 text-[13px] font-semibold">
+          {error}
+        </div>
+      )}
 
       {/* Lawyers Table Card */}
       <div className="bg-white border border-[#e7e4dd] rounded-[12px] p-5 shadow-xs">
@@ -84,67 +90,88 @@ export default function LawyersPage() {
               </tr>
             </thead>
             <tbody>
-              {lawyers.map((lawyer, idx) => (
-                <tr
-                  key={lawyer.id}
-                  className={`hover:bg-[#f7fbf9] transition-colors ${
-                    idx < lawyers.length - 1 ? 'border-b border-[#f0ede6]' : ''
-                  }`}
-                >
-                  {/* Lawyer · Firm */}
-                  <td className="p-[10px_12px] whitespace-nowrap leading-tight">
-                    <b className="text-[#062c55] font-bold block">{lawyer.name}</b>
-                    <span className="text-[#5a6b78] text-[12px]">{lawyer.firm}</span>
-                  </td>
-
-                  {/* Address */}
-                  <td className="p-[10px_12px] text-[#5a6b78] whitespace-nowrap text-[12.5px] leading-tight">
-                    {lawyer.addressLines.map((line, i) => (
-                      <div key={i}>{line}</div>
-                    ))}
-                  </td>
-
-                  {/* Province / State · Country */}
-                  <td className="p-[10px_12px] text-[#17242f] whitespace-nowrap">
-                    {lawyer.regionCountry}
-                  </td>
-
-                  {/* Email · Phone */}
-                  <td className="p-[10px_12px] text-[#5a6b78] whitespace-nowrap leading-tight">
-                    <div>{lawyer.email}</div>
-                    <div className="text-[12px]">{lawyer.phone}</div>
-                  </td>
-
-                  {/* Status */}
-                  <td className="p-[10px_12px] whitespace-nowrap">
-                    {getStatusChip(lawyer.status)}
-                  </td>
-
-                  {/* Agreement */}
-                  <td className="p-[10px_12px] whitespace-nowrap leading-tight">
-                    <div className="text-[#17242f]">{lawyer.agreementDate}</div>
-                    <span className="text-[#5a6b78] text-[12px]">{lawyer.agreementType}</span>
-                  </td>
-
-                  {/* Sent · Month */}
-                  <td className="p-[10px_12px] text-right tabular-nums text-[#17242f] font-semibold whitespace-nowrap">
-                    {lawyer.sentMonth}
-                  </td>
-
-                  {/* Notes */}
-                  <td className="p-[10px_12px] text-[#5a6b78] text-[12.5px] whitespace-nowrap">
-                    {lawyer.notes}
+              {loading ? (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-[#5a6b78]">
+                    Loading lawyers…
                   </td>
                 </tr>
-              ))}
+              ) : lawyers.length > 0 ? (
+                lawyers.map((lawyer, idx) => {
+                  const addrLines = (lawyer as any).addressLines || lawyer.address_lines || []
+                  const regionCountry =
+                    (lawyer as any).regionCountry ||
+                    (lawyer.jurisdiction_code ? `${lawyer.jurisdiction_code} · ${lawyer.country}` : lawyer.country || '—')
+                  const agreementDate = (lawyer as any).agreementDate || lawyer.agreement_date || '—'
+                  const agreementType = (lawyer as any).agreementType || lawyer.agreement_type || 'flat ad fee'
+                  const sentMonth = (lawyer as any).sentMonth ?? lawyer.sentThisMonth ?? 0
+
+                  return (
+                    <tr
+                      key={lawyer.id || idx}
+                      className={`hover:bg-[#f7fbf9] transition-colors ${
+                        idx < lawyers.length - 1 ? 'border-b border-[#f0ede6]' : ''
+                      }`}
+                    >
+                      {/* Lawyer · Firm */}
+                      <td className="p-[10px_12px] whitespace-nowrap leading-tight">
+                        <b className="text-[#062c55] font-bold block">{lawyer.name}</b>
+                        <span className="text-[#5a6b78] text-[12px]">{lawyer.firm || 'Independent Counsel'}</span>
+                      </td>
+
+                      {/* Address */}
+                      <td className="p-[10px_12px] text-[#5a6b78] text-[12px] whitespace-nowrap leading-tight">
+                        {addrLines.length > 0 ? (
+                          addrLines.map((line: string, lIdx: number) => <div key={lIdx}>{line}</div>)
+                        ) : (
+                          <span>—</span>
+                        )}
+                      </td>
+
+                      {/* Province / State · country */}
+                      <td className="p-[10px_12px] text-[#17242f] whitespace-nowrap">
+                        {regionCountry}
+                      </td>
+
+                      {/* Email · Phone */}
+                      <td className="p-[10px_12px] text-[#5a6b78] whitespace-nowrap leading-tight">
+                        <div>{lawyer.email}</div>
+                        <div className="text-[12px] text-[#5a6b78]">{lawyer.phone}</div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="p-[10px_12px] whitespace-nowrap">
+                        {getStatusChip(lawyer.status)}
+                      </td>
+
+                      {/* Agreement */}
+                      <td className="p-[10px_12px] text-[#5a6b78] text-[12px] whitespace-nowrap leading-tight">
+                        <div>{agreementDate}</div>
+                        <div>{agreementType}</div>
+                      </td>
+
+                      {/* Sent · month */}
+                      <td className="p-[10px_12px] text-right tabular-nums text-[#062c55] font-bold whitespace-nowrap">
+                        {sentMonth}
+                      </td>
+
+                      {/* Notes */}
+                      <td className="p-[10px_12px] text-[#5a6b78] whitespace-nowrap">
+                        {lawyer.notes || '—'}
+                      </td>
+                    </tr>
+                  )
+                })
+              ) : (
+                <tr>
+                  <td colSpan={8} className="p-8 text-center text-[#5a6b78]">
+                    No lawyers in the roster yet. Click &quot;Add a lawyer&quot; to register a partner counsel.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
-
-        {/* Note below table */}
-        <p className="text-[12.5px] text-[#5a6b78] mt-3.5">
-          All names and addresses are fictional until real lawyers sign. &quot;Add a lawyer&quot; asks for: name, firm, address, province or state, country, email, phone, agreement date, status, notes. Lawyer sign-up, invites and profiles are phase 2.
-        </p>
       </div>
     </section>
   )

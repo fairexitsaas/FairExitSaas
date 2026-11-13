@@ -29,16 +29,7 @@ interface UserRecord {
   country: 'CA' | 'US'
 }
 
-const INITIAL_USERS: UserRecord[] = [
-  { id: 'FX-0420', region: 'California', industry: 'Tech', freeCheck: 'Done', report: 'Bought', lawyerRequest: 'Yes', date: 'Today', country: 'US' },
-  { id: 'FX-0419', region: 'British Columbia', industry: 'Construction', freeCheck: 'Done', report: '—', lawyerRequest: 'Yes', date: 'Today', country: 'CA' },
-  { id: 'FX-0418', region: 'Ontario', industry: 'Logistics', freeCheck: 'Done', report: 'Bought', lawyerRequest: '—', date: 'Yesterday', country: 'CA' },
-  { id: 'FX-0417', region: 'British Columbia', industry: 'Software', freeCheck: 'Done', report: '—', lawyerRequest: '—', date: 'Yesterday', country: 'CA' },
-  { id: 'FX-0409', region: 'Alberta', industry: 'Energy', freeCheck: 'Done', report: 'Bought', lawyerRequest: '—', date: '2 days', country: 'CA' },
-  { id: 'FX-0408', region: 'New York', industry: 'Finance', freeCheck: 'Done', report: 'Bought', lawyerRequest: '—', date: '2 days', country: 'US' },
-  { id: 'FX-0405', region: 'Texas', industry: 'Healthcare', freeCheck: 'Done', report: '—', lawyerRequest: 'Yes', date: '3 days', country: 'US' },
-  { id: 'FX-0402', region: 'Quebec', industry: 'Manufacturing', freeCheck: 'Done', report: '—', lawyerRequest: '—', date: '3 days', country: 'CA' },
-]
+const INITIAL_USERS: UserRecord[] = []
 
 interface LawyerRequestRecord {
   id: string
@@ -56,68 +47,7 @@ interface LawyerRequestRecord {
   country: 'CA' | 'US'
 }
 
-const INITIAL_LAWYER_REQUESTS: LawyerRequestRecord[] = [
-  {
-    id: 'REQ-0029',
-    daysAgo: '2 days ago',
-    region: 'Ontario',
-    name: 'A. Patel',
-    email: 'a.patel@..',
-    phone: '(647) 555-..',
-    status: 'New',
-    lawyer: '',
-    dateSent: '—',
-    howBy: null,
-    whatWeSent: null,
-    notes: '',
-    country: 'CA',
-  },
-  {
-    id: 'REQ-0028',
-    daysAgo: 'Today',
-    region: 'California',
-    name: 'T. Nguyen',
-    email: 't.nguyen@..',
-    phone: '(415) 555-..',
-    status: 'New',
-    lawyer: '',
-    dateSent: '—',
-    howBy: null,
-    whatWeSent: null,
-    notes: '',
-    country: 'US',
-  },
-  {
-    id: 'REQ-0027',
-    daysAgo: '3 days ago',
-    region: 'British Columbia',
-    name: 'K. Singh',
-    email: 'k.singh@..',
-    phone: '(604) 555-..',
-    status: 'Sent to lawyer',
-    lawyer: 'Coastline Work La',
-    dateSent: 'Oct 3',
-    howBy: { method: 'Email', agent: 'Sundeep' },
-    whatWeSent: { type: 'Summary', details: 'no documents' },
-    notes: 'Emailed firm, CC...',
-    country: 'CA',
-  },
-  {
-    id: 'REQ-0024',
-    daysAgo: '8 days ago',
-    region: 'Ontario',
-    name: 'M. Bell',
-    email: 'm.bell@..',
-    phone: '(416) 555-..',
-    status: 'Call happened',
-    lawyer: 'Jordan Ellis · Ellis Employm',
-    dateSent: 'Sep 29',
-    howBy: { method: 'Email', agent: 'Riaz' },
-    whatWeSent: { type: 'Summary', details: 'no documents' },
-    notes: 'Lawyer confirmed...',
-    country: 'CA',
-  },
-]
+const INITIAL_LAWYER_REQUESTS: LawyerRequestRecord[] = []
 
 interface ReportRecord {
   id: string
@@ -130,13 +60,7 @@ interface ReportRecord {
   country: 'CA' | 'US'
 }
 
-const INITIAL_REPORTS: ReportRecord[] = [
-  { id: 'RPT-7Q4K2M', user: 'FX-0418', region: 'Ontario', status: 'Completed', paidVia: 'Web · Stripe', amount: '$59 CAD', date: 'Today', country: 'CA' },
-  { id: 'RPT-5M8N1C', user: 'FX-0420', region: 'California', status: 'Processing', paidVia: 'App · Apple', amount: '$59 USD', date: 'Today', country: 'US' },
-  { id: 'RPT-8K2L4Q', user: 'FX-0411', region: 'Ontario', status: 'Failed · scan unreadable', paidVia: 'Web · Stripe', amount: '$59 CAD', date: '2 days', country: 'CA' },
-  { id: 'RPT-2H6T9P', user: 'FX-0409', region: 'Alberta', status: 'Completed', paidVia: 'App · Google', amount: '$59 CAD', date: '2 days', country: 'CA' },
-  { id: 'RPT-1D4P9S', user: 'FX-0408', region: 'New York', status: 'Completed', paidVia: 'Web · Stripe', amount: '$59 USD', date: '2 days', country: 'US' },
-]
+const INITIAL_REPORTS: ReportRecord[] = []
 
 interface LawyerRecord {
   id: string
@@ -154,53 +78,7 @@ interface LawyerRecord {
   country: 'CA' | 'US'
 }
 
-const INITIAL_LAWYERS: LawyerRecord[] = [
-  {
-    id: 'LAW-001',
-    name: 'Jordan Ellis',
-    firm: 'Ellis Employment Law',
-    addressLines: ['120 Adelaide St W,', 'Suite 2200', 'Toronto ON M5H 1T1'],
-    regionCountry: 'Ontario · Canada',
-    email: 'intake@..',
-    phone: '(416) 555-..',
-    status: 'Active',
-    agreementDate: 'Signed Jun 2026',
-    agreementType: 'flat ad fee',
-    sentMonth: 11,
-    notes: 'Prefers email intros',
-    country: 'CA',
-  },
-  {
-    id: 'LAW-002',
-    name: 'Coastline Work Law',
-    firm: 'firm - contact: Sam Osei',
-    addressLines: ['800 W Pender St,', '5th floor', 'Vancouver BC V6C 2V6'],
-    regionCountry: 'British Columbia · Canada',
-    email: 'hello@..',
-    phone: '(604) 555-..',
-    status: 'Paused · at monthly max',
-    agreementDate: 'Signed Aug 2026',
-    agreementType: 'flat ad fee',
-    sentMonth: 7,
-    notes: 'Max 8 a month',
-    country: 'CA',
-  },
-  {
-    id: 'LAW-003',
-    name: 'Morgan Reyes',
-    firm: 'Reyes Employment Law',
-    addressLines: ['355 S Grand Ave,', 'Suite 1800', 'Los Angeles CA 90071'],
-    regionCountry: 'California · US',
-    email: 'office@..',
-    phone: '(213) 555-..',
-    status: 'Active',
-    agreementDate: 'Signed Sep 2026',
-    agreementType: 'flat ad fee',
-    sentMonth: 6,
-    notes: '—',
-    country: 'US',
-  },
-]
+const INITIAL_LAWYERS: LawyerRecord[] = []
 
 function AdminDashboardInner({
   initialTab = 'overview',

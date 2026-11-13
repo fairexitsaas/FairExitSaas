@@ -279,7 +279,7 @@ export default function ReportFlow() {
           {cs.statusDetail === "build_failed" && <Btn className="mt-3" onClick={async () => { try { if (caseId || cs.id) await fairexit.buildReport(caseId || cs.id); await refresh(); } catch (e) { setError(errText(e)); } }}>Try again</Btn>}
         </Card>
       )}
-      <AskLawyerModal isOpen={lawyerOpen} onClose={() => setLawyerOpen(false)} country={country} regionName={cs.jurisdiction?.name} caseId={caseId || undefined} />
+      <AskLawyerModal isOpen={lawyerOpen} onClose={() => setLawyerOpen(false)} country={country} regionName={cs.jurisdiction?.name} caseId={caseId || undefined} sourcePage="/report" enquiryType="ask_lawyer" />
     </Shell>
   );
 }

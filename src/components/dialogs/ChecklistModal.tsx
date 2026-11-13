@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
+import { fairexit } from "@/lib/api/fairexit";
+import { notifyError, notifySuccess } from "@/lib/notifications";
 
 interface ChecklistModalProps {
   isOpen: boolean;
@@ -8,6 +10,9 @@ interface ChecklistModalProps {
   onOpenLawyerModal: () => void;
   country?: "US" | "CA";
   contractType?: "signed" | "none";
+  caseId?: string | null;
+  regionName?: string;
+  sourcePage?: string;
 }
 
 export default function ChecklistModal({
@@ -16,18 +21,51 @@ export default function ChecklistModal({
   onOpenLawyerModal,
   country = "US",
   contractType = "signed",
+  caseId = null,
+  regionName,
+  sourcePage,
 }: ChecklistModalProps) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
 
   if (!isOpen) return null;
 
-  const handleSend = () => {
-    if (!email || email.includes("@")) {
+  const handleSend = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (sending) return;
+
+    const trimmedEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
+    setError("");
+    setSending(true);
+    const currentPath = sourcePage || (typeof window !== "undefined" ? window.location.pathname : "/questions");
+
+    try {
+      await fairexit.askLawyer({
+        caseId: caseId || undefined,
+        country,
+        jurisdictionCode: regionName,
+        regionName,
+        email: trimmedEmail,
+        enquiryType: "3_point_checklist",
+        sourcePage: currentPath,
+        consent: true,
+      });
       setSent(true);
-      setTimeout(() => {
-        // keep open with success state or auto close
-      }, 1500);
+      notifySuccess("Checklist sent to your email!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Unable to send checklist. Please try again.";
+      setError(msg);
+      notifyError(msg);
+    } finally {
+      setSending(false);
     }
   };
 
@@ -93,27 +131,38 @@ export default function ChecklistModal({
           </div>
         </div>
 
+        {error && (
+          <div className="mb-3 p-2.5 rounded-[9px] bg-red-50 border border-red-200 text-red-700 text-[12.5px] font-semibold">
+            {error}
+          </div>
+        )}
+
         {sent ? (
           <div className="py-3 px-4 bg-[#e6f5ef] border border-[#b9e6d4] rounded-[10px] text-center font-sans font-[700] text-[13.5px] text-[#0c7a60] mb-3 animate-fade">
             ✓ Sent — checklist on its way to {email || "your email"}!
           </div>
         ) : (
-          <div className="space-y-2.5 mb-3">
+          <form onSubmit={handleSend} className="space-y-2.5 mb-3">
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@email.com (optional)"
-              className="w-full border border-[#cdd3d8] rounded-[10px] px-3.5 py-2.5 text-[13.5px] text-[#17242f] placeholder-[#8a98a4] focus:outline-none focus:border-[#0c8f72] transition-colors"
+              onChange={(e) => {
+                setEmail(e.target.value);
+                if (error) setError("");
+              }}
+              disabled={sending}
+              placeholder="you@email.com"
+              required
+              className="w-full border border-[#cdd3d8] rounded-[10px] px-3.5 py-2.5 text-[13.5px] text-[#17242f] placeholder-[#8a98a4] focus:outline-none focus:border-[#0c8f72] transition-colors disabled:opacity-60"
             />
             <button
-              type="button"
-              onClick={handleSend}
-              className="w-full py-3 rounded-[9px] bg-[#0c8f72] hover:bg-[#0aa07e] active:scale-[0.98] text-white font-sans font-[700] text-[14px] leading-[20px] transition-all cursor-pointer text-center shadow-xs"
+              type="submit"
+              disabled={sending}
+              className="w-full py-3 rounded-[9px] bg-[#0c8f72] hover:bg-[#0aa07e] active:scale-[0.98] text-white font-sans font-[700] text-[14px] leading-[20px] transition-all cursor-pointer text-center shadow-xs disabled:opacity-60"
             >
-              Email me this checklist
+              {sending ? "Sending…" : "Email me this checklist"}
             </button>
-          </div>
+          </form>
         )}
 
         {/* Link from Photo 4 */}

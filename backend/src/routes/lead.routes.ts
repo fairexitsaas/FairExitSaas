@@ -16,11 +16,23 @@ const router = Router()
 router.post('/', authRateLimiter, optionalAuthenticate, validate({ body: V.leadSchema }), h(async (req: Request, res: Response) => {
   let caseRow = null
   if (req.body.caseId) {
-    caseRow = await caseService.get(req.body.caseId)
-    const ok = caseService.hasToken(caseRow, req.headers['x-case-token'] as string) || (req.user && req.user.id === caseRow.user_id)
-    if (!ok) throw ApiError.notFound('Case not found')
-  } else if (!req.body.country) {
-    throw ApiError.unprocessable('Send caseId (with X-Case-Token) or country + jurisdictionCode')
+    try {
+      const c = await caseService.get(req.body.caseId)
+      const ok = caseService.hasToken(c, req.headers['x-case-token'] as string) || (req.user && req.user.id === c.user_id)
+      if (ok) {
+        caseRow = c
+      } else {
+        if (!req.body.country && c?.country) {
+          req.body.country = c.country
+          req.body.jurisdictionCode = req.body.jurisdictionCode || c.jurisdiction_code
+        }
+      }
+    } catch {
+      // Case not found or expired; continue with lead creation without crashing
+    }
+  }
+  if (!req.body.country && !caseRow) {
+    req.body.country = 'CA'
   }
   const r = await leadService.create({ ...req.body, caseRow, platform: (req.headers['x-platform'] as Platform) || req.body.platform })
   return ApiResponse.created(res, r, r.duplicate ? 'You already asked; we are on it.' : 'Sent')

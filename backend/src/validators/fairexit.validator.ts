@@ -1,4 +1,4 @@
-﻿import { z } from 'zod'
+import { z } from 'zod'
 
 const platform = z.enum(['web', 'ios', 'android']).default('web')
 const country = z.enum(['CA', 'US'])
@@ -148,11 +148,14 @@ export const leadSchema = z.object({
   caseId: uuid.optional(),
   country: country.optional(),
   jurisdictionCode: z.string().max(40).optional(),
-  name: z.string().trim().min(1).max(120),
-  email: z.string().email(),
-  phone: z.string().min(7).max(30),
+  regionName: z.string().max(100).optional(),
+  name: z.string().trim().max(120).optional(),
+  email: z.string().trim().email(),
+  phone: z.string().trim().max(30).optional(),
   bestTime: z.string().max(60).optional(),
-  consent: z.literal(true, { errorMap: () => ({ message: 'Tick the box so we can share your details.' }) }),
+  enquiryType: z.string().trim().max(60).optional(),
+  sourcePage: z.string().trim().max(200).optional(),
+  consent: z.boolean().optional(),
   platform,
 })
 
@@ -164,6 +167,9 @@ export const adminListQuery = z.object({
   country: z.enum(['CA', 'US', 'all']).default('all'),
   month: z.string().regex(/^\d{4}-\d{2}$/).optional(),
   status: z.string().max(30).optional(),
+  enquiryType: z.string().max(60).optional(),
+  search: z.string().max(100).optional(),
+  region: z.string().max(100).optional(),
   format: z.enum(['json', 'csv']).default('json'),
   limit: z.string().optional().transform((v) => (v ? Math.min(1000, parseInt(v, 10)) : 200)),
   offset: z.string().optional().transform((v) => (v ? parseInt(v, 10) : 0)),

@@ -4,13 +4,13 @@ import React from 'react'
 import { useAdmin } from '../AdminContext'
 
 export default function UsersPage() {
-  const { users, handleExportCSV } = useAdmin()
+  const { users, loading, error, handleExportCSV } = useAdmin()
 
   const onExport = () => {
     handleExportCSV(
       'users',
       ['User ID', 'Region', 'Industry', 'Free check', 'Report', 'Lawyer request', 'Date'],
-      users.map((u) => [u.id, u.region, u.industry, u.freeCheck, u.report, u.lawyerRequest, u.date])
+      users.map((u) => [u.userId, u.region, u.industry || '—', u.freeCheck, u.report, u.lawyerRequest, u.date])
     )
   }
 
@@ -35,6 +35,12 @@ export default function UsersPage() {
           Export CSV
         </button>
       </div>
+
+      {error && (
+        <div className="mb-4 p-3.5 rounded-[10px] bg-red-50 border border-red-200 text-red-700 text-[13px] font-semibold">
+          {error}
+        </div>
+      )}
 
       {/* Users Table Card */}
       <div className="bg-white border border-[#e7e4dd] rounded-[12px] overflow-hidden shadow-xs">
@@ -66,26 +72,40 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map((user, idx) => (
-                <tr
-                  key={user.id}
-                  className={`hover:bg-[#f7fbf9] transition-colors ${
-                    idx < users.length - 1 ? 'border-b border-[#f0ede6]' : ''
-                  }`}
-                >
-                  <td className="p-[10px_12px] tabular-nums font-bold text-[#062c55] whitespace-nowrap">
-                    {user.id}
-                  </td>
-                  <td className="p-[10px_12px] text-[#17242f]">{user.region}</td>
-                  <td className="p-[10px_12px] text-[#17242f]">{user.industry}</td>
-                  <td className="p-[10px_12px] text-[#17242f]">{user.freeCheck}</td>
-                  <td className="p-[10px_12px] text-[#17242f]">{user.report}</td>
-                  <td className="p-[10px_12px] text-[#17242f]">{user.lawyerRequest}</td>
-                  <td className="p-[10px_12px] text-right tabular-nums text-[#5a6b78]">
-                    {user.date}
+              {loading ? (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-[#5a6b78]">
+                    Loading users…
                   </td>
                 </tr>
-              ))}
+              ) : users.length > 0 ? (
+                users.map((user, idx) => (
+                  <tr
+                    key={user.userId || idx}
+                    className={`hover:bg-[#f7fbf9] transition-colors ${
+                      idx < users.length - 1 ? 'border-b border-[#f0ede6]' : ''
+                    }`}
+                  >
+                    <td className="p-[10px_12px] tabular-nums font-bold text-[#062c55] whitespace-nowrap">
+                      {user.userId}
+                    </td>
+                    <td className="p-[10px_12px] text-[#17242f]">{user.region || '—'}</td>
+                    <td className="p-[10px_12px] text-[#17242f]">{user.industry || '—'}</td>
+                    <td className="p-[10px_12px] text-[#17242f]">{user.freeCheck}</td>
+                    <td className="p-[10px_12px] text-[#17242f]">{user.report}</td>
+                    <td className="p-[10px_12px] text-[#17242f]">{user.lawyerRequest}</td>
+                    <td className="p-[10px_12px] text-right tabular-nums text-[#5a6b78]">
+                      {user.date ? new Date(user.date).toLocaleDateString() : '—'}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={7} className="p-8 text-center text-[#5a6b78]">
+                    No users recorded yet.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

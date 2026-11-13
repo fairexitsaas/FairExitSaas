@@ -5,10 +5,23 @@ import Link from 'next/link'
 import { useAdmin } from '../AdminContext'
 
 export default function OverviewPage() {
-  const { regionFilter, setRegionFilter, users } = useAdmin()
+  const { regionFilter, setRegionFilter, overview, users, loading, error } = useAdmin()
 
-  // Filter users based on region filter if needed
-  const filteredUsers = users.slice(0, 4)
+  const recentUsers = users.slice(0, 5)
+
+  // Calculate total revenue from cents across currencies
+  const totalRevenueCents = overview?.kpis.revenueCents
+    ? Object.values(overview.kpis.revenueCents).reduce((sum, val) => sum + val, 0)
+    : 0
+  const formattedRevenue = `$${Math.round(totalRevenueCents / 100).toLocaleString()}`
+
+  const reportTotal =
+    (overview?.reportStatus.completed || 0) +
+    (overview?.reportStatus.processing || 0) +
+    (overview?.reportStatus.failed || 0) +
+    (overview?.reportStatus.pendingPayment || 0)
+
+  const calcPct = (count: number) => (reportTotal > 0 ? Math.round((count / reportTotal) * 100) : 0)
 
   return (
     <section>
@@ -61,6 +74,12 @@ export default function OverviewPage() {
         </div>
       </div>
 
+      {error && (
+        <div className="mb-4 p-3.5 rounded-[10px] bg-red-50 border border-red-200 text-red-700 text-[13px] font-semibold">
+          {error}
+        </div>
+      )}
+
       {/* 5 KPIs */}
       <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3 mb-[18px]">
         {/* KPI 1: Free checks */}
@@ -69,10 +88,12 @@ export default function OverviewPage() {
             Free checks
           </div>
           <div className="text-[26px] font-extrabold text-[#062c55] mt-1 tabular-nums tracking-[-0.5px]">
-            {regionFilter === 'ca' ? '218' : regionFilter === 'us' ? '194' : '412'}
+            {loading ? '…' : (overview?.kpis.freeChecks ?? 0)}
           </div>
           <div className="text-[12px] text-[#0c8f72] font-bold mt-0.5">
-            +18% vs last month
+            {overview?.kpis.freeChecksChangePct !== null && overview?.kpis.freeChecksChangePct !== undefined
+              ? `${overview.kpis.freeChecksChangePct >= 0 ? '+' : ''}${overview.kpis.freeChecksChangePct}% vs last month`
+              : 'This month'}
           </div>
         </div>
 
@@ -82,10 +103,10 @@ export default function OverviewPage() {
             Reports bought · $59
           </div>
           <div className="text-[26px] font-extrabold text-[#062c55] mt-1 tabular-nums tracking-[-0.5px]">
-            {regionFilter === 'ca' ? '20' : regionFilter === 'us' ? '17' : '37'}
+            {loading ? '…' : (overview?.kpis.reportsBought ?? 0)}
           </div>
           <div className="text-[12px] text-[#5a6b78] mt-0.5">
-            9% of free checks
+            {overview?.kpis.conversionPct ?? 0}% of free checks
           </div>
         </div>
 
@@ -95,10 +116,10 @@ export default function OverviewPage() {
             Revenue
           </div>
           <div className="text-[26px] font-extrabold text-[#062c55] mt-1 tabular-nums tracking-[-0.5px]">
-            {regionFilter === 'ca' ? '$1,180' : regionFilter === 'us' ? '$1,003' : '$2,183'}
+            {loading ? '…' : formattedRevenue}
           </div>
           <div className="text-[12px] text-[#5a6b78] mt-0.5">
-            1 refund
+            {overview?.kpis.refunds ?? 0} {overview?.kpis.refunds === 1 ? 'refund' : 'refunds'}
           </div>
         </div>
 
@@ -108,10 +129,10 @@ export default function OverviewPage() {
             Lawyer requests
           </div>
           <div className="text-[26px] font-extrabold text-[#062c55] mt-1 tabular-nums tracking-[-0.5px]">
-            {regionFilter === 'ca' ? '16' : regionFilter === 'us' ? '13' : '29'}
+            {loading ? '…' : (overview?.kpis.lawyerRequests ?? 0)}
           </div>
           <div className="text-[12px] text-[#b07a00] font-bold mt-0.5">
-            2 not sent yet
+            {overview?.kpis.lawyerRequestsNotSent ?? 0} not sent yet
           </div>
         </div>
 
@@ -121,7 +142,7 @@ export default function OverviewPage() {
             Sent to a lawyer
           </div>
           <div className="text-[26px] font-extrabold text-[#062c55] mt-1 tabular-nums tracking-[-0.5px]">
-            {regionFilter === 'ca' ? '14' : regionFilter === 'us' ? '10' : '24'}
+            {loading ? '…' : (overview?.kpis.sentToLawyer ?? 0)}
           </div>
           <div className="text-[12px] text-[#5a6b78] mt-0.5">
             Updated by the team
@@ -142,36 +163,48 @@ export default function OverviewPage() {
             {/* Completed */}
             <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[13px]">
               <span>Completed</span>
-              <b className="tabular-nums text-[#062c55]">33</b>
+              <b className="tabular-nums text-[#062c55]">{overview?.reportStatus.completed ?? 0}</b>
               <div className="col-span-2 h-2 bg-[#f0ede6] rounded-[5px] overflow-hidden">
-                <span className="block h-full bg-[#0eb28d] rounded-[5px] w-[89%]" />
+                <span
+                  className="block h-full bg-[#0eb28d] rounded-[5px] transition-all"
+                  style={{ width: `${calcPct(overview?.reportStatus.completed || 0)}%` }}
+                />
               </div>
             </div>
 
             {/* Processing */}
             <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[13px]">
               <span>Processing</span>
-              <b className="tabular-nums text-[#062c55]">2</b>
+              <b className="tabular-nums text-[#062c55]">{overview?.reportStatus.processing ?? 0}</b>
               <div className="col-span-2 h-2 bg-[#f0ede6] rounded-[5px] overflow-hidden">
-                <span className="block h-full bg-[#062c55] rounded-[5px] w-[5%]" />
+                <span
+                  className="block h-full bg-[#062c55] rounded-[5px] transition-all"
+                  style={{ width: `${calcPct(overview?.reportStatus.processing || 0)}%` }}
+                />
               </div>
             </div>
 
             {/* Failed */}
             <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[13px]">
               <span>Failed (needs a look)</span>
-              <b className="tabular-nums text-[#062c55]">1</b>
+              <b className="tabular-nums text-[#062c55]">{overview?.reportStatus.failed ?? 0}</b>
               <div className="col-span-2 h-2 bg-[#f0ede6] rounded-[5px] overflow-hidden">
-                <span className="block h-full bg-[#e0b24a] rounded-[5px] w-[3%]" />
+                <span
+                  className="block h-full bg-[#e0b24a] rounded-[5px] transition-all"
+                  style={{ width: `${calcPct(overview?.reportStatus.failed || 0)}%` }}
+                />
               </div>
             </div>
 
             {/* Pending payment */}
             <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 text-[13px]">
               <span>Pending payment</span>
-              <b className="tabular-nums text-[#062c55]">1</b>
+              <b className="tabular-nums text-[#062c55]">{overview?.reportStatus.pendingPayment ?? 0}</b>
               <div className="col-span-2 h-2 bg-[#f0ede6] rounded-[5px] overflow-hidden">
-                <span className="block h-full bg-[#e0b24a] rounded-[5px] w-[3%]" />
+                <span
+                  className="block h-full bg-[#8fb0cf] rounded-[5px] transition-all"
+                  style={{ width: `${calcPct(overview?.reportStatus.pendingPayment || 0)}%` }}
+                />
               </div>
             </div>
           </div>
@@ -182,38 +215,43 @@ export default function OverviewPage() {
           <h2 className="text-[15px] font-extrabold text-[#062c55] flex items-baseline gap-2.5 mb-3">
             Needs attention
           </h2>
-          <ul className="space-y-0 text-[13px]">
-            <li className="flex gap-2.5 py-2.5 border-b border-[#f0ede6]">
-              <span className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-[#d42e2b]" />
-              <div>
-                <b className="text-[#17242f]">REQ-0029 not sent yet · 2 business days old</b>
-                <small className="block text-[#5a6b78] text-[12px]">
-                  Promise is 3 business days.{' '}
-                  <Link href="/admin/lawyer-requests" className="text-[#0c8f72] font-semibold hover:underline">
-                    Open Lawyer requests.
-                  </Link>
-                </small>
-              </div>
-            </li>
-            <li className="flex gap-2.5 py-2.5 border-b border-[#f0ede6]">
-              <span className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-[#b07a00]" />
-              <div>
-                <b className="text-[#17242f]">1 report failed to build</b>
-                <small className="block text-[#5a6b78] text-[12px]">
-                  RPT-8K2L4Q · scan unreadable. Email the person.
-                </small>
-              </div>
-            </li>
-            <li className="flex gap-2.5 pt-2.5">
-              <span className="w-2 h-2 rounded-full mt-1.5 shrink-0 bg-[#2c62b8]" />
-              <div>
-                <b className="text-[#17242f]">No lawyer listed for Alberta yet</b>
-                <small className="block text-[#5a6b78] text-[12px]">
-                  Requests from Alberta wait until you add one.
-                </small>
-              </div>
-            </li>
-          </ul>
+          {overview?.needsAttention && overview.needsAttention.length > 0 ? (
+            <ul className="space-y-0 text-[13px]">
+              {overview.needsAttention.map((item, idx) => (
+                <li
+                  key={idx}
+                  className={`flex gap-2.5 py-2.5 ${
+                    idx < overview.needsAttention.length - 1 ? 'border-b border-[#f0ede6]' : ''
+                  }`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${
+                      item.type === 'lead_not_sent'
+                        ? 'bg-[#d42e2b]'
+                        : item.type === 'report_failed'
+                        ? 'bg-[#b07a00]'
+                        : 'bg-[#2c62b8]'
+                    }`}
+                  />
+                  <div>
+                    <b className="text-[#17242f]">{item.text}</b>
+                    {item.type === 'lead_not_sent' && (
+                      <small className="block text-[#5a6b78] text-[12px]">
+                        <Link href="/admin/lawyer-requests" className="text-[#0c8f72] font-semibold hover:underline">
+                          Open Lawyer requests.
+                        </Link>
+                      </small>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <div className="text-[13px] text-[#5a6b78] py-8 text-center flex flex-col items-center justify-center">
+              <span className="text-[#0c8f72] text-[20px] mb-1">✓</span>
+              <span>All clear. No items require immediate attention.</span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -247,25 +285,33 @@ export default function OverviewPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((user, idx) => (
-                <tr
-                  key={user.id}
-                  className={`hover:bg-[#f7fbf9] transition-colors ${
-                    idx < filteredUsers.length - 1 ? 'border-b border-[#f0ede6]' : ''
-                  }`}
-                >
-                  <td className="p-[10px_12px] tabular-nums font-bold text-[#062c55] whitespace-nowrap">
-                    {user.id}
-                  </td>
-                  <td className="p-[10px_12px] text-[#17242f]">{user.region}</td>
-                  <td className="p-[10px_12px] text-[#17242f]">{user.industry}</td>
-                  <td className="p-[10px_12px] text-[#17242f]">{user.report}</td>
-                  <td className="p-[10px_12px] text-[#17242f]">{user.lawyerRequest}</td>
-                  <td className="p-[10px_12px] text-right tabular-nums text-[#5a6b78]">
-                    {user.date}
+              {recentUsers.length > 0 ? (
+                recentUsers.map((user, idx) => (
+                  <tr
+                    key={user.userId || idx}
+                    className={`hover:bg-[#f7fbf9] transition-colors ${
+                      idx < recentUsers.length - 1 ? 'border-b border-[#f0ede6]' : ''
+                    }`}
+                  >
+                    <td className="p-[10px_12px] tabular-nums font-bold text-[#062c55] whitespace-nowrap">
+                      {user.userId}
+                    </td>
+                    <td className="p-[10px_12px] text-[#17242f]">{user.region || '—'}</td>
+                    <td className="p-[10px_12px] text-[#17242f]">{user.industry || '—'}</td>
+                    <td className="p-[10px_12px] text-[#17242f]">{user.report}</td>
+                    <td className="p-[10px_12px] text-[#17242f]">{user.lawyerRequest}</td>
+                    <td className="p-[10px_12px] text-right tabular-nums text-[#5a6b78]">
+                      {user.date ? new Date(user.date).toLocaleDateString() : '—'}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-[#5a6b78]">
+                    No users recorded yet.
                   </td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>

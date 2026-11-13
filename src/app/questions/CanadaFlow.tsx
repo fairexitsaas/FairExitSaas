@@ -5119,6 +5119,9 @@ function QuestionsContent() {
         onOpenLawyerModal={() => setAskLawyerOpen(true)}
         country="CA"
         contractType={state.contract === "none" ? "none" : "signed"}
+        caseId={caseId}
+        regionName={state.province || "Ontario"}
+        sourcePage="/questions"
       />
 
       {/* ── ASK A LAWYER TO CONTACT ME MODAL (PHOTO 2) ── */}
@@ -5128,6 +5131,8 @@ function QuestionsContent() {
         country="CA"
         regionName={state.province || "Ontario"}
         caseId={caseId}
+        sourcePage="/questions"
+        enquiryType="ask_lawyer"
       />
 
       {/* ── STICKY BOTTOM BAR ("Your details — Ontario · 14 yrs [View]") ── */}
