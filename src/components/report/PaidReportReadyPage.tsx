@@ -45,10 +45,17 @@ export default function PaidReportReadyPage({
   const [downloadError, setDownloadError] = useState("");
 
   // Build state: 'building' | 'ready' | 'failed'
-  const isInitiallyReady = cs?.status === "ready" && !!cs?.report && !!cs?.report_pdf_path;
+  const isInitiallyReady = cs?.status === "ready" && !!cs?.report;
   const [buildStatus, setBuildStatus] = useState<"building" | "ready" | "failed">(
     isInitiallyReady ? "ready" : "building"
   );
+
+  useEffect(() => {
+    if (cs?.status === "ready" && !!cs?.report) {
+      setBuildStatus("ready");
+      setPdfPending(false);
+    }
+  }, [cs?.status, cs?.report]);
   type FailureKind = "polling_timeout" | "claude_failed" | "pdf_failed" | "generic_failed" | null;
   const [failureKind, setFailureKind] = useState<FailureKind>(null);
   const [pdfPending, setPdfPending] = useState(false);
@@ -86,38 +93,90 @@ export default function PaidReportReadyPage({
   const [postPayError, setPostPayError] = useState("");
 
   const activeId = caseId || cs?.id;
+  const userEmail = postPayEmail || cs?.email || data.email || "";
+  const [deliveryPollVersion, setDeliveryPollVersion] = useState(0);
 
   // Sync actual email delivery status from backend in live mode when report is ready
   useEffect(() => {
-    if (!activeId || emailMode !== "live" || buildStatus !== "ready") return;
-    fairexit
-      .getReportDelivery(activeId)
-      .then((res) => {
-        if (res?.delivery?.status === "sent") {
+    // 1. Guard conditions
+    if (!activeId || emailMode !== "live" || buildStatus !== "ready" || !userEmail) {
+      if (!userEmail && emailSentState === "pending") {
+        setEmailSentState("none");
+      }
+      return;
+    }
+
+    // 2. If already in a terminal state (sent or failed), do not start polling unless explicitly re-triggered
+    if (emailSentState === "sent" || (emailSentState === "failed" && !isRetryingEmail)) {
+      return;
+    }
+
+    let isSubscribed = true;
+    let timerId: NodeJS.Timeout | null = null;
+    let inFlight = false;
+
+    const checkDelivery = async () => {
+      if (!isSubscribed || inFlight) return;
+      inFlight = true;
+      try {
+        const res = await fairexit.getReportDelivery(activeId);
+        if (!isSubscribed) return;
+
+        const deliveryStatus = res?.delivery?.status;
+        if (deliveryStatus === "sent") {
           setEmailSentState("sent");
-        } else if (res?.delivery?.status === "failed") {
+          setEmailError("");
+          // Terminal status: stop polling immediately
+          return;
+        } else if (deliveryStatus === "failed") {
           setEmailSentState("failed");
-          setEmailError(res.delivery.error || "Email delivery failed");
-        } else if (res?.delivery?.status === "pending") {
+          setEmailError(res?.delivery?.error || "Email delivery failed");
+          // Terminal status: stop polling
+          return;
+        } else if (deliveryStatus === "disabled") {
+          setEmailSentState("none");
+          // Terminal status in mock mode: stop polling
+          return;
+        } else if (deliveryStatus === "pending") {
           setEmailSentState("pending");
+          // Continue checking delivery status periodically (every 2.5s)
+          if (isSubscribed) {
+            timerId = setTimeout(checkDelivery, 2500);
+          }
+        } else if (deliveryStatus === "no_email" || !deliveryStatus) {
+          setEmailSentState("none");
         }
-      })
-      .catch(() => {});
-  }, [activeId, emailMode, buildStatus]);
+      } catch {
+        // Transient network error checking delivery status: retry in 3s if still subscribed
+        if (isSubscribed) {
+          timerId = setTimeout(checkDelivery, 3000);
+        }
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    checkDelivery();
+
+    return () => {
+      isSubscribed = false;
+      if (timerId) clearTimeout(timerId);
+    };
+  }, [activeId, emailMode, buildStatus, userEmail, deliveryPollVersion]);
 
   // Poll only the report status endpoint while a build is active.
   useEffect(() => {
     if (!activeId) return;
 
     // If report and PDF are already marked ready in the initial case data, don't start a poll
-    if (cs?.status === "ready" && !!cs?.report && !!cs?.report_pdf_path) {
+    if (cs?.status === "ready" && !!cs?.report && (!!cs?.report_pdf_path || !!(cs?.report as any)?.available)) {
       setBuildStatus("ready");
       setPdfPending(false);
       return;
     }
 
     // Ensure report build is triggered if not already in building or ready status
-    if (cs?.status !== "building" && cs?.status !== "ready") {
+    if (cs && cs.status !== "building" && cs.status !== "ready") {
       (async () => {
         try {
           await fairexit.attest(activeId);
@@ -226,7 +285,6 @@ export default function PaidReportReadyPage({
 
   const isCanada = cs?.country ? cs.country === "CA" : data.country !== "US";
   const answers = (cs?.answers as Record<string, unknown>) || {};
-  const userEmail = postPayEmail || cs?.email || data.email || "";
   const priceCurrency = isCanada ? "$59 CAD" : "$59 USD";
 
   const [persistedToken, setPersistedToken] = useState<string>(() => {
@@ -277,6 +335,7 @@ export default function PaidReportReadyPage({
     if (!activeId || isRetryingEmail || emailMode === "mock") return;
     setIsRetryingEmail(true);
     setEmailError("");
+    setEmailSentState("pending");
     try {
       const res = await fairexit.sendReportEmail(activeId, { forceRetry: true, email: userEmail });
       if (res?.status === "sent") {
@@ -284,6 +343,9 @@ export default function PaidReportReadyPage({
         notifySuccess(`Report emailed to ${userEmail}!`);
       } else if (res?.status === "disabled") {
         setEmailSentState("none");
+      } else if (res?.status === "pending") {
+        setEmailSentState("pending");
+        setDeliveryPollVersion((v) => v + 1);
       } else {
         setEmailSentState("failed");
         setEmailError(res?.error || "Could not send report email");
@@ -352,6 +414,10 @@ export default function PaidReportReadyPage({
         } else if (res?.emailDelivery?.status === "failed") {
           setEmailSentState("failed");
           setEmailError(res.emailDelivery.error || "Email delivery failed");
+        } else if (res?.emailDelivery?.status === "pending") {
+          setEmailSentState("pending");
+          setDeliveryPollVersion((v) => v + 1);
+          notifySuccess("Customer information saved!");
         } else {
           setEmailSentState("none");
           notifySuccess("Customer information saved!");

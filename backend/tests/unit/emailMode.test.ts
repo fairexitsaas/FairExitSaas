@@ -498,4 +498,64 @@ describe('EMAIL_MODE: Independent Mock & Live Resend Integration Tests', () => {
     expect(serialized).not.toContain('super_secret_resend_key_never_leak')
     expect(serialized).not.toContain('RESEND_API_KEY')
   })
+
+  it('14. Authoritative delivery resolution prevents older pending status from overriding sent status', async () => {
+    // Case 1: consent has 'sent', answers has 'pending'
+    const caseSentInConsent: CaseRow = {
+      ...sampleCase,
+      answers: {
+        ...sampleCase.answers,
+        report_delivery: { status: 'pending', to: 'client@example.com' },
+      },
+      consent: {
+        ...sampleCase.consent,
+        report_delivery: { status: 'sent', sentAt: '2026-11-16T10:00:00.000Z', to: 'client@example.com', resendId: 're_abc' },
+      },
+    }
+    vi.spyOn(caseService, 'get').mockResolvedValue(caseSentInConsent)
+    const status1 = await caseService.getDeliveryStatus(sampleCase.id)
+    expect(status1.delivery.status).toBe('sent')
+    expect(status1.delivery.sentAt).toBe('2026-11-16T10:00:00.000Z')
+    expect(status1.delivery.alreadySent).toBe(true)
+
+    // Case 2: answers has 'sent', consent has 'pending'
+    const caseSentInAnswers: CaseRow = {
+      ...sampleCase,
+      answers: {
+        ...sampleCase.answers,
+        report_delivery: { status: 'sent', sentAt: '2026-11-16T10:05:00.000Z', to: 'client@example.com', resendId: 're_def' },
+      },
+      consent: {
+        ...sampleCase.consent,
+        report_delivery: { status: 'pending', to: 'client@example.com' },
+      },
+    }
+    vi.spyOn(caseService, 'get').mockResolvedValue(caseSentInAnswers)
+    const status2 = await caseService.getDeliveryStatus(sampleCase.id)
+    expect(status2.delivery.status).toBe('sent')
+    expect(status2.delivery.sentAt).toBe('2026-11-16T10:05:00.000Z')
+    expect(status2.delivery.alreadySent).toBe(true)
+  })
+
+  it('15. Terminal delivery states (sent, failed) are returned accurately by delivery status endpoint', async () => {
+    ;(env as any).EMAIL_MODE = 'live'
+
+    // Mock case with failed delivery in both answers and consent
+    const failedCase: CaseRow = {
+      ...sampleCase,
+      answers: {
+        ...sampleCase.answers,
+        report_delivery: { status: 'failed', failedAt: '2026-11-16T10:00:00.000Z', error: 'Invalid recipient domain', to: 'bad@example.com' },
+      },
+      consent: {
+        ...sampleCase.consent,
+        report_delivery: { status: 'failed', failedAt: '2026-11-16T10:00:00.000Z', error: 'Invalid recipient domain', to: 'bad@example.com' },
+      },
+    }
+    vi.spyOn(caseService, 'get').mockResolvedValue(failedCase)
+    const failedStatus = await caseService.getDeliveryStatus(sampleCase.id)
+    expect(failedStatus.delivery.status).toBe('failed')
+    expect(failedStatus.delivery.error).toBe('Invalid recipient domain')
+    expect(failedStatus.delivery.alreadySent).toBe(false)
+  })
 })

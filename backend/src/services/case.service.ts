@@ -21,6 +21,27 @@ export function newToken(): string {
   return 'fxc_' + crypto.randomBytes(24).toString('base64url')
 }
 
+export function getAuthoritativeDelivery(c: CaseRow): Record<string, any> | null {
+  const ans = (c.answers as any)?.report_delivery || null
+  const con = (c.consent as any)?.report_delivery || null
+  if (!ans && !con) return null
+  if (!ans) return con
+  if (!con) return ans
+
+  // If one is 'sent', 'sent' always takes precedence over 'pending' or 'failed'
+  if (ans.status === 'sent' && con.status !== 'sent') return ans
+  if (con.status === 'sent' && ans.status !== 'sent') return con
+
+  // If one is 'failed', 'failed' takes precedence over 'pending'
+  if (ans.status === 'failed' && con.status === 'pending') return ans
+  if (con.status === 'failed' && ans.status === 'pending') return con
+
+  // Compare timestamps if both have sentAt / failedAt
+  const ansTime = new Date(ans.sentAt || ans.failedAt || 0).getTime()
+  const conTime = new Date(con.sentAt || con.failedAt || 0).getTime()
+  return ansTime >= conTime ? ans : con
+}
+
 export const caseService = {
   async create(input: { country: Country; answers: Record<string, any>; platform: Platform; industry?: string | null; userId?: string | null }) {
     const token = newToken()
@@ -234,7 +255,7 @@ export const caseService = {
       }
     }
 
-    const deliveryRecord = (c.answers?.report_delivery as any) || (c.consent?.report_delivery as any)
+    const deliveryRecord = getAuthoritativeDelivery(c)
     if (deliveryRecord?.status === 'sent' && deliveryRecord?.to === c.email && !forceRetry) {
       return {
         status: 'sent' as const,
@@ -257,9 +278,10 @@ export const caseService = {
           mocked: false,
           attempts: (deliveryRecord?.attempts || 0) + 1,
         }
-        await this.update(c.id, {
-          answers: { ...(c.answers || {}), report_delivery: reportDelivery },
-          consent: { ...(c.consent || {}), report_delivery: reportDelivery },
+        const fresh = await this.get(c.id).catch(() => c)
+        await this.update(fresh.id, {
+          answers: { ...(fresh.answers || {}), report_delivery: reportDelivery },
+          consent: { ...(fresh.consent || {}), report_delivery: reportDelivery },
         })
         return { status: 'sent' as const, sentAt: now, to: c.email, resendId: res.id }
       } else {
@@ -270,9 +292,10 @@ export const caseService = {
           to: c.email,
           attempts: (deliveryRecord?.attempts || 0) + 1,
         }
-        await this.update(c.id, {
-          answers: { ...(c.answers || {}), report_delivery: reportDelivery },
-          consent: { ...(c.consent || {}), report_delivery: reportDelivery },
+        const fresh = await this.get(c.id).catch(() => c)
+        await this.update(fresh.id, {
+          answers: { ...(fresh.answers || {}), report_delivery: reportDelivery },
+          consent: { ...(fresh.consent || {}), report_delivery: reportDelivery },
         })
         return { status: 'failed' as const, error: reportDelivery.error, to: c.email }
       }
@@ -285,9 +308,10 @@ export const caseService = {
         to: c.email,
         attempts: (deliveryRecord?.attempts || 0) + 1,
       }
-      await this.update(c.id, {
-        answers: { ...(c.answers || {}), report_delivery: reportDelivery },
-        consent: { ...(c.consent || {}), report_delivery: reportDelivery },
+      const fresh = await this.get(c.id).catch(() => c)
+      await this.update(fresh.id, {
+        answers: { ...(fresh.answers || {}), report_delivery: reportDelivery },
+        consent: { ...(fresh.consent || {}), report_delivery: reportDelivery },
       })
       return { status: 'failed' as const, error: reportDelivery.error, to: c.email }
     }
@@ -295,7 +319,7 @@ export const caseService = {
 
   async getDeliveryStatus(caseId: string) {
     const c = await this.get(caseId)
-    const delivery = (c.answers?.report_delivery as any) || (c.consent?.report_delivery as any) || null
+    const delivery = getAuthoritativeDelivery(c)
     return {
       paid: this.isPaid(c),
       reportReady: c.status === 'ready' && !!c.report_ready_at,
@@ -342,7 +366,7 @@ export const caseService = {
       payment: row.paid_at ? { provider: row.payment_provider, amountCents: row.amount_cents, currency: row.currency } : null,
       email: row.email,
       customerName: row.answers?.customer_name || row.answers?.name || null,
-      reportDelivery: (row.answers?.report_delivery as any) || (row.consent?.report_delivery as any) || null,
+      reportDelivery: getAuthoritativeDelivery(row),
       remind: row.remind,
       contractStatus: row.contract_status,
       documents: {
@@ -355,6 +379,7 @@ export const caseService = {
       report: row.report_id
         ? { reportId: row.report_id, readyAt: row.report_ready_at, deleteAfter: row.report_delete_after, available: !!row.report }
         : null,
+      report_pdf_path: row.report_pdf_path,
       hasExtractedDocs: Boolean(row.call_a?.facts && row.call_a.facts.length > 0),
       extractedFacts: row.call_a?.facts || null,
       attestedAt: row.attested_at,

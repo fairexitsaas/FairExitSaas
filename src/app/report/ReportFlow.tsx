@@ -122,6 +122,12 @@ export default function ReportFlow() {
     }
   }, [caseId]);
 
+  useEffect(() => {
+    if (caseId) {
+      refresh();
+    }
+  }, [caseId, refresh]);
+
   const confirmedSessionRef = useRef<string | null>(null);
 
   // Stripe redirect back: exactly one component handles Stripe Checkout session confirmation
@@ -174,6 +180,14 @@ export default function ReportFlow() {
     setView("upload");
     router.push(`/report?step=upload${id ? `&case=${id}` : ""}`);
   };
+
+  if (caseId && !cs && !error) {
+    return (
+      <div className="min-h-screen bg-[#F6F4EF] flex items-center justify-center p-4">
+        <Spinner text="Loading your report details…" />
+      </div>
+    );
+  }
 
   // If jurisdiction is genuinely not covered (e.g. Quebec), show the not covered screen
   if (cs && !cs.covered && (cs.answers?.province === "QC" || cs.answers?.province === "Quebec")) {
@@ -291,7 +305,7 @@ export default function ReportFlow() {
     <Shell rail={step}>
       <ErrorBox text={error} />
       {step === "not_covered" && (
-        <Card><H1>Not covered yet</H1><p className="text-[#5a6b78]">FairExit doesn&apos;t cover {cs.freeResult?.name || "this region"} yet.</p></Card>
+        <Card><H1>Not covered yet</H1><p className="text-[#5a6b78]">FairExit doesn&apos;t cover {cs?.freeResult?.name || "this region"} yet.</p></Card>
       )}
       {step === "pay" && <PayStep cs={cs} cfg={cfg} onDone={refresh} />}
       {step === "upload" && <UploadStep cs={cs} words={words} onRead={async () => { setView(null); await refresh(); }} />}
@@ -302,19 +316,19 @@ export default function ReportFlow() {
       {step === "check" && <CheckStep cs={cs} words={words} onAddClearerCopy={() => setView("upload")} onBuilt={() => { setView("building"); void refresh(); }} />}
       {step === "building" && (
         <Card><Kicker>Step 4 of 4</Kicker><H1>Building your report…</H1><Spinner text="This takes a minute or two." />
-          <p className="text-[13px] text-[#5a6b78] mt-3">We&apos;ll also email it to {cs.email || "you"}.</p></Card>
+          <p className="text-[13px] text-[#5a6b78] mt-3">We&apos;ll also email it to {cs?.email || "you"}.</p></Card>
       )}
-      {step === "ready" && <ReadyStep cs={cs} caseId={caseId || cs.id || ""} words={words} onLawyer={() => setLawyerOpen(true)} />}
-      {cs.status === "failed" && (
+      {step === "ready" && <ReadyStep cs={cs} caseId={caseId || cs?.id || ""} words={words} onLawyer={() => setLawyerOpen(true)} />}
+      {cs?.status === "failed" && (
         <Card className="mt-4" style={{ borderLeft: `4px solid ${C.red}` }}>
-          <b className="text-[#062c55]">{cs.statusDetail === "build_failed" ? "We couldn't build your report." : "We couldn't read your documents."}</b>
+          <b className="text-[#062c55]">{cs?.statusDetail === "build_failed" ? "We couldn't build your report." : "We couldn't read your documents."}</b>
           <p className="text-[13.5px] text-[#5a6b78] mt-1">
-            {cs.statusDetail === "build_failed" ? "Your confirmed details are saved. Try again below." : "Add a clearer copy (a PDF or a flat, well-lit photo) and try again."}
+            {cs?.statusDetail === "build_failed" ? "Your confirmed details are saved. Try again below." : "Add a clearer copy (a PDF or a flat, well-lit photo) and try again."}
           </p>
-          {cs.statusDetail === "build_failed" && <Btn className="mt-3" onClick={async () => { try { if (caseId || cs.id) await fairexit.buildReport(caseId || cs.id); await refresh(); } catch (e) { setError(errText(e)); } }}>Try again</Btn>}
+          {cs?.statusDetail === "build_failed" && <Btn className="mt-3" onClick={async () => { try { if (caseId || cs?.id) await fairexit.buildReport(caseId || cs.id); await refresh(); } catch (e) { setError(errText(e)); } }}>Try again</Btn>}
         </Card>
       )}
-      <AskLawyerModal isOpen={lawyerOpen} onClose={() => setLawyerOpen(false)} country={country} regionName={cs.jurisdiction?.name} caseId={caseId || undefined} sourcePage="/report" enquiryType="ask_lawyer" />
+      <AskLawyerModal isOpen={lawyerOpen} onClose={() => setLawyerOpen(false)} country={country} regionName={cs?.jurisdiction?.name} caseId={caseId || undefined} sourcePage="/report" enquiryType="ask_lawyer" />
       <PostPaymentCustomerModal
         isOpen={customerModalOpen}
         caseId={caseId || cs?.id || null}
