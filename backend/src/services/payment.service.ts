@@ -394,12 +394,23 @@ export const paymentService = {
     check(await db().from('payments').upsert({ case_id: caseId, provider, provider_ref: providerRef, status: 'paid', amount_cents: amountCents, currency, raw }, { onConflict: 'provider,provider_ref' }), 'payment')
     const c = await caseService.get(caseId)
     if (c.paid_at) return { paid: true, alreadyPaid: true, case: c }
+    const paidAt = new Date().toISOString()
     const updated = await caseService.update(caseId, {
       status: c.status === 'free_check' || c.status === 'pending_payment' ? 'paid' : c.status,
-      paid_at: new Date().toISOString(),
+      paid_at: paidAt,
       payment_provider: provider,
       amount_cents: amountCents,
       currency,
+    })
+
+    logger.info('[PAYMENT][CONFIRMED]', {
+      caseId,
+      provider,
+      providerRef,
+      amountCents,
+      currency,
+      paidAt,
+      alreadyPaid: false,
     })
     if (updated.email && env.EMAIL_MODE === 'live') {
       const token = await caseService.addToken(updated)

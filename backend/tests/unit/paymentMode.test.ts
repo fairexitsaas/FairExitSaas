@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { caseController } from '../../src/controllers/case.controller'
 import { paymentService, setStripe } from '../../src/services/payment.service'
-import { caseService } from '../../src/services/case.service'
+import { caseService, hasCompletedPostPaymentCollection } from '../../src/services/case.service'
 import { emailService } from '../../src/services/email.service'
+import { logger } from '../../src/utils/logger'
 import { env } from '../../src/config/env'
 import type { CaseRow } from '../../src/fairexit/types'
 
@@ -733,5 +734,114 @@ describe('Payment Mode Configuration & Verification (Mock vs Live in Production)
     await expect(
       caseService.deliverReportEmail(unpaidCase)
     ).rejects.toThrow('Payment required before report delivery')
+  })
+
+  // -------------------------------------------------------------------------
+  // 15. Structured payment confirmation log & post-payment customer info check
+  // -------------------------------------------------------------------------
+  it('15. Emits [PAYMENT][CONFIRMED] log once and correctly validates post-payment collection status', async () => {
+    const loggerInfoSpy = vi.spyOn(logger, 'info')
+
+    const unpaidCase: CaseRow = {
+      ...sampleCase,
+      status: 'free_check',
+      paid_at: null,
+      payment_provider: null,
+      email: 'preexisting@example.com', // Pre-existing email without customer_name or consent
+      consent: null,
+      answers: {},
+    }
+
+    // Pre-existing email alone must NOT count as completed customer info
+    expect(hasCompletedPostPaymentCollection(unpaidCase)).toBe(false)
+    expect(caseService.view(unpaidCase).hasCompletedCustomerInfo).toBe(false)
+
+    // Mock db for payments table
+    const { db } = await import('../../src/config/db')
+    vi.spyOn(db(), 'from').mockImplementation((table: string) => {
+      if (table === 'payments') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+              }),
+            }),
+          }),
+          upsert: vi.fn().mockResolvedValue({ data: {}, error: null }),
+        } as any
+      }
+      return {} as any
+    })
+
+    vi.spyOn(caseService, 'get').mockResolvedValue(unpaidCase)
+    vi.spyOn(caseService, 'update').mockImplementation(async (id, patch) => {
+      return {
+        ...unpaidCase,
+        ...patch,
+        status: patch.status || unpaidCase.status,
+      } as any
+    })
+
+    const result = await paymentService.markPaid(
+      unpaidCase.id,
+      'stripe',
+      'cs_test_conf_log',
+      5900,
+      'USD'
+    )
+
+    expect(result.paid).toBe(true)
+    expect(result.alreadyPaid).toBe(false)
+
+    // Verify structured log output
+    const confirmedLogCall = loggerInfoSpy.mock.calls.find(call => call[0] === '[PAYMENT][CONFIRMED]')
+    expect(confirmedLogCall).toBeDefined()
+    expect(confirmedLogCall![1]).toMatchObject({
+      caseId: unpaidCase.id,
+      provider: 'stripe',
+      providerRef: 'cs_test_conf_log',
+      amountCents: 5900,
+      currency: 'USD',
+      alreadyPaid: false,
+    })
+
+    // Now test idempotency on duplicate call: should not log again
+    loggerInfoSpy.mockClear()
+    const paidCase = {
+      ...unpaidCase,
+      status: 'paid' as any,
+      paid_at: new Date().toISOString(),
+      payment_provider: 'stripe' as any,
+    }
+    vi.spyOn(caseService, 'get').mockResolvedValue(paidCase)
+
+    const dupResult = await paymentService.markPaid(
+      unpaidCase.id,
+      'stripe',
+      'cs_test_conf_log',
+      5900,
+      'USD'
+    )
+    expect(dupResult.paid).toBe(true)
+    expect(dupResult.alreadyPaid).toBe(true)
+    const duplicateLog = loggerInfoSpy.mock.calls.find(call => call[0] === '[PAYMENT][CONFIRMED]')
+    expect(duplicateLog).toBeUndefined()
+
+    // Test submitCustomerInfo updates completion status
+    vi.spyOn(caseService, 'addToken').mockResolvedValue('test_token_123')
+    const completedCase = {
+      ...paidCase,
+      email: 'jane.smith@example.com',
+      answers: { customer_name: 'Jane Smith' },
+      consent: {
+        name: 'Jane Smith',
+        email: 'jane.smith@example.com',
+        source: 'post-payment-collection',
+        submitted_at: new Date().toISOString(),
+      },
+    }
+    expect(hasCompletedPostPaymentCollection(completedCase)).toBe(true)
+    expect(caseService.view(completedCase as any).hasCompletedCustomerInfo).toBe(true)
   })
 })

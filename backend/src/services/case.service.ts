@@ -42,6 +42,23 @@ export function getAuthoritativeDelivery(c: CaseRow): Record<string, any> | null
   return ansTime >= conTime ? ans : con
 }
 
+export function hasCompletedPostPaymentCollection(c: CaseRow | any): boolean {
+  if (!c) return false
+  const answers = (c.answers as Record<string, any>) || {}
+  const consent = (c.consent as Record<string, any>) || {}
+  const hasName = Boolean(
+    c.customerName ||
+    answers.customer_name ||
+    answers.name ||
+    consent.name
+  )
+  const hasEmail = Boolean(c.email || consent.email)
+  const isPostPaySource = consent.source === 'post-payment-collection'
+  const hasSubmittedAt = Boolean(consent.submitted_at)
+
+  return Boolean(hasName && hasEmail && isPostPaySource && hasSubmittedAt)
+}
+
 export const caseService = {
   async create(input: { country: Country; answers: Record<string, any>; platform: Platform; industry?: string | null; userId?: string | null }) {
     const token = newToken()
@@ -366,6 +383,8 @@ export const caseService = {
       payment: row.paid_at ? { provider: row.payment_provider, amountCents: row.amount_cents, currency: row.currency } : null,
       email: row.email,
       customerName: row.answers?.customer_name || row.answers?.name || null,
+      hasCompletedCustomerInfo: hasCompletedPostPaymentCollection(row),
+      consent: row.consent,
       reportDelivery: getAuthoritativeDelivery(row),
       remind: row.remind,
       contractStatus: row.contract_status,

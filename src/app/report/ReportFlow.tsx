@@ -16,6 +16,27 @@ import CanadaReviewPage from "@/components/report/ca/CanadaReviewPage";
 import USReviewPage from "@/components/report/us/USReviewPage";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 import PostPaymentCustomerModal from "@/components/report/PostPaymentCustomerModal";
+import PaymentLoadingUI from "@/components/report/payment/PaymentLoadingUI";
+
+export function hasCompletedPostPaymentCollection(c: any): boolean {
+  if (!c) return false;
+  if (typeof c.hasCompletedCustomerInfo === "boolean") {
+    return c.hasCompletedCustomerInfo;
+  }
+  const answers = c.answers || {};
+  const consent = c.consent || {};
+  const hasName = Boolean(
+    c.customerName ||
+    answers.customer_name ||
+    answers.name ||
+    consent.name
+  );
+  const hasEmail = Boolean(c.email || consent.email);
+  const isPostPaySource = consent.source === "post-payment-collection";
+  const hasSubmittedAt = Boolean(consent.submitted_at);
+
+  return Boolean(hasName && hasEmail && isPostPaySource && hasSubmittedAt);
+}
 
 /* ── palette (same tokens as the prototype) ── */
 const C = {
@@ -96,6 +117,16 @@ export default function ReportFlow() {
   const [error, setError] = useState("");
   const [lawyerOpen, setLawyerOpen] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [paymentStatus, setPaymentStatus] = useState<"idle" | "confirming" | "confirmed" | "failed">("idle");
+  const [showPaymentSuccessBanner, setShowPaymentSuccessBanner] = useState(false);
+
+  const urlStep = sp?.get("step");
+  const step = view || urlStep || cs?.nextStep;
+  const countryParam = sp?.get("country")?.toUpperCase();
+  const country = cs?.country || (countryParam === "US" ? "US" : "CA");
+  const words = cs?.jurisdiction?.words || (country === "US"
+    ? { lawyer: "attorney", region: "state", letter: "separation agreement", contract: "offer letter or employment contract" }
+    : { lawyer: "lawyer", region: "province", letter: "severance letter", contract: "employment contract" });
 
   // resolve the case from ?case=&t= (email link) or the last case in this browser
   useEffect(() => {
@@ -140,33 +171,40 @@ export default function ReportFlow() {
     confirmedSessionRef.current = sessionId;
 
     (async () => {
+      setPaymentStatus("confirming");
       try {
         const res = await fairexit.stripeConfirm(caseId, { sessionId });
         // Only open the customer modal after backend confirms payment was successful
         if (res?.paid) {
-          if (!res?.case?.email) {
+          setPaymentStatus("confirmed");
+          setShowPaymentSuccessBanner(true);
+          const cur = (cs?.country || countryParam || "US") === "US" ? "USD" : "CAD";
+          notifySuccess(`Payment successful! Your $59 ${cur} payment has been confirmed.`);
+
+          const fresh = await refresh();
+          const targetCase = fresh || res?.case;
+          if (!hasCompletedPostPaymentCollection(targetCase)) {
             setCustomerModalOpen(true);
           } else {
             setView("upload");
           }
         } else {
+          setPaymentStatus("failed");
           setError("Payment confirmation was unsuccessful. Please check with your bank or contact support.");
         }
       } catch (e) {
+        setPaymentStatus("failed");
         setError(errText(e));
-      } finally {
-        await refresh();
       }
     })();
-  }, [caseId, sp, refresh]);
+  }, [caseId, sp, refresh, countryParam, cs?.country]);
 
-  const urlStep = sp?.get("step");
-  const step = view || urlStep || cs?.nextStep;
-  const countryParam = sp?.get("country")?.toUpperCase();
-  const country = cs?.country || (countryParam === "US" ? "US" : "CA");
-  const words = cs?.jurisdiction?.words || (country === "US"
-    ? { lawyer: "attorney", region: "state", letter: "separation agreement", contract: "offer letter or employment contract" }
-    : { lawyer: "lawyer", region: "province", letter: "severance letter", contract: "employment contract" });
+  // Auto-open post-payment customer details modal if the case is paid but details are incomplete
+  useEffect(() => {
+    if (cs?.paid && !hasCompletedPostPaymentCollection(cs) && !customerModalOpen && paymentStatus !== "confirming") {
+      setCustomerModalOpen(true);
+    }
+  }, [cs, customerModalOpen, paymentStatus]);
 
   const handlePaySuccess = async (newCaseId?: string) => {
     const id = newCaseId || caseId;
@@ -175,6 +213,13 @@ export default function ReportFlow() {
       try {
         const c = await fairexit.getCase(id);
         setCs(c);
+        setPaymentStatus("confirmed");
+        setShowPaymentSuccessBanner(true);
+        const cur = (c?.country || country) === "US" ? "USD" : "CAD";
+        notifySuccess(`Payment successful! Your $59 ${cur} payment has been confirmed.`);
+        if (!hasCompletedPostPaymentCollection(c)) {
+          setCustomerModalOpen(true);
+        }
       } catch (e) {
         console.warn("Could not load case", e);
       }
@@ -182,6 +227,26 @@ export default function ReportFlow() {
     setView("upload");
     router.push(`/report?step=upload${id ? `&case=${id}` : ""}`);
   };
+
+  const handleCustomerSuccess = async () => {
+    setCustomerModalOpen(false);
+    setView("upload");
+    const fresh = await refresh();
+    const id = fresh?.id || caseId;
+    if (id) {
+      router.push(`/report?step=upload&case=${id}`);
+    }
+  };
+
+  if (paymentStatus === "confirming") {
+    return (
+      <PaymentLoadingUI
+        fullScreen
+        title="Verifying your payment…"
+        subtitle="Securely confirming your transaction with Stripe. Please do not close or refresh this window."
+      />
+    );
+  }
 
   if (caseId && !cs && !error) {
     return (
@@ -211,56 +276,82 @@ export default function ReportFlow() {
     );
   }
 
-  // Allow post-pay steps (upload, reading, review, ready) directly during testing
-  const isPostPayStep = step === "upload" || view === "upload" || step === "reading" || view === "reading" || step === "review" || view === "review" || step === "ready" || view === "ready";
-  if ((urlStep === "pay" || step === "pay") && !isPostPayStep) {
-    return (
-      <ReportSalesPage
-        caseId={caseId}
-        cs={cs}
-        cfg={cfg}
-        country={country}
-        onPaySuccess={handlePaySuccess}
-      />
-    );
-  }
+  const renderScreen = () => {
+    // Allow post-pay steps (upload, reading, review, ready) directly during testing
+    const isPostPayStep =
+      step === "upload" ||
+      view === "upload" ||
+      step === "reading" ||
+      view === "reading" ||
+      step === "review" ||
+      view === "review" ||
+      step === "ready" ||
+      view === "ready";
 
-  // If on upload step (post payment), show the Figma 1200px/390px upload screen
-  if (step === "upload" || view === "upload") {
-    return (
-      <ReportUploadPage
-        caseId={caseId}
-        cs={cs}
-        onContinue={async () => {
-          setView("reading");
-          if (caseId) {
-            router.push(`/report?step=reading&case=${caseId}`);
-          } else {
-            router.push(`/report?step=reading`);
-          }
-        }}
-      />
-    );
-  }
-
-  // Loading / Reading state after submission (COMMON / Reading your letter)
-  if (step === "reading" || view === "reading") {
-    return (
-      <ReadingLetterPage
-        caseId={caseId}
-        cs={cs}
-        onDone={() => {
-          setView("review");
-        }}
-      />
-    );
-  }
-
-  // Country-specific flow after reading state
-  if (step === "review" || view === "review") {
-    if (country === "US") {
+    if ((urlStep === "pay" || step === "pay") && !isPostPayStep) {
       return (
-        <USReviewPage
+        <ReportSalesPage
+          caseId={caseId}
+          cs={cs}
+          cfg={cfg}
+          country={country}
+          onPaySuccess={handlePaySuccess}
+        />
+      );
+    }
+
+    // If on upload step (post payment), show the Figma 1200px/390px upload screen
+    if (step === "upload" || view === "upload") {
+      return (
+        <ReportUploadPage
+          caseId={caseId}
+          cs={cs}
+          onContinue={async () => {
+            setView("reading");
+            if (caseId) {
+              router.push(`/report?step=reading&case=${caseId}`);
+            } else {
+              router.push(`/report?step=reading`);
+            }
+          }}
+        />
+      );
+    }
+
+    // Loading / Reading state after submission (COMMON / Reading your letter)
+    if (step === "reading" || view === "reading") {
+      return (
+        <ReadingLetterPage
+          caseId={caseId}
+          cs={cs}
+          onDone={() => {
+            setView("review");
+          }}
+        />
+      );
+    }
+
+    // Country-specific flow after reading state
+    if (step === "review" || view === "review") {
+      if (country === "US") {
+        return (
+          <USReviewPage
+            caseId={caseId}
+            cs={cs}
+            onContinue={(targetStep = "building") => {
+              setView(targetStep);
+              if (caseId) {
+                router.push(`/report?step=${targetStep}&case=${caseId}`);
+              } else {
+                router.push(`/report?step=${targetStep}`);
+              }
+              refresh();
+            }}
+          />
+        );
+      }
+      return (
+        <CanadaReviewPage
           caseId={caseId}
           cs={cs}
           onContinue={(targetStep = "building") => {
@@ -275,74 +366,100 @@ export default function ReportFlow() {
         />
       );
     }
-    return (
-      <CanadaReviewPage
-        caseId={caseId}
-        cs={cs}
-        onContinue={(targetStep = "building") => {
-          setView(targetStep);
-          if (caseId) {
-            router.push(`/report?step=${targetStep}&case=${caseId}`);
-          } else {
-            router.push(`/report?step=${targetStep}`);
-          }
-          refresh();
-        }}
-      />
-    );
-  }
 
-  // Report Ready or Building state (COMMON / Paid · report ready (PDF))
-  if (step === "ready" || view === "ready" || step === "building" || view === "building") {
+    // Report Ready or Building state (COMMON / Paid · report ready (PDF))
+    if (step === "ready" || view === "ready" || step === "building" || view === "building") {
+      return (
+        <PaidReportReadyPage
+          caseId={caseId}
+          cs={cs}
+          onDone={refresh}
+        />
+      );
+    }
+
     return (
-      <PaidReportReadyPage
-        caseId={caseId}
-        cs={cs}
-        onDone={refresh}
-      />
+      <Shell rail={step}>
+        <ErrorBox text={error} />
+        {step === "not_covered" && (
+          <Card><H1>Not covered yet</H1><p className="text-[#5a6b78]">FairExit doesn&apos;t cover {cs?.freeResult?.name || "this region"} yet.</p></Card>
+        )}
+        {step === "pay" && <PayStep cs={cs} cfg={cfg} onDone={refresh} />}
+        {step === "upload" && <UploadStep cs={cs} words={words} onRead={async () => { setView(null); await refresh(); }} />}
+        {step === "reading" && (
+          <Card><Kicker>Step 2 of 4</Kicker><H1>Reading your documents…</H1><Spinner text="This usually takes under a minute." />
+            <p className="text-[13px] text-[#5a6b78] mt-3">You can leave this page; your progress is saved.</p></Card>
+        )}
+        {step === "check" && <CheckStep cs={cs} words={words} onAddClearerCopy={() => setView("upload")} onBuilt={() => { setView("building"); void refresh(); }} />}
+        {step === "building" && (
+          <Card><Kicker>Step 4 of 4</Kicker><H1>Building your report…</H1><Spinner text="This takes a minute or two." />
+            <p className="text-[13px] text-[#5a6b78] mt-3">We&apos;ll also email it to {cs?.email || "you"}.</p></Card>
+        )}
+        {step === "ready" && <ReadyStep cs={cs} caseId={caseId || cs?.id || ""} words={words} onLawyer={() => setLawyerOpen(true)} />}
+        {cs?.status === "failed" && (
+          <Card className="mt-4" style={{ borderLeft: `4px solid ${C.red}` }}>
+            <b className="text-[#062c55]">{cs?.statusDetail === "build_failed" ? "We couldn't build your report." : "We couldn't read your documents."}</b>
+            <p className="text-[13.5px] text-[#5a6b78] mt-1">
+              {cs?.statusDetail === "build_failed" ? "Your confirmed details are saved. Try again below." : "Add a clearer copy (a PDF or a flat, well-lit photo) and try again."}
+            </p>
+            {cs?.statusDetail === "build_failed" && <Btn className="mt-3" onClick={async () => { try { if (caseId || cs?.id) await fairexit.buildReport(caseId || cs.id); await refresh(); } catch (e) { setError(errText(e)); } }}>Try again</Btn>}
+          </Card>
+        )}
+      </Shell>
     );
-  }
+  };
+
+  const currencyCode = country === "US" ? "USD" : "CAD";
+  const successFeedbackText = `Payment successful! Your $59 ${currencyCode} payment has been confirmed.`;
 
   return (
-    <Shell rail={step}>
-      <ErrorBox text={error} />
-      {step === "not_covered" && (
-        <Card><H1>Not covered yet</H1><p className="text-[#5a6b78]">FairExit doesn&apos;t cover {cs?.freeResult?.name || "this region"} yet.</p></Card>
+    <>
+      {showPaymentSuccessBanner && (
+        <div className="sticky top-0 z-40 bg-[#E5F5EE] border-b border-[#C7E6D6] px-4 py-3 text-center shadow-xs">
+          <div className="max-w-[760px] mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-[#04291F] font-semibold text-[14px]">
+              <span className="w-5 h-5 rounded-full bg-[#0EB28D] text-white flex items-center justify-center text-[12px] font-bold">
+                ✓
+              </span>
+              <span>{successFeedbackText}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPaymentSuccessBanner(false)}
+              className="text-[#0C8F72] hover:text-[#04291F] text-[18px] font-bold leading-none px-1"
+              aria-label="Dismiss banner"
+            >
+              ×
+            </button>
+          </div>
+        </div>
       )}
-      {step === "pay" && <PayStep cs={cs} cfg={cfg} onDone={refresh} />}
-      {step === "upload" && <UploadStep cs={cs} words={words} onRead={async () => { setView(null); await refresh(); }} />}
-      {step === "reading" && (
-        <Card><Kicker>Step 2 of 4</Kicker><H1>Reading your documents…</H1><Spinner text="This usually takes under a minute." />
-          <p className="text-[13px] text-[#5a6b78] mt-3">You can leave this page; your progress is saved.</p></Card>
-      )}
-      {step === "check" && <CheckStep cs={cs} words={words} onAddClearerCopy={() => setView("upload")} onBuilt={() => { setView("building"); void refresh(); }} />}
-      {step === "building" && (
-        <Card><Kicker>Step 4 of 4</Kicker><H1>Building your report…</H1><Spinner text="This takes a minute or two." />
-          <p className="text-[13px] text-[#5a6b78] mt-3">We&apos;ll also email it to {cs?.email || "you"}.</p></Card>
-      )}
-      {step === "ready" && <ReadyStep cs={cs} caseId={caseId || cs?.id || ""} words={words} onLawyer={() => setLawyerOpen(true)} />}
-      {cs?.status === "failed" && (
-        <Card className="mt-4" style={{ borderLeft: `4px solid ${C.red}` }}>
-          <b className="text-[#062c55]">{cs?.statusDetail === "build_failed" ? "We couldn't build your report." : "We couldn't read your documents."}</b>
-          <p className="text-[13.5px] text-[#5a6b78] mt-1">
-            {cs?.statusDetail === "build_failed" ? "Your confirmed details are saved. Try again below." : "Add a clearer copy (a PDF or a flat, well-lit photo) and try again."}
-          </p>
-          {cs?.statusDetail === "build_failed" && <Btn className="mt-3" onClick={async () => { try { if (caseId || cs?.id) await fairexit.buildReport(caseId || cs.id); await refresh(); } catch (e) { setError(errText(e)); } }}>Try again</Btn>}
-        </Card>
-      )}
-      <AskLawyerModal isOpen={lawyerOpen} onClose={() => setLawyerOpen(false)} country={country} regionName={cs?.jurisdiction?.name} caseId={caseId || undefined} sourcePage="/report" enquiryType="ask_lawyer" />
+
+      {renderScreen()}
+
       <PostPaymentCustomerModal
         isOpen={customerModalOpen}
         caseId={caseId || cs?.id || null}
-        initialName={cs?.customerName || (cs?.answers as any)?.customer_name || ""}
-        initialEmail={cs?.email || ""}
-        onSuccess={async () => {
-          setCustomerModalOpen(false);
-          await refresh();
+        initialName={cs?.customerName || (cs?.answers as any)?.customer_name || (cs?.answers as any)?.name || (cs?.consent as any)?.name || ""}
+        initialEmail={cs?.email || (cs?.consent as any)?.email || ""}
+        onSuccess={handleCustomerSuccess}
+        onClose={() => {
+          if (hasCompletedPostPaymentCollection(cs)) {
+            setCustomerModalOpen(false);
+          }
         }}
-        onClose={() => setCustomerModalOpen(false)}
       />
-    </Shell>
+
+      <AskLawyerModal
+        isOpen={lawyerOpen}
+        onClose={() => setLawyerOpen(false)}
+        country={country}
+        regionName={cs?.jurisdiction?.name}
+        caseId={caseId || undefined}
+        sourcePage="/report"
+        enquiryType="ask_lawyer"
+      />
+    </>
   );
 }
 

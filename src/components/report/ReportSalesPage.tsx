@@ -1175,7 +1175,7 @@ export default function ReportSalesPage({
                 <button
                   type="submit"
                   disabled={isPaying || !isPaymentModeResolved}
-                  className="w-full h-[55px] rounded-[12px] bg-[#12C79A] hover:bg-[#0EB28D] text-white font-sans font-[800] text-[17.5px] leading-[27px] transition-all shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer flex items-center justify-center disabled:opacity-50"
+                  className="w-full h-[55px] rounded-[12px] bg-[#12C79A] hover:bg-[#0EB28D] text-white font-sans font-[800] text-[17.5px] leading-[27px] transition-all shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer flex items-center justify-center disabled:opacity-60"
                 >
                   {!isPaymentModeResolved ? (
                     isConfigLoading ? (
@@ -1187,14 +1187,26 @@ export default function ReportSalesPage({
                       "Checkout unavailable"
                     )
                   ) : isPaying ? (
-                    <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Redirecting to checkout…
-                    </span>
+                    <div className="flex items-center gap-2.5">
+                      <div className="relative w-5 h-5 flex items-center justify-center shrink-0">
+                        <span className="absolute inset-0 rounded-full border-2 border-white/30" />
+                        <span className="absolute inset-0 rounded-full border-2 border-transparent border-t-white border-r-[#FAF8F5] animate-spin" />
+                      </div>
+                      <span className="text-[16px] font-[700] tracking-wide">
+                        Securely preparing your checkout…
+                      </span>
+                    </div>
                   ) : (
                     `Get my report · $59 ${isUS ? "USD" : "CAD"}`
                   )}
                 </button>
+
+                {isPaying && (
+                  <div className="p-3.5 bg-[#FAF8F5] border border-[#E7E4DD] rounded-[12px] text-center text-[#062C55] text-[13px] font-sans flex items-center justify-center gap-2.5 shadow-xs animate-fadein">
+                    <div className="w-4 h-4 rounded-full border-2 border-[#062C55]/25 border-t-[#0EB28D] animate-spin" />
+                    <span className="font-semibold">Redirecting you to Stripe…</span>
+                  </div>
+                )}
 
                 {/* Subtitle / Guarantees */}
                 <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center font-sans font-normal text-[12px] leading-[18px] text-[#5A6B78] pt-1">

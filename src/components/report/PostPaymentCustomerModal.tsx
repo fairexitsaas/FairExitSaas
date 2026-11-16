@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
 import { saveReportInputs } from "@/lib/report-storage";
@@ -28,6 +28,15 @@ export default function PostPaymentCustomerModal({
   const [consentNews, setConsentNews] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+
+  // Synchronize name & email with case data when modal opens or initial values change, clearing stale errors
+  useEffect(() => {
+    if (isOpen) {
+      if (initialName) setName(initialName);
+      if (initialEmail) setEmail(initialEmail);
+      setErrorMessage("");
+    }
+  }, [isOpen, initialName, initialEmail]);
 
   if (!isOpen) return null;
 
@@ -112,12 +121,9 @@ export default function PostPaymentCustomerModal({
       aria-modal="true"
       aria-label="Your payment is confirmed"
     >
-      {/* Backdrop */}
+      {/* Backdrop — backdrop dismissal is intentionally disabled so users cannot bypass required name/email collection */}
       <div
         className="fixed inset-0 bg-[#062C55]/65 backdrop-blur-xs transition-opacity"
-        onClick={() => {
-          if (!isSubmitting && onClose) onClose();
-        }}
       />
 
       {/* Modal Dialog */}
