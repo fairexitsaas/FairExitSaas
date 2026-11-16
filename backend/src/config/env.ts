@@ -95,6 +95,10 @@ const envSchema = z.object({
   STRIPE_SECRET_KEY: z.string().optional(),
   STRIPE_WEBHOOK_SECRET: z.string().optional(),
   STRIPE_AUTOMATIC_TAX: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  US_PAID_REPORT: z.string().optional(),
+  CANADA_PAID_REPORT: z.string().optional(),
+  STRIPE_PRICE_ID_US: z.string().optional(),
+  STRIPE_PRICE_ID_CA: z.string().optional(),
   // Apple In-App Purchase (App Store Server API)
   APPLE_IAP_PRODUCT_ID: z.string().default('fairexit.severance_report'),
   APPLE_BUNDLE_ID: z.string().optional(),

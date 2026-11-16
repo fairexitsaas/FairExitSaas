@@ -146,6 +146,8 @@ export default function ReportFlow() {
         if (res?.paid) {
           if (!res?.case?.email) {
             setCustomerModalOpen(true);
+          } else {
+            setView("upload");
           }
         } else {
           setError("Payment confirmation was unsuccessful. Please check with your bank or contact support.");
@@ -390,7 +392,10 @@ function PayStep({ cs, cfg, onDone }: { cs: any; cfg: any; onDone: () => void })
         onDone();
       } else {
         const back = `${window.location.origin}/report?case=${cs.id}`;
-        const r = await fairexit.stripeCheckout(cs.id, { successUrl: back, cancelUrl: back });
+        const r = await fairexit.stripeCheckout(cs.id, {
+          successUrl: `${back}&session_id={CHECKOUT_SESSION_ID}`,
+          cancelUrl: `${back}&step=pay&canceled=true`,
+        });
         if (r.url) window.location.assign(r.url);
       }
     } catch (e) { setErr(errText(e)); setBusy(false); }

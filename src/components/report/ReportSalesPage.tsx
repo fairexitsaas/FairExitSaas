@@ -160,6 +160,16 @@ export default function ReportSalesPage({
   const [subscribeNews, setSubscribeNews] = useState(true);
   const [isPaying, setIsPaying] = useState(false);
   const [payError, setPayError] = useState("");
+  const [isCanceled, setIsCanceled] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const sp = new URLSearchParams(window.location.search);
+      if (sp.get("canceled") === "true") {
+        setIsCanceled(true);
+      }
+    }
+  }, []);
 
   // FAQ Accordion states
   const [openFaq, setOpenFaq] = useState<Record<number, boolean>>({});
@@ -315,9 +325,40 @@ export default function ReportSalesPage({
     ? (data.state || data.provinceName || "New York")
     : (data.provinceName || "Ontario");
 
-  const proceedToPayment = () => {
+  const proceedToPayment = async () => {
     setPayError("");
-    setCheckoutDialogOpen(true);
+    const activeCaseId = caseId || cs?.id;
+    if (!activeCaseId) {
+      setPayError("Case identifier missing. Please refresh and try again.");
+      return;
+    }
+
+    if (isMockPayment) {
+      setCheckoutDialogOpen(true);
+      return;
+    }
+
+    // Live mode: redirect customers directly to Stripe-hosted Checkout
+    setIsPaying(true);
+    try {
+      await fairexit.prepareCheckout(activeCaseId, { termsAccepted: true, consentVersion: "2026-09-21" });
+      const successUrl = `${window.location.origin}/report?case=${activeCaseId}&session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${window.location.origin}/report?case=${activeCaseId}&step=pay&canceled=true`;
+      const res = await fairexit.stripeCheckout(activeCaseId, {
+        successUrl,
+        cancelUrl,
+      });
+
+      if (res?.url) {
+        window.location.assign(res.url);
+      } else {
+        throw new Error("Could not redirect to payment provider.");
+      }
+    } catch (err: unknown) {
+      setIsPaying(false);
+      const msg = err instanceof Error ? err.message : "Payment could not be completed. Please try again.";
+      setPayError(msg);
+    }
   };
 
   const handleCheckoutSubmit = (e: React.FormEvent) => {
@@ -374,10 +415,11 @@ export default function ReportSalesPage({
         setCustomerModalOpen(true);
       } else {
         // 2b. Execute live Stripe checkout (when PAYMENTS_MODE=live)
-        const backUrl = `${window.location.origin}/report?case=${activeCaseId}&step=pay`;
+        const successUrl = `${window.location.origin}/report?case=${activeCaseId}&session_id={CHECKOUT_SESSION_ID}`;
+        const cancelUrl = `${window.location.origin}/report?case=${activeCaseId}&step=pay&canceled=true`;
         const res = await fairexit.stripeCheckout(activeCaseId, {
-          successUrl: backUrl,
-          cancelUrl: backUrl,
+          successUrl,
+          cancelUrl,
         });
 
         if (res?.url) {
@@ -1064,7 +1106,7 @@ export default function ReportSalesPage({
                     $59
                   </div>
                   <div className="font-serif font-normal text-[11px] leading-[11px] text-[#5A6B78] mt-1">
-                    one-time
+                    {isUS ? "USD · one-time" : "CAD · one-time"}
                   </div>
                 </div>
               </div>
@@ -1077,6 +1119,12 @@ export default function ReportSalesPage({
                 (you add them right after paying). Yours to keep, print or share with{" "}
                 {isUS ? "an attorney" : "a lawyer"}.
               </p>
+
+              {isCanceled && (
+                <div className="p-3 mb-4 bg-[#FEF6EE] border border-[#F9DBAF] text-[#874A00] text-[13px] rounded-lg">
+                  Checkout was cancelled. You have not been charged.
+                </div>
+              )}
 
               {/* Checkout Form */}
               <form onSubmit={handleCheckoutSubmit} className="space-y-4">
@@ -1139,9 +1187,12 @@ export default function ReportSalesPage({
                       "Checkout unavailable"
                     )
                   ) : isPaying ? (
-                    "Preparing checkout…"
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Redirecting to checkout…
+                    </span>
                   ) : (
-                    "Get my report · $59"
+                    `Get my report · $59 ${isUS ? "USD" : "CAD"}`
                   )}
                 </button>
 
@@ -1149,7 +1200,7 @@ export default function ReportSalesPage({
                 <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center font-sans font-normal text-[12px] leading-[18px] text-[#5A6B78] pt-1">
                   <span>No account needed</span>
                   <span>·</span>
-                  <span>$59 plus applicable tax</span>
+                  <span>$59 {isUS ? "USD" : "CAD"} plus applicable tax</span>
                   <span>·</span>
                   <button
                     type="button"
