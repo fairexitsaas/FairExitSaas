@@ -8,6 +8,7 @@ export interface CheckoutDialogProps {
   onClose: () => void;
   email?: string;
   amount?: string;
+  taxNote?: string;
   onPay: (paymentMethod: "apple_pay" | "card", cardDetails?: { number: string; exp: string; cvc: string }) => Promise<void>;
   isProcessing?: boolean;
   errorMessage?: string;
@@ -18,6 +19,7 @@ export default function CheckoutDialog({
   onClose,
   email = "",
   amount = "$59.00",
+  taxNote = "applicable tax",
   onPay,
   isProcessing = false,
   errorMessage = "",
@@ -145,7 +147,7 @@ export default function CheckoutDialog({
                 Processing…
               </span>
             ) : (
-              `Pay ${amount} + applicable tax →`
+              `Pay ${amount} + ${taxNote} →`
             )}
           </button>
         </form>

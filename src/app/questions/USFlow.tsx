@@ -374,18 +374,22 @@ export default function USFlow() {
 
       let id = caseId;
       try {
-        id = id || (await ensureCase());
+        if (!id) {
+          id = await ensureCase();
+        }
       } catch (e) {
-        console.warn("Could not save to remote backend, continuing with local data", e);
+        console.error("Could not save to remote backend", e);
+        setErrorMessage("Could not save your check. Please check your connection and try again.");
+        return;
       }
       if (id) {
         router.push(`/report?case=${id}&step=pay`);
       } else {
-        router.push("/report?step=pay");
+        setErrorMessage("Case creation in progress. Please try again in a moment.");
       }
     } catch (err) {
       console.error("FairExit: could not transition to report", err);
-      router.push("/report?step=pay");
+      setErrorMessage("Could not proceed to report checkout. Please try again.");
     } finally {
       setCheckoutState("idle");
     }
