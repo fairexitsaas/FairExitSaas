@@ -21,6 +21,19 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async headers() {
+    return [
+      {
+        source: '/lawyer-request/:path*',
+        headers: [
+          {
+            key: 'Referrer-Policy',
+            value: 'no-referrer',
+          },
+        ],
+      },
+    ];
+  },
   async redirects() {
     return [
       { source: '/admin', destination: '/admin/overview', permanent: false },

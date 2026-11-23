@@ -33,7 +33,45 @@ export const caseController = {
     return ApiResponse.created(res, { caseId: row.id, caseToken: token, case: caseService.view(row, []) }, 'Free check saved. Keep caseToken: it is the only way to reopen this case without an account.')
   },
 
-  get: async (req: Request, res: Response) => ApiResponse.ok(res, await fullView(C(req))),
+  get: async (req: Request, res: Response) => {
+    const c = C(req)
+    if (req.caseAccessVia === 'lawyer_token') {
+      return ApiResponse.ok(res, {
+        id: c.id,
+        publicId: c.public_id,
+        country: c.country,
+        jurisdiction: c.jurisdiction,
+        email: c.email,
+        customerName: c.answers?.customer_name || c.answers?.name || null,
+        answers: {
+          years: c.answers?.years ?? null,
+          salary: c.answers?.salary ?? null,
+          offer: c.answers?.offer ?? null,
+          role: c.answers?.role ?? c.answers?.roleLabel ?? null,
+        },
+      })
+    }
+    return ApiResponse.ok(res, await fullView(c))
+  },
+
+  exchangeLawyerToken: async (req: Request, res: Response) => {
+    const c = C(req)
+    return ApiResponse.ok(res, {
+      id: c.id,
+      publicId: c.public_id,
+      country: c.country,
+      jurisdiction: c.jurisdiction,
+      jurisdictionCode: c.jurisdiction_code,
+      email: c.email,
+      customerName: c.answers?.customer_name || c.answers?.name || null,
+      answers: {
+        years: c.answers?.years ?? null,
+        salary: c.answers?.salary ?? null,
+        offer: c.answers?.offer ?? null,
+        role: c.answers?.role ?? c.answers?.roleLabel ?? null,
+      },
+    })
+  },
 
   updateAnswers: async (req: Request, res: Response) => {
     const c = C(req)

@@ -135,6 +135,7 @@ export function createFairExitClient(opts: FairExitClientOptions) {
     // lawyer request
     askLawyer: (body: {
       caseId?: string
+      token?: string
       country?: Country
       jurisdictionCode?: string
       regionName?: string
@@ -148,6 +149,8 @@ export function createFairExitClient(opts: FairExitClientOptions) {
     }) =>
       call<any>('POST', '/leads', { ...body, platform: opts.platform || 'web' }, body.caseId, undefined, 'Lawyer Consultation Request'),
 
+    exchangeLawyerToken: (id: string, token: string) =>
+      call<any>('POST', `${c(id)}/lawyer-token/exchange`, { token }, id, undefined, 'Lawyer Token Exchange'),
     // payment
     price: (id: string) => call<any>('GET', `${c(id)}/price`, undefined, id, undefined, 'Price Check'),
     prepareCheckout: (id: string, body: { email?: string; remind?: boolean; termsAccepted: boolean; consentVersion?: string }) => call<any>('POST', `${c(id)}/checkout/prepare`, body, id, undefined, 'Prepare Checkout'),

@@ -263,17 +263,16 @@ describe('EMAIL_MODE: Independent Mock & Live Resend Integration Tests', () => {
     // Attachments verification
     expect(capturedBody.attachments).toBeDefined()
     expect(capturedBody.attachments.length).toBe(1)
-    expect(capturedBody.attachments[0].filename).toBe('FairExit-Report.pdf')
+    expect(capturedBody.attachments[0].filename).toBe('FairExit-Severance-Report-US.pdf')
     expect(capturedBody.attachments[0].content_type).toBe('application/pdf')
     expect(capturedBody.attachments[0].content).toBe(mockPdfBytes.toString('base64'))
 
-    // Email content verification: exact subject and clean body without URLs or private tokens
-    expect(capturedBody.subject).toBe('Your FairExit Report Is Ready')
-    expect(capturedBody.text).toBe('Your FairExit report is ready. Please find your PDF report attached to this email.')
-    expect(capturedBody.text).not.toContain('http')
-    expect(capturedBody.text).not.toContain('case=')
-    expect(capturedBody.text).not.toContain('supabase')
-    expect(capturedBody.text).not.toContain('token')
+    // Email content verification: exact subject, HTML template, and clean body
+    expect(capturedBody.subject).toBe('Your FairExit Severance Report is ready')
+    expect(capturedBody.html).toBeDefined()
+    expect(capturedBody.html).toContain('Your Severance Report is ready')
+    expect(capturedBody.html).toContain('attorney')
+    expect(capturedBody.text).toContain('Your Severance Report is attached as a PDF')
   })
 
   it('8b. The attachment opens and contains the complete report bytes (offline accessible)', async () => {

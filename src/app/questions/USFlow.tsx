@@ -3479,19 +3479,10 @@ export default function USFlow() {
                   </div>
                   {/* ── END VERDICT CARD ── */}
 
-                {/* Free Check Done Pill + Email Link */}
+                {/* Free Check Done Pill */}
                 <div className="text-center my-6">
-                  <div className="inline-block bg-[#e6f5ef] text-[#0c7a60] font-sans font-[800] text-[12.5px] leading-[18px] px-3.5 py-1.5 rounded-[6px] mb-2.5">
-                    Your free check is done · no card, no signup, nothing owed
-                  </div>
-                  <div>
-                    <button
-                      type="button"
-                      onClick={() => setEmailModalOpen(true)}
-                      className="font-sans font-[700] text-[14px] leading-[20px] text-[#0c8f72] underline hover:no-underline cursor-pointer"
-                    >
-                      Email me my free result →
-                    </button>
+                  <div className="inline-block bg-[#e6f5ef] text-[#0c7a60] font-sans font-[800] text-[12.5px] leading-[18px] px-3.5 py-1.5 rounded-[6px]">
+                    Your free check is done · no card, no signup required.
                   </div>
                 </div>
 
@@ -4047,65 +4038,6 @@ export default function USFlow() {
         enquiryType="ask_lawyer"
       />
 
-      {/* ── EMAIL ME MY FREE RESULTS MODAL ── */}
-      {emailModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="fixed inset-0 bg-[#062c55]/45 backdrop-blur-xs animate-scrimin"
-            onClick={() => setEmailModalOpen(false)}
-          />
-          <div className="relative bg-white rounded-2xl border border-[#e7e4dd] p-6 sm:p-7 max-w-[420px] w-full shadow-2xl z-10 animate-dlgup text-center">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0c8f72] block mb-1">
-              Free · No card needed
-            </span>
-            <h3 className="font-serif font-semibold text-2xl text-[#062c55] mb-2 leading-tight">
-              Email me my free results
-            </h3>
-            <p className="text-xs sm:text-[13px] text-[#5a6b78] leading-relaxed mb-4">
-              We&apos;ll send a clean PDF summary of your checklist and
-              details so you have them for reference.
-            </p>
-
-            {emailSent ? (
-              <div className="p-4 bg-[#e6f5ef] border border-[#b9e6d4] rounded-xl text-sm font-bold text-[#0c7a60] mb-4">
-                ✓ Check your inbox! Your results have been sent.
-              </div>
-            ) : (
-              <div className="space-y-3 mb-4">
-                <input
-                  type="email"
-                  value={emailInput}
-                  onChange={(e) => setEmailInput(e.target.value)}
-                  placeholder="your.email@example.com"
-                  className="w-full border border-[#cdd3d8] rounded-xl px-3.5 py-2.5 text-sm font-medium focus:outline-none focus:border-[#0eb28d]"
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (emailInput.includes("@")) {
-                      setEmailSent(true);
-                    }
-                  }}
-                  className="w-full py-3 rounded-xl bg-[#0eb28d] hover:bg-[#0c8f72] text-white font-bold text-sm shadow-md transition-all cursor-pointer"
-                >
-                  Send my results →
-                </button>
-              </div>
-            )}
-
-            <button
-              type="button"
-              onClick={() => {
-                setEmailModalOpen(false);
-                setEmailSent(false);
-              }}
-              className="text-xs font-bold text-[#5a6b78] hover:text-[#062c55] cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* ── STICKY BOTTOM BAR ("Your details — Illinois · 9 yrs [View]") ── */}
       {currentStep !== "step-results" &&

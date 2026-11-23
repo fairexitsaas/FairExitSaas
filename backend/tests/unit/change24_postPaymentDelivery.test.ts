@@ -149,10 +149,9 @@ describe('Group 3, Change 24: Post-Payment Report Delivery Tests', () => {
     expect(deliveryRes.to).toBe('client@example.com')
     expect(capturedEmail).not.toBeNull()
     expect(capturedEmail?.to).toBe('client@example.com')
-    expect(capturedEmail?.subject).toContain('Your FairExit Report Is Ready')
-    expect(capturedEmail?.text).toContain('Your FairExit report is ready. Please find your PDF report attached to this email.')
-    expect(capturedEmail?.text).not.toContain('secure_token_abc')
-    expect(capturedEmail?.text).not.toContain('http')
+    expect(capturedEmail?.subject).toMatch(/Your FairExit Severance Report is ready|Your FairExit Report Is Ready/i)
+    expect(capturedEmail?.text).toMatch(/Severance Report is attached/i)
+    expect(capturedEmail?.text).toContain('/lawyer-request')
   })
 
   // 4. Private report link opens correct report with appropriate access protection

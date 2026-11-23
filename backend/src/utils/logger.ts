@@ -5,19 +5,29 @@ const SENSITIVE_KEYS = new Set([
   'token',
   'access_token',
   'refresh_token',
+  'lawyer_token',
+  'case_token',
+  'x-case-token',
   'authorization',
   'secret',
   'service_role_key',
   'anon_key',
   'cookie',
   'supabase_service_role_key',
+  't',
+  'casetoken',
+  'lawyertoken',
 ])
+
+function maskSensitiveString(str: string): string {
+  return str.replace(/\bfx[lc]_[a-zA-Z0-9_-]{10,}\b/g, '***REDACTED***')
+}
 
 function maskSensitiveData(data: unknown): unknown {
   if (data === null || data === undefined) return data
 
   if (typeof data === 'string') {
-    return data
+    return maskSensitiveString(data)
   }
 
   if (Array.isArray(data)) {
@@ -29,6 +39,8 @@ function maskSensitiveData(data: unknown): unknown {
     for (const [key, value] of Object.entries(data)) {
       if (SENSITIVE_KEYS.has(key.toLowerCase())) {
         masked[key] = '***REDACTED***'
+      } else if (typeof value === 'string') {
+        masked[key] = maskSensitiveString(value)
       } else if (typeof value === 'object' && value !== null) {
         masked[key] = maskSensitiveData(value)
       } else {
@@ -44,11 +56,12 @@ function maskSensitiveData(data: unknown): unknown {
 class Logger {
   private formatMessage(level: LogLevel, message: string, meta?: unknown) {
     const timestamp = new Date().toISOString()
+    const maskedMessage = maskSensitiveString(message)
     const maskedMeta = meta ? maskSensitiveData(meta) : undefined
     return {
       timestamp,
       level: level.toUpperCase(),
-      message,
+      message: maskedMessage,
       ...(maskedMeta ? { details: maskedMeta } : {}),
     }
   }

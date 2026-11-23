@@ -15,20 +15,29 @@ const router = Router()
 
 router.post('/', authRateLimiter, optionalAuthenticate, validate({ body: V.leadSchema }), h(async (req: Request, res: Response) => {
   let caseRow = null
+  const isLawyerRequestPage = req.body.enquiryType === 'lawyer_request_page' || req.body.sourcePage === '/lawyer-request'
+
   if (req.body.caseId) {
     try {
       const c = await caseService.get(req.body.caseId)
-      const ok = caseService.hasToken(c, req.headers['x-case-token'] as string) || (req.user && req.user.id === c.user_id)
+      const token = (req.headers['x-case-token'] as string) || (req.body.token as string)
+      const ok = caseService.hasLawyerToken(c, token) || caseService.hasToken(c, token) || (req.user && req.user.id === c.user_id)
       if (ok) {
         caseRow = c
       } else {
+        if (isLawyerRequestPage) {
+          throw ApiError.forbidden('Invalid or unauthorized case token')
+        }
         if (!req.body.country && c?.country) {
           req.body.country = c.country
           req.body.jurisdictionCode = req.body.jurisdictionCode || c.jurisdiction_code
         }
       }
-    } catch {
-      // Case not found or expired; continue with lead creation without crashing
+    } catch (err) {
+      if (isLawyerRequestPage) {
+        throw err instanceof ApiError ? err : ApiError.notFound('Case not found')
+      }
+      // Case not found or expired; continue with lead creation without crashing for general leads
     }
   }
   if (!req.body.country && !caseRow) {
