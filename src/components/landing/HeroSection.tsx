@@ -53,7 +53,7 @@ export default function HeroSection({
               </span>
 
               {isCanada ? (
-                <h1 className="font-serif text-[24px] sm:text-[34px] lg:text-[44px] leading-[1.15] text-[#062c55] font-semibold my-2.5 sm:my-4 tracking-[-0.5px]">
+                <h1 className="font-serif text-[30px] sm:text-[34px] lg:text-[44px] leading-[1.18] sm:leading-[1.15] text-[#062c55] font-semibold my-3 sm:my-4 tracking-[-0.5px]">
                   Just laid off in Canada?{" "}
                   <em
                     className="italic text-[#0c8f72]"
@@ -64,7 +64,7 @@ export default function HeroSection({
                   of your severance offer — in 60 seconds.
                 </h1>
               ) : (
-                <h1 className="font-serif text-[24px] sm:text-[34px] lg:text-[44px] leading-[1.15] text-[#062c55] font-semibold my-2.5 sm:my-4 tracking-[-0.5px]">
+                <h1 className="font-serif text-[30px] sm:text-[34px] lg:text-[44px] leading-[1.18] sm:leading-[1.15] text-[#062c55] font-semibold my-3 sm:my-4 tracking-[-0.5px]">
                   Laid off in the US?{" "}
                   <em
                     className="italic text-[#0c8f72]"

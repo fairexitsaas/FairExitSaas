@@ -1,15 +1,20 @@
 "use client";
 
-import React, { Suspense } from "react";
+import React, { Suspense, useContext } from "react";
 import { useSearchParams } from "next/navigation";
+import { CountryContext } from "@/context/CountryContext";
+import { detectIsUS } from "@/lib/report-storage";
 import CanadaFlow from "./CanadaFlow";
 import USFlow from "./USFlow";
 
 function QuestionsRouter() {
   const searchParams = useSearchParams();
-  const countryParam = searchParams?.get("country")?.toUpperCase();
-  const stParam = searchParams?.get("st") || searchParams?.get("state");
-  const isCanada = countryParam ? countryParam === "CA" : stParam ? false : true;
+  const countryContext = useContext(CountryContext);
+  const isUS = detectIsUS({
+    country: countryContext?.Country,
+    searchParams,
+  });
+  const isCanada = !isUS;
   const flowKey = `${isCanada ? "CA" : "US"}_${searchParams?.toString() || ""}`;
 
   return isCanada ? (

@@ -20,6 +20,9 @@ export function hashToken(token: string): string {
 export function newToken(): string {
   return 'fxc_' + crypto.randomBytes(24).toString('base64url')
 }
+export function newLawyerToken(): string {
+  return 'fxl_' + crypto.randomBytes(24).toString('base64url')
+}
 
 export function getAuthoritativeDelivery(c: CaseRow): Record<string, any> | null {
   const ans = (c.answers as any)?.report_delivery || null
@@ -164,6 +167,36 @@ export const caseService = {
     return (row.token_hashes || []).some((x) => x.length === h.length && crypto.timingSafeEqual(Buffer.from(x), Buffer.from(h)))
   },
 
+  /** Dedicated short-lived token for lawyer-request context (default 7 days). Stores only SHA-256 hash. */
+  async createLawyerToken(row: CaseRow, ttlHours = 168): Promise<string> {
+    const token = newLawyerToken()
+    const hash = hashToken(token)
+    const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString()
+    const existing = Array.isArray((row.answers as any)?.lawyer_tokens) ? (row.answers as any).lawyer_tokens : []
+    const now = new Date()
+    const valid = existing.filter((item: any) => item && item.hash && new Date(item.expires_at) > now)
+    const updated = [...valid, { hash, expires_at: expiresAt, created_at: now.toISOString() }].slice(-5)
+
+    await this.update(row.id, {
+      answers: { ...(row.answers || {}), lawyer_tokens: updated },
+    } as Partial<CaseRow>)
+
+    return token
+  },
+
+  /** Validates whether a token is a valid, unexpired dedicated lawyer-request token. */
+  hasLawyerToken(row: CaseRow, token: string | undefined | null): boolean {
+    if (!token || !token.startsWith('fxl_')) return false
+    const h = hashToken(token)
+    const list = Array.isArray((row.answers as any)?.lawyer_tokens) ? (row.answers as any).lawyer_tokens : []
+    const now = new Date()
+    return list.some((item: any) => {
+      if (!item || !item.hash || !item.expires_at) return false
+      if (new Date(item.expires_at) <= now) return false
+      return item.hash.length === h.length && crypto.timingSafeEqual(Buffer.from(item.hash), Buffer.from(h))
+    })
+  },
+
   async documents(caseId: string): Promise<CaseDocumentRow[]> {
     return check(
       await db().from('case_documents').select('*').eq('case_id', caseId).is('deleted_at', null).order('kind').order('page'),
@@ -230,6 +263,7 @@ export const caseService = {
 
     const base = env.APP_WEB_URL.replace(/\/$/, '')
     const privateLink = `${base}/report?case=${c.id}&t=${encodeURIComponent(token)}`
+    const pdfDownloadUrl = `${base}/cases/${c.id}/report/pdf?t=${encodeURIComponent(token)}`
 
     let emailDelivery: { status: 'sent' | 'pending' | 'failed' | 'disabled'; sentAt?: string; error?: string; message?: string } = {
       status: env.EMAIL_MODE === 'mock' ? 'disabled' : 'pending',
@@ -245,6 +279,7 @@ export const caseService = {
       case: updated,
       customer: { name: cleanName, email: cleanEmail },
       privateLink,
+      pdfDownloadUrl,
       emailDelivery,
     }
   },
@@ -283,8 +318,9 @@ export const caseService = {
     }
 
     const activeToken = typeof token === 'string' && token.trim() ? token : (await this.addToken(c))
+    const lawyerToken = await this.createLawyerToken(c)
     try {
-      const res = await emailService.reportReady(c, activeToken)
+      const res = await emailService.reportReady(c, activeToken, undefined, lawyerToken)
       const now = new Date().toISOString()
       if (res.sent) {
         const reportDelivery = {

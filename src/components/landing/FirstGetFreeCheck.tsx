@@ -166,7 +166,7 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
               }}
             >
               <div className="text-[32px] font-extrabold text-navy dark:text-white mb-1 flex items-baseline gap-1.5 font-serif">
-                $59<span className="text-[13px] font-semibold normal-case text-slate tracking-normal font-sans">one-time</span>
+                $59<span className="text-[13px] font-semibold normal-case text-slate tracking-normal font-sans">{isCanada ? "CAD" : "USD"} · one-time</span>
               </div>
               <h4 className="font-serif text-xl text-navy dark:text-white m-0 mb-3 font-semibold">
                 Get your Severance Report

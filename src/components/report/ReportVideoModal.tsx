@@ -128,7 +128,7 @@ export default function ReportVideoModal({
         {/* CTA */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-[#E7E4DD]">
           <span className="font-sans text-[13px] text-[#5A6B78]">
-            One-time $59 · No recurring fees · PDF to keep
+            One-time $59 {isUS ? "USD" : "CAD"} · No recurring fees · PDF to keep
           </span>
           <button
             type="button"

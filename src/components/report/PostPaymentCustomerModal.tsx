@@ -11,7 +11,7 @@ export interface PostPaymentCustomerModalProps {
   caseId: string | null;
   initialName?: string;
   initialEmail?: string;
-  onSuccess: (data: { name: string; email: string; privateLink?: string }) => void;
+  onSuccess: (data: { name: string; email: string; privateLink?: string; pdfDownloadUrl?: string }) => void;
   onClose?: () => void;
 }
 
@@ -88,6 +88,7 @@ export default function PostPaymentCustomerModal({
           name: trimmedName,
           email: trimmedEmail,
           privateLink: res?.privateLink,
+          pdfDownloadUrl: res?.pdfDownloadUrl,
         });
       } else {
         // Fallback for offline/local case

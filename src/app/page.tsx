@@ -2,6 +2,7 @@
 
 import React, { useContext } from "react";
 import { CountryContext, CountryCode } from "@/context/CountryContext";
+import TaglineStrip from "@/components/landing/TaglineStrip";
 import Navbar from "@/components/layout/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
 import HowItWorks from "@/components/landing/HowItWorks";
@@ -29,14 +30,17 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen flex flex-col text-primary">
-      {/* Navigation Bar */}
+      {/* 1. Header / Navbar */}
       <Navbar
         country={currentCountry}
         onCountrySwitch={handleCountrySwitch}
       />
 
+      {/* 2. Tagline Strip (Immediately below header/navbar) */}
+      <TaglineStrip />
+
       <main id="main-content" className="flex-1">
-        {/* Section 1: Hero & Explainer Video */}
+        {/* 3. Hero Section & Explainer Video */}
         <HeroSection country={currentCountry} />
 
         {/* Section 2: Country-Specific Landing Page Section Flow */}

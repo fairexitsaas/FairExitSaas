@@ -10,7 +10,7 @@ declare global {
       /** Loaded by the caseAccess middleware */
       caseRow?: CaseRow
       /** How the caller proved access to the case */
-      caseAccessVia?: 'token' | 'owner' | 'admin'
+      caseAccessVia?: 'token' | 'owner' | 'admin' | 'lawyer_token'
       isAdmin?: boolean
       rawBody?: Buffer
     }

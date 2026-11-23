@@ -18,6 +18,8 @@ const one = Router({ mergeParams: true })
 router.use('/:caseId', validate({ params: V.caseParams }), caseAccess, one)
 
 one.get('/', h(cc.get))
+one.post('/lawyer-token/exchange', h(cc.exchangeLawyerToken))
+one.post('/exchange-lawyer-token', h(cc.exchangeLawyerToken))
 one.patch('/answers', validate({ body: V.patchAnswersSchema }), h(cc.updateAnswers))
 one.post('/claim', h(cc.claim))
 one.delete('/', h(cc.remove))

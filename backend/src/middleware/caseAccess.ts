@@ -49,11 +49,32 @@ export async function requireAdmin(req: Request, _res: Response, next: NextFunct
 export async function caseAccess(req: Request, _res: Response, next: NextFunction) {
   try {
     const c = await caseService.get(req.params.caseId)
-    const token = (req.headers['x-case-token'] as string | undefined) || (req.method === 'GET' ? (req.query.t as string | undefined) : undefined)
-    if (caseService.hasToken(c, token)) req.caseAccessVia = 'token'
-    else if (req.user && c.user_id && req.user.id === c.user_id) req.caseAccessVia = 'owner'
-    else if (req.user && (await isAdminUser(req.user.id, req.user.app_metadata?.role))) req.caseAccessVia = 'admin'
-    else throw ApiError.notFound('Case not found') // 404, not 403: never confirm a case exists
+    const token =
+      (req.headers?.['x-case-token'] as string | undefined) ||
+      (req.body && typeof req.body.token === 'string' ? req.body.token : undefined) ||
+      (req.method === 'GET' ? (req.query?.t as string | undefined) : undefined)
+    if (caseService.hasToken(c, token)) {
+      req.caseAccessVia = 'token'
+    } else if (caseService.hasLawyerToken(c, token)) {
+      req.caseAccessVia = 'lawyer_token'
+    } else if (req.user && c.user_id && req.user.id === c.user_id) {
+      req.caseAccessVia = 'owner'
+    } else if (req.user && (await isAdminUser(req.user.id, req.user.app_metadata?.role))) {
+      req.caseAccessVia = 'admin'
+    } else {
+      throw ApiError.notFound('Case not found') // 404, not 403: never confirm a case exists
+    }
+
+    // Strict scope restriction: lawyer_token can ONLY read case metadata for lawyer request, never report, pdf, docs, or modifications
+    if (req.caseAccessVia === 'lawyer_token') {
+      const isAllowedLawyerRoute =
+        (req.method === 'GET' && (req.path === '/' || req.path === '')) ||
+        (req.method === 'POST' && (req.path === '/lawyer-token/exchange' || req.path === '/exchange-lawyer-token'))
+      if (!isAllowedLawyerRoute) {
+        throw ApiError.notFound('Case not found')
+      }
+    }
+
     req.caseRow = c
     next()
   } catch (e) {

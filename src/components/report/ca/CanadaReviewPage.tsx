@@ -3,7 +3,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
-import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { getReportInputs, saveReportInputs, ReportInputs, isBonusInOtherPay } from "@/lib/report-storage";
@@ -1158,9 +1157,7 @@ export default function CanadaReviewPage({
             <Link href="/#how" className="hover:text-[#062C55] transition">How it works</Link>
             <Link href="/#paths" className="hover:text-[#062C55] transition">Pricing</Link>
             <Link href="/faq" className="hover:text-[#062C55] transition">FAQ</Link>
-            <Link href="/blog" className="hover:text-[#062C55] transition">Blog</Link>
             <Link href="/about" className="hover:text-[#062C55] transition">About</Link>
-            <button type="button" onClick={() => triggerGetApp()} className="text-[#0C8F72] font-[700] text-[12.5px] hover:underline">Get the app</button>
             <Link href="/" className="text-[#5A6B78] hover:text-[#062C55] transition underline text-[13px] font-[600]">Exit ✕</Link>
           </nav>
 

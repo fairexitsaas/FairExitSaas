@@ -4,7 +4,15 @@ import React, { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ReportInputs, getReportInputs, saveReportInputs, defaultMockReportInputs } from "@/lib/report-storage";
+import {
+  ReportInputs,
+  getReportInputs,
+  saveReportInputs,
+  defaultMockReportInputs,
+  defaultMockUSReportInputs,
+  isUSState,
+  detectIsUS,
+} from "@/lib/report-storage";
 import { fairexit } from "@/lib/api/fairexit";
 import {
   ApplePayBadge,
@@ -19,7 +27,6 @@ import ReportVideoPlayer from "./ReportVideoPlayer";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import TermsConditionsModal from "@/components/dialogs/TermsConditionsModal";
 import CheckoutDialog from "@/components/dialogs/CheckoutDialog";
-import { triggerGetApp } from "@/context/GetAppContext";
 
 interface ReportSalesPageProps {
   caseId?: string | null;
@@ -48,7 +55,15 @@ export default function ReportSalesPage({
   onPaySuccess,
 }: ReportSalesPageProps) {
   const router = useRouter();
-  const [data, setData] = useState<ReportInputs>(defaultMockReportInputs);
+  const [data, setData] = useState<ReportInputs>(() => {
+    if (typeof window !== "undefined") {
+      const stored = getReportInputs();
+      if (stored && (stored.country || stored.state || stored.province)) {
+        return stored;
+      }
+    }
+    return country === "US" ? defaultMockUSReportInputs : defaultMockReportInputs;
+  });
   const [explainEach, setExplainEach] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -140,17 +155,11 @@ export default function ReportSalesPage({
   const isMockPayment = paymentMode === "mock";
 
   // Country detection: check explicit prop, cs object, jurisdiction, stored inputs, or URL params
-  const isUS = Boolean(
-    country === "US" ||
-    cs?.country === "US" ||
-    cs?.jurisdiction?.country === "US" ||
-    data.country === "US" ||
-    (data.province && String(data.province).toLowerCase().startsWith("us")) ||
-    (cs?.region && String(cs.region).toLowerCase().startsWith("us")) ||
-    (data.state && US_STATE_SET.has(data.state)) ||
-    (data.provinceName && US_STATE_SET.has(data.provinceName)) ||
-    (typeof window !== "undefined" && new URLSearchParams(window.location.search).get("country") === "US")
-  );
+  const isUS = detectIsUS({
+    country,
+    cs,
+    data,
+  });
   const isCanada = !isUS;
 
   // Checkout form state
@@ -181,15 +190,11 @@ export default function ReportSalesPage({
     if (cs) {
       const freeRes = cs.freeResult || {};
       const jurisdiction = cs.jurisdiction || {};
-      const detectedCountry =
-        country ||
-        cs.country ||
-        jurisdiction.country ||
-        (cs.region && String(cs.region).toLowerCase().startsWith("us") ? "US" : null) ||
-        (jurisdiction.name && US_STATE_SET.has(jurisdiction.name) ? "US" : null) ||
-        stored.country ||
-        "CA";
-      const isCaseUS = detectedCountry === "US";
+      const isCaseUS = detectIsUS({
+        country,
+        cs,
+        data: stored,
+      });
 
       const facts = cs.extractedFacts || cs.call_a?.facts || [];
       const hasExtractedDocs = Boolean(
@@ -237,9 +242,9 @@ export default function ReportSalesPage({
         ...stored,
         country: isCaseUS ? "US" : "CA",
         email: cs.email || stored.email || "",
-        province: isCaseUS ? (cs.region || stored.state || stored.province) : (cs.region || stored.province),
-        provinceName: jurisdiction.name || (isCaseUS ? stored.state : stored.provinceName),
-        state: isCaseUS ? (jurisdiction.name || cs.region || stored.state) : undefined,
+        province: isCaseUS ? (cs.region || stored.state || stored.province || "US-CA") : (cs.region || stored.province || "ON"),
+        provinceName: jurisdiction.name || (isCaseUS ? (stored.state || "California") : (stored.provinceName || "Ontario")),
+        state: isCaseUS ? (jurisdiction.name || cs.region || stored.state || "California") : undefined,
         offer: resolvedOffer,
         signByDays: resolvedSignBy,
         releaseRequired: resolvedRelease,
@@ -340,8 +345,8 @@ export default function ReportSalesPage({
     setIsPaying(true);
     try {
       await fairexit.prepareCheckout(activeCaseId, { termsAccepted: true, consentVersion: "2026-09-21" });
-      const successUrl = `${window.location.origin}/report?case=${activeCaseId}&session_id={CHECKOUT_SESSION_ID}`;
-      const cancelUrl = `${window.location.origin}/report?case=${activeCaseId}&step=pay&canceled=true`;
+      const successUrl = `${window.location.origin}/report?case=${activeCaseId}&session_id={CHECKOUT_SESSION_ID}${isUS ? "&country=US" : ""}`;
+      const cancelUrl = `${window.location.origin}/report?case=${activeCaseId}&step=pay&canceled=true${isUS ? "&country=US" : ""}`;
       const res = await fairexit.stripeCheckout(activeCaseId, {
         successUrl,
         cancelUrl,
@@ -413,12 +418,12 @@ export default function ReportSalesPage({
         if (onPaySuccess) {
           onPaySuccess(activeCaseId || undefined);
         } else {
-          router.push(`/report?step=upload${activeCaseId ? `&case=${activeCaseId}` : ""}`);
+          router.push(`/report?step=upload${activeCaseId ? `&case=${activeCaseId}` : ""}${isUS ? "&country=US" : ""}`);
         }
       } else {
         // 2b. Execute live Stripe checkout (when PAYMENTS_MODE=live)
-        const successUrl = `${window.location.origin}/report?case=${activeCaseId}&session_id={CHECKOUT_SESSION_ID}`;
-        const cancelUrl = `${window.location.origin}/report?case=${activeCaseId}&step=pay&canceled=true`;
+        const successUrl = `${window.location.origin}/report?case=${activeCaseId}&session_id={CHECKOUT_SESSION_ID}${isUS ? "&country=US" : ""}`;
+        const cancelUrl = `${window.location.origin}/report?case=${activeCaseId}&step=pay&canceled=true${isUS ? "&country=US" : ""}`;
         const res = await fairexit.stripeCheckout(activeCaseId, {
           successUrl,
           cancelUrl,
@@ -465,19 +470,9 @@ export default function ReportSalesPage({
             <Link href="/faq" className="hover:text-[#062C55] transition-colors">
               FAQ
             </Link>
-            <Link href="/blog" className="hover:text-[#062C55] transition-colors">
-              Blog
-            </Link>
             <Link href="/about" className="hover:text-[#062C55] transition-colors">
               About
             </Link>
-            <button
-              type="button"
-              onClick={() => triggerGetApp()}
-              className="text-[#0C8F72] font-[700] hover:text-[#096B55] transition-colors"
-            >
-              Get the app
-            </button>
             <Link
               href="/"
               className="underline text-[#5A6B78] hover:text-[#062C55] transition-colors"
@@ -521,19 +516,9 @@ export default function ReportSalesPage({
             <Link href="/faq" className="block hover:text-[#062C55]" onClick={() => setMobileMenuOpen(false)}>
               FAQ
             </Link>
-            <Link href="/blog" className="block hover:text-[#062C55]" onClick={() => setMobileMenuOpen(false)}>
-              Blog
-            </Link>
             <Link href="/about" className="block hover:text-[#062C55]" onClick={() => setMobileMenuOpen(false)}>
               About
             </Link>
-            <button
-              type="button"
-              onClick={() => { setMobileMenuOpen(false); triggerGetApp(); }}
-              className="block text-left text-[#0C8F72] font-bold"
-            >
-              Get the app
-            </button>
             <Link href="/" className="block underline text-[#5A6B78]" onClick={() => setMobileMenuOpen(false)}>
               Exit ✕
             </Link>
@@ -1195,7 +1180,7 @@ export default function ReportSalesPage({
                 <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center font-sans font-normal text-[12px] leading-[18px] text-[#5A6B78] pt-1">
                   <span>No account needed</span>
                   <span>·</span>
-                  <span>{isUS ? "plus applicable sales tax" : "$59 CAD plus applicable tax"}</span>
+                  <span>{isUS ? "$59 USD plus applicable sales tax" : "$59 CAD plus applicable tax"}</span>
                   <span>·</span>
                   <button
                     type="button"
@@ -1440,7 +1425,7 @@ export default function ReportSalesPage({
       <div className="sm:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#062C55] text-white px-4 py-3 flex items-center justify-between shadow-2xl border-t border-white/10">
         <div>
           <div className="font-sans font-[700] text-[13px] text-white">Your full report</div>
-          <div className="font-sans text-[11px] text-[#A2B4C5]">$59 one-time</div>
+          <div className="font-sans text-[11px] text-[#A2B4C5]">$59 {isUS ? "USD" : "CAD"} · one-time</div>
         </div>
         <button
           type="button"

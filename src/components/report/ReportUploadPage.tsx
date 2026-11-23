@@ -2,10 +2,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getReportInputs, saveReportInputs, ReportInputs } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs, detectIsUS } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifySuccess } from "@/lib/notifications";
@@ -152,12 +151,11 @@ export default function ReportUploadPage({
     }
   }, [caseId, cs]);
 
-  const isUS =
-    data.country === "US" ||
-    cs?.country === "US" ||
-    (typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("country")?.toUpperCase() ===
-        "US");
+  const isUS = detectIsUS({
+    country: cs?.country,
+    cs,
+    data,
+  });
   const isCanada = !isUS;
   const country = (isUS ? "US" : "CA") as "CA" | "US";
 
@@ -572,7 +570,7 @@ export default function ReportUploadPage({
         if (onContinue) {
           onContinue();
         } else {
-          router.push(`/report?case=${activeCaseId || "demo"}&step=reading`);
+          router.push(`/report?case=${activeCaseId || "demo"}&step=reading${isUS ? "&country=US" : ""}`);
         }
       } catch (err: unknown) {
         setIsSubmitting(false);
@@ -602,7 +600,7 @@ export default function ReportUploadPage({
       if (onContinue) {
         onContinue();
       } else {
-        router.push(`/report?case=demo&step=reading`);
+        router.push(`/report?case=demo&step=reading${isUS ? "&country=US" : ""}`);
       }
     }
   };
@@ -639,19 +637,9 @@ export default function ReportUploadPage({
             <Link href="/faq" className="hover:text-[#062C55] transition">
               FAQ
             </Link>
-            <Link href="/blog" className="hover:text-[#062C55] transition">
-              Blog
-            </Link>
             <Link href="/about" className="hover:text-[#062C55] transition">
               About
             </Link>
-            <button
-              type="button"
-              onClick={() => triggerGetApp()}
-              className="text-[#0C8F72] font-[700] text-[12.5px] hover:underline"
-            >
-              Get the app
-            </button>
             <Link
               href="/"
               className="text-[#5A6B78] hover:text-[#062C55] transition underline text-[13px] font-[600]"

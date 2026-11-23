@@ -430,6 +430,12 @@ export default function Footer({
                       FAQ
                     </Link>
                     <Link
+                      href="/blog"
+                      className="hover:text-navy dark:hover:text-white transition-colors no-underline whitespace-nowrap"
+                    >
+                      Blog
+                    </Link>
+                    <Link
                       href="/legal"
                       className="hover:text-navy dark:hover:text-white transition-colors no-underline whitespace-nowrap"
                     >
