@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReportInputs, getReportInputs, saveReportInputs, defaultMockReportInputs } from "@/lib/report-storage";
-import { fairexit, caseStore } from "@/lib/api/fairexit";
+import { fairexit } from "@/lib/api/fairexit";
 import {
   ApplePayBadge,
   GooglePayBadge,
@@ -19,7 +19,6 @@ import ReportVideoPlayer from "./ReportVideoPlayer";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import TermsConditionsModal from "@/components/dialogs/TermsConditionsModal";
 import CheckoutDialog from "@/components/dialogs/CheckoutDialog";
-import PostPaymentCustomerModal from "./PostPaymentCustomerModal";
 import { triggerGetApp } from "@/context/GetAppContext";
 
 interface ReportSalesPageProps {
@@ -57,7 +56,6 @@ export default function ReportSalesPage({
   const [termsModalOpen, setTermsModalOpen] = useState(false);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
-  const [customerModalOpen, setCustomerModalOpen] = useState(false);
 
   // Payment mode resolution: unresolved ('loading' | null) until authoritative runtime config is available
   const [configData, setConfigData] = useState<any>(() => {
@@ -409,10 +407,14 @@ export default function ReportSalesPage({
         // 2a. Execute server-side mock payment (when PAYMENTS_MODE=mock)
         await fairexit.mockPay(activeCaseId);
 
-        // 3a. Payment confirmed! Close dialog and open customer info modal (Change 24)
+        // 3a. Payment confirmed! Delegate post-payment collection to parent coordinator
         setIsPaying(false);
         setCheckoutDialogOpen(false);
-        setCustomerModalOpen(true);
+        if (onPaySuccess) {
+          onPaySuccess(activeCaseId || undefined);
+        } else {
+          router.push(`/report?step=upload${activeCaseId ? `&case=${activeCaseId}` : ""}`);
+        }
       } else {
         // 2b. Execute live Stripe checkout (when PAYMENTS_MODE=live)
         const successUrl = `${window.location.origin}/report?case=${activeCaseId}&session_id={CHECKOUT_SESSION_ID}`;
@@ -433,25 +435,6 @@ export default function ReportSalesPage({
       const msg = err instanceof Error ? err.message : "Payment could not be completed. Please try again.";
       setPayError(msg);
     }
-  };
-
-  const handleCustomerSuccess = (customerData: { name: string; email: string; privateLink?: string }) => {
-    setCustomerModalOpen(false);
-    const activeCaseId = caseId || cs?.id;
-    if (activeCaseId && customerData?.privateLink) {
-      try {
-        const parsed = new URL(customerData.privateLink);
-        const t = parsed.searchParams.get("t");
-        if (t) caseStore.set(activeCaseId, t);
-      } catch {
-        const match = customerData.privateLink.match(/[?&]t=([^&]+)/);
-        if (match?.[1]) caseStore.set(activeCaseId, decodeURIComponent(match[1]));
-      }
-    }
-    if (onPaySuccess) {
-      onPaySuccess(activeCaseId || undefined);
-    }
-    router.push(`/report?step=upload${activeCaseId ? `&case=${activeCaseId}` : ""}`);
   };
 
   return (
@@ -1212,7 +1195,7 @@ export default function ReportSalesPage({
                 <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center font-sans font-normal text-[12px] leading-[18px] text-[#5A6B78] pt-1">
                   <span>No account needed</span>
                   <span>·</span>
-                  <span>$59 {isUS ? "USD" : "CAD"} plus applicable tax</span>
+                  <span>{isUS ? "plus applicable sales tax" : "$59 CAD plus applicable tax"}</span>
                   <span>·</span>
                   <button
                     type="button"
@@ -1445,21 +1428,12 @@ export default function ReportSalesPage({
         onClose={() => setCheckoutDialogOpen(false)}
         email=""
         amount={isUS ? "$59.00 USD" : "$59.00 CAD"}
+        taxNote={isUS ? "applicable sales tax" : "applicable tax"}
         isProcessing={isPaying || !isPaymentModeResolved}
         errorMessage={payError || configError}
         onPay={async () => {
           await handleDialogPay();
         }}
-      />
-
-      {/* ── STEP 4: POST-PAYMENT CUSTOMER INFORMATION (Change 24) ── */}
-      <PostPaymentCustomerModal
-        isOpen={customerModalOpen}
-        caseId={caseId || cs?.id || null}
-        initialName={data.employee_name || ""}
-        initialEmail={data.email || ""}
-        onSuccess={handleCustomerSuccess}
-        onClose={() => setCustomerModalOpen(false)}
       />
 
       {/* ── MOBILE STICKY BOTTOM BAR (as shown in phone screenshot) ── */}

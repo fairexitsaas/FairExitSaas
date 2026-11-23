@@ -253,10 +253,19 @@ export function createFairExitClient(opts: FairExitClientOptions) {
 // ---------------------------------------------------------------------------
 const TOKENS_KEY = 'fx_case_tokens_v1'
 const LAST_KEY = 'fx_last_case_v1'
+const PAID_CASES_KEY = 'fx_paid_cases_v1'
 
 function readTokens(): Record<string, string> {
   try {
     return JSON.parse(localStorage.getItem(TOKENS_KEY) || '{}')
+  } catch {
+    return {}
+  }
+}
+
+function readPaidCases(): Record<string, boolean> {
+  try {
+    return JSON.parse(localStorage.getItem(PAID_CASES_KEY) || '{}')
   } catch {
     return {}
   }
@@ -280,6 +289,26 @@ export const caseStore = {
     } catch {
       return null
     }
+  },
+  isPaid(caseId: string): boolean {
+    if (!caseId) return false
+    return Boolean(readPaidCases()[caseId])
+  },
+  markPaid(caseId: string) {
+    if (!caseId) return
+    try {
+      localStorage.setItem(PAID_CASES_KEY, JSON.stringify({ ...readPaidCases(), [caseId]: true }))
+      // Once a case is paid, remove it as the active unpaid draft so it is never
+      // automatically reused for a fresh free check
+      if (localStorage.getItem(LAST_KEY) === caseId) {
+        localStorage.removeItem(LAST_KEY)
+      }
+    } catch {}
+  },
+  clearLast() {
+    try {
+      localStorage.removeItem(LAST_KEY)
+    } catch {}
   },
 }
 

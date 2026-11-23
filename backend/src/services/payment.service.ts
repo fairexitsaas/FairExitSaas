@@ -42,6 +42,10 @@ interface PriceValidationRecord {
 
 const priceValidationCache = new Map<string, PriceValidationRecord>()
 
+export function clearPriceValidationCache() {
+  priceValidationCache.clear()
+}
+
 export async function resolvePriceForCase(c: CaseRow): Promise<{
   priceId: string
   currency: 'usd' | 'cad'
@@ -64,6 +68,11 @@ export async function resolvePriceForCase(c: CaseRow): Promise<{
   // Check cache (5 min TTL) to avoid excessive external Stripe API roundtrips
   const cached = priceValidationCache.get(priceId)
   if (cached && Date.now() - cached.validatedAt < 5 * 60 * 1000) {
+    if (cached.currency.toLowerCase() !== expectedCurrency) {
+      throw ApiError.internal(
+        `Configured Stripe Price ${priceId} currency (${cached.currency}) does not match expected country currency (${expectedCurrency})`
+      )
+    }
     return {
       priceId: cached.priceId,
       currency: cached.currency,
@@ -109,7 +118,7 @@ export const paymentService = {
       amountCents: env.REPORT_PRICE_CENTS,
       currency: cur,
       label: `$${(env.REPORT_PRICE_CENTS / 100).toFixed(0)} ${cur}`,
-      taxNote: 'plus applicable tax',
+      taxNote: isUS ? 'plus applicable sales tax' : 'plus applicable tax',
       priceId: priceId || null,
     }
   },

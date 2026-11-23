@@ -117,6 +117,21 @@ export default function ReportFlow() {
   const [error, setError] = useState("");
   const [lawyerOpen, setLawyerOpen] = useState(false);
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const customerInfoSubmittedRef = useRef(false);
+  const prevCaseIdRef = useRef<string | null>(caseId);
+
+  useEffect(() => {
+    if (caseId !== prevCaseIdRef.current) {
+      prevCaseIdRef.current = caseId;
+      customerInfoSubmittedRef.current = false;
+    }
+  }, [caseId]);
+
+  useEffect(() => {
+    if (hasCompletedPostPaymentCollection(cs)) {
+      customerInfoSubmittedRef.current = true;
+    }
+  }, [cs]);
   const [paymentStatus, setPaymentStatus] = useState<"idle" | "confirming" | "confirmed" | "failed">("idle");
   const [showPaymentSuccessBanner, setShowPaymentSuccessBanner] = useState(false);
 
@@ -128,14 +143,24 @@ export default function ReportFlow() {
     ? { lawyer: "attorney", region: "state", letter: "separation agreement", contract: "offer letter or employment contract" }
     : { lawyer: "lawyer", region: "province", letter: "severance letter", contract: "employment contract" });
 
-  // resolve the case from ?case=&t= (email link) or the last case in this browser
+  // resolve the case from ?case=&t= (email link) or the last active draft in this browser
   useEffect(() => {
     const t = sp?.get("t");
     const fromUrl = sp?.get("case");
-    if (fromUrl && t) caseStore.set(fromUrl, t);
-    if (!fromUrl) {
-      const last = caseStore.last(); // reopen the last report in this browser
-      if (last) queueMicrotask(() => setCaseId(last));
+    const isPayStep = sp?.get("step") === "pay";
+
+    if (fromUrl) {
+      if (t) caseStore.set(fromUrl, t);
+      // Synchronize active caseId when URL changes across client-side transitions
+      setCaseId(fromUrl);
+    } else {
+      // Reopen last active draft ONLY if it is not an already paid report and not an explicit pay step.
+      // A paid case may only reopen from its own report link (Requirement A1.4).
+      const last = caseStore.last();
+      const isPaid = last ? caseStore.isPaid(last) : false;
+      if (last && !isPaid && !isPayStep) {
+        queueMicrotask(() => setCaseId(last));
+      }
     }
     fairexit.config().then(setCfg).catch(() => undefined);
   }, [sp]);
@@ -145,6 +170,9 @@ export default function ReportFlow() {
     try {
       const updated = await fairexit.getCase(caseId);
       setCs(updated);
+      if (updated?.paid) {
+        caseStore.markPaid(caseId);
+      }
       setError("");
       return updated;
     } catch (e) {
@@ -183,9 +211,10 @@ export default function ReportFlow() {
 
           const fresh = await refresh();
           const targetCase = fresh || res?.case;
-          if (!hasCompletedPostPaymentCollection(targetCase)) {
+          if (!hasCompletedPostPaymentCollection(targetCase) && !customerInfoSubmittedRef.current) {
             setCustomerModalOpen(true);
           } else {
+            customerInfoSubmittedRef.current = true;
             setView("upload");
           }
         } else {
@@ -201,10 +230,11 @@ export default function ReportFlow() {
 
   // Auto-open post-payment customer details modal if the case is paid but details are incomplete
   useEffect(() => {
-    if (cs?.paid && !hasCompletedPostPaymentCollection(cs) && !customerModalOpen && paymentStatus !== "confirming") {
+    if (customerInfoSubmittedRef.current) return;
+    if (cs?.paid && !hasCompletedPostPaymentCollection(cs) && paymentStatus !== "confirming") {
       setCustomerModalOpen(true);
     }
-  }, [cs, customerModalOpen, paymentStatus]);
+  }, [cs, paymentStatus]);
 
   const handlePaySuccess = async (newCaseId?: string) => {
     const id = newCaseId || caseId;
@@ -217,8 +247,10 @@ export default function ReportFlow() {
         setShowPaymentSuccessBanner(true);
         const cur = (c?.country || country) === "US" ? "USD" : "CAD";
         notifySuccess(`Payment successful! Your $59 ${cur} payment has been confirmed.`);
-        if (!hasCompletedPostPaymentCollection(c)) {
+        if (!hasCompletedPostPaymentCollection(c) && !customerInfoSubmittedRef.current) {
           setCustomerModalOpen(true);
+        } else {
+          customerInfoSubmittedRef.current = true;
         }
       } catch (e) {
         console.warn("Could not load case", e);
@@ -229,6 +261,7 @@ export default function ReportFlow() {
   };
 
   const handleCustomerSuccess = async () => {
+    customerInfoSubmittedRef.current = true;
     setCustomerModalOpen(false);
     setView("upload");
     const fresh = await refresh();
@@ -438,13 +471,13 @@ export default function ReportFlow() {
       {renderScreen()}
 
       <PostPaymentCustomerModal
-        isOpen={customerModalOpen}
+        isOpen={customerModalOpen && !customerInfoSubmittedRef.current}
         caseId={caseId || cs?.id || null}
         initialName={cs?.customerName || (cs?.answers as any)?.customer_name || (cs?.answers as any)?.name || (cs?.consent as any)?.name || ""}
         initialEmail={cs?.email || (cs?.consent as any)?.email || ""}
         onSuccess={handleCustomerSuccess}
         onClose={() => {
-          if (hasCompletedPostPaymentCollection(cs)) {
+          if (hasCompletedPostPaymentCollection(cs) || customerInfoSubmittedRef.current) {
             setCustomerModalOpen(false);
           }
         }}
@@ -492,7 +525,8 @@ function PayStep({ cs, cfg, onDone }: { cs: any; cfg: any; onDone: () => void })
   const [remind, setRemind] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const cur = cs.country === "US" ? "USD" : "CAD";
+  const isUS = cs.country === "US";
+  const cur = isUS ? "USD" : "CAD";
   const rawMode = cfg?.payments?.mode;
   const isResolved = rawMode === "mock" || rawMode === "live";
   const mock = rawMode === "mock";
@@ -522,13 +556,20 @@ function PayStep({ cs, cfg, onDone }: { cs: any; cfg: any; onDone: () => void })
     <Card>
       <Kicker>Severance Report · $59 {cur}</Kicker>
       <H1>Get your Severance Report</H1>
-      <p className="text-[#5a6b78] text-[14.5px] mb-4">$59 plus applicable tax, one time. Next you add your {cs.jurisdiction?.words?.letter || "letter"} and contract, check what we read, and we build your report (PDF).</p>
+      <p className="text-[#5a6b78] text-[14.5px] mb-4">
+        {isUS
+          ? "$59 USD · one-time, plus applicable sales tax."
+          : "$59 CAD · one-time, plus applicable tax."}{" "}
+        Next you add your {cs.jurisdiction?.words?.letter || "letter"} and contract, check what we read, and we build your report (PDF).
+      </p>
       <label className="block text-[13px] font-bold text-[#062c55] mb-1" htmlFor="ppEmail">Email for your receipt and report</label>
       <input id="ppEmail" type="email" autoComplete="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)}
         className="w-full min-h-[44px] rounded-xl border border-[#d5dde4] px-3 mb-3" placeholder="you@example.com" />
       <label className="flex gap-2 text-[13.5px] mb-2 items-start"><input type="checkbox" className="mt-1" checked={remind} onChange={(e) => setRemind(e.target.checked)} /> Remind me before my deadline</label>
       <label className="flex gap-2 text-[13.5px] mb-4 items-start"><input type="checkbox" className="mt-1" checked={terms} onChange={(e) => setTerms(e.target.checked)} /> I agree to the <NextLink href="/legal" className="underline text-[#0c8f72]">terms and privacy policy</NextLink>. FairExit gives information, not legal advice.</label>
-      <Btn onClick={pay} disabled={busy || !isResolved} className="w-full">{!isResolved ? "Connecting to checkout…" : busy ? "Working…" : `Pay $59.00 ${cur} + applicable tax →`}</Btn>
+      <Btn onClick={pay} disabled={busy || !isResolved} className="w-full">
+        {!isResolved ? "Connecting to checkout…" : busy ? "Working…" : `Pay $59.00 ${cur} + ${isUS ? "applicable sales tax" : "applicable tax"} →`}
+      </Btn>
       {mock && <p className="text-[12px] text-[#b07a00] mt-2">Test mode: no card is charged (PAYMENTS_MODE=mock).</p>}
       <ErrorBox text={err} />
     </Card>
