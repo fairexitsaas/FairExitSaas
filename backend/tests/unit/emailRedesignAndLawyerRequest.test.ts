@@ -592,6 +592,32 @@ describe('FairExit: Report Email Redesign, Lawyer Request & UI Corrections', () 
       // 3. Exchanges token with backend via POST request
       expect(pageContent).toContain('fairexit.exchangeLawyerToken(activeCaseId, tokenToExchange)')
     })
+
+    it('implements a single-page form with all questions visible together and no three-step navigation', () => {
+      const pageContent = readSource('src/app/lawyer-request/page.tsx')
+
+      // 1. No 3-step navigation or next/back buttons
+      expect(pageContent).not.toContain('Step 1 of 3')
+      expect(pageContent).not.toContain('Step 2 of 3')
+      expect(pageContent).not.toContain('Step 3 of 3')
+      expect(pageContent).not.toContain('Continue to contact details')
+      expect(pageContent).not.toContain('← Back')
+
+      // 2. All 3 fields visible together on the same form
+      expect(pageContent).toContain('Full name')
+      expect(pageContent).toContain('Phone number')
+      expect(pageContent).toContain('Email address')
+
+      // 3. Submit button with loading spinner and duplicate prevention
+      expect(pageContent).toContain('Submit request →')
+      expect(pageContent).toContain('Submitting request…')
+      expect(pageContent).toContain('if (submitting) return')
+      expect(pageContent).toContain('disabled={submitting}')
+
+      // 4. Inline success confirmation on the same page
+      expect(pageContent).toContain('Thank you — your request has been received.')
+      expect(pageContent).toContain('Return to homepage')
+    })
   })
 
   describe('6. Referrer-Policy: no-referrer Verification', () => {

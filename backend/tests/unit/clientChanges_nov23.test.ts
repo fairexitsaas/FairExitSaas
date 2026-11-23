@@ -91,16 +91,17 @@ describe('Client Changes Verification Suite (Tasks 1 to 5)', () => {
   describe('Task 3 — Standalone Lawyer Request Page (/lawyer-request)', () => {
     const pagePath = 'src/app/lawyer-request/page.tsx'
 
-    it('exists as a page and follows the exact 3-stage flow', () => {
+    it('exists as a single-page form with all questions visible together and no 3-step navigation', () => {
       expect(fs.existsSync(path.join(rootDir, pagePath))).toBe(true)
       const content = readSource(pagePath)
 
-      // 3 Stages
-      expect(content).toMatch(/Step 1 of 3 · Overview/)
-      expect(content).toMatch(/Step 2 of 3 · Your Details/)
-      expect(content).toMatch(/Step 3 of 3 · Complete/)
+      // No 3-step navigation
+      expect(content).not.toMatch(/Step 1 of 3/)
+      expect(content).not.toMatch(/Step 2 of 3/)
+      expect(content).not.toMatch(/Continue to contact details/i)
+      expect(content).not.toMatch(/← Back/i)
 
-      // Exactly 3 contact fields
+      // All 3 contact fields visible together on the form
       expect(content).toMatch(/Full name/)
       expect(content).toMatch(/Phone number/)
       expect(content).toMatch(/Email address/)

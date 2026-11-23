@@ -51,10 +51,10 @@ export default function Footer({
 
   if (variant === "about") {
     return (
-      <footer className="border-t border-[#dfe3e8] dark:border-[#1e3b5c] py-8 sm:py-9 transition-colors">
-        <div className="max-w-[1100px] mx-auto px-4 sm:px-6 w-full flex flex-col sm:flex-row justify-between gap-8 sm:gap-10 items-start">
+      <footer className="border-t border-[#e7e4dd] dark:border-[#1e3b5c] pt-12 pb-16 sm:pt-14 sm:pb-20 bg-[#f6f4ef] dark:bg-[#062c55] transition-colors">
+        <div className="max-w-[1040px] mx-auto px-4 sm:px-6 w-full flex flex-col sm:flex-row justify-between gap-10 sm:gap-14 items-start">
           {/* Left Column: Logo, Tagline, Disclaimer */}
-          <div className="max-w-[600px]">
+          <div className="max-w-[580px]">
             <Image
               className="h-7 w-auto object-contain dark:hidden"
               src="/fairexitlogo.png"
@@ -69,54 +69,54 @@ export default function Footer({
               width={140}
               height={32}
             />
-            <div className="text-sm font-bold text-[#0c8f72] dark:text-[#0eb28d] my-2">
-              Challenge your severance offer.
+            <div className="text-[14px] sm:text-[14.5px] font-bold text-[#0eb28d] my-2.5 tracking-[-0.01em]">
+              Challenge your severance offer
             </div>
             {isCanada ? (
-              <p className="text-[11.5px] sm:text-[12px] text-[#5a6b78] dark:text-[#9ab1c6] leading-[1.55]">
+              <p className="text-[12px] sm:text-[12.5px] text-[#5a6b78] dark:text-[#9ab1c6] leading-[1.6]">
                 <b className="font-bold text-[#062c55] dark:text-white">
-                  Information, not legal advice.
+                  Educational &amp; organizational information — not legal advice.
                 </b>{" "}
-                Our verdict and ranges are estimates from AI and general rules — they can be wrong, and the law changes. Please do your own research.{" "}
+                FairExit helps you organize your offer and understand general information; it doesn&apos;t assess whether an offer is fair or tell you what to do. Any general information can be wrong, and the law changes.{" "}
                 <b className="font-bold text-[#062c55] dark:text-white">
-                  Only a licensed employment lawyer can confirm your exact number.
+                  Only a licensed employment lawyer can advise on your situation.
                 </b>{" "}
-                We&apos;re paid a flat advertising fee by lawyers, never a cut of your outcome, and you always choose who to talk to.{" "}
+                Connecting with a lawyer is free for you.{" "}
                 <Link
                   href="/legal"
-                  className="text-[#0c8f72] dark:text-[#0eb28d] hover:underline font-medium"
+                  className="text-[#0eb28d] dark:text-[#0eb28d] hover:underline font-semibold"
                 >
                   Read the full Terms &amp; Disclaimer →
                 </Link>
               </p>
             ) : (
-              <p className="text-[11.5px] sm:text-[12px] text-[#5a6b78] dark:text-[#9ab1c6] leading-[1.55]">
+              <p className="text-[12px] sm:text-[12.5px] text-[#5a6b78] dark:text-[#9ab1c6] leading-[1.6]">
                 <b className="font-bold text-[#062c55] dark:text-white">
                   Educational &amp; organizational information — not legal advice.
                 </b>{" "}
-                FairExit helps you organize your offer and understand general federal rules; it doesn&apos;t assess whether your layoff was lawful, evaluate compliance, or tell you what you&apos;re owed. Any read or general information can be wrong, and the law changes. Please do your own research.{" "}
+                FairExit helps you organize your offer and understand general information; it doesn&apos;t assess whether an offer is fair or tell you what to do. Any general information can be wrong, and the law changes.{" "}
                 <b className="font-bold text-[#062c55] dark:text-white">
-                  Only a licensed employment attorney can advise you.
+                  Only a licensed employment attorney can advise on your situation.
                 </b>{" "}
-                Deadlines to act can be short — confirm them with an attorney promptly. We&apos;re paid a flat advertising fee by attorneys, never a cut of your outcome, and you always choose who to talk to.{" "}
+                Connecting with an attorney is free for you.{" "}
                 <Link
                   href="/legal"
-                  className="text-[#0c8f72] dark:text-[#0eb28d] hover:underline font-medium"
+                  className="text-[#0eb28d] dark:text-[#0eb28d] hover:underline font-semibold"
                 >
-                  Full disclaimer, terms &amp; privacy →
+                  Read the full Terms &amp; Disclaimer →
                 </Link>
               </p>
             )}
           </div>
 
           {/* Right Column: Single column links matching the screenshot */}
-          <div className="text-[13.5px] text-[#5a6b78] dark:text-[#9ab1c6] shrink-0 sm:min-w-[140px]">
-            <div className="font-bold text-[#062c55] dark:text-white mb-2">
+          <div className="text-[13.5px] sm:text-[14px] text-[#5a6b78] dark:text-[#9ab1c6] shrink-0 sm:min-w-[150px]">
+            <div className="font-bold text-[#062c55] dark:text-white mb-2.5 text-[14px]">
               FairExit
             </div>
-            <div className="flex flex-col gap-[7px]">
+            <div className="flex flex-col gap-[7.5px]">
               <Link
-                href="/questions"
+                href={isCanada ? "/questions?country=CA" : "/questions?country=US"}
                 className="hover:text-[#062c55] dark:hover:text-white transition-colors no-underline whitespace-nowrap"
               >
                 {isCanada ? "Check my offer" : "Check my layoff"}
@@ -140,6 +140,12 @@ export default function Footer({
                 className="hover:text-[#062c55] dark:hover:text-white transition-colors no-underline whitespace-nowrap"
               >
                 FAQ
+              </Link>
+              <Link
+                href="/blog"
+                className="hover:text-[#062c55] dark:hover:text-white transition-colors no-underline whitespace-nowrap"
+              >
+                Blog
               </Link>
               <Link
                 href="/about"
