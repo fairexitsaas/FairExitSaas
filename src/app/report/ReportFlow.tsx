@@ -6,6 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
+import { detectIsUS } from "@/lib/report-storage";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifyError, notifySuccess } from "@/lib/notifications";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
@@ -138,7 +139,12 @@ export default function ReportFlow() {
   const urlStep = sp?.get("step");
   const step = view || urlStep || cs?.nextStep;
   const countryParam = sp?.get("country")?.toUpperCase();
-  const country = cs?.country || (countryParam === "US" ? "US" : "CA");
+  const isUS = detectIsUS({
+    country: countryParam,
+    cs,
+    searchParams: sp,
+  });
+  const country: "US" | "CA" = isUS ? "US" : "CA";
   const words = cs?.jurisdiction?.words || (country === "US"
     ? { lawyer: "attorney", region: "state", letter: "separation agreement", contract: "offer letter or employment contract" }
     : { lawyer: "lawyer", region: "province", letter: "severance letter", contract: "employment contract" });
@@ -206,7 +212,7 @@ export default function ReportFlow() {
         if (res?.paid) {
           setPaymentStatus("confirmed");
           setShowPaymentSuccessBanner(true);
-          const cur = (cs?.country || countryParam || "US") === "US" ? "USD" : "CAD";
+          const cur = isUS ? "USD" : "CAD";
           notifySuccess(`Payment successful! Your $59 ${cur} payment has been confirmed.`);
 
           const fresh = await refresh();
@@ -245,7 +251,7 @@ export default function ReportFlow() {
         setCs(c);
         setPaymentStatus("confirmed");
         setShowPaymentSuccessBanner(true);
-        const cur = (c?.country || country) === "US" ? "USD" : "CAD";
+        const cur = isUS ? "USD" : "CAD";
         notifySuccess(`Payment successful! Your $59 ${cur} payment has been confirmed.`);
         if (!hasCompletedPostPaymentCollection(c) && !customerInfoSubmittedRef.current) {
           setCustomerModalOpen(true);
@@ -257,7 +263,7 @@ export default function ReportFlow() {
       }
     }
     setView("upload");
-    router.push(`/report?step=upload${id ? `&case=${id}` : ""}`);
+    router.push(`/report?step=upload${id ? `&case=${id}` : ""}${isUS ? "&country=US" : ""}`);
   };
 
   const handleCustomerSuccess = async () => {
@@ -267,7 +273,7 @@ export default function ReportFlow() {
     const fresh = await refresh();
     const id = fresh?.id || caseId;
     if (id) {
-      router.push(`/report?step=upload&case=${id}`);
+      router.push(`/report?step=upload&case=${id}${isUS ? "&country=US" : ""}`);
     }
   };
 
@@ -342,9 +348,9 @@ export default function ReportFlow() {
           onContinue={async () => {
             setView("reading");
             if (caseId) {
-              router.push(`/report?step=reading&case=${caseId}`);
+              router.push(`/report?step=reading&case=${caseId}${isUS ? "&country=US" : ""}`);
             } else {
-              router.push(`/report?step=reading`);
+              router.push(`/report?step=reading${isUS ? "?country=US" : ""}`);
             }
           }}
         />
@@ -374,9 +380,9 @@ export default function ReportFlow() {
             onContinue={(targetStep = "building") => {
               setView(targetStep);
               if (caseId) {
-                router.push(`/report?step=${targetStep}&case=${caseId}`);
+                router.push(`/report?step=${targetStep}&case=${caseId}&country=US`);
               } else {
-                router.push(`/report?step=${targetStep}`);
+                router.push(`/report?step=${targetStep}&country=US`);
               }
               refresh();
             }}
@@ -525,7 +531,7 @@ function PayStep({ cs, cfg, onDone }: { cs: any; cfg: any; onDone: () => void })
   const [remind, setRemind] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
-  const isUS = cs.country === "US";
+  const isUS = detectIsUS({ country: cs.country, cs });
   const cur = isUS ? "USD" : "CAD";
   const rawMode = cfg?.payments?.mode;
   const isResolved = rawMode === "mock" || rawMode === "live";
@@ -542,7 +548,7 @@ function PayStep({ cs, cfg, onDone }: { cs: any; cfg: any; onDone: () => void })
         await fairexit.mockPay(cs.id);
         onDone();
       } else {
-        const back = `${window.location.origin}/report?case=${cs.id}`;
+        const back = `${window.location.origin}/report?case=${cs.id}${isUS ? "&country=US" : ""}`;
         const r = await fairexit.stripeCheckout(cs.id, {
           successUrl: `${back}&session_id={CHECKOUT_SESSION_ID}`,
           cancelUrl: `${back}&step=pay&canceled=true`,
@@ -907,7 +913,7 @@ function ReadyStep({ cs, caseId, words, onLawyer }: { cs: any; caseId: string; w
       <H1>Your report is ready</H1>
       <p className="text-[#5a6b78] text-[14px]">{r.cover?.role_line} · {r.cover?.place_line}</p>
       <div className="flex flex-wrap gap-2 mt-3">
-        <a className="min-h-[44px] inline-flex items-center px-4 rounded-xl bg-[#0eb28d] text-[#04291f] font-bold" href={fairexit.reportPdfUrl(caseId, token)}>Download my report (PDF)</a>
+        <a className="min-h-[44px] inline-flex items-center px-4 rounded-xl bg-[#0eb28d] text-[#04291f] font-bold" href={fairexit.reportPdfUrl(caseId, token)} download={`FairExit-Severance-Report-${data.reportId || "report"}.pdf`}>Download my report (PDF)</a>
         <Btn kind="o" onClick={onLawyer}>Ask a {words.lawyer} to contact me</Btn>
       </div>
       {cs.email && <p className="text-[13px] text-[#5a6b78] mt-2">We also emailed it to <b>{cs.email}</b>.</p>}

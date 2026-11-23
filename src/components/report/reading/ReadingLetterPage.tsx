@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getReportInputs, saveReportInputs, ReportInputs } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs, detectIsUS } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { startPollLoop } from "@/lib/reportPolling";
 import { useErrorModal } from "@/context/ErrorModalContext";
@@ -22,12 +22,11 @@ export default function ReadingLetterPage({
   const { showErrorModal } = useErrorModal();
   const [data] = useState<ReportInputs>(() => getReportInputs());
 
-  const isUS =
-    data.country === "US" ||
-    cs?.country === "US" ||
-    (typeof window !== "undefined" &&
-      new URLSearchParams(window.location.search).get("country")?.toUpperCase() ===
-        "US");
+  const isUS = detectIsUS({
+    country: cs?.country,
+    cs,
+    data,
+  });
 
   const [readState, setReadState] = useState<{ done: boolean; failed: boolean; error?: string }>({
     done: false,

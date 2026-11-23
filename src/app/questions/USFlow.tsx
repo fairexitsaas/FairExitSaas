@@ -342,8 +342,8 @@ export default function USFlow() {
     try {
       saveReportInputs({
         country: "US",
-        state: state.usState || "—",
-        provinceName: state.usState || "—",
+        state: state.usState || "California",
+        provinceName: state.usState || "California",
         age: Number(state.age) || 0,
         years: Number(state.years) || 0,
         salary: Number(state.salary) || 0,
@@ -383,7 +383,7 @@ export default function USFlow() {
         return;
       }
       if (id) {
-        router.push(`/report?case=${id}&step=pay`);
+        router.push(`/report?case=${id}&step=pay&country=US`);
       } else {
         setErrorMessage("Case creation in progress. Please try again in a moment.");
       }
@@ -1258,26 +1258,12 @@ export default function USFlow() {
                 FAQ
               </a>
               <a
-                href="/blog"
-                className="hover:text-[#062c55] transition-colors"
-              >
-                Blog
-              </a>
-              <a
                 href="/about"
                 className="hover:text-[#062c55] transition-colors"
               >
                 About
               </a>
             </nav>
-
-            <button
-              type="button"
-              onClick={() => triggerGetApp()}
-              className="hidden lg:inline-flex items-center text-[13px] font-bold text-[#0c8f72] hover:underline transition-colors whitespace-nowrap cursor-pointer"
-            >
-              Get the app
-            </button>
             <button
               type="button"
               onClick={handleExit}
@@ -1341,23 +1327,10 @@ export default function USFlow() {
             <a href="/faq" className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors">
               FAQ
             </a>
-            <a href="/blog" className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors">
-              Blog
-            </a>
             <a href="/about" className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors">
               About
             </a>
-            <div className="pt-3 pb-2 flex justify-between text-xs text-[#5a6b78]">
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  triggerGetApp();
-                }}
-                className="font-bold text-[#0c8f72] cursor-pointer"
-              >
-                Get the app
-              </button>
+            <div className="pt-3 pb-2 flex justify-end text-xs text-[#5a6b78]">
               <button
                 type="button"
                 onClick={handleExit}

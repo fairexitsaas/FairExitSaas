@@ -2,11 +2,10 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { triggerGetApp } from "@/context/GetAppContext";
 import Image from "next/image";
-import { getReportInputs, saveReportInputs, ReportInputs } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs, detectIsUS } from "@/lib/report-storage";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
-import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
+import { fairexit, caseStore, FairExitApiError, FAIREXIT_API_URL } from "@/lib/api/fairexit";
 import { startPollLoop } from "@/lib/reportPolling";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifySuccess, notifyError } from "@/lib/notifications";
@@ -283,7 +282,12 @@ export default function PaidReportReadyPage({
     }
   };
 
-  const isCanada = cs?.country ? cs.country === "CA" : data.country !== "US";
+  const isUS = detectIsUS({
+    country: cs?.country,
+    cs,
+    data,
+  });
+  const isCanada = !isUS;
   const answers = (cs?.answers as Record<string, unknown>) || {};
   const priceCurrency = isCanada ? "$59 CAD" : "$59 USD";
 
@@ -310,6 +314,8 @@ export default function PaidReportReadyPage({
     }
   }, [activeId]);
 
+  const [copiedPdfLink, setCopiedPdfLink] = useState(false);
+
   const activeToken =
     persistedToken ||
     (activeId && typeof window !== "undefined" ? caseStore.get(activeId) || "" : "");
@@ -321,12 +327,36 @@ export default function PaidReportReadyPage({
       ? `${origin}/report?case=${activeId}`
       : "";
 
+  const pdfDownloadUrl =
+    activeId && activeToken
+      ? fairexit.reportPdfUrl(activeId, activeToken)
+      : activeId
+      ? `${FAIREXIT_API_URL}/cases/${activeId}/report/pdf`
+      : "";
+
+  const pdfViewUrl =
+    activeId && activeToken
+      ? fairexit.reportPdfUrl(activeId, activeToken, { inline: true })
+      : activeId
+      ? `${FAIREXIT_API_URL}/cases/${activeId}/report/pdf?download=0`
+      : "";
+
   const handleCopyLink = () => {
     if (privateLink) {
       navigator.clipboard.writeText(privateLink).then(() => {
         setCopiedLink(true);
         notifySuccess("Copied private report link to clipboard!");
         setTimeout(() => setCopiedLink(false), 3000);
+      });
+    }
+  };
+
+  const handleCopyPdfLink = () => {
+    if (pdfDownloadUrl) {
+      navigator.clipboard.writeText(pdfDownloadUrl).then(() => {
+        setCopiedPdfLink(true);
+        notifySuccess("Copied direct PDF download link to clipboard!");
+        setTimeout(() => setCopiedPdfLink(false), 3000);
       });
     }
   };
@@ -572,9 +602,7 @@ export default function PaidReportReadyPage({
             <Link href="/#how" className="hover:text-[#062C55] transition">How it works</Link>
             <Link href="/#paths" className="hover:text-[#062C55] transition">Pricing</Link>
             <Link href="/faq" className="hover:text-[#062C55] transition">FAQ</Link>
-            <Link href="/blog" className="hover:text-[#062C55] transition">Blog</Link>
             <Link href="/about" className="hover:text-[#062C55] transition">About</Link>
-            <button type="button" onClick={() => triggerGetApp()} className="text-[#0C8F72] font-[700] text-[12.5px] hover:underline">Get the app</button>
             <Link href="/" className="text-[#5A6B78] hover:text-[#062C55] transition underline text-[13px] font-[600]">Exit ✕</Link>
           </nav>
 
@@ -699,23 +727,32 @@ export default function PaidReportReadyPage({
                 </h1>
 
                 {/* Primary Action: Download my report (PDF) - ONLY shown when report is ready! */}
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  disabled={isDownloading}
-                  className="w-full sm:w-[380px] h-[54px] rounded-[12px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[17px] leading-[24px] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] transition flex items-center justify-center cursor-pointer mb-3"
-                >
-                  {isDownloading ? (
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                      <span>{pdfPending ? "Compiling PDF…" : "Opening PDF…"}</span>
-                    </div>
-                  ) : pdfPending ? (
-                    "Generate and download report (PDF)"
-                  ) : (
-                    "Download my report (PDF)"
-                  )}
-                </button>
+                {pdfDownloadUrl && !pdfPending ? (
+                  <a
+                    href={pdfDownloadUrl}
+                    download={`FairExit-Severance-Report-${cs?.report?.reportId || "report"}.pdf`}
+                    onClick={() => notifySuccess("Downloading your FairExit report PDF…")}
+                    className="w-full sm:w-[380px] h-[54px] rounded-[12px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[17px] leading-[24px] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] transition flex items-center justify-center cursor-pointer mb-3 no-underline text-center"
+                  >
+                    Download my report (PDF)
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    disabled={isDownloading}
+                    className="w-full sm:w-[380px] h-[54px] rounded-[12px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[17px] leading-[24px] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] transition flex items-center justify-center cursor-pointer mb-3"
+                  >
+                    {isDownloading ? (
+                      <div className="flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        <span>{pdfPending ? "Compiling PDF…" : "Opening PDF…"}</span>
+                      </div>
+                    ) : (
+                      "Generate and download report (PDF)"
+                    )}
+                  </button>
+                )}
                 {downloadError && <p role="alert" className="w-full sm:w-[380px] mb-3 text-left text-[13px] text-[#A3231F]">{downloadError}</p>}
 
                 {/* Secondary Action: Talk to a lawyer, free */}
@@ -832,6 +869,48 @@ export default function PaidReportReadyPage({
                     <p className="font-sans text-[11.5px] leading-[17px] text-[#5A6B78] mt-2">
                       Only someone with this secret link can access your report. Your documents are deleted after 30 days; your report is kept for 12 months.
                     </p>
+                  </div>
+                )}
+
+                {/* ── 2b. Direct PDF Download Link Box ── */}
+                {pdfDownloadUrl && (
+                  <div className="w-full sm:w-[480px] p-4 rounded-[12px] bg-[#FAF9F5] border border-[#E7E4DD] text-left mb-3">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="font-sans font-[700] text-[12px] uppercase tracking-wider text-[#062C55]">
+                        Direct PDF download link
+                      </span>
+                      <span className="text-[11px] font-semibold text-[#0C8F72] bg-[#E5F5EE] px-2 py-0.5 rounded">
+                        PDF file
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={pdfDownloadUrl}
+                        className="w-full bg-white border border-[#CFD8DF] rounded-[8px] px-3 py-2 text-[12px] font-mono text-[#062C55] outline-none select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCopyPdfLink}
+                        className="px-3.5 py-2 bg-[#0EB28D] hover:bg-[#0C8F72] text-white rounded-[8px] font-sans font-[700] text-[12px] whitespace-nowrap transition cursor-pointer shrink-0"
+                      >
+                        {copiedPdfLink ? "Copied! ✓" : "Copy PDF link"}
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="font-sans text-[11.5px] leading-[17px] text-[#5A6B78]">
+                        Direct link to download your generated PDF file directly. Remains accessible even after closing this page.
+                      </p>
+                      <a
+                        href={pdfViewUrl || pdfDownloadUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[12px] font-bold text-[#0C8F72] hover:underline whitespace-nowrap ml-3"
+                      >
+                        Open PDF ↗
+                      </a>
+                    </div>
                   </div>
                 )}
 

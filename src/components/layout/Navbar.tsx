@@ -5,8 +5,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { CountryCode } from "@/context/CountryContext";
-import { useAccessibility } from "@/context/AccessibilityContext";
-import { triggerGetApp } from "@/context/GetAppContext";
 
 interface NavbarProps {
   country: CountryCode;
@@ -18,7 +16,6 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isCanada = country === "CA";
-  const { toggleDialog } = useAccessibility();
 
   const handleNavLinkClick = (href: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -63,11 +60,6 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
       return;
     }
 
-    if (href === "#app") {
-      triggerGetApp();
-      return;
-    }
-
     if (href === "demo-v3.html" || href === "/questions") {
       handleCtaClick(e);
       return;
@@ -98,11 +90,6 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
     e.preventDefault();
     setMobileMenuOpen(false);
     router.push(isCanada ? "/questions?country=CA" : "/questions?country=US");
-  };
-
-  const handleA11yClick = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    toggleDialog();
   };
 
   // Flag SVGs matching the reference markup
@@ -195,20 +182,6 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
           </Link>
           <Link
             className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
-            href="/blog"
-            onClick={(e) => handleNavLinkClick("/blog", e)}
-          >
-            Blog
-          </Link>
-          <a
-            className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
-            href="#app"
-            onClick={(e) => handleNavLinkClick("#app", e)}
-          >
-            Get the app
-          </a>
-          <Link
-            className="text-[#5a6b78] hover:text-[#062c55] dark:text-[#9ab1c6] dark:hover:text-white no-underline text-[14.5px] font-semibold transition-colors whitespace-nowrap"
             href="/about"
             onClick={(e) => handleNavLinkClick("/about", e)}
           >
@@ -218,25 +191,6 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
 
         {/* Nav Right */}
         <div className="hidden lg:flex items-center gap-2.5 lg:gap-3 shrink-0 ml-auto lg:ml-6">
-          {/* Accessibility button */}
-          <button
-            type="button"
-            onClick={handleA11yClick}
-            aria-label="Accessibility options"
-            title="Accessibility"
-            className="inline-flex items-center justify-center w-[34px] h-[34px] rounded-full border border-[#e7e4dd] dark:border-[#1e3b5c] bg-white dark:bg-[#0d2238] text-[#062c55] dark:text-[#f0f6fc] cursor-pointer shadow-[0_1px_3px_rgba(6,44,85,0.04)] hover:border-[#0eb28d] dark:hover:border-[#0eb28d] hover:scale-105 transition-all"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              fill="currentColor"
-              className="w-[19px] h-[19px]"
-              aria-hidden="true"
-            >
-              <circle cx="12" cy="3.6" r="2"></circle>
-              <path d="M20 8.2c-2.3.7-5 1-8 1s-5.7-.3-8-1L3.4 10c1.9.6 4 .9 5.9 1v3.1L7.5 20.6l1.9.6L11 16h2l1.6 5.2 1.9-.6-1.8-6.5V11c1.9-.1 4-.4 5.9-1L20 8.2z"></path>
-            </svg>
-          </button>
-
           {/* Country Pill Switcher */}
           <button
             type="button"
@@ -318,20 +272,6 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
         </Link>
         <Link
           className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
-          href="/blog"
-          onClick={(e) => handleNavLinkClick("/blog", e)}
-        >
-          Blog
-        </Link>
-        <a
-          className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
-          href="#app"
-          onClick={(e) => handleNavLinkClick("#app", e)}
-        >
-          Get the app
-        </a>
-        <Link
-          className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
           href="/about"
           onClick={(e) => handleNavLinkClick("/about", e)}
         >
@@ -346,18 +286,6 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
             ? "Switch to the US site →"
             : "Switch to the Canadian site →"}
         </button>
-        <a
-          className="text-[#062c55] hover:text-[#0c8f72] dark:text-[#f0f6fc] dark:hover:text-[#0eb28d] text-[15.5px] font-bold py-3 border-b border-[#e7e4dd]/80 dark:border-[#1e3b5c] transition-colors no-underline block"
-          href="#"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            toggleDialog();
-            setMobileMenuOpen(false);
-          }}
-        >
-          Accessibility options
-        </a>
         <div className="pt-4 flex justify-start">
           <Link
             className="inline-flex items-center justify-center gap-1.5 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-[9px] font-bold text-[14.5px] sm:text-[15px] no-underline border-none cursor-pointer bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] active:scale-[0.98] transition-all whitespace-nowrap self-start"

@@ -160,7 +160,7 @@ export function createFairExitClient(opts: FairExitClientOptions) {
 
     // post-payment customer information & report delivery (Change 24)
     submitCustomerInfo: (id: string, body: { name: string; email: string; consentNews?: boolean }) =>
-      call<{ success: boolean; customer: { name: string; email: string }; privateLink: string; emailDelivery: any; case: any }>('POST', `${c(id)}/customer-info`, body, id, undefined, 'Customer Info'),
+      call<{ success: boolean; customer: { name: string; email: string }; privateLink: string; pdfDownloadUrl?: string; emailDelivery: any; case: any }>('POST', `${c(id)}/customer-info`, body, id, undefined, 'Customer Info'),
     sendReportEmail: (id: string, body?: { email?: string; forceRetry?: boolean }) =>
       call<{ success: boolean; status?: string; sentAt?: string; error?: string }>('POST', `${c(id)}/report/email`, body || {}, id, undefined, 'Send Report Email'),
     getReportDelivery: (id: string) =>
@@ -223,7 +223,10 @@ export function createFairExitClient(opts: FairExitClientOptions) {
     reportStatus: (id: string, signal?: AbortSignal) => call<any>('GET', `${c(id)}/report/status`, undefined, id, signal, 'Report Generation Status'),
     report: (id: string) => call<any>('GET', `${c(id)}/report`, undefined, id, undefined, 'Report Retrieval'),
     /** Link usable in <a href> / WebView (token in the query string). */
-    reportPdfUrl: (id: string, token: string) => `${base}${c(id)}/report/pdf?t=${encodeURIComponent(token)}`,
+    reportPdfUrl: (id: string, token: string, opts?: { inline?: boolean }) => {
+      const inlineParam = opts?.inline ? '&download=0' : ''
+      return `${base}${c(id)}/report/pdf?t=${encodeURIComponent(token)}${inlineParam}`
+    },
     reportHtmlUrl: (id: string, token: string) => `${base}${c(id)}/report/html?t=${encodeURIComponent(token)}`,
 
     // deadlines
@@ -312,7 +315,8 @@ export const caseStore = {
   },
 }
 
-export const FAIREXIT_API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1'
+export const FAIREXIT_API_URL = rawApiUrl.endsWith('/api/v') ? `${rawApiUrl}1` : rawApiUrl
 
 export const fairexit = createFairExitClient({
   baseUrl: FAIREXIT_API_URL,

@@ -464,7 +464,7 @@ function QuestionsContent() {
         return;
       }
       if (id) {
-        router.push(`/report?case=${id}&step=pay`);
+        router.push(`/report?case=${id}&step=pay&country=CA`);
       } else {
         setErrorMessage("Case creation in progress. Please try again in a moment.");
       }
@@ -1111,26 +1111,12 @@ function QuestionsContent() {
                 FAQ
               </NextLink>
               <NextLink
-                href="/#why"
-                className="hover:text-[#062c55] transition-colors"
-              >
-                Blog
-              </NextLink>
-              <NextLink
                 href="/#about"
                 className="hover:text-[#062c55] transition-colors"
               >
                 About
               </NextLink>
             </nav>
-
-            <button
-              type="button"
-              onClick={() => triggerGetApp()}
-              className="hidden lg:inline-block text-[13px] font-bold text-[#0c8f72] hover:underline whitespace-nowrap cursor-pointer"
-            >
-              Get the app
-            </button>
             <button
               type="button"
               onClick={handleExit}
@@ -1207,30 +1193,13 @@ function QuestionsContent() {
               FAQ
             </NextLink>
             <NextLink
-              href="/#why"
-              className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Blog
-            </NextLink>
-            <NextLink
               href="/#about"
               className="block py-2.5 border-b border-[#e7e4dd]/80 text-[#062c55] hover:text-[#0c8f72] transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               About
             </NextLink>
-            <div className="pt-3 pb-2 flex justify-between text-xs text-[#5a6b78]">
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileMenuOpen(false);
-                  triggerGetApp();
-                }}
-                className="font-bold text-[#0c8f72] cursor-pointer bg-transparent border-none p-0"
-              >
-                Get the app
-              </button>
+            <div className="pt-3 pb-2 flex justify-end text-xs text-[#5a6b78]">
               <button
                 type="button"
                 onClick={handleExit}

@@ -81,6 +81,135 @@ export const defaultMockReportInputs: ReportInputs = {
   documentsExtracted: false,
 };
 
+export const defaultMockUSReportInputs: ReportInputs = {
+  country: "US",
+  province: "US-CA",
+  provinceName: "California",
+  state: "California",
+  age: 52,
+  years: 9,
+  salary: 110000,
+  offer: undefined,
+  role: "Middle management / Senior / Director",
+  union: "No",
+  employment: "Regular employee",
+  signed: "No",
+  federal: "No",
+  payroll: "100+",
+  otherPay: "None",
+  newJob: "Not yet",
+  minClause: "No",
+  contract: "Signed · role changed",
+  howEnded: "Laid off",
+  market: "Some",
+  flagged: "Nothing unusual",
+  statutoryMin: 0,
+  courtAwardLow: 0,
+  courtAwardHigh: 0,
+  noticeWeeks: 0,
+  courtMonths: "—",
+  signByDays: undefined,
+  documentsExtracted: false,
+};
+
+export const US_STATES = [
+  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+  "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+  "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan",
+  "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire",
+  "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
+  "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia",
+  "Wisconsin", "Wyoming"
+] as const;
+
+export const US_STATE_CODES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
+  "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT",
+  "VA", "WA", "WV", "WI", "WY"
+] as const;
+
+const US_STATE_SET_LOWER = new Set([
+  ...US_STATES.map((s) => s.toLowerCase()),
+  ...US_STATE_CODES.map((c) => c.toLowerCase()),
+  ...US_STATE_CODES.map((c) => `us-${c.toLowerCase()}`),
+]);
+
+export function isUSState(val?: unknown): boolean {
+  if (!val || typeof val !== "string") return false;
+  const s = val.trim().toLowerCase();
+  return US_STATE_SET_LOWER.has(s);
+}
+
+export function detectIsUS(opts?: {
+  country?: unknown;
+  cs?: any;
+  data?: ReportInputs | null;
+  searchParams?: URLSearchParams | null;
+}): boolean {
+  const { country, cs, data, searchParams } = opts || {};
+  const countryStr = typeof country === "string" ? country.toUpperCase() : null;
+
+  // 1. Explicit country override
+  if (countryStr === "US") return true;
+
+  // 2. Case from server
+  if (cs?.country === "US") return true;
+  if (cs?.jurisdiction?.country === "US") return true;
+  if (typeof cs?.jurisdiction_code === "string" && cs.jurisdiction_code.toUpperCase().startsWith("US-")) return true;
+  if (typeof cs?.region === "string" && (cs.region.toLowerCase().startsWith("us") || isUSState(cs.region))) return true;
+  if (isUSState(cs?.answers?.usState) || isUSState(cs?.answers?.state)) return true;
+  if (isUSState(cs?.jurisdiction?.name)) return true;
+
+  // 3. Form / stored inputs
+  if (data?.country === "US") return true;
+  if (typeof data?.province === "string" && data.province.toLowerCase().startsWith("us")) return true;
+  if (isUSState(data?.state)) return true;
+  if (isUSState(data?.provinceName)) return true;
+  if (isUSState((data?.fullState as any)?.usState) || isUSState((data?.fullState as any)?.state)) return true;
+
+  // 4. URL parameters
+  if (searchParams) {
+    const cParam = searchParams.get("country")?.toUpperCase();
+    if (cParam === "US") return true;
+    if (searchParams.get("st") || searchParams.get("state")) return true;
+  } else if (typeof window !== "undefined") {
+    try {
+      const sp = new URLSearchParams(window.location.search);
+      const cParam = sp.get("country")?.toUpperCase();
+      if (cParam === "US") return true;
+      if (sp.get("st") || sp.get("state")) return true;
+    } catch {}
+  }
+
+  // 5. Browser storage
+  if (typeof window !== "undefined") {
+    try {
+      const localCountry = (
+        localStorage.getItem("fairexit_country") ||
+        localStorage.getItem("fx_country")
+      )?.toUpperCase();
+      if (localCountry === "US") return true;
+
+      const raw = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (
+          parsed.country === "US" ||
+          isUSState(parsed.state) ||
+          isUSState(parsed.provinceName) ||
+          isUSState(parsed.fullState?.usState)
+        ) {
+          return true;
+        }
+      }
+    } catch {}
+  }
+
+  return false;
+}
+
 export function saveReportInputs(data: Partial<ReportInputs>): void {
   if (typeof window === "undefined") return;
   try {
@@ -99,11 +228,15 @@ export function getReportInputs(): ReportInputs {
   try {
     const fromSession = sessionStorage.getItem(STORAGE_KEY);
     if (fromSession) {
-      return { ...defaultMockReportInputs, ...JSON.parse(fromSession) };
+      const parsed = JSON.parse(fromSession);
+      const fallback = parsed?.country === "US" || isUSState(parsed?.state) ? defaultMockUSReportInputs : defaultMockReportInputs;
+      return { ...fallback, ...parsed };
     }
     const fromLocal = localStorage.getItem(STORAGE_KEY);
     if (fromLocal) {
-      return { ...defaultMockReportInputs, ...JSON.parse(fromLocal) };
+      const parsed = JSON.parse(fromLocal);
+      const fallback = parsed?.country === "US" || isUSState(parsed?.state) ? defaultMockUSReportInputs : defaultMockReportInputs;
+      return { ...fallback, ...parsed };
     }
   } catch (e) {
     console.error("Failed to read report inputs from storage", e);

@@ -153,7 +153,7 @@ export default function SeveranceReportPreviewDialog({
               }}
               className="w-full sm:w-auto inline-flex items-center justify-center px-6 py-3 rounded-xl text-white font-semibold text-sm shadow-md transition-all active:scale-95 bg-brand-green hover:bg-brand-green-hover cursor-pointer"
             >
-              Get Severance Report — $59 →
+              Get Severance Report — $59 {isCanada ? "CAD" : "USD"} →
             </button>
           ) : (
             <button

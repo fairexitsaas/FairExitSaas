@@ -230,6 +230,7 @@ export const caseService = {
 
     const base = env.APP_WEB_URL.replace(/\/$/, '')
     const privateLink = `${base}/report?case=${c.id}&t=${encodeURIComponent(token)}`
+    const pdfDownloadUrl = `${base}/cases/${c.id}/report/pdf?t=${encodeURIComponent(token)}`
 
     let emailDelivery: { status: 'sent' | 'pending' | 'failed' | 'disabled'; sentAt?: string; error?: string; message?: string } = {
       status: env.EMAIL_MODE === 'mock' ? 'disabled' : 'pending',
@@ -245,6 +246,7 @@ export const caseService = {
       case: updated,
       customer: { name: cleanName, email: cleanEmail },
       privateLink,
+      pdfDownloadUrl,
       emailDelivery,
     }
   },
