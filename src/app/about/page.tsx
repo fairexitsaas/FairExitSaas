@@ -113,60 +113,42 @@ function AboutContent() {
         </section>
 
         {/* 4. WHAT YOU CAN DO FROM HERE (3 small cards, no prices, no promises) */}
-        <section className="py-12 sm:py-16 px-4 sm:px-6 max-w-[920px] mx-auto">
-          <div className="text-center mb-8">
-            <span className="text-xs font-extrabold tracking-[1.4px] uppercase text-[#0c8f72] dark:text-[#0eb28d] block mb-2">
-              OPTIONS
+        <section className="py-10 sm:py-14 px-4 sm:px-6 max-w-[880px] mx-auto w-full">
+          <div className="mb-6 text-left">
+            <span className="text-xs font-extrabold tracking-[1.4px] uppercase text-[#0c8f72] dark:text-[#0eb28d] block">
+              WHAT YOU CAN DO FROM HERE
             </span>
-            <h2 className="font-serif font-semibold text-2xl sm:text-[32px] text-[#062c55] dark:text-white leading-tight">
-              What you can do from here
-            </h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-            {/* Option 1 */}
-            <div className="bg-white dark:bg-[#0d2238] border border-[#e7e4dd] dark:border-[#1e3b5c] rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-extrabold tracking-[0.6px] uppercase text-[#0c8f72] dark:text-[#0eb28d] mb-1.5">
-                  Option 1
-                </div>
-                <h3 className="font-serif font-semibold text-lg sm:text-[19px] text-[#062c55] dark:text-white mb-2">
-                  Sign it
-                </h3>
-                <p className="text-sm text-[#5a6b78] dark:text-[#9ab1c6] leading-relaxed">
-                  Knowing what&apos;s in it.
-                </p>
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {/* Card 1 */}
+            <div className="bg-white dark:bg-[#0d2238] border border-[#e7e4dd] dark:border-[#1e3b5c] rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-start">
+              <h3 className="font-serif font-semibold text-lg sm:text-[19px] text-[#062c55] dark:text-white mb-2">
+                Sign it
+              </h3>
+              <p className="text-sm text-[#5a6b78] dark:text-[#9ab1c6] leading-relaxed">
+                Knowing what&apos;s in it.
+              </p>
             </div>
 
-            {/* Option 2 */}
-            <div className="bg-white dark:bg-[#0d2238] border border-[#e7e4dd] dark:border-[#1e3b5c] rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-extrabold tracking-[0.6px] uppercase text-[#0c8f72] dark:text-[#0eb28d] mb-1.5">
-                  Option 2
-                </div>
-                <h3 className="font-serif font-semibold text-lg sm:text-[19px] text-[#062c55] dark:text-white mb-2">
-                  Raise it yourself
-                </h3>
-                <p className="text-sm text-[#5a6b78] dark:text-[#9ab1c6] leading-relaxed">
-                  With your questions organized.
-                </p>
-              </div>
+            {/* Card 2 */}
+            <div className="bg-white dark:bg-[#0d2238] border border-[#e7e4dd] dark:border-[#1e3b5c] rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-start">
+              <h3 className="font-serif font-semibold text-lg sm:text-[19px] text-[#062c55] dark:text-white mb-2">
+                Raise it yourself
+              </h3>
+              <p className="text-sm text-[#5a6b78] dark:text-[#9ab1c6] leading-relaxed">
+                With your questions organized.
+              </p>
             </div>
 
-            {/* Option 3 */}
-            <div className="bg-white dark:bg-[#0d2238] border border-[#e7e4dd] dark:border-[#1e3b5c] rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between">
-              <div>
-                <div className="text-[11px] font-extrabold tracking-[0.6px] uppercase text-[#0c8f72] dark:text-[#0eb28d] mb-1.5">
-                  Option 3
-                </div>
-                <h3 className="font-serif font-semibold text-lg sm:text-[19px] text-[#062c55] dark:text-white mb-2">
-                  {isCanada ? "Talk to a lawyer" : "Talk to an attorney"}
-                </h3>
-                <p className="text-sm text-[#5a6b78] dark:text-[#9ab1c6] leading-relaxed">
-                  Leave your details and we pass them on. Free, no obligation.
-                </p>
-              </div>
+            {/* Card 3 */}
+            <div className="bg-white dark:bg-[#0d2238] border border-[#e7e4dd] dark:border-[#1e3b5c] rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-start">
+              <h3 className="font-serif font-semibold text-lg sm:text-[19px] text-[#062c55] dark:text-white mb-2">
+                {isCanada ? "Talk to a lawyer" : "Talk to an attorney"}
+              </h3>
+              <p className="text-sm text-[#5a6b78] dark:text-[#9ab1c6] leading-relaxed">
+                Leave your details and we pass them on. Free for you, no obligation.
+              </p>
             </div>
           </div>
         </section>
@@ -192,8 +174,8 @@ function AboutContent() {
         </section>
       </main>
 
-      {/* 6. FOOTER: Standard home page footer without old "verdict / exact number" */}
-      <Footer country={currentCountry} onCountrySwitch={handleCountrySwitch} />
+      {/* 6. FOOTER: Redesigned About page footer per reference design */}
+      <Footer country={currentCountry} onCountrySwitch={handleCountrySwitch} variant="about" />
       <FloatingActions />
     </div>
   );

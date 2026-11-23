@@ -17,7 +17,6 @@ function LawyerRequestContent() {
   const urlCaseId = searchParams?.get("case");
   const urlToken = searchParams?.get("t");
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
   const [fullName, setFullName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -25,6 +24,7 @@ function LawyerRequestContent() {
   const [caseContext, setCaseContext] = useState<any>(null);
   const [loadingCase, setLoadingCase] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
   // Determine country
@@ -34,7 +34,6 @@ function LawyerRequestContent() {
       : (caseContext?.country as CountryCode) || context?.Country || "CA";
   const isCanada = country === "CA";
   const lawyerWord = isCanada ? "lawyer" : "attorney";
-  const lawyerWordCapital = isCanada ? "Lawyer" : "Attorney";
 
   // Check for active case context
   const activeCaseId = urlCaseId || (typeof window !== "undefined" ? caseStore.last() : null);
@@ -152,6 +151,7 @@ function LawyerRequestContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return; // Prevent duplicate clicks while submitting
     if (!validateInputs()) return;
 
     setSubmitting(true);
@@ -180,7 +180,7 @@ function LawyerRequestContent() {
         consent: true,
       });
 
-      setStep(3);
+      setSubmitted(true);
     } catch (err: any) {
       console.error("[LawyerRequest] Submission failed:", err);
       setErrorMsg(
@@ -214,77 +214,55 @@ function LawyerRequestContent() {
         </Link>
       </header>
 
-      {/* ── Main Content Area ── */}
-      <main className="flex-1 w-full max-w-[680px] mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col justify-center">
-        {/* Progress Tracker (3 Stages) */}
-        <div className="flex items-center justify-between max-w-[360px] mx-auto w-full mb-8">
-          <div className="flex flex-col items-center">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                step >= 1
-                  ? "bg-[#0EB28D] text-white"
-                  : "bg-[#E7E4DD] text-[#5A6B78]"
-              }`}
-            >
-              1
+      {/* ── Main Single-Page Content Area ── */}
+      <main className="flex-1 w-full max-w-[640px] md:max-w-[680px] mx-auto px-4 sm:px-6 py-8 sm:py-12 flex flex-col justify-center">
+        {submitted ? (
+          /* ════════════════════════════════════════════════════════════
+              SUCCESS / THANK-YOU CONFIRMATION (Inline on Same Page)
+          ════════════════════════════════════════════════════════════ */
+          <div className="bg-white border border-[#E7E4DD] rounded-2xl p-7 sm:p-10 shadow-sm animate-fade text-center">
+            <div className="w-16 h-16 rounded-full bg-[#E6F5EF] text-[#0EB28D] flex items-center justify-center mx-auto mb-5 text-2xl font-bold shadow-xs">
+              ✓
             </div>
-            <span className="text-[11px] font-semibold text-[#5A6B78] mt-1">
-              Intro
+            <span className="text-xs font-extrabold tracking-wider uppercase text-[#0C8F72] block mb-2">
+              Request Confirmed
             </span>
-          </div>
-          <div
-            className={`h-[2px] flex-1 mx-2 transition-colors ${
-              step >= 2 ? "bg-[#0EB28D]" : "bg-[#E7E4DD]"
-            }`}
-          />
-          <div className="flex flex-col items-center">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                step >= 2
-                  ? "bg-[#0EB28D] text-white"
-                  : "bg-[#E7E4DD] text-[#5A6B78]"
-              }`}
-            >
-              2
-            </div>
-            <span className="text-[11px] font-semibold text-[#5A6B78] mt-1">
-              Contact
-            </span>
-          </div>
-          <div
-            className={`h-[2px] flex-1 mx-2 transition-colors ${
-              step >= 3 ? "bg-[#0EB28D]" : "bg-[#E7E4DD]"
-            }`}
-          />
-          <div className="flex flex-col items-center">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
-                step === 3
-                  ? "bg-[#0EB28D] text-white"
-                  : "bg-[#E7E4DD] text-[#5A6B78]"
-              }`}
-            >
-              3
-            </div>
-            <span className="text-[11px] font-semibold text-[#5A6B78] mt-1">
-              Confirmed
-            </span>
-          </div>
-        </div>
+            <h1 className="font-serif font-semibold text-2xl sm:text-3xl text-[#062C55] mb-3 leading-snug">
+              Thank you — your request has been received.
+            </h1>
+            <p className="text-[15px] sm:text-[16px] text-[#5A6B78] leading-relaxed max-w-[480px] mx-auto mb-6">
+              Thank you, <strong className="text-[#062C55]">{fullName}</strong>. We have received your request and forwarded your details to our legal support team.
+            </p>
 
-        {/* ════════════════════════════════════════════════════════════
-            STAGE 1: INTRODUCTION
-        ════════════════════════════════════════════════════════════ */}
-        {step === 1 && (
+            <div className="p-4 sm:p-5 rounded-xl bg-[#FAF9F5] border border-[#E7E4DD] text-left max-w-[500px] mx-auto mb-8 text-xs sm:text-[13.5px] text-[#5A6B78] space-y-2 leading-relaxed">
+              <p>
+                An independent employment {lawyerWord} will review your circumstances to determine if they are in a position to assist you.
+              </p>
+              <p>
+                Submitting this request does not guarantee a consultation or legal representation, and there is no obligation to proceed.
+              </p>
+            </div>
+
+            <Link
+              href="/"
+              className="inline-block py-3 px-8 rounded-xl bg-[#062C55] hover:bg-[#041D38] text-white font-sans font-bold text-sm shadow-sm transition"
+            >
+              Return to homepage
+            </Link>
+          </div>
+        ) : (
+          /* ════════════════════════════════════════════════════════════
+              SINGLE-PAGE FORM (All Questions Visible Together)
+          ════════════════════════════════════════════════════════════ */
           <div className="bg-white border border-[#E7E4DD] rounded-2xl p-6 sm:p-9 shadow-sm animate-fade">
             <span className="text-xs font-extrabold tracking-wider uppercase text-[#0C8F72] block mb-2">
-              Step 1 of 3 · Overview
+              Legal Network Consultation
             </span>
             <h1 className="font-serif font-semibold text-2xl sm:text-3xl text-[#062C55] mb-3 leading-snug">
               Request to speak with an employment {lawyerWord}
             </h1>
-            <p className="text-[15px] sm:text-[16px] text-[#5A6B78] leading-relaxed mb-6">
-              If you are facing a layoff, reviewing a severance agreement, or wondering whether your offer reflects your full rights, you can request to speak with an experienced employment {lawyerWord}.
+            <p className="text-[14.5px] sm:text-[15.5px] text-[#5A6B78] leading-relaxed mb-6">
+              If you are facing a layoff or reviewing a severance agreement, an independent employment {lawyerWord} can assess your situation and explain your options. Please provide your contact details below.
             </p>
 
             {/* Existing Case Notice (if available) */}
@@ -297,54 +275,12 @@ function LawyerRequestContent() {
                   </span>
                 </div>
                 <p className="text-xs sm:text-[13px] text-[#416155] leading-relaxed">
-                  We found your previous check ({caseContext.jurisdiction?.name || (isCanada ? "Canada" : "United States")}{caseContext.answers?.years ? ` · ${caseContext.answers.years} yrs service` : ""}{caseContext.answers?.salary ? ` · $${Math.round(Number(caseContext.answers.salary)).toLocaleString()}/yr` : ""}). We will securely include this summary with your request so you don&apos;t have to re-enter your situation.
+                  We found your previous severance check ({caseContext.jurisdiction?.name || (isCanada ? "Canada" : "United States")}{caseContext.answers?.years ? ` · ${caseContext.answers.years} yrs service` : ""}{caseContext.answers?.salary ? ` · $${Math.round(Number(caseContext.answers.salary)).toLocaleString()}/yr` : ""}). This case summary will be securely attached to your inquiry.
                 </p>
               </div>
             )}
 
-            {/* Scope & Expectation Notice */}
-            <div className="p-4 sm:p-5 rounded-xl bg-[#FAF9F5] border border-[#E7E4DD] mb-7 text-left space-y-2">
-              <h3 className="font-sans font-bold text-sm text-[#062C55]">
-                How this works
-              </h3>
-              <ul className="text-xs sm:text-[13.5px] text-[#5A6B78] space-y-1.5 list-disc pl-4 leading-relaxed">
-                <li>
-                  Your contact details and situation summary will be reviewed and routed to an independent employment {lawyerWord}.
-                </li>
-                <li>
-                  Submitting a request does not create a lawyer-client relationship and does not guarantee representation or a consultation.
-                </li>
-                <li>
-                  There is no obligation to proceed, and requesting contact is completely free.
-                </li>
-              </ul>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              className="w-full py-3.5 px-6 rounded-xl bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-bold text-base shadow-sm hover:shadow transition cursor-pointer text-center"
-            >
-              Continue to contact details →
-            </button>
-          </div>
-        )}
-
-        {/* ════════════════════════════════════════════════════════════
-            STAGE 2: CONTACT INFORMATION (3 FIELDS ONLY)
-        ════════════════════════════════════════════════════════════ */}
-        {step === 2 && (
-          <div className="bg-white border border-[#E7E4DD] rounded-2xl p-6 sm:p-9 shadow-sm animate-fade">
-            <span className="text-xs font-extrabold tracking-wider uppercase text-[#0C8F72] block mb-2">
-              Step 2 of 3 · Your Details
-            </span>
-            <h1 className="font-serif font-semibold text-2xl sm:text-3xl text-[#062C55] mb-2 leading-snug">
-              How should the {lawyerWord} reach you?
-            </h1>
-            <p className="text-sm text-[#5A6B78] mb-6 leading-relaxed">
-              Please provide your direct contact information. Use personal contact details rather than employer email or devices.
-            </p>
-
+            {/* Error Message Alert */}
             {errorMsg && (
               <div
                 role="alert"
@@ -409,30 +345,30 @@ function LawyerRequestContent() {
                 </span>
               </div>
 
-              {/* Linked Case Context Pill */}
-              {caseContext && (
-                <div className="pt-2 text-xs text-[#5A6B78] flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#0EB28D]" />
-                  <span>
-                    Existing severance facts ({caseContext.jurisdiction?.name || (isCanada ? "CA" : "US")}) will be automatically attached.
-                  </span>
-                </div>
-              )}
+              {/* How this works & Legal Notice */}
+              <div className="p-4 sm:p-4.5 rounded-xl bg-[#FAF9F5] border border-[#E7E4DD] text-left space-y-1.5 my-5">
+                <h3 className="font-sans font-bold text-xs uppercase tracking-wider text-[#062C55]">
+                  How this works
+                </h3>
+                <ul className="text-xs text-[#5A6B78] space-y-1 list-disc pl-4 leading-relaxed">
+                  <li>
+                    Your contact information and situation summary will be reviewed and routed to an independent employment {lawyerWord}.
+                  </li>
+                  <li>
+                    Submitting a request does not create a lawyer-client relationship and does not guarantee representation or a consultation.
+                  </li>
+                  <li>
+                    Connecting is completely free, with no obligation to proceed.
+                  </li>
+                </ul>
+              </div>
 
-              {/* Submit and Back Buttons */}
-              <div className="pt-4 flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={() => setStep(1)}
-                  disabled={submitting}
-                  className="w-full sm:w-1/3 py-3 px-4 rounded-xl border border-[#CFD8DF] text-[#5A6B78] hover:text-[#062C55] hover:bg-[#FAF9F5] font-sans font-bold text-sm transition cursor-pointer text-center"
-                >
-                  ← Back
-                </button>
+              {/* Submit Button */}
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full sm:w-2/3 py-3.5 px-6 rounded-xl bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-bold text-base shadow-sm hover:shadow transition cursor-pointer text-center flex items-center justify-center gap-2 disabled:opacity-60"
+                  className="w-full py-3.5 px-6 rounded-xl bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-bold text-base shadow-sm hover:shadow transition cursor-pointer text-center flex items-center justify-center gap-2 disabled:opacity-60"
                 >
                   {submitting ? (
                     <>
@@ -445,42 +381,6 @@ function LawyerRequestContent() {
                 </button>
               </div>
             </form>
-          </div>
-        )}
-
-        {/* ════════════════════════════════════════════════════════════
-            STAGE 3: THANK-YOU & CONFIRMATION
-        ════════════════════════════════════════════════════════════ */}
-        {step === 3 && (
-          <div className="bg-white border border-[#E7E4DD] rounded-2xl p-7 sm:p-10 shadow-sm animate-fade text-center">
-            <div className="w-16 h-16 rounded-full bg-[#E6F5EF] text-[#0EB28D] flex items-center justify-center mx-auto mb-5 text-2xl font-bold shadow-xs">
-              ✓
-            </div>
-            <span className="text-xs font-extrabold tracking-wider uppercase text-[#0C8F72] block mb-2">
-              Step 3 of 3 · Complete
-            </span>
-            <h1 className="font-serif font-semibold text-2xl sm:text-3xl text-[#062C55] mb-3 leading-snug">
-              Thank you — your request has been received.
-            </h1>
-            <p className="text-[15px] sm:text-[16px] text-[#5A6B78] leading-relaxed max-w-[480px] mx-auto mb-6">
-              Thank you, <strong className="text-[#062C55]">{fullName}</strong>. We have received your request and forwarded your details to our legal support team.
-            </p>
-
-            <div className="p-4 sm:p-5 rounded-xl bg-[#FAF9F5] border border-[#E7E4DD] text-left max-w-[480px] mx-auto mb-8 text-xs sm:text-[13px] text-[#5A6B78] space-y-2 leading-relaxed">
-              <p>
-                An independent employment {lawyerWord} will review your circumstances to determine if they are in a position to assist you.
-              </p>
-              <p>
-                Please note that submitting this request does not guarantee a consultation or legal representation, and neither you nor the {lawyerWord} are under any obligation.
-              </p>
-            </div>
-
-            <Link
-              href="/"
-              className="inline-block py-3 px-8 rounded-xl bg-[#062C55] hover:bg-[#041D38] text-white font-sans font-bold text-sm shadow-sm transition"
-            >
-              Return to homepage
-            </Link>
           </div>
         )}
       </main>
