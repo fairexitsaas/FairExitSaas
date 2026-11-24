@@ -221,7 +221,8 @@ export default function ReportFlow() {
             setCustomerModalOpen(true);
           } else {
             customerInfoSubmittedRef.current = true;
-            setView("upload");
+            setView("reading");
+            router.push(`/report?step=reading&case=${caseId}${isUS ? "&country=US" : ""}`);
           }
         } else {
           setPaymentStatus("failed");
@@ -257,23 +258,23 @@ export default function ReportFlow() {
           setCustomerModalOpen(true);
         } else {
           customerInfoSubmittedRef.current = true;
+          setView("reading");
+          router.push(`/report?step=reading${id ? `&case=${id}` : ""}${isUS ? "&country=US" : ""}`);
         }
       } catch (e) {
         console.warn("Could not load case", e);
       }
     }
-    setView("upload");
-    router.push(`/report?step=upload${id ? `&case=${id}` : ""}${isUS ? "&country=US" : ""}`);
   };
 
   const handleCustomerSuccess = async () => {
     customerInfoSubmittedRef.current = true;
     setCustomerModalOpen(false);
-    setView("upload");
+    setView("reading");
     const fresh = await refresh();
     const id = fresh?.id || caseId;
     if (id) {
-      router.push(`/report?step=upload&case=${id}${isUS ? "&country=US" : ""}`);
+      router.push(`/report?step=reading&case=${id}${isUS ? "&country=US" : ""}`);
     }
   };
 
@@ -316,47 +317,6 @@ export default function ReportFlow() {
   }
 
   const renderScreen = () => {
-    // Allow post-pay steps (upload, reading, review, ready) directly during testing
-    const isPostPayStep =
-      step === "upload" ||
-      view === "upload" ||
-      step === "reading" ||
-      view === "reading" ||
-      step === "review" ||
-      view === "review" ||
-      step === "ready" ||
-      view === "ready";
-
-    if ((urlStep === "pay" || step === "pay") && !isPostPayStep) {
-      return (
-        <ReportSalesPage
-          caseId={caseId}
-          cs={cs}
-          cfg={cfg}
-          country={country}
-          onPaySuccess={handlePaySuccess}
-        />
-      );
-    }
-
-    // If on upload step (post payment), show the Figma 1200px/390px upload screen
-    if (step === "upload" || view === "upload") {
-      return (
-        <ReportUploadPage
-          caseId={caseId}
-          cs={cs}
-          onContinue={async () => {
-            setView("reading");
-            if (caseId) {
-              router.push(`/report?step=reading&case=${caseId}${isUS ? "&country=US" : ""}`);
-            } else {
-              router.push(`/report?step=reading${isUS ? "?country=US" : ""}`);
-            }
-          }}
-        />
-      );
-    }
-
     // Loading / Reading state after submission (COMMON / Reading your letter)
     if (step === "reading" || view === "reading") {
       return (
@@ -417,6 +377,48 @@ export default function ReportFlow() {
       );
     }
 
+    // Document readiness check for pre-payment requirement
+    const hasLetter =
+      (Array.isArray(cs?.documents) && cs.documents.some((d: any) => d.kind === "letter" && d.status === "uploaded")) ||
+      ((cs?.documents as any)?.letterPages > 0);
+    const hasContract =
+      (Array.isArray(cs?.documents) && cs.documents.some((d: any) => d.kind === "contract" && d.status === "uploaded")) ||
+      ((cs?.documents as any)?.contractPages > 0) ||
+      ["never", "missing", "later"].includes(cs?.contractStatus || cs?.contract_status);
+    const docsSatisfied = hasLetter && hasContract;
+
+    // First: Document Upload Page (shown first, or when documents are not yet uploaded)
+    if (view === "upload" || step === "upload" || (!docsSatisfied && !cs?.paid)) {
+      return (
+        <ReportUploadPage
+          caseId={caseId}
+          cs={cs}
+          onContinue={async () => {
+            setView("pay");
+            if (caseId) {
+              router.push(`/report?step=pay&case=${caseId}${isUS ? "&country=US" : ""}`);
+            } else {
+              router.push(`/report?step=pay${isUS ? "&country=US" : ""}`);
+            }
+            refresh();
+          }}
+        />
+      );
+    }
+
+    // Second: Payment Page (accessible once documents are uploaded or when step is explicitly pay)
+    if (urlStep === "pay" || step === "pay" || !cs?.paid) {
+      return (
+        <ReportSalesPage
+          caseId={caseId}
+          cs={cs}
+          cfg={cfg}
+          country={country}
+          onPaySuccess={handlePaySuccess}
+        />
+      );
+    }
+
     return (
       <Shell rail={step}>
         <ErrorBox text={error} />
@@ -424,7 +426,7 @@ export default function ReportFlow() {
           <Card><H1>Not covered yet</H1><p className="text-[#5a6b78]">FairExit doesn&apos;t cover {cs?.freeResult?.name || "this region"} yet.</p></Card>
         )}
         {step === "pay" && <PayStep cs={cs} cfg={cfg} onDone={refresh} />}
-        {step === "upload" && <UploadStep cs={cs} words={words} onRead={async () => { setView(null); await refresh(); }} />}
+        {step === "upload" && <UploadStep cs={cs} words={words} onDone={() => { setView("pay"); void refresh(); }} />}
         {step === "reading" && (
           <Card><Kicker>Step 2 of 4</Kicker><H1>Reading your documents…</H1><Spinner text="This usually takes under a minute." />
             <p className="text-[13px] text-[#5a6b78] mt-3">You can leave this page; your progress is saved.</p></Card>
@@ -503,8 +505,8 @@ export default function ReportFlow() {
 }
 
 function Shell({ children, rail }: { children: React.ReactNode; rail?: string }) {
-  const steps = [["pay", "Pay"], ["upload", "Add documents"], ["check", "Check"], ["ready", "Your report"]];
-  const idx = rail === "reading" ? 1 : rail === "building" ? 3 : steps.findIndex((s) => s[0] === rail);
+  const steps = [["upload", "Add documents"], ["pay", "Pay"], ["check", "Check"], ["ready", "Your report"]];
+  const idx = rail === "upload" ? 0 : rail === "pay" ? 1 : rail === "reading" ? 1 : rail === "building" ? 3 : steps.findIndex((s) => s[0] === rail);
   return (
     <div className="min-h-screen bg-[#f6f4ef] text-[#17242f] font-sans antialiased pb-24">
       <header className="sticky top-0 z-30 bg-[#f6f4ef]/95 backdrop-blur-md border-b border-[#e7e4dd]">
@@ -585,7 +587,7 @@ function PayStep({ cs, cfg, onDone }: { cs: any; cfg: any; onDone: () => void })
 /* =========================================================================
    Upload (only two documents)
    ========================================================================= */
-function UploadStep({ cs, words, onRead }: { cs: any; words: any; onRead: () => void }) {
+function UploadStep({ cs, words, onDone }: { cs: any; words: any; onDone?: () => void }) {
   const [docs, setDocs] = useState<any>(null);
   const [busy, setBusy] = useState("");
   const [err, setErr] = useState("");
@@ -605,7 +607,6 @@ function UploadStep({ cs, words, onRead }: { cs: any; words: any; onRead: () => 
   }
   async function remove(id: string) { try { setDocs(await fairexit.removeDocument(cs.id, id)); } catch (e) { setErr(errText(e)); } }
   async function noContract(status: "never" | "missing") { try { await fairexit.setContractStatus(cs.id, status); await load(); } catch (e) { setErr(errText(e)); } }
-  async function read() { setBusy("Starting…"); try { await fairexit.startRead(cs.id); onRead(); } catch (e) { setErr(errText(e)); setBusy(""); } }
 
   const list = (kind: string) => (docs?.documents || []).filter((d: any) => d.kind === kind && d.status === "uploaded");
   const slot = (kind: "letter" | "contract", title: string) => (
@@ -645,8 +646,8 @@ function UploadStep({ cs, words, onRead }: { cs: any; words: any; onRead: () => 
       )}
       {busy && <div className="my-3"><Spinner text={busy} /></div>}
       <ErrorBox text={err} />
-      <Btn className="w-full mt-2" disabled={!docs?.canRead || !!busy} onClick={read}>
-        {list("letter").length && list("contract").length ? "Continue — both added →" : docs?.contractStatus === "never" ? "Continue — no written contract →" : docs?.contractStatus === "missing" ? "Continue — contract not added →" : "Add both to continue"}
+      <Btn className="w-full mt-2" disabled={(!list("letter").length || (!list("contract").length && !docs?.contractStatus)) || !!busy} onClick={() => { if (onDone) onDone(); }}>
+        {list("letter").length && list("contract").length ? "Continue to payment — both added →" : docs?.contractStatus === "never" ? "Continue to payment — no written contract →" : docs?.contractStatus === "missing" ? "Continue to payment — contract not added →" : "Add both to continue"}
       </Btn>
     </div>
   );

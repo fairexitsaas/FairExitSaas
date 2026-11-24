@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { caseController } from '../../src/controllers/case.controller'
 import { paymentService, setStripe } from '../../src/services/payment.service'
 import { caseService, hasCompletedPostPaymentCollection } from '../../src/services/case.service'
+import { flowService } from '../../src/services/flow.service'
 import { emailService } from '../../src/services/email.service'
 import { logger } from '../../src/utils/logger'
 import { env } from '../../src/config/env'
@@ -106,7 +107,11 @@ describe('Payment Mode Configuration & Verification (Mock vs Live in Production)
       paid_at: new Date().toISOString(),
       payment_provider: 'mock',
     })
-    vi.spyOn(caseService, 'documents').mockResolvedValue([])
+    const mockDocs = [
+      { id: 'doc-letter', case_id: sampleCase.id, kind: 'letter', status: 'uploaded' },
+      { id: 'doc-contract', case_id: sampleCase.id, kind: 'contract', status: 'uploaded' },
+    ] as any
+    vi.spyOn(caseService, 'documents').mockResolvedValue(mockDocs)
     vi.spyOn(caseService, 'view').mockReturnValue({ id: sampleCase.id, status: 'paid' } as any)
 
     const { req, res } = createMockReqRes()
@@ -233,6 +238,12 @@ describe('Payment Mode Configuration & Verification (Mock vs Live in Production)
     } as CaseRow))
 
     // Step B: Collect customer name & email after mock payment
+    const mockDocs = [
+      { id: 'doc-letter', case_id: sampleCase.id, kind: 'letter', status: 'uploaded' },
+      { id: 'doc-contract', case_id: sampleCase.id, kind: 'contract', status: 'uploaded' },
+    ] as any
+    vi.spyOn(caseService, 'documents').mockResolvedValue(mockDocs)
+    vi.spyOn(flowService, 'startRead').mockResolvedValue({ started: true } as any)
     const customerResult = await caseService.submitCustomerInfo(sampleCase.id, {
       name: 'Alex Morgan',
       email: 'alex@example.com',

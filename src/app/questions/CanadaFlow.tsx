@@ -457,7 +457,7 @@ function QuestionsContent() {
         return;
       }
       if (id) {
-        router.push(`/report?case=${id}&step=pay&country=CA`);
+        router.push(`/report?case=${id}&step=upload&country=CA`);
       } else {
         setErrorMessage("Case creation in progress. Please try again in a moment.");
       }

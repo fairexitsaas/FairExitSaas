@@ -428,7 +428,7 @@ export default function USFlow() {
         return;
       }
       if (id) {
-        router.push(`/report?case=${id}&step=pay&country=US`);
+        router.push(`/report?case=${id}&step=upload&country=US`);
       } else {
         setErrorMessage("Case creation in progress. Please try again in a moment.");
       }

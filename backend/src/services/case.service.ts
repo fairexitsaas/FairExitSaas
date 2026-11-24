@@ -9,6 +9,7 @@ import type { CaseRow, CaseDocumentRow, Platform, CaseStatus } from '../fairexit
 import { PAID_STATUSES } from '../fairexit/types'
 import { env } from '../config/env'
 import { emailService } from './email.service'
+import { flowService } from './flow.service'
 
 
 // Must be longer than a real Call B (Opus, 2-5 min) plus the PDF, or live jobs get marked failed.
@@ -211,14 +212,18 @@ export const caseService = {
   nextStep(row: CaseRow, docs: CaseDocumentRow[]): string {
     if (!row.covered) return 'not_covered'
     const s: CaseStatus = row.status
-    if (!this.isPaid(row) && (s === 'free_check' || s === 'pending_payment')) return 'pay'
-    if (s === 'paid') return 'upload'
     if (s === 'reading') return 'reading'
     if (s === 'checking') return 'check'
     if (s === 'building') return 'building'
     if (s === 'ready') return 'ready'
     if (s === 'failed') return row.status_detail === 'build_failed' ? 'check' : 'upload'
-    return docs.length ? 'upload' : 'pay'
+
+    const r = this.readiness(row, docs)
+    const docsSatisfied = r.letterPages > 0 && r.contractOk
+    if (!docsSatisfied) return 'upload'
+    if (!this.isPaid(row)) return 'pay'
+    if (!hasCompletedPostPaymentCollection(row)) return 'pay'
+    return 'reading'
   },
 
   readiness(row: CaseRow, docs: CaseDocumentRow[]) {
@@ -226,16 +231,35 @@ export const caseService = {
     const letterPages = uploaded.filter((d) => d.kind === 'letter').length
     const contractPages = uploaded.filter((d) => d.kind === 'contract').length
     const contractOk = contractPages > 0 || row.contract_status === 'never' || row.contract_status === 'missing'
-    return { letterPages, contractPages, contractOk, canRead: this.isPaid(row) && letterPages > 0 && contractOk }
+    return {
+      letterPages,
+      contractPages,
+      contractOk,
+      canPay: letterPages > 0 && contractOk,
+      canRead: this.isPaid(row) && hasCompletedPostPaymentCollection(row) && letterPages > 0 && contractOk,
+    }
   },
 
-  async submitCustomerInfo(caseId: string, input: { name: string; email: string; consentNews?: boolean }) {
+  async submitCustomerInfo(caseId: string, input: { name: string; email: string; consentNews?: boolean }, requestId?: string) {
     const c = await this.get(caseId)
     if (!this.isPaid(c)) {
       throw ApiError.badRequest('Payment required before submitting customer details')
     }
-    const cleanName = input.name.trim()
-    const cleanEmail = input.email.trim().toLowerCase()
+
+    const docs = await this.documents(caseId)
+    const r = this.readiness(c, docs)
+    if (!r.letterPages || !r.contractOk) {
+      throw ApiError.badRequest('Both required documents must exist before processing can begin')
+    }
+
+    const cleanName = (input.name || '').trim()
+    const cleanEmail = (input.email || '').trim().toLowerCase()
+    if (!cleanName) {
+      throw ApiError.badRequest('Name is required')
+    }
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      throw ApiError.badRequest('Valid email is required')
+    }
 
     const answers = {
       ...(c.answers || {}),
@@ -261,6 +285,15 @@ export const caseService = {
       remind: !!input.consentNews,
     })
 
+    // Initiate document processing workflow ONLY on successful save and if not already started
+    const alreadyProcessing = ['reading', 'checking', 'building', 'ready'].includes(c.status) || c.call_a !== null
+    let processingStarted = false
+    if (!alreadyProcessing) {
+      const readResult = await flowService.startRead(updated, requestId)
+      processingStarted = readResult.started
+    }
+
+    const latest = await this.get(caseId)
     const base = env.APP_WEB_URL.replace(/\/$/, '')
     const privateLink = `${base}/report?case=${c.id}&t=${encodeURIComponent(token)}`
     const pdfDownloadUrl = `${base}/cases/${c.id}/report/pdf?t=${encodeURIComponent(token)}`
@@ -270,17 +303,18 @@ export const caseService = {
       ...(env.EMAIL_MODE === 'mock' ? { message: 'Email delivery is disabled in demo mode. You can access your report here.' } : {}),
     }
 
-    if (env.EMAIL_MODE === 'live' && c.status === 'ready' && c.report_ready_at && c.report_pdf_path) {
-      emailDelivery = await this.deliverReportEmail(updated, token, false)
+    if (env.EMAIL_MODE === 'live' && latest.status === 'ready' && latest.report_ready_at && latest.report_pdf_path) {
+      emailDelivery = await this.deliverReportEmail(latest, token, false)
     }
 
     return {
       success: true,
-      case: updated,
+      case: this.view(latest, docs),
       customer: { name: cleanName, email: cleanEmail },
       privateLink,
       pdfDownloadUrl,
       emailDelivery,
+      processingStarted,
     }
   },
 

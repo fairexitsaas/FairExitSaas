@@ -18,13 +18,14 @@ describe('Terms & Conditions Acceptance and Consent Recording', () => {
   })
 
   it('creates a test case via POST /api/v1/documents slot creation', async () => {
+    const sampleBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII='
     const res = await request(app)
       .post('/api/v1/documents')
       .send({
         kind: 'letter',
-        fileName: 'terms-test-letter.pdf',
-        mimeType: 'application/pdf',
-        sizeBytes: 1024 * 50,
+        fileName: 'terms-test-letter.png',
+        mimeType: 'image/png',
+        dataBase64: sampleBase64,
         country: 'CA',
       })
 
@@ -35,6 +36,20 @@ describe('Terms & Conditions Acceptance and Consent Recording', () => {
 
     testCaseId = res.body.data.caseId
     testCaseToken = res.body.data.caseToken
+
+    // Upload second document (contract) so readiness.canPay is satisfied in the swapped flow
+    const contractRes = await request(app)
+      .post('/api/v1/documents')
+      .set('X-Case-Token', testCaseToken)
+      .send({
+        caseId: testCaseId,
+        kind: 'contract',
+        fileName: 'terms-test-contract.png',
+        mimeType: 'image/png',
+        dataBase64: sampleBase64,
+      })
+
+    expect(contractRes.status).toBe(201)
   })
 
   it('rejects POST /checkout/prepare when termsAccepted is missing or false', async () => {

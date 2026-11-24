@@ -87,8 +87,8 @@ describe('US Flow Currency & Architecture Regression Tests', () => {
   })
 
   describe('4. Intake & Navigation Routing', () => {
-    it('USFlow directs users to /report with step=pay and country=US', () => {
-      expect(usFlowContent).toContain('/report?case=${id}&step=pay&country=US')
+    it('USFlow directs users to /report with step=upload and country=US', () => {
+      expect(usFlowContent).toContain('/report?case=${id}&step=upload&country=US')
     })
 
     it('USFlow saves country: "US" with California fallback for state', () => {

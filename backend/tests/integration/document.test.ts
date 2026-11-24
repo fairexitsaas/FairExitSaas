@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import request from 'supertest'
 import app from '../../src/app'
+import { caseService } from '../../src/services/case.service'
 
 describe('Document Processing & Fact Extraction Endpoints (/api/v1/documents)', () => {
   let createdCaseId: string
@@ -94,6 +95,22 @@ describe('Document Processing & Fact Extraction Endpoints (/api/v1/documents)', 
   })
 
   it('runs Call A extraction and retrieves original extracted facts', async () => {
+    // In swapped flow, case must be paid and customer details saved before Call A processing starts
+    const existingCase = await caseService.get(createdCaseId)
+    await caseService.update(createdCaseId, {
+      status: 'paid',
+      paid_at: new Date().toISOString(),
+      email: 'test@example.com',
+      answers: { ...(existingCase.answers || {}), customer_name: 'Test Customer', province: 'ON' },
+      consent: {
+        name: 'Test Customer',
+        email: 'test@example.com',
+        source: 'post-payment-collection',
+        submitted_at: new Date().toISOString(),
+      },
+      jurisdiction_code: 'CA-ON',
+    })
+
     // Process document via POST /api/v1/documents/:id/process
     const processRes = await request(app)
       .post(`/api/v1/documents/${createdCaseId}/process`)

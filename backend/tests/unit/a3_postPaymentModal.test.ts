@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { caseService, hasCompletedPostPaymentCollection } from '../../src/services/case.service'
+import { flowService } from '../../src/services/flow.service'
 import { postPaymentCustomerSchema } from '../../src/validators/fairexit.validator'
 import type { CaseRow } from '../../src/fairexit/types'
 
@@ -85,6 +86,13 @@ describe('A3 - Post-Payment Modal Lifecycle & Idempotency Tests', () => {
     })
     vi.spyOn(caseService, 'addToken').mockResolvedValue('new_private_token_123')
 
+    const mockDocs = [
+      { id: 'd1', kind: 'letter', status: 'uploaded', page: 1 },
+      { id: 'd2', kind: 'contract', status: 'uploaded', page: 1 },
+    ] as any
+    vi.spyOn(caseService, 'documents').mockResolvedValue(mockDocs)
+    const startReadSpy = vi.spyOn(flowService, 'startRead').mockResolvedValue({ started: true, status: 'reading' })
+
     // Initial check: hasCompletedPostPaymentCollection is false
     expect(hasCompletedPostPaymentCollection(paidCase)).toBe(false)
 
@@ -99,6 +107,7 @@ describe('A3 - Post-Payment Modal Lifecycle & Idempotency Tests', () => {
     expect(res.customer.name).toBe('Alex Mercer')
     expect(res.customer.email).toBe('alex@example.com')
     expect(res.privateLink).toContain('t=new_private_token_123')
+    expect(startReadSpy).toHaveBeenCalledTimes(1)
 
     // Now hasCompletedPostPaymentCollection must be true
     expect(hasCompletedPostPaymentCollection(updatedRow)).toBe(true)
@@ -179,6 +188,16 @@ describe('A3 - Post-Payment Modal Lifecycle & Idempotency Tests', () => {
     })
     vi.spyOn(caseService, 'addToken').mockResolvedValue('token_2')
 
+    const mockDocs = [
+      { id: 'd1', kind: 'letter', status: 'uploaded', page: 1 },
+      { id: 'd2', kind: 'contract', status: 'uploaded', page: 1 },
+    ] as any
+    vi.spyOn(caseService, 'documents').mockResolvedValue(mockDocs)
+    const startReadSpy = vi.spyOn(flowService, 'startRead').mockImplementation(async () => {
+      storedCase.status = 'reading'
+      return { started: true, status: 'reading' }
+    })
+
     // First submission
     const res1 = await caseService.submitCustomerInfo(paidCase.id, {
       name: 'Alex Mercer',
@@ -186,8 +205,9 @@ describe('A3 - Post-Payment Modal Lifecycle & Idempotency Tests', () => {
     })
     expect(res1.success).toBe(true)
     expect(hasCompletedPostPaymentCollection(storedCase)).toBe(true)
+    expect(startReadSpy).toHaveBeenCalledTimes(1)
 
-    // Second submission (e.g. network retry or update)
+    // Second submission (e.g. network retry or update) - should NOT trigger duplicate processing
     const res2 = await caseService.submitCustomerInfo(paidCase.id, {
       name: 'Alex Mercer Jr.',
       email: 'alex.jr@example.com',
@@ -196,5 +216,6 @@ describe('A3 - Post-Payment Modal Lifecycle & Idempotency Tests', () => {
     expect(hasCompletedPostPaymentCollection(storedCase)).toBe(true)
     expect(res2.customer.name).toBe('Alex Mercer Jr.')
     expect(res2.customer.email).toBe('alex.jr@example.com')
+    expect(startReadSpy).toHaveBeenCalledTimes(1)
   })
 })

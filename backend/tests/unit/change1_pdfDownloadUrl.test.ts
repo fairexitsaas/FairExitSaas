@@ -74,6 +74,11 @@ describe('Change 1: Direct PDF Download URL & Security Lifecycle Tests', () => {
 
   it('submitCustomerInfo returns distinct privateLink and pdfDownloadUrl', async () => {
     vi.spyOn(caseService, 'get').mockResolvedValue(paidCase)
+    vi.spyOn(caseService, 'documents').mockResolvedValue([
+      { id: 'd1', kind: 'letter', status: 'uploaded', page: 1 },
+      { id: 'd2', kind: 'contract', status: 'uploaded', page: 1 },
+    ] as any)
+    vi.spyOn(flowService, 'startRead').mockResolvedValue({ started: true, status: 'reading' })
     vi.spyOn(caseService, 'update').mockImplementation(async (_id, patch) => ({
       ...paidCase,
       ...patch,

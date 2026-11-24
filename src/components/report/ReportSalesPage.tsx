@@ -418,7 +418,7 @@ export default function ReportSalesPage({
         if (onPaySuccess) {
           onPaySuccess(activeCaseId || undefined);
         } else {
-          router.push(`/report?step=upload${activeCaseId ? `&case=${activeCaseId}` : ""}${isUS ? "&country=US" : ""}`);
+          router.push(`/report?case=${activeCaseId || ""}${isUS ? "&country=US" : ""}`);
         }
       } else {
         // 2b. Execute live Stripe checkout (when PAYMENTS_MODE=live)

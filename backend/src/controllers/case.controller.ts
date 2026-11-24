@@ -105,12 +105,23 @@ export const caseController = {
   price: async (req: Request, res: Response) => ApiResponse.ok(res, { ...paymentService.price(C(req)), mode: env.PAYMENTS_MODE, iap: { appleProductId: env.APPLE_IAP_PRODUCT_ID, googleProductId: env.GOOGLE_IAP_PRODUCT_ID } }),
 
   prepareCheckout: async (req: Request, res: Response) => {
-    const updated = await paymentService.prepare(C(req), req.body)
+    const c = C(req)
+    const docs = await caseService.documents(c.id)
+    const r = caseService.readiness(c, docs)
+    if (!r.letterPages || !r.contractOk) {
+      throw ApiError.badRequest('Both documents must be uploaded before proceeding to payment')
+    }
+    const updated = await paymentService.prepare(c, req.body)
     return ApiResponse.ok(res, { ...(await fullView(updated)), price: paymentService.price(updated) }, 'Checkout details saved')
   },
 
   stripeCheckout: async (req: Request, res: Response) => {
     let c = C(req)
+    const docs = await caseService.documents(c.id)
+    const r = caseService.readiness(c, docs)
+    if (!r.letterPages || !r.contractOk) {
+      throw ApiError.badRequest('Both documents must be uploaded before proceeding to payment')
+    }
     if (req.body.email || req.body.termsAccepted) {
       c = await paymentService.prepare(c, { email: req.body.email, remind: req.body.remind, termsAccepted: req.body.termsAccepted === true })
     }
@@ -130,7 +141,7 @@ export const caseController = {
 
   submitCustomerInfo: async (req: Request, res: Response) => {
     const c = C(req)
-    const result = await caseService.submitCustomerInfo(c.id, req.body)
+    const result = await caseService.submitCustomerInfo(c.id, req.body, req.id)
     return ApiResponse.ok(res, result, 'Customer delivery information saved')
   },
 
@@ -177,6 +188,11 @@ export const caseController = {
     if (env.PAYMENTS_MODE !== 'mock') throw ApiError.forbidden('Mock payments are off')
     const c = C(req)
     if (!c.covered) throw ApiError.badRequest('jurisdiction_not_covered')
+    const docs = await caseService.documents(c.id)
+    const r = caseService.readiness(c, docs)
+    if (!r.letterPages || !r.contractOk) {
+      throw ApiError.badRequest('Both documents must be uploaded before proceeding to payment')
+    }
     await paymentService.markPaid(c.id, 'mock', `mock_${c.id}`, env.REPORT_PRICE_CENTS, c.country === 'US' ? 'USD' : 'CAD')
     return ApiResponse.ok(res, { paid: true, case: await fullView(await caseService.get(c.id)) }, 'Marked as paid (mock)')
   },

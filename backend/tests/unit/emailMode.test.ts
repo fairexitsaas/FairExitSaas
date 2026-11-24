@@ -178,6 +178,12 @@ describe('EMAIL_MODE: Independent Mock & Live Resend Integration Tests', () => {
 
   it('6. Customer name and email collection still work in mock mode via submitCustomerInfo', async () => {
     ;(env as any).EMAIL_MODE = 'mock'
+    const mockDocs = [
+      { id: 'doc-letter', case_id: sampleCase.id, kind: 'letter', status: 'uploaded' },
+      { id: 'doc-contract', case_id: sampleCase.id, kind: 'contract', status: 'uploaded' },
+    ] as any
+    vi.spyOn(caseService, 'documents').mockResolvedValue(mockDocs)
+    vi.spyOn(flowService, 'startRead').mockResolvedValue({ started: true } as any)
     vi.spyOn(caseService, 'get').mockResolvedValue(sampleCase)
     vi.spyOn(caseService, 'addToken').mockResolvedValue('token_mock_123')
     vi.spyOn(caseService, 'update').mockImplementation(async (_id, patch) => ({

@@ -54,15 +54,23 @@ describe('Direct Unpaid Workflow Verification', () => {
     expect(caseService.isPaid(paidCase)).toBe(true)
   })
 
-  it('directs nextStep to pay for unpaid free_check and pending_payment', () => {
-    expect(caseService.nextStep(unpaidCase, [])).toBe('pay')
+  it('directs nextStep to upload for unsatisifed documents and pay once documents are added', () => {
+    expect(caseService.nextStep(unpaidCase, [])).toBe('upload')
     const pendingCase = { ...unpaidCase, status: 'pending_payment' as const }
-    expect(caseService.nextStep(pendingCase, [])).toBe('pay')
-    const paidCase = { ...unpaidCase, status: 'paid' as const, paid_at: new Date().toISOString(), payment_provider: 'mock' }
-    expect(caseService.nextStep(paidCase, [])).toBe('upload')
+    expect(caseService.nextStep(pendingCase, [])).toBe('upload')
+
+    const docs = [
+      { id: 'doc-1', kind: 'letter', status: 'uploaded', page: 1 },
+    ] as CaseDocumentRow[]
+    const caseWithNever = { ...unpaidCase, contract_status: 'never' as const }
+    expect(caseService.nextStep(caseWithNever, docs)).toBe('pay')
+
+    const paidCase = { ...caseWithNever, status: 'paid' as const, paid_at: new Date().toISOString(), payment_provider: 'mock' }
+    // Before customer info is completed, nextStep is 'pay' so modal displays
+    expect(caseService.nextStep(paidCase, docs)).toBe('pay')
   })
 
-  it('allows canRead in readiness check once case is paid and documents are satisfied', () => {
+  it('allows canRead in readiness check once case is paid, documents are satisfied, and customer info is completed', () => {
     const docs = [
       { id: 'doc-1', kind: 'letter', status: 'uploaded', page: 1 },
     ] as CaseDocumentRow[]
@@ -73,10 +81,18 @@ describe('Direct Unpaid Workflow Verification', () => {
       payment_provider: 'mock',
       contract_status: 'never' as const,
     }
-    const ready = caseService.readiness(paidWithNeverContract, docs)
-    expect(ready.canRead).toBe(true)
-    expect(ready.letterPages).toBe(1)
-    expect(ready.contractOk).toBe(true)
+    const readyBeforeCustomerInfo = caseService.readiness(paidWithNeverContract, docs)
+    expect(readyBeforeCustomerInfo.canRead).toBe(false)
+    expect(readyBeforeCustomerInfo.letterPages).toBe(1)
+    expect(readyBeforeCustomerInfo.contractOk).toBe(true)
+
+    const paidWithCustomerInfo = {
+      ...paidWithNeverContract,
+      answers: { customer_name: 'John Doe', name: 'John Doe' },
+      consent: { name: 'John Doe', email: 'john@example.com', source: 'post-payment-collection', submitted_at: new Date().toISOString() },
+    }
+    const readyAfterCustomerInfo = caseService.readiness(paidWithCustomerInfo, docs)
+    expect(readyAfterCustomerInfo.canRead).toBe(true)
 
     const unpaidReady = caseService.readiness(unpaidCase, docs)
     expect(unpaidReady.canRead).toBe(false)
@@ -85,12 +101,11 @@ describe('Direct Unpaid Workflow Verification', () => {
   it('returns paid: false in case view for unpaid cases and paid: true once paid', () => {
     const unpaidView = caseService.view(unpaidCase, [])
     expect(unpaidView.paid).toBe(false)
-    expect(unpaidView.nextStep).toBe('pay')
+    expect(unpaidView.nextStep).toBe('upload')
 
     const paidCase = { ...unpaidCase, status: 'paid' as const, paid_at: new Date().toISOString(), payment_provider: 'mock' }
     const paidView = caseService.view(paidCase, [])
     expect(paidView.paid).toBe(true)
-    expect(paidView.nextStep).toBe('upload')
   })
 
   it('does not throw 402 on setContractStatus for unpaid cases', async () => {
@@ -104,18 +119,36 @@ describe('Direct Unpaid Workflow Verification', () => {
     expect(updated.contract_status).toBe('never')
   })
 
-  it('does not throw 402 on startRead for unpaid cases', async () => {
+  it('enforces payment and customer details safeguards before startRead can execute', async () => {
     const docs = [
       { id: 'doc-1', kind: 'letter', status: 'uploaded', page: 1 },
     ] as CaseDocumentRow[]
-    vi.spyOn(caseService, 'documents').mockResolvedValueOnce(docs)
-    vi.spyOn(caseService, 'update').mockResolvedValueOnce({
-      ...unpaidCase,
-      status: 'reading',
-    })
+    vi.spyOn(caseService, 'documents').mockResolvedValue(docs)
 
     const caseWithNever = { ...unpaidCase, contract_status: 'never' as const }
-    const res = await flowService.startRead(caseWithNever)
+    // Unpaid case must reject startRead
+    await expect(flowService.startRead(caseWithNever)).rejects.toThrow('Payment required')
+
+    // Paid case without customer info must reject startRead
+    const paidWithoutCustomerInfo = {
+      ...caseWithNever,
+      status: 'paid' as const,
+      paid_at: new Date().toISOString(),
+      payment_provider: 'mock',
+    }
+    await expect(flowService.startRead(paidWithoutCustomerInfo)).rejects.toThrow('Customer name and email must be saved')
+
+    // Paid case with customer info starts reading
+    const paidWithCustomerInfo = {
+      ...paidWithoutCustomerInfo,
+      answers: { customer_name: 'John Doe', name: 'John Doe' },
+      consent: { name: 'John Doe', email: 'john@example.com', source: 'post-payment-collection', submitted_at: new Date().toISOString() },
+    }
+    vi.spyOn(caseService, 'update').mockResolvedValueOnce({
+      ...paidWithCustomerInfo,
+      status: 'reading',
+    })
+    const res = await flowService.startRead(paidWithCustomerInfo)
     expect(res.status).toBe('reading')
   })
 })

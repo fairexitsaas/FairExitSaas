@@ -7,7 +7,7 @@ import { env } from '../config/env'
 import { ApiError } from '../utils/ApiError'
 import { logger } from '../utils/logger'
 import { reserveBackground, releaseBackground, runInBackground, runReservedBackground } from '../utils/background'
-import { caseService } from './case.service'
+import { caseService, hasCompletedPostPaymentCollection } from './case.service'
 import { aiService, assertDailyLimit } from './ai.service'
 import { emailService } from './email.service'
 import { storageService } from './storage.service'
@@ -197,6 +197,9 @@ export const flowService = {
   // AI reads the documents (Call A)
   // -------------------------------------------------------------------------
   async startRead(c: CaseRow, requestId?: string) {
+    if (!caseService.isPaid(c)) {
+      throw ApiError.badRequest('Payment required before reading documents')
+    }
     const docs = await caseService.documents(c.id)
     const r = caseService.readiness(c, docs)
 
@@ -204,6 +207,9 @@ export const flowService = {
     if (c.status === 'building') throw ApiError.conflict('Your report is being built')
     if (!r.letterPages) throw ApiError.badRequest('Add your severance letter first — the report needs at least that.')
     if (!r.contractOk) throw ApiError.badRequest('Add your contract, or tell us you never signed one / could not add it.')
+    if (!hasCompletedPostPaymentCollection(c)) {
+      throw ApiError.badRequest('Customer name and email must be saved before document processing can begin')
+    }
     const j = jurisdictionOf(c)
     await assertDailyLimit(c.id, 'A')
     const startedAt = new Date().toISOString()

@@ -4,7 +4,7 @@ import { ApiError } from '../utils/ApiError'
 import { documentService } from '../services/document.service'
 import { extractionService } from '../services/extraction.service'
 import { reviewService } from '../services/review.service'
-import { caseService } from '../services/case.service'
+import { caseService, hasCompletedPostPaymentCollection } from '../services/case.service'
 import { env } from '../config/env'
 import { logger } from '../utils/logger'
 import { runInBackground } from '../utils/background'
@@ -86,7 +86,7 @@ export const documentController = {
     if (body.autoProcess) {
       const allDocs = await caseService.documents(c.id)
       const ready = caseService.readiness(c, allDocs)
-      if (ready.letterPages && ready.contractOk) {
+      if (ready.letterPages && ready.contractOk && caseService.isPaid(c) && hasCompletedPostPaymentCollection(c)) {
         runInBackground(`process:${c.id}`, 'Call A Document Extraction', async () => {
           await extractionService.processCaseDocuments(c.id)
         })
@@ -120,6 +120,9 @@ export const documentController = {
     const id = req.params.id
     const doc = await documentService.viewDocById(id).catch(() => null)
     const caseId = doc ? doc.caseId : id
+    const c = await caseService.get(caseId)
+    if (!caseService.isPaid(c)) throw ApiError.badRequest('Payment required before processing documents')
+    if (!hasCompletedPostPaymentCollection(c)) throw ApiError.badRequest('Customer name and email required before processing documents')
 
     const result = await extractionService.processCaseDocuments(caseId)
     return ApiResponse.ok(res, result, 'Document extraction completed')

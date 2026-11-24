@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { caseService } from '../../src/services/case.service'
+import { flowService } from '../../src/services/flow.service'
 import { paymentService } from '../../src/services/payment.service'
 import { emailService } from '../../src/services/email.service'
 import { env } from '../../src/config/env'
@@ -82,6 +83,12 @@ describe('Group 3, Change 24: Post-Payment Report Delivery Tests', () => {
       amount_cents: 5900,
       currency: 'CAD',
     }
+    const mockDocs = [
+      { id: 'doc-letter', case_id: baseCase.id, kind: 'letter', status: 'uploaded' },
+      { id: 'doc-contract', case_id: baseCase.id, kind: 'contract', status: 'uploaded' },
+    ] as any
+    vi.spyOn(caseService, 'documents').mockResolvedValue(mockDocs)
+    vi.spyOn(flowService, 'startRead').mockResolvedValue({ started: true } as any)
     vi.spyOn(caseService, 'get').mockResolvedValue(paidCase)
     vi.spyOn(caseService, 'addToken').mockResolvedValue('test_token_123')
     vi.spyOn(caseService, 'update').mockImplementation(async (_id, patch) => ({
@@ -200,7 +207,7 @@ describe('Group 3, Change 24: Post-Payment Report Delivery Tests', () => {
     }
 
     expect(caseService.isPaid(unpaid)).toBe(false)
-    expect(caseService.nextStep(unpaid, [])).toBe('pay')
+    expect(caseService.nextStep(unpaid, [])).toBe('upload')
 
     await expect(
       caseService.deliverReportEmail(unpaid)

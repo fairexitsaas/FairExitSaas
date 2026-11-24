@@ -564,13 +564,11 @@ export default function ReportUploadPage({
           hasContract: currentHasContract,
         });
 
-        await fairexit.startRead(activeCaseId);
-
         setIsSubmitting(false);
         if (onContinue) {
           onContinue();
         } else {
-          router.push(`/report?case=${activeCaseId || "demo"}&step=reading${isUS ? "&country=US" : ""}`);
+          router.push(`/report?case=${activeCaseId || "demo"}&step=pay${isUS ? "&country=US" : ""}`);
         }
       } catch (err: unknown) {
         setIsSubmitting(false);
@@ -581,13 +579,13 @@ export default function ReportUploadPage({
                 0,
                 err instanceof Error
                   ? err.message
-                  : "Failed to start reading documents. Please check your files.",
+                  : "Failed to proceed to payment. Please check your files.",
               );
         setErrorMessage(apiErr.message);
         showErrorModal({
-          title: "Document Reading Failed",
+          title: "Document Upload Check Failed",
           message: apiErr.message,
-          stage: "Document Reading",
+          stage: "Document Upload",
           statusCode: apiErr.status,
           requestId: apiErr.requestId,
           onRetry: () => handleContinue(),
@@ -600,7 +598,7 @@ export default function ReportUploadPage({
       if (onContinue) {
         onContinue();
       } else {
-        router.push(`/report?case=demo&step=reading${isUS ? "&country=US" : ""}`);
+        router.push(`/report?case=demo&step=pay${isUS ? "&country=US" : ""}`);
       }
     }
   };
@@ -1260,7 +1258,7 @@ export default function ReportUploadPage({
                       Both documents uploaded successfully!
                     </h4>
                     <p className="font-sans text-[12.5px] text-[#0C8F72]">
-                      Your documents are ready. Click generate report below to continue.
+                      Your documents are ready. Click continue to payment below.
                     </p>
                   </div>
                 </div>
@@ -1291,7 +1289,7 @@ export default function ReportUploadPage({
                 {isSubmitting ? (
                   <>
                     <span className="inline-block w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                    Generating report…
+                    Continuing to payment…
                   </>
                 ) : isUploading ? (
                   <>
@@ -1299,15 +1297,15 @@ export default function ReportUploadPage({
                     Uploading documents…
                   </>
                 ) : bothAdded ? (
-                  "Generate report →"
+                  "Continue to payment →"
                 ) : hasLetter && contractStatus === "never" ? (
-                  "Generate report without a contract →"
+                  "Continue to payment without a contract →"
                 ) : hasLetter &&
                   (contractStatus === "missing" ||
                     contractStatus === "later") ? (
-                  "Generate report without it →"
+                  "Continue to payment without it →"
                 ) : (
-                  "Generate report →"
+                  "Continue to payment →"
                 )}
               </button>
 

@@ -171,10 +171,10 @@ describe('A1 - Case Lifecycle and Multi-Case Isolation Tests', () => {
     expect(view.nextStep).toBe('ready')
     expect(view.country).toBe('CA')
 
-    // Fresh US case view remains unpaid and points to pay
+    // Fresh US case view remains unpaid and points to upload
     const freshUSView = caseService.view(baseUSCase, [])
     expect(freshUSView.paid).toBe(false)
-    expect(freshUSView.nextStep).toBe('pay')
+    expect(freshUSView.nextStep).toBe('upload')
     expect(freshUSView.country).toBe('US')
   })
 })
