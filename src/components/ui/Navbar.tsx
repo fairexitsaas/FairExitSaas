@@ -41,7 +41,7 @@ export default function Navbar() {
             FE
           </div>
           <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Fairexit
+            FairExit
           </span>
         </Link>
 

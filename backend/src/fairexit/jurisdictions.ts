@@ -58,9 +58,13 @@ export const US_STATES: Record<string, string> = {
   MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire',
   NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma',
   OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee',
-  TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+  TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', DC: 'Washington, DC', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
 }
-const US_BY_NAME: Record<string, string> = Object.fromEntries(Object.entries(US_STATES).map(([k, v]) => [v.toLowerCase(), k]))
+const US_BY_NAME: Record<string, string> = {
+  ...Object.fromEntries(Object.entries(US_STATES).map(([k, v]) => [v.toLowerCase(), k])),
+  'district of columbia': 'DC',
+  'washington dc': 'DC',
+}
 
 const REGIONS = (regionData as unknown as { regions: Record<string, { slug: string }> }).regions
 

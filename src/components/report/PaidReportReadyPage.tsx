@@ -8,7 +8,7 @@ import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import { fairexit, caseStore, FairExitApiError, FAIREXIT_API_URL } from "@/lib/api/fairexit";
 import { startPollLoop } from "@/lib/reportPolling";
 import { useErrorModal } from "@/context/ErrorModalContext";
-import { notifySuccess, notifyError } from "@/lib/notifications";
+import { notifySuccess } from "@/lib/notifications";
 import FullScreenLoadingExperience from "@/components/report/loading/FullScreenLoadingExperience";
 
 interface PaidReportReadyPageProps {
@@ -546,42 +546,6 @@ export default function PaidReportReadyPage({
     }
   };
 
-  if (buildStatus === "building" || (buildStatus === "failed" && !cs?.report)) {
-    const hasContract = Boolean(
-      data.hasContract ?? (
-        ((cs?.documents as any)?.contractPages ? (cs?.documents as any).contractPages > 0 : false) ||
-        (Array.isArray((cs?.documents as any)?.uploaded) &&
-          (cs?.documents as any).uploaded.some((d: any) => d.kind === "contract")) ||
-        (Array.isArray(cs?.documents) && cs.documents.some((d: any) => d.kind === "contract"))
-      )
-    );
-
-    const regionName = cs?.jurisdiction?.name || (isCanada ? data.provinceName : data.state);
-    const regionCode =
-      (cs as any)?.jurisdiction_code ||
-      (cs?.jurisdiction as any)?.code ||
-      (!isCanada
-        ? data.state
-          ? `US-${data.state}`
-          : "US-*"
-        : data.province
-        ? `CA-${data.province}`
-        : "CA-ON");
-
-    return (
-      <FullScreenLoadingExperience
-        mode="building"
-        caseId={activeId}
-        hasContract={hasContract}
-        jurisdictionName={regionName}
-        jurisdictionCode={regionCode}
-        isUS={!isCanada}
-        error={buildStatus === "failed" ? buildError || "Report generation could not be completed." : null}
-        onRetry={handleRetryBuild}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#F6F4EF] text-[#17242F] font-sans antialiased selection:bg-[#0EB28D]/20 pb-20">
       {/* ── Top Header Navigation ── */}
@@ -960,7 +924,100 @@ export default function PaidReportReadyPage({
                   </div>
                 )}
               </>
-            ) : null}
+            ) : buildStatus === "building" ? (
+              <div className="py-6 flex flex-col items-center justify-center max-w-[500px] mx-auto animate-fade">
+                <Image
+                  src="/analyzing.gif"
+                  alt="Analyzing documents and building report"
+                  width={84}
+                  height={84}
+                  className="w-[84px] h-[84px] object-contain mb-4"
+                  unoptimized
+                />
+
+                <div className="inline-flex items-center justify-center px-3.5 py-1 bg-[#EEF1F4] border border-[#DDE3E9] rounded-[6px] text-[11.5px] font-sans font-[700] text-[#062C55] mb-3">
+                  Step 4 of 4 · Paid
+                </div>
+
+                <h1 className="font-serif font-[600] text-[22px] sm:text-[24px] leading-[28px] tracking-[-0.5px] text-[#062C55] mb-2">
+                  Building your report…
+                </h1>
+
+                <p className="font-sans text-[14px] text-[#5A6B78] leading-relaxed mb-6">
+                  Analyzing your severance documents, calculating legal floors, and compiling your personalized PDF report.
+                </p>
+
+                {/* Progress bar */}
+                <div className="w-full max-w-[380px] h-[7px] bg-[#E7E4DD] rounded-full overflow-hidden mb-6">
+                  <div
+                    className="h-full bg-[#0EB28D] rounded-full transition-all duration-700 ease-out"
+                    style={{ width: buildProgressStep === 3 ? "85%" : "45%" }}
+                  />
+                </div>
+
+                {/* Steps indicator */}
+                <div className="w-full max-w-[380px] text-left space-y-2.5 text-[13px] font-sans text-[#5A6B78] bg-[#F9F8F5] p-4 rounded-[10px] border border-[#E7E4DD] mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-4 h-4 rounded-full bg-[#0EB28D] text-white text-[10px] flex items-center justify-center shrink-0 font-bold">✓</span>
+                    <span className="text-[#062C55] font-medium">Checking jurisdiction rules & case details</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    {buildProgressStep >= 2 ? (
+                      <span className="w-4 h-4 rounded-full border-2 border-[#0EB28D] border-t-transparent animate-spin shrink-0" />
+                    ) : (
+                      <span className="w-4 h-4 rounded-full border-2 border-[#D8D4CA] shrink-0" />
+                    )}
+                    <span className={buildProgressStep >= 2 ? "text-[#062C55] font-bold" : "text-[#5A6B78]"}>
+                      Calculating statutory floor and common law ranges
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    {buildProgressStep >= 3 ? (
+                      <span className="w-4 h-4 rounded-full border-2 border-[#0EB28D] border-t-transparent animate-spin shrink-0" />
+                    ) : (
+                      <span className="w-4 h-4 rounded-full border-2 border-[#D8D4CA] shrink-0" />
+                    )}
+                    <span className={buildProgressStep >= 3 ? "text-[#062C55] font-bold" : "text-[#5A6B78]"}>
+                      Formatting custom PDF and email delivery
+                    </span>
+                  </div>
+                </div>
+
+                <p className="text-[12px] text-[#5A6B78]">
+                  This typically takes 15–30 seconds. Your report will appear automatically.
+                </p>
+              </div>
+            ) : (
+              <div className="py-6 flex flex-col items-center justify-center max-w-[480px] mx-auto animate-fade">
+                <div className="w-12 h-12 rounded-full bg-[#FFF0F0] border border-[#FFD0D0] flex items-center justify-center text-[#E53E3E] text-xl font-bold mb-4">
+                  !
+                </div>
+
+                <h1 className="font-serif font-[600] text-[22px] sm:text-[24px] text-[#062C55] mb-2">
+                  Report generation could not be completed
+                </h1>
+
+                <p className="font-sans text-[14px] text-[#E53E3E] mb-6 leading-relaxed">
+                  {buildError || "An unexpected error occurred while generating your report."}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleRetryBuild}
+                  className="w-full sm:w-[320px] h-[50px] rounded-[12px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white font-sans font-[700] text-[16px] shadow-sm transition flex items-center justify-center cursor-pointer mb-3"
+                >
+                  Retry building report
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleTalkToLawyer}
+                  className="text-[#062C55] hover:text-[#0EB28D] text-[13.5px] font-sans font-medium underline transition cursor-pointer mt-1"
+                >
+                  {isCanada ? "Talk to a lawyer" : "Talk to an attorney"}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ══════════════════════════════════════════════════
@@ -1001,11 +1058,17 @@ export default function PaidReportReadyPage({
                   key={idx}
                   className="flex items-center justify-between py-[7px] border-b border-[#D3DAE1]"
                 >
-                  <span className="font-sans font-[400] text-[#5A6B78] truncate pr-2">
+                  <span className="font-sans font-[400] text-[#5A6B78] shrink-0 pr-2">
                     {row.label}
                   </span>
                   <span className="font-sans font-[700] text-[#062C55] text-right truncate">
-                    {String(row.value)}
+                    {row.label === "Other pay" && String(row.value).toLowerCase() === "benefits"
+                      ? isCanada
+                        ? "Benefits"
+                        : "Health benefits"
+                      : row.label === "Anything flagged" && String(row.value).toLowerCase() === "discrim"
+                      ? "Possible discrimination / retaliation"
+                      : String(row.value)}
                   </span>
                 </div>
               ))}

@@ -78,11 +78,37 @@ export function validateShape(out: any): { ok: boolean; problems: string[]; repo
   return { ok: problems.length === 0, problems, report }
 }
 
-/** Soft checks against prompt rules 1, 2 and U2. */
-export function ruleWarnings(report: ReportJson, allowedSourceIds: string[], allowedAmounts: number[]): string[] {
+export interface AllowedContext {
+  /** Statutory calculator minimum and common-law range bounds */
+  calculator: number[]
+  /** Confirmed facts table rows (e.g. tenure, verified wage) */
+  confirmed: number[]
+  /** Numbers specifically stated in the employment contract (e.g. base salary $128,000) */
+  contract: number[]
+  /** Numbers specifically stated in the severance letter (e.g. offer $15,000) */
+  letter: number[]
+  /** User-provided answers */
+  userAnswers: number[]
+  /** All known numbers combined */
+  all: number[]
+}
+
+export type AllowedAmountsList = number[] & {
+  context?: AllowedContext
+}
+
+/** Soft checks against prompt rules 1, 2 and U2 with strict contextual provenance checking. */
+export function ruleWarnings(
+  report: ReportJson,
+  allowedSourceIds: string[],
+  allowedAmounts: number[] | AllowedAmountsList
+): string[] {
   const warn: string[] = []
   const ids = new Set(allowedSourceIds)
   const cited = new Set<string>(report.citations_used || [])
+
+  const ctx: AllowedContext | undefined = (allowedAmounts as AllowedAmountsList)?.context
+
   const walk = (v: unknown, fn: (s: string, path: string) => void, path = '') => {
     if (typeof v === 'string') fn(v, path)
     else if (Array.isArray(v)) v.forEach((x, i) => walk(x, fn, `${path}[${i}]`))
@@ -91,16 +117,66 @@ export function ruleWarnings(report: ReportJson, allowedSourceIds: string[], all
       walk(x, fn, path ? `${path}.${k}` : k)
     })
   }
-  const allowed = allowedAmounts.filter((n) => Number.isFinite(n)).map((n) => Math.round(n))
+
   walk(report, (s, path) => {
     if (/\bpage \d+\b|next page/i.test(s)) warn.push(`U2: page reference at ${path}`)
     if (/\byou should\b/i.test(s)) warn.push(`tone: "you should" at ${path}`)
     if (/\(check\)|\bunverified\b|\bTBD\b/.test(s)) warn.push(`H1: banned word at ${path}`)
+
     for (const m of s.matchAll(/\$\s?([0-9][0-9,]*(?:\.\d+)?)/g)) {
       const n = Math.round(parseFloat(m[1].replace(/,/g, '')))
-      if (!allowed.some((a) => Math.abs(a - n) <= 1)) warn.push(`rule 2: amount $${m[1]} at ${path} is not in confirmed_facts, minimum or range`)
+
+      // Contextual provenance checking
+      let validForPath = false
+      if (ctx) {
+        const p = path.toLowerCase()
+        const clauseIdxMatch = p.match(/^clauses\[(\d+)\]/)
+        const clauseCitesContract = !!(clauseIdxMatch && report.clauses?.[parseInt(clauseIdxMatch[1])]?.source_id === 'DOC-CONTRACT')
+        const clauseCitesLetter = !!(clauseIdxMatch && report.clauses?.[parseInt(clauseIdxMatch[1])]?.source_id === 'DOC-LETTER')
+
+        // 1. Contract-stated fields: contract facts, confirmed facts, calculator
+        if (
+          p.endsWith('.contract_says') ||
+          p.endsWith('.contract_note') ||
+          p.endsWith('.contract_quote') ||
+          p.endsWith('.contract_excerpt') ||
+          clauseCitesContract
+        ) {
+          const allowedContract = [...ctx.contract, ...ctx.confirmed, ...ctx.calculator]
+          validForPath = allowedContract.some((a) => Math.abs(a - n) <= 1)
+        }
+        // 2. Severance letter fields: letter facts, confirmed facts
+        else if (
+          p.endsWith('.letter_says') ||
+          p.endsWith('.letter_note') ||
+          p.endsWith('.letter_quote') ||
+          clauseCitesLetter
+        ) {
+          const allowedLetter = [...ctx.letter, ...ctx.confirmed]
+          validForPath = allowedLetter.some((a) => Math.abs(a - n) <= 1)
+        }
+        // 3. Confirmed facts line: confirmed facts, answers, contract, letter
+        else if (p.includes('confirmed_line') || p.includes('confirmed_facts') || p.includes('name_line')) {
+          validForPath = ctx.all.some((a) => Math.abs(a - n) <= 1)
+        }
+        // 4. Statutory entitlements & legal minimums: STRICTLY calculator minimum/range and confirmed facts
+        //    (Contract salary like $128,000 or letter offer $15,000 CANNOT authorize a statutory claim!)
+        else {
+          const allowedLegal = [...ctx.calculator, ...ctx.confirmed]
+          validForPath = allowedLegal.some((a) => Math.abs(a - n) <= 1)
+        }
+      } else {
+        // Plain array fallback (for tests passing flat number arrays)
+        const allowed = (allowedAmounts as number[]).filter((x) => Number.isFinite(x)).map((x) => Math.round(x))
+        validForPath = allowed.some((a) => Math.abs(a - n) <= 1)
+      }
+
+      if (!validForPath) {
+        warn.push(`rule 2: amount $${m[1]} at ${path} is not in confirmed_facts, minimum or range`)
+      }
     }
   })
+
   for (const id of cited) if (!ids.has(id)) warn.push(`rule 1: source_id ${id} is not in the given sources`)
   return warn
 }
@@ -3475,18 +3551,135 @@ ${CSS}
   return fixItalicSpaces(rawHtml)
 }
 
-export function allowedAmounts(input: Record<string, any>): number[] {
-  const out: number[] = []
-  const rows = input?.confirmed_facts?.rows || {}
-  for (const r of Object.values<any>(rows)) {
-    for (const v of [r.value, r.user_value, r.doc_value]) {
-      const n = typeof v === 'number' ? v : parseFloat(String(v ?? '').replace(/[$,]/g, ''))
-      if (Number.isFinite(n)) out.push(n)
+export function extractContextualAmounts(input: Record<string, any>): AllowedContext {
+  const calculator: number[] = []
+  const confirmed: number[] = []
+  const contract: number[] = []
+  const letter: number[] = []
+  const userAnswers: number[] = []
+
+  const parseNum = (v: unknown): number | null => {
+    if (typeof v === 'number' && Number.isFinite(v) && v > 0) return Math.round(v)
+    if (typeof v === 'string') {
+      const cleaned = v.replace(/[$,]/g, '').trim()
+      const n = parseFloat(cleaned)
+      if (Number.isFinite(n) && n > 0) return Math.round(n)
+    }
+    return null
+  }
+
+  // 1. Calculator minimums and ranges
+  for (const k of ['amount', 'weekly_pay']) {
+    const n = parseNum(input?.minimum?.[k])
+    if (n !== null) calculator.push(n)
+  }
+  for (const k of ['low', 'high']) {
+    const n = parseNum(input?.range?.[k])
+    if (n !== null) calculator.push(n)
+  }
+
+  // 2. Confirmed facts table rows
+  const cfRows = input?.confirmed_facts?.rows || {}
+  for (const r of Object.values<any>(cfRows)) {
+    for (const v of [r?.value, r?.user_value, r?.doc_value]) {
+      const n = parseNum(v)
+      if (n !== null) confirmed.push(n)
     }
   }
-  for (const k of ['amount', 'weekly_pay']) if (Number.isFinite(input?.minimum?.[k])) out.push(input.minimum[k])
-  for (const k of ['low', 'high']) if (Number.isFinite(input?.range?.[k])) out.push(input.range[k])
-  return out
+
+  // Check state rows if present
+  const checkRows = input?.check?.rows || {}
+  for (const r of Object.values<any>(checkRows)) {
+    for (const v of [r?.value, r?.user_value, r?.doc_value]) {
+      const n = parseNum(v)
+      if (n !== null) {
+        confirmed.push(n)
+        const src = String(r?.source || r?.doc_source || '').toLowerCase()
+        if (src === 'contract') contract.push(n)
+        if (src === 'letter' || src === 'agreement') letter.push(n)
+      }
+    }
+  }
+
+  // 3. Document facts from Call A (partitioned by document provenance)
+  const factsList = Array.isArray(input?.call_a?.facts)
+    ? input.call_a.facts
+    : Object.values<any>(input?.call_a?.facts || {})
+  for (const f of factsList) {
+    const doc = String(f?.document || '').toLowerCase()
+    const key = String(f?.key || '').toLowerCase()
+    for (const v of [f?.value, f?.doc_value, f?.amount]) {
+      const n = parseNum(v)
+      if (n !== null) {
+        if (doc === 'contract' || key.includes('salary') || key.includes('remuneration')) {
+          contract.push(n)
+        } else if (doc === 'letter' || doc === 'agreement' || key.includes('offer') || key.includes('severance')) {
+          letter.push(n)
+        } else {
+          if (key.includes('salary') || key.includes('wage')) contract.push(n)
+          else if (key.includes('severance') || key.includes('offer')) letter.push(n)
+          else contract.push(n)
+        }
+      }
+    }
+  }
+
+  // 4. User answers
+  const answers = input?.answers || {}
+  for (const [k, v] of Object.entries<any>(answers)) {
+    const n = parseNum(v)
+    if (n !== null) {
+      userAnswers.push(n)
+      const lk = k.toLowerCase()
+      if (lk.includes('salary') || lk.includes('wage') || lk.includes('pay')) {
+        contract.push(n)
+      }
+      if (lk.includes('offer') || lk.includes('severance')) {
+        letter.push(n)
+      }
+    }
+  }
+
+  // 5. Uploaded documents facts if present
+  if (Array.isArray(input?.documents)) {
+    for (const d of input.documents) {
+      const kind = String(d?.kind || d?.type || '').toLowerCase()
+      if (d?.facts && typeof d.facts === 'object') {
+        const dFactList = Array.isArray(d.facts) ? d.facts : Object.values<any>(d.facts)
+        for (const f of dFactList) {
+          const n = parseNum(f?.value ?? f?.amount ?? f)
+          if (n !== null) {
+            if (kind === 'contract') contract.push(n)
+            else if (kind === 'letter' || kind === 'agreement') letter.push(n)
+          }
+        }
+      }
+    }
+  }
+
+  const allSet = new Set<number>([
+    ...calculator,
+    ...confirmed,
+    ...contract,
+    ...letter,
+    ...userAnswers,
+  ])
+
+  return {
+    calculator: Array.from(new Set(calculator)),
+    confirmed: Array.from(new Set(confirmed)),
+    contract: Array.from(new Set(contract)),
+    letter: Array.from(new Set(letter)),
+    userAnswers: Array.from(new Set(userAnswers)),
+    all: Array.from(allSet),
+  }
+}
+
+export function allowedAmounts(input: Record<string, any>): AllowedAmountsList {
+  const context = extractContextualAmounts(input)
+  const list = [...context.all] as AllowedAmountsList
+  list.context = context
+  return list
 }
 
 export { fmtMoney }

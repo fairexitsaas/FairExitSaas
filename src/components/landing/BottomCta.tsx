@@ -15,7 +15,7 @@ export default function BottomCta({ country }: BottomCtaProps) {
   const handleStartRead = (e: React.MouseEvent) => {
     e.preventDefault();
     if (isCanada) {
-      router.push("/questions");
+      router.push("/questions?country=CA");
       return;
     }
     const el =
@@ -41,7 +41,7 @@ export default function BottomCta({ country }: BottomCtaProps) {
         <div className="mt-6">
           <a
             className="inline-flex items-center justify-center gap-1.5 bg-green hover:bg-greend text-white w-full sm:w-auto py-3.5 sm:py-[18px] px-6 sm:px-[30px] rounded-[14px] font-extrabold text-[16px] sm:text-[18px] no-underline border-none cursor-pointer shadow-button hover:shadow-button-hover active:scale-[0.98] transition-all text-center whitespace-normal sm:whitespace-nowrap"
-            href={isCanada ? "/questions" : "#hero"}
+            href={isCanada ? "/questions?country=CA" : "#hero"}
             onClick={handleStartRead}
           >
             Start my 60-second read →

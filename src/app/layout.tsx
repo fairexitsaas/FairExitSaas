@@ -17,8 +17,8 @@ const newsreader = Newsreader({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Fairexit — Challenge your severance offer',
-    template: '%s | Fairexit',
+    default: 'FairExit — Know your worth. Challenge your severance offer.',
+    template: '%s | FairExit',
   },
   description:
     'Free severance check for Canada and layoff rights check for the United States.',

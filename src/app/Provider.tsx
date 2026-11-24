@@ -16,7 +16,7 @@ type ProviderProp = {
 
 export default function Provider({ children }: ProviderProp) {
   const pathname = usePathname();
-  // Default to US so page content renders immediately behind the dialog
+  // Default to US so page content renders identically on server and client during hydration
   const [Country, setCountryState] = useState<CountryCode>("US");
   const [isCountryModalOpen, setIsCountryModalOpen] = useState<boolean>(false);
   const [mounted, setMounted] = useState<boolean>(false);
@@ -28,11 +28,14 @@ export default function Provider({ children }: ProviderProp) {
         // 1. Check URL parameters for explicit country or state
         const params = new URLSearchParams(window.location.search);
         const countryParam = params.get("country")?.toUpperCase();
+        const pParam = params.get("p") || params.get("province");
         const stParam = params.get("st") || params.get("state");
 
         let knownCountry: CountryCode | null = null;
         if (countryParam === "CA" || countryParam === "US") {
           knownCountry = countryParam;
+        } else if (pParam) {
+          knownCountry = "CA";
         } else if (stParam) {
           knownCountry = "US";
         }

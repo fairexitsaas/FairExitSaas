@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CountryCode } from "@/context/CountryContext";
+import { US_STATES } from "@/lib/report-storage";
 
 interface QuickCheckFormProps {
   country: CountryCode;
@@ -29,6 +30,10 @@ export default function QuickCheckForm({ country }: QuickCheckFormProps) {
   const handleUsSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    try {
+      localStorage.setItem("fairexit_country", "US");
+      localStorage.setItem("fx_country", "us");
+    } catch {}
     const q: string[] = ["country=US"];
     if (usState) q.push("st=" + encodeURIComponent(usState));
     if (usAge) q.push("age40=" + (usAge.startsWith("Yes") ? "yes" : "no"));
@@ -48,6 +53,10 @@ export default function QuickCheckForm({ country }: QuickCheckFormProps) {
   const handleCaSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    try {
+      localStorage.setItem("fairexit_country", "CA");
+      localStorage.setItem("fx_country", "ca");
+    } catch {}
 
     const q: string[] = ["country=CA"];
     if (qsProvince) q.push("p=" + encodeURIComponent(qsProvince));
@@ -275,12 +284,12 @@ export default function QuickCheckForm({ country }: QuickCheckFormProps) {
             className="w-full px-3.5 py-[11px] pr-9 border-[1.5px] border-[#cdd3d8] rounded-[11px] text-[15px] text-[#17242f] bg-white font-inherit box-border outline-none transition-all duration-200 appearance-none cursor-pointer hover:border-[#9aa3ab] focus:border-[#0eb28d] focus:shadow-[inset_3px_0_0_#0eb28d]"
           >
             <option value="">Select your state</option>
-            <option>California</option>
-            <option>New York</option>
-            <option>Texas</option>
-            <option>Florida</option>
-            <option>Illinois</option>
-            <option>Other state</option>
+            {US_STATES.map((st) => (
+              <option key={st} value={st}>
+                {st}
+              </option>
+            ))}
+            <option value="Other state">Other state</option>
           </select>
 
           <label htmlFor="age" className="block text-[11.5px] font-extrabold tracking-[0.3px] uppercase text-[#5a6b78] mt-3 mb-[5px]">

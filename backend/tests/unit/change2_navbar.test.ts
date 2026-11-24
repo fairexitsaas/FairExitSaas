@@ -33,9 +33,9 @@ describe('Change 2: Navbar & Footer Navigation Requirements', () => {
       expect(navbarContent).toMatch(/Pricing/i)
       expect(navbarContent).toMatch(/FAQ/i)
       expect(navbarContent).toMatch(/About/i)
-      // Country flag switcher
+      // Country flag switcher (Canadian flag updated to client asset flag-ca.png per Nov 23 fixes)
       expect(navbarContent).toMatch(/handleToggleCountry/)
-      expect(navbarContent).toMatch(/CaFlagSvg/)
+      expect(navbarContent).toMatch(/flag-ca\.png/)
       expect(navbarContent).toMatch(/UsFlagSvg/)
     })
 

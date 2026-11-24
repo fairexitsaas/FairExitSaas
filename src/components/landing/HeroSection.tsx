@@ -39,7 +39,7 @@ export default function HeroSection({
                 <Image
                   className="h-[20px] sm:h-[22px] w-auto rounded-[2px]"
                   style={{ width: "auto", height: "auto" }}
-                  src={isCanada ? "/flag-ca.svg" : "/flag-us.svg"}
+                  src={isCanada ? "/flag-ca.png" : "/flag-us.svg"}
                   alt={isCanada ? "Canada" : "United States"}
                   width={34}
                   height={22}
@@ -53,7 +53,7 @@ export default function HeroSection({
               </span>
 
               {isCanada ? (
-                <h1 className="font-serif text-[30px] sm:text-[34px] lg:text-[44px] leading-[1.18] sm:leading-[1.15] text-[#062c55] font-semibold my-3 sm:my-4 tracking-[-0.5px]">
+                <h1 className="font-serif text-[36px] min-[375px]:text-[40px] sm:text-[40px] lg:text-[44px] leading-[1.14] sm:leading-[1.15] text-[#062c55] font-semibold my-3 sm:my-4 tracking-[-0.5px]">
                   Just laid off in Canada?{" "}
                   <em
                     className="italic text-[#0c8f72]"
@@ -64,7 +64,7 @@ export default function HeroSection({
                   of your severance offer — in 60 seconds.
                 </h1>
               ) : (
-                <h1 className="font-serif text-[30px] sm:text-[34px] lg:text-[44px] leading-[1.18] sm:leading-[1.15] text-[#062c55] font-semibold my-3 sm:my-4 tracking-[-0.5px]">
+                <h1 className="font-serif text-[36px] min-[375px]:text-[40px] sm:text-[40px] lg:text-[44px] leading-[1.14] sm:leading-[1.15] text-[#062c55] font-semibold my-3 sm:my-4 tracking-[-0.5px]">
                   Laid off in the US?{" "}
                   <em
                     className="italic text-[#0c8f72]"

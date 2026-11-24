@@ -178,32 +178,23 @@ describe('Client Changes Verification Suite (Tasks 1 to 5)', () => {
   describe('Task 4 — Mobile Homepage Headline Typography', () => {
     const heroContent = readSource('src/components/landing/HeroSection.tsx')
 
-    it('homepage hero H1 mobile font size is increased to at least 30px', () => {
-      // Look for H1 class with text-[30px]
-      expect(heroContent).toMatch(/<h1[^>]*text-\[30px\]/)
+    it('homepage hero H1 mobile font size is increased to approximately 40px', () => {
+      // Look for H1 class with mobile 36-40px per Nov 23 client changes
+      expect(heroContent).toMatch(/<h1[^>]*text-\[36px\][^>]*min-\[375px\]:text-\[40px\]/)
     })
   })
 
-  describe('Task 5 — Tagline Strip Above Navbar', () => {
-    const taglineContent = readSource('src/components/landing/TaglineStrip.tsx')
+  describe('Task 5 — Tagline Strip and Navbar Tagline', () => {
     const homeContent = readSource('src/app/page.tsx')
+    const navbarContent = readSource('src/components/layout/Navbar.tsx')
 
-    it('TaglineStrip contains exact required wording and styling', () => {
-      expect(taglineContent).toMatch(/Know your worth\./)
-      expect(taglineContent).toMatch(/Challenge your severance offer\./)
-      expect(taglineContent).toMatch(/#0EB28D/)
-      expect(taglineContent).toMatch(/font-sans/)
-      expect(taglineContent).toMatch(/font-bold/)
-      expect(taglineContent).toMatch(/whitespace-nowrap/)
+    it('Tagline is placed directly under the logo in Navbar', () => {
+      expect(navbarContent).toMatch(/Know your worth\./)
+      expect(navbarContent).toMatch(/Challenge your severance offer\./)
     })
 
-    it('TaglineStrip is placed immediately below Navbar on the homepage', () => {
-      const stripIndex = homeContent.indexOf('<TaglineStrip')
-      const navIndex = homeContent.indexOf('<Navbar')
-
-      expect(stripIndex).toBeGreaterThan(-1)
-      expect(navIndex).toBeGreaterThan(-1)
-      expect(navIndex).toBeLessThan(stripIndex)
+    it('TaglineStrip has been removed from the homepage below Navbar per Nov 23 client changes', () => {
+      expect(homeContent).not.toMatch(/<TaglineStrip/)
     })
   })
 })

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { Suspense, useContext } from "react";
+import React, { Suspense, useContext, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { CountryContext } from "@/context/CountryContext";
 import { detectIsUS } from "@/lib/report-storage";
@@ -16,6 +16,14 @@ function QuestionsRouter() {
   });
   const isCanada = !isUS;
   const flowKey = `${isCanada ? "CA" : "US"}_${searchParams?.toString() || ""}`;
+
+  useEffect(() => {
+    if (isCanada && countryContext?.Country !== "CA") {
+      countryContext?.setCountry("CA");
+    } else if (isUS && countryContext?.Country !== "US") {
+      countryContext?.setCountry("US");
+    }
+  }, [isCanada, isUS, countryContext]);
 
   return isCanada ? (
     <CanadaFlow key={flowKey} />

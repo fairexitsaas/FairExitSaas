@@ -3,8 +3,8 @@ import Navbar from '@/components/ui/Navbar'
 import SignupForm from '@/components/auth/SignupForm'
 
 export const metadata: Metadata = {
-  title: 'Sign Up — Fairexit',
-  description: 'Create a new Fairexit account.',
+  title: 'Sign Up — FairExit',
+  description: 'Create a new FairExit account.',
 }
 
 export default function SignupPage() {

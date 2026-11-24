@@ -73,7 +73,7 @@ export default function LoginForm() {
           Welcome back
         </h1>
         <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Sign in to access your Fairexit account
+          Sign in to access your FairExit account
         </p>
       </div>
 

@@ -23,7 +23,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
   const handleStartRead = (e: React.MouseEvent) => {
     e.preventDefault();
     if (isCanada) {
-      router.push("/questions");
+      router.push("/questions?country=CA");
       return;
     }
     const el =
@@ -148,7 +148,7 @@ export default function FaqSection({ country }: FaqSectionProps) {
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3.5 sm:gap-5 mt-5">
               <a
                 className="inline-flex items-center justify-center gap-1.5 bg-green hover:bg-greend text-white px-5 py-2.5 rounded-xl font-bold text-sm no-underline border-none cursor-pointer shadow-button hover:shadow-button-hover active:scale-[0.98] transition-all whitespace-nowrap"
-                href="/questions"
+                href="/questions?country=CA"
                 onClick={handleStartRead}
               >
                 Start my 60-second read — free →

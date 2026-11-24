@@ -119,7 +119,7 @@ export const US_STATES = [
   "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire",
   "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
   "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
-  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia",
+  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "Washington, DC", "West Virginia",
   "Wisconsin", "Wyoming"
 ] as const;
 
@@ -127,13 +127,54 @@ export const US_STATE_CODES = [
   "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA", "HI", "ID", "IL", "IN", "IA",
   "KS", "KY", "LA", "ME", "MD", "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
   "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC", "SD", "TN", "TX", "UT", "VT",
-  "VA", "WA", "WV", "WI", "WY"
+  "VA", "WA", "DC", "WV", "WI", "WY"
 ] as const;
+
+export const CA_PROVINCES = [
+  "Ontario",
+  "British Columbia",
+  "Alberta",
+  "Saskatchewan",
+  "Manitoba",
+  "Nova Scotia",
+  "New Brunswick",
+  "Prince Edward Island",
+  "Newfoundland and Labrador",
+  "Federal",
+] as const;
+
+export const CA_PROVINCE_CODES = [
+  "ON", "BC", "AB", "SK", "MB", "NS", "NB", "PE", "NL", "FED"
+] as const;
+
+const CA_PROVINCE_SET_LOWER = new Set([
+  ...CA_PROVINCES.map((p) => p.toLowerCase()),
+  ...CA_PROVINCE_CODES.map((c) => c.toLowerCase()),
+  "fed",
+  "federal",
+  "pei",
+  "n.b.",
+  "n.s.",
+  "b.c.",
+  "ont",
+  "alta",
+  "sask",
+  "man",
+  "ca-on", "ca-bc", "ca-ab", "ca-sk", "ca-mb", "ca-ns", "ca-nb", "ca-pe", "ca-nl", "ca-fed",
+]);
+
+export function isCAProvince(val?: unknown): boolean {
+  if (!val || typeof val !== "string") return false;
+  const s = val.trim().toLowerCase();
+  return CA_PROVINCE_SET_LOWER.has(s);
+}
 
 const US_STATE_SET_LOWER = new Set([
   ...US_STATES.map((s) => s.toLowerCase()),
   ...US_STATE_CODES.map((c) => c.toLowerCase()),
   ...US_STATE_CODES.map((c) => `us-${c.toLowerCase()}`),
+  "district of columbia",
+  "washington dc",
 ]);
 
 export function isUSState(val?: unknown): boolean {
@@ -151,37 +192,46 @@ export function detectIsUS(opts?: {
   const { country, cs, data, searchParams } = opts || {};
   const countryStr = typeof country === "string" ? country.toUpperCase() : null;
 
-  // 1. Explicit country override
+  // 1. URL parameters (Highest priority: explicit URL parameters override ambient/stale state)
+  let sp = searchParams;
+  if (!sp && typeof window !== "undefined") {
+    try {
+      sp = new URLSearchParams(window.location.search);
+    } catch {}
+  }
+  if (sp) {
+    const cParam = sp.get("country")?.toUpperCase();
+    if (cParam === "CA") return false;
+    if (cParam === "US") return true;
+
+    const pParam = sp.get("p") || sp.get("province");
+    if (isCAProvince(pParam)) return false;
+
+    const stParam = sp.get("st") || sp.get("state");
+    if (isUSState(stParam)) return true;
+  }
+
+  // 2. Case from server (cs)
+  if (cs?.country === "CA" || cs?.jurisdiction?.country === "CA") return false;
+  if (typeof cs?.jurisdiction_code === "string" && cs.jurisdiction_code.toUpperCase().startsWith("CA")) return false;
+  if (isCAProvince(cs?.answers?.province) || isCAProvince(cs?.region) || isCAProvince(cs?.jurisdiction?.name)) return false;
+
+  if (cs?.country === "US" || cs?.jurisdiction?.country === "US") return true;
+  if (typeof cs?.jurisdiction_code === "string" && cs.jurisdiction_code.toUpperCase().startsWith("US")) return true;
+  if (typeof cs?.region === "string" && (cs.region.toLowerCase().startsWith("us") || isUSState(cs.region))) return true;
+  if (isUSState(cs?.answers?.usState) || isUSState(cs?.answers?.state) || isUSState(cs?.jurisdiction?.name)) return true;
+
+  // 3. Explicit country override from caller / CountryContext
+  if (countryStr === "CA") return false;
   if (countryStr === "US") return true;
 
-  // 2. Case from server
-  if (cs?.country === "US") return true;
-  if (cs?.jurisdiction?.country === "US") return true;
-  if (typeof cs?.jurisdiction_code === "string" && cs.jurisdiction_code.toUpperCase().startsWith("US-")) return true;
-  if (typeof cs?.region === "string" && (cs.region.toLowerCase().startsWith("us") || isUSState(cs.region))) return true;
-  if (isUSState(cs?.answers?.usState) || isUSState(cs?.answers?.state)) return true;
-  if (isUSState(cs?.jurisdiction?.name)) return true;
-
-  // 3. Form / stored inputs
+  // 4. Form / stored inputs object
+  if (data?.country === "CA" || isCAProvince(data?.province) || isCAProvince(data?.provinceName)) return false;
   if (data?.country === "US") return true;
   if (typeof data?.province === "string" && data.province.toLowerCase().startsWith("us")) return true;
   if (isUSState(data?.state)) return true;
-  if (isUSState(data?.provinceName)) return true;
+  if (isUSState(data?.provinceName) && data?.provinceName?.toLowerCase() !== "ca") return true;
   if (isUSState((data?.fullState as any)?.usState) || isUSState((data?.fullState as any)?.state)) return true;
-
-  // 4. URL parameters
-  if (searchParams) {
-    const cParam = searchParams.get("country")?.toUpperCase();
-    if (cParam === "US") return true;
-    if (searchParams.get("st") || searchParams.get("state")) return true;
-  } else if (typeof window !== "undefined") {
-    try {
-      const sp = new URLSearchParams(window.location.search);
-      const cParam = sp.get("country")?.toUpperCase();
-      if (cParam === "US") return true;
-      if (sp.get("st") || sp.get("state")) return true;
-    } catch {}
-  }
 
   // 5. Browser storage
   if (typeof window !== "undefined") {
@@ -190,15 +240,24 @@ export function detectIsUS(opts?: {
         localStorage.getItem("fairexit_country") ||
         localStorage.getItem("fx_country")
       )?.toUpperCase();
+      if (localCountry === "CA") return false;
       if (localCountry === "US") return true;
 
       const raw = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (
+          parsed.country === "CA" ||
+          isCAProvince(parsed.province) ||
+          isCAProvince(parsed.provinceName)
+        ) {
+          return false;
+        }
+        if (
           parsed.country === "US" ||
           isUSState(parsed.state) ||
-          isUSState(parsed.provinceName) ||
+          (typeof parsed.province === "string" && parsed.province.toLowerCase().startsWith("us")) ||
+          (isUSState(parsed.provinceName) && parsed.provinceName?.toLowerCase() !== "ca") ||
           isUSState(parsed.fullState?.usState)
         ) {
           return true;

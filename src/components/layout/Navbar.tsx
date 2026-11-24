@@ -103,18 +103,14 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
     </svg>
   );
 
-  const CaFlagSvg = (
-    <svg className="w-[18px] h-[12.5px] rounded-[2px] shrink-0 inline-block shadow-[0_0_0_1px_rgba(0,0,0,0.06)]" viewBox="0 0 20 14" aria-hidden="true">
-      <rect width="20" height="14" fill="#fff"></rect>
-      <rect width="5.5" height="14" fill="#d52b1e"></rect>
-      <rect x="14.5" width="5.5" height="14" fill="#d52b1e"></rect>
-      <g transform="translate(10 7) scale(0.11) translate(-50 -48)">
-        <path
-          d="M50 6L55 25L60 20L58 40L75 35L68 48L90 50L68 58L72 70L55 65L57 90L50 82L43 90L45 65L28 70L32 58L10 50L32 48L25 35L42 40L40 20L45 25Z"
-          fill="#d52b1e"
-        ></path>
-      </g>
-    </svg>
+  const CaFlagImg = (
+    <Image
+      src="/flag-ca.png"
+      alt="Canada flag"
+      width={18}
+      height={13}
+      className="w-[18px] h-[12.5px] rounded-[2px] object-cover shrink-0 inline-block shadow-[0_0_0_1px_rgba(0,0,0,0.06)]"
+    />
   );
 
   return (
@@ -150,10 +146,8 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
               priority
             />
           </Link>
-          <span className="text-[10.5px] sm:text-[11.5px] text-[#5a6b78] dark:text-[#9ab1c6] font-semibold mt-0.5 text-left tracking-[0.1px] truncate max-w-[180px] xs:max-w-none">
-            {isCanada
-              ? "Challenge your severance offer"
-              : "Make sense of your offer"}
+          <span className="text-[10px] xs:text-[11px] sm:text-[11.5px] text-[#5a6b78] dark:text-[#9ab1c6] font-semibold mt-0.5 text-left tracking-[0.1px] leading-tight">
+            Know your worth. Challenge your severance offer.
           </span>
         </div>
 
@@ -204,7 +198,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
           >
             {isCanada ? (
               <>
-                {CaFlagSvg}
+                {CaFlagImg}
                 <span>
                   CA <span className="font-semibold text-[#5a6b78] dark:text-[#8ea5b8] text-[12.5px]">· switch to</span>
                 </span>
@@ -216,7 +210,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
                 <span>
                   US <span className="font-semibold text-[#5a6b78] dark:text-[#8ea5b8] text-[12.5px]">· switch to</span>
                 </span>
-                {CaFlagSvg}
+                {CaFlagImg}
               </>
             )}
           </button>
@@ -224,7 +218,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
           {/* Primary CTA */}
           <Link
             className="inline-flex items-center justify-center gap-1.5 text-white px-3.5 sm:px-[22px] py-2 sm:py-[12px] rounded-[9px] font-bold text-[13.5px] sm:text-[15px] no-underline border-none cursor-pointer bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] hover:shadow-[0_14px_24px_-10px_rgba(12,143,114,0.65)] hover:-translate-y-px active:scale-[0.98] transition-all whitespace-nowrap"
-            href={isCanada ? "/questions" : "/#check"}
+            href={isCanada ? "/questions?country=CA" : "/#check"}
             onClick={handleCtaClick}
           >
             {isCanada ? "Check my offer →" : "Check my layoff →"}
@@ -289,7 +283,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
         <div className="pt-4 flex justify-start">
           <Link
             className="inline-flex items-center justify-center gap-1.5 text-white px-5 sm:px-6 py-2.5 sm:py-3 rounded-[9px] font-bold text-[14.5px] sm:text-[15px] no-underline border-none cursor-pointer bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] shadow-[0_12px_22px_-12px_rgba(12,143,114,0.55)] active:scale-[0.98] transition-all whitespace-nowrap self-start"
-            href={isCanada ? "/questions" : "/#check"}
+            href={isCanada ? "/questions?country=CA" : "/#check"}
             onClick={handleCtaClick}
           >
             {isCanada ? "Check my offer →" : "Check my layoff →"}

@@ -198,7 +198,7 @@ export default function BlogPostBeforeYouSign() {
                 </p>
               </div>
               <Link
-                href="/questions"
+                href="/questions?country=US"
                 className="w-full sm:w-auto text-center font-extrabold text-[15px] leading-[26px] px-6 py-3 rounded-[9px] bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-sm hover:brightness-105 active:scale-95 transition-all whitespace-nowrap"
               >
                 Check my layoff →

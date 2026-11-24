@@ -650,7 +650,7 @@ export default function AttorneysPage() {
               height={30}
             />
             <div className="text-sm font-bold text-[#0eb28d] my-2">
-              Challenge your severance offer.
+              Know your worth. Challenge your severance offer.
             </div>
             <p className="text-[11.5px] text-[#5a6b78] dark:text-[#9ab1c6] leading-[1.58]">
               <strong className="font-bold text-[#17242f] dark:text-white">

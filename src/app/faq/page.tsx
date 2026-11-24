@@ -468,7 +468,7 @@ function FaqContent() {
         {/* Kick */}
         <div className="flex items-center gap-2 text-xs font-extrabold tracking-[1.3px] uppercase text-[#0c8f72] dark:text-[#0eb28d] mb-2">
           <Image
-            src={isCanada ? "/flag-ca.svg" : "/flag-us.svg"}
+            src={isCanada ? "/flag-ca.png" : "/flag-us.svg"}
             alt=""
             width={20}
             height={14}
@@ -599,7 +599,7 @@ function FaqContent() {
             </p>
           </div>
           <Link
-            href={isCanada ? "/questions" : "/questions?country=US"}
+            href={isCanada ? "/questions?country=CA" : "/questions?country=US"}
             className="w-full sm:w-auto text-center font-extrabold text-[15px] px-5 py-3 rounded-lg bg-gradient-to-b from-[#0eb28d] to-[#0c8f72] text-white shadow-md hover:brightness-105 active:scale-95 transition-all whitespace-nowrap"
           >
             {isCanada ? "Check my offer →" : "Check my layoff →"}
@@ -615,7 +615,7 @@ function FaqContent() {
             className="text-[#0c8f72] dark:text-[#0eb28d] font-semibold underline cursor-pointer inline-flex items-center gap-1.5 align-baseline"
           >
             <Image
-              src={isCanada ? "/flag-us.svg" : "/flag-ca.svg"}
+              src={isCanada ? "/flag-us.svg" : "/flag-ca.png"}
               alt=""
               width={16}
               height={11}

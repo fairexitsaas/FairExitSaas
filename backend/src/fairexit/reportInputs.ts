@@ -131,10 +131,71 @@ export function buildMinimumAndRange(c: CaseRow, ctx: CheckCtx, j: Jurisdiction)
   return { minimum, range, engine: { input: inp, bonus_regular: regular, rules_version: RULES_VERSION } }
 }
 
+export function detectUploadedDocs(c: CaseRow, ctx?: CheckCtx): { hasLetter: boolean; hasContract: boolean } {
+  let hasLetter = false
+  let hasContract = false
+
+  const callA = c.call_a || ctx?.callA
+  if (callA?.facts) {
+    const list = Array.isArray(callA.facts) ? callA.facts : Object.values(callA.facts)
+    for (const f of list as any[]) {
+      const doc = String(f?.document || '').toLowerCase()
+      if (doc === 'letter' || doc === 'agreement') hasLetter = true
+      if (doc === 'contract') hasContract = true
+    }
+  }
+
+  const docs = (c as any).documents
+  if (Array.isArray(docs)) {
+    for (const d of docs) {
+      const k = String(d?.kind || d?.type || '').toLowerCase()
+      if (k === 'letter' || k === 'agreement') hasLetter = true
+      if (k === 'contract') hasContract = true
+    }
+  }
+
+  if (ctx?.check?.rows) {
+    for (const r of Object.values<any>(ctx.check.rows)) {
+      const src = String(r?.doc_source || r?.source || '').toLowerCase()
+      if (src === 'letter' || src === 'agreement') hasLetter = true
+      if (src === 'contract') hasContract = true
+    }
+  }
+
+  return { hasLetter, hasContract }
+}
+
 export function buildCallBInput(c: CaseRow, ctx: CheckCtx) {
   const j = finalJurisdiction(c, ctx)
   if (!j) throw new Error('jurisdiction_not_covered')
-  const sources = sourcesFor(j)
+  const statutorySources = sourcesFor(j)
+  const { hasLetter, hasContract } = detectUploadedDocs(c, ctx)
+  const documentSources: Array<{ id: string; name: string; citation: string; status: string }> = []
+  if (hasLetter || hasContract) {
+    documentSources.push({
+      id: 'from_documents',
+      name: 'Uploaded employment documents',
+      citation: 'Severance letter and/or employment contract provided by employee',
+      status: 'confirmed',
+    })
+  }
+  if (hasLetter) {
+    documentSources.push({
+      id: 'DOC-LETTER',
+      name: 'Severance / Separation Letter',
+      citation: 'Uploaded severance letter / separation agreement',
+      status: 'confirmed',
+    })
+  }
+  if (hasContract) {
+    documentSources.push({
+      id: 'DOC-CONTRACT',
+      name: 'Employment Contract / Offer Letter',
+      citation: 'Uploaded employment contract / original offer letter',
+      status: 'confirmed',
+    })
+  }
+  const sources = [...statutorySources, ...documentSources]
   const { minimum, range, engine } = buildMinimumAndRange(c, ctx, j)
   const input: Record<string, unknown> = {
     jurisdiction: j,
@@ -147,5 +208,5 @@ export function buildCallBInput(c: CaseRow, ctx: CheckCtx) {
     region_rules: regionRulesFor(j),
     sources,
   }
-  return { input, jurisdiction: j, engine, rulesAsOf: latestCheckedDate(sources) }
+  return { input, jurisdiction: j, engine, rulesAsOf: latestCheckedDate(statutorySources) }
 }

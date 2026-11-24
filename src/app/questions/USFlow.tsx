@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import NextLink from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { QuestionBackButton, QuestionNextButton } from "@/components/common/QuestionNavButtons";
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
@@ -26,13 +27,57 @@ const OCCUPATIONS = [
 ];
 
 const US_STATES = [
+  "Alabama",
+  "Alaska",
+  "Arizona",
+  "Arkansas",
   "California",
-  "New York",
-  "Texas",
+  "Colorado",
+  "Connecticut",
+  "Delaware",
   "Florida",
+  "Georgia",
+  "Hawaii",
+  "Idaho",
   "Illinois",
+  "Indiana",
+  "Iowa",
+  "Kansas",
+  "Kentucky",
+  "Louisiana",
+  "Maine",
+  "Maryland",
+  "Massachusetts",
+  "Michigan",
+  "Minnesota",
+  "Mississippi",
+  "Missouri",
+  "Montana",
+  "Nebraska",
+  "Nevada",
+  "New Hampshire",
   "New Jersey",
+  "New Mexico",
+  "New York",
+  "North Carolina",
+  "North Dakota",
+  "Ohio",
+  "Oklahoma",
+  "Oregon",
+  "Pennsylvania",
+  "Rhode Island",
+  "South Carolina",
+  "South Dakota",
+  "Tennessee",
+  "Texas",
+  "Utah",
+  "Vermont",
+  "Virginia",
   "Washington",
+  "Washington, DC",
+  "West Virginia",
+  "Wisconsin",
+  "Wyoming",
   "Other state",
 ];
 
@@ -3316,18 +3361,16 @@ export default function USFlow() {
             ════════════════════════════════════════════════════════════════ */}
             {currentStep === "step-analyzing" && (
               <div className="bg-white border border-[#e7e4dd] rounded-[22px] py-14 sm:py-20 px-6 sm:px-12 text-center shadow-[0_20px_50px_-25px_rgba(6,44,85,0.12)] max-w-[620px] mx-auto animate-fade">
-                {/* Document outline icon with green top banner matching screenshot */}
-                <div className="relative mx-auto w-14 h-[68px] mb-6 flex items-center justify-center">
-                  <div className="absolute inset-0 bg-[#0eb28d]/15 rounded-lg blur-md animate-pulse" />
-                  <div className="relative w-12 h-16 bg-white border-[1.75px] border-[#a3d9c4] rounded-[6px] shadow-sm overflow-hidden flex flex-col">
-                    <div className="h-2 bg-[#0eb28d] w-full" />
-                    <div className="p-2 space-y-1.5 flex-1 relative bg-gradient-to-b from-white to-[#fafcfb]">
-                      <div className="h-1 bg-[#e7e4dd] rounded-full w-4/5" />
-                      <div className="h-1 bg-[#e7e4dd] rounded-full w-full" />
-                      <div className="h-1 bg-[#e7e4dd] rounded-full w-3/4" />
-                      <div className="absolute inset-x-0 h-4 bg-gradient-to-b from-transparent via-[#0eb28d]/20 to-transparent animate-pulse" />
-                    </div>
-                  </div>
+                {/* Moving magnifying glass animation matching client assets */}
+                <div className="mx-auto mb-6 flex items-center justify-center">
+                  <Image
+                    src="/analyzing.gif"
+                    alt="Reading your situation…"
+                    width={80}
+                    height={80}
+                    className="w-20 h-20 object-contain"
+                    unoptimized
+                  />
                 </div>
 
                 <h1 className="font-serif font-normal text-2xl sm:text-[28px] text-[#062c55] mb-2 tracking-tight">

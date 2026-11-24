@@ -176,7 +176,7 @@ function BlogIndexContent() {
               </p>
             </div>
             <Link
-              href="/questions"
+              href={isCanada ? "/questions?country=CA" : "/questions?country=US"}
               className="w-full sm:w-auto text-center font-extrabold text-[15px] px-5 py-3 rounded-[9px] bg-[#0eb28d] hover:bg-[#0c8f72] text-white shadow-md active:scale-95 transition-all whitespace-nowrap"
             >
               {isCanada ? "Check my offer →" : "Check my layoff →"}

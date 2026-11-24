@@ -4,8 +4,8 @@ import Navbar from '@/components/ui/Navbar'
 import LoginForm from '@/components/auth/LoginForm'
 
 export const metadata: Metadata = {
-  title: 'Log In — Fairexit',
-  description: 'Log in to your Fairexit account.',
+  title: 'Log In — FairExit',
+  description: 'Log in to your FairExit account.',
 }
 
 export default function LoginPage() {

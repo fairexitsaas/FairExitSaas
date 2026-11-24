@@ -70,7 +70,7 @@ export default function Footer({
               height={32}
             />
             <div className="text-[14px] sm:text-[14.5px] font-bold text-[#0eb28d] my-2.5 tracking-[-0.01em]">
-              Challenge your severance offer
+              Know your worth. Challenge your severance offer.
             </div>
             {isCanada ? (
               <p className="text-[12px] sm:text-[12.5px] text-[#5a6b78] dark:text-[#9ab1c6] leading-[1.6]">
@@ -167,7 +167,7 @@ export default function Footer({
                   className="text-left font-normal text-[#5a6b78] dark:text-[#9ab1c6] hover:text-[#062c55] dark:hover:text-white bg-transparent border-none p-0 cursor-pointer text-inherit whitespace-nowrap inline-flex items-center gap-1.5"
                 >
                   <Image
-                    src="/flag-ca.svg"
+                    src="/flag-ca.png"
                     alt="Canada"
                     width={16}
                     height={11}
@@ -205,7 +205,7 @@ export default function Footer({
               height={32}
             />
             <div className="text-sm font-bold text-[#0eb28d] my-2">
-              Challenge your severance offer.
+              Know your worth. Challenge your severance offer.
             </div>
             <p className="text-[11.5px] text-[#5a6b78] dark:text-[#9ab1c6] leading-[1.57]">
               <b className="font-bold text-[#17242f] dark:text-white">
@@ -294,7 +294,7 @@ export default function Footer({
             height={32}
           />
           <div className="text-[13px] font-bold text-greend my-1.5 mb-3">
-            Challenge your severance offer
+            Know your worth. Challenge your severance offer.
           </div>
           {isCanada ? (
             <p className="text-xs text-slate leading-[1.55]">
@@ -395,7 +395,7 @@ export default function Footer({
                 {isCanada ? (
                   <>
                     <Link
-                      href="/questions"
+                      href="/questions?country=CA"
                       className="hover:text-navy dark:hover:text-white transition-colors no-underline whitespace-nowrap"
                     >
                       Check my offer
@@ -453,7 +453,7 @@ export default function Footer({
                       className="text-left font-normal text-slate hover:text-navy dark:hover:text-white bg-transparent border-none p-0 cursor-pointer text-inherit whitespace-nowrap inline-flex items-center gap-1.5"
                     >
                       <Image
-                        src="/flag-ca.svg"
+                        src="/flag-ca.png"
                         alt="Canada"
                         width={16}
                         height={11}

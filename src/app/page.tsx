@@ -2,7 +2,6 @@
 
 import React, { useContext } from "react";
 import { CountryContext, CountryCode } from "@/context/CountryContext";
-import TaglineStrip from "@/components/landing/TaglineStrip";
 import Navbar from "@/components/layout/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
 import HowItWorks from "@/components/landing/HowItWorks";
@@ -35,9 +34,6 @@ export default function HomePage() {
         country={currentCountry}
         onCountrySwitch={handleCountrySwitch}
       />
-
-      {/* 2. Tagline Strip (Immediately below header/navbar) */}
-      <TaglineStrip />
 
       <main id="main-content" className="flex-1">
         {/* 3. Hero Section & Explainer Video */}

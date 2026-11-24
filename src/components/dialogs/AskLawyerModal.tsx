@@ -156,7 +156,7 @@ export default function AskLawyerModal({
 
             {/* Heading */}
             <h3 className="font-serif font-[600] text-[24px] sm:text-[26px] text-[#062C55] leading-[1.2] mb-2.5">
-              Want a {professionalWord} to contact you?
+              Want {isUS ? "an attorney" : "a lawyer"} to contact you?
             </h3>
 
             {/* Subtext */}
