@@ -18,6 +18,9 @@ import USReviewPage from "@/components/report/us/USReviewPage";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 import PostPaymentCustomerModal from "@/components/report/PostPaymentCustomerModal";
 import PaymentLoadingUI from "@/components/report/payment/PaymentLoadingUI";
+import { MismatchStep, findMismatches, type Rows } from "@/components/report/mismatch-row";
+import "@/components/report/mismatch-row.css";
+import { buildMismatchRows } from "@/lib/confirmation-mismatch";
 
 export function hasCompletedPostPaymentCollection(c: any): boolean {
   if (!c) return false;
@@ -137,6 +140,11 @@ export default function ReportFlow() {
   const [showPaymentSuccessBanner, setShowPaymentSuccessBanner] = useState(false);
 
   const urlStep = sp?.get("step");
+  const [prevUrlStep, setPrevUrlStep] = useState(urlStep);
+  if (prevUrlStep !== urlStep) {
+    setPrevUrlStep(urlStep);
+    setView(null);
+  }
   const step = view || urlStep || cs?.nextStep;
   const countryParam = sp?.get("country")?.toUpperCase();
   const isUS = detectIsUS({
@@ -325,6 +333,9 @@ export default function ReportFlow() {
           cs={cs}
           onDone={() => {
             setView("review");
+            if (caseId) {
+              router.replace(`/report?step=review&case=${caseId}${isUS ? "&country=US" : ""}`);
+            }
           }}
         />
       );
@@ -713,6 +724,42 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
 
   if (!page) return err ? <ErrorBox text={err} /> : <Spinner text="Loading what we read…" />;
   const pct = page.counter.total ? Math.round((page.counter.confirmed / page.counter.total) * 100) : 0;
+
+  const mismatchRows = buildMismatchRows({
+    answers: cs?.answers,
+    conflicts: page.conflicts,
+    isUS: page.country === "US",
+  });
+  const activeMismatches = findMismatches(mismatchRows);
+  if (activeMismatches.length > 0) {
+    const handleCheckMismatchesDone = async (fixed: Rows) => {
+      setBusyKey("mismatch:saving");
+      setErr("");
+      try {
+        let latestPage = page;
+        if (fixed.age && (fixed.age.status === "confirmed_from_document" || fixed.age.status === "confirmed_by_user")) {
+          latestPage = await fairexit.resolveConflict(cs.id, "age", fixed.age.status === "confirmed_from_document" ? "document" : "answers");
+        }
+        if (fixed.annual_pay && (fixed.annual_pay.status === "confirmed_from_document" || fixed.annual_pay.status === "confirmed_by_user")) {
+          latestPage = await fairexit.resolveConflict(cs.id, "pay", fixed.annual_pay.status === "confirmed_from_document" ? "document" : "answers");
+        }
+        setPage(latestPage);
+      } catch (e) {
+        setErr(errText(e));
+      } finally {
+        setBusyKey("");
+      }
+    };
+    return (
+      <div>
+        <Kicker>Step 3 of 4</Kicker>
+        <Card>
+          <ErrorBox text={err} />
+          <MismatchStep rows={mismatchRows} busy={busyKey === "mismatch:saving"} onDone={handleCheckMismatchesDone} />
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div>

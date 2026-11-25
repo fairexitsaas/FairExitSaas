@@ -45,15 +45,18 @@ export function finalJurisdiction(c: CaseRow, ctx: CheckCtx): Jurisdiction | nul
 }
 
 /** The answers object the prompt describes, in plain keys, plus the raw free-check state. */
-export function answersForPrompt(c: CaseRow, j: Jurisdiction) {
+export function answersForPrompt(c: CaseRow, j: Jurisdiction, ctx?: CheckCtx) {
   const a = c.answers || {}
+  const confirmedAge = ctx ? num(confirmedValue(ctx, 'age')) : null
+  const confirmedPay = ctx ? num(confirmedValue(ctx, 'pay')) : null
+  const confirmedYears = ctx ? num(confirmedValue(ctx, 'years')) : null
   const role = a.roleLabel || ROLE_OPTIONS.find((r) => r.factor === num(a.roleFactor ?? a.roleF))?.label || null
   const extras = Object.entries((c.country === 'US' ? a.comp : a.pay) || {}).filter(([, v]) => !!v).map(([k]) => k)
   return {
     [j.words.region]: j.name,
-    age: num(a.age),
-    years: num(a.years),
-    pay: num(a.salary ?? a.pay),
+    age: confirmedAge ?? num(a.age),
+    years: confirmedYears ?? num(a.years),
+    pay: confirmedPay ?? num(a.salary ?? a.pay),
     pay_extras: extras,
     role,
     union: a.union || null,
@@ -199,7 +202,7 @@ export function buildCallBInput(c: CaseRow, ctx: CheckCtx) {
   const { minimum, range, engine } = buildMinimumAndRange(c, ctx, j)
   const input: Record<string, unknown> = {
     jurisdiction: j,
-    answers: answersForPrompt(c, j),
+    answers: answersForPrompt(c, j, ctx),
     contract: c.contract_status || 'missing',
     call_a: c.call_a,
     confirmed_facts: exportConfirmedFacts(ctx),

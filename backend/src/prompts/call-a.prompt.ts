@@ -2,7 +2,7 @@
  * FairExit Call A Prompt Module
  *
  * Source of truth: backend/prompts/prompt-a1/prompt-a1.txt
- * Exact SHA-256: 1f7d19cc6fcf4ccdc81e94447d78868c729990e096c635114563026dd93071d6
+ * Exact SHA-256: 566883dbe26c5403bb4bda6fd073a4dae0ae7ae727fee1899016a7435722ce94
  *
  * This module exports the exact system prompt for Call A (Read the Documents),
  * ensuring zero unauthorized alterations to its instructions.
@@ -49,6 +49,30 @@ export const CALL_A_KEYS = [
 ] as const
 
 export type CallAKey = typeof CALL_A_KEYS[number]
+
+/**
+ * (v0.8) Optional keys extracted when present in documents (never placed in `missing`).
+ */
+export const CALL_A_OPTIONAL_KEYS = [
+  'age_stated',
+  'base_salary',
+  'hire_date',
+  'severance_formula',
+  'cobra_terms',
+  'promotion_terms',
+  'bonus_forfeited',
+  'bonus_earned_when',
+  'pto_promised',
+  'confidentiality_clause',
+  'repayment_clause',
+  'non_disparagement',
+  'arbitration',
+  'effective_date',
+  'group_or_individual',
+  'adea_named',
+] as const
+
+export type CallAOptionalKey = typeof CALL_A_OPTIONAL_KEYS[number]
 
 /**
  * Returns the exact system prompt for Call A tailored to the jurisdiction

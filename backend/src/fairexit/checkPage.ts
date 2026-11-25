@@ -519,6 +519,99 @@ export function sameValue(a: unknown, b: unknown): boolean {
   return String(a ?? '').trim().toLowerCase() === String(b ?? '').trim().toLowerCase()
 }
 
+const NON_ANNUAL_RATE_RE = /\b(per\s*hour|\/\s*h(?:ou)?r|hourly|per\s*week|\/\s*wk|weekly|per\s*month|\/\s*mo|monthly|bi-?weekly|semi-?monthly|per\s*day|daily)\b/i
+const ANNUAL_RATE_RE = /\b(per\s*year|\/\s*y(?:ea)?r|a\s*year|annual(?:ly)?|base\s*salary|salary)\b/i
+
+function parseAgeFactValue(raw: unknown): number | null {
+  if (typeof raw === 'number') {
+    const r = Math.round(raw)
+    return Number.isFinite(r) && r >= 16 && r <= 100 ? r : null
+  }
+  if (typeof raw !== 'string') return null
+  const s = raw.trim()
+  if (!s) return null
+  if (/^\d{2,3}$/.test(s)) {
+    const n = parseInt(s, 10)
+    return n >= 16 && n <= 100 ? n : null
+  }
+  const m = s.match(/\bage\s*(?:is|:|=)?\s*(\d{2})\b/i) || s.match(/\b(\d{2})\s*(?:years?\s*old|yrs?\s*old|y\.?o\.?)\b/i) || s.match(/^(\d{2})\b/)
+  if (m) {
+    const n = parseInt(m[1], 10)
+    return n >= 16 && n <= 100 ? n : null
+  }
+  return null
+}
+
+function parseAnnualPayFactValue(raw: unknown): number | null {
+  if (typeof raw === 'number') return Number.isFinite(raw) && raw > 0 ? raw : null
+  if (typeof raw !== 'string') return null
+  const s = raw.trim()
+  if (!s) return null
+  if (NON_ANNUAL_RATE_RE.test(s) && !ANNUAL_RATE_RE.test(s)) return null
+  const matches = Array.from(s.matchAll(/\$\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*(k|thousand)?/gi))
+  if (matches.length > 0) {
+    const last = matches[matches.length - 1]
+    const val = Math.round(parseFloat(last[1].replace(/,/g, '')) * (last[2] ? 1000 : 1) * 100) / 100
+    if (Number.isFinite(val) && val > 0) {
+      if (!ANNUAL_RATE_RE.test(s) && val < 1000) return null
+      return val
+    }
+  }
+  const plain = s.match(/^\s*([0-9][0-9,]*(?:\.[0-9]+)?)\s*(k)?\s*$/i)
+  if (plain) {
+    const val = parseFloat(plain[1].replace(/,/g, '')) * (plain[2] ? 1000 : 1)
+    return Number.isFinite(val) && val >= 1000 ? val : null
+  }
+  return null
+}
+
+function docFactPriority(doc: string): number {
+  if (doc === 'letter' || doc === 'agreement') return 0
+  if (doc === 'contract') return 1
+  return 2
+}
+
+export function extractedAgeFact(ctx: CheckCtx): { value: number; document: string; quote: string | null; where: string | null } | null {
+  const facts = ctx.callA?.facts || []
+  const direct = facts
+    .filter((f) => (f.key === 'age_stated' || f.key === 'age') && f.value !== null && f.value !== undefined && String(f.value).trim() !== '')
+    .sort((a, b) => docFactPriority(a.document) - docFactPriority(b.document))
+  for (const f of direct) {
+    const n = parseAgeFactValue(f.value)
+    if (n !== null) return { value: n, document: f.document, quote: f.quote || null, where: f.where || null }
+  }
+  for (const f of facts.filter((x) => x.key === 'other')) {
+    const text = [f.value, f.quote].filter(Boolean).map(String).join(' ')
+    const m = text.match(/\bage\s*(?:is|:|=)?\s*(\d{2})\b|\(\s*age\s+(\d{2})\s*\)/i)
+    if (m) {
+      const n = parseInt(m[1] || m[2], 10)
+      if (n >= 16 && n <= 100) return { value: n, document: f.document, quote: f.quote || null, where: f.where || null }
+    }
+  }
+  return null
+}
+
+export function extractedAnnualPayFact(ctx: CheckCtx): { value: number; document: string; quote: string | null; where: string | null } | null {
+  const facts = ctx.callA?.facts || []
+  const rank = (k: string) => (k === 'annual_pay' || k === 'base_salary' || k === 'salary' || k === 'pay' ? 0 : k === 'pay_rate' ? 1 : 9)
+  const candidates = facts
+    .filter((f) => rank(f.key) < 9 && f.value !== null && f.value !== undefined && String(f.value).trim() !== '')
+    .sort((a, b) => rank(a.key) - rank(b.key) || docFactPriority(a.document) - docFactPriority(b.document))
+  for (const f of candidates) {
+    const n = parseAnnualPayFactValue(f.value)
+    if (n !== null) return { value: n, document: f.document, quote: f.quote || null, where: f.where || null }
+  }
+  for (const f of facts.filter((x) => x.key === 'other')) {
+    const text = [f.value, f.quote].filter(Boolean).map(String).join(' ')
+    const m = text.match(/(?:annual\s+(?:base\s+)?salary|base\s+salary)\s*(?:of|:)?\s*\$\s*([0-9][0-9,]*(?:\.[0-9]+)?)/i)
+    if (m) {
+      const n = parseFloat(m[1].replace(/,/g, ''))
+      if (Number.isFinite(n) && n >= 1000) return { value: n, document: f.document, quote: f.quote || null, where: f.where || null }
+    }
+  }
+  return null
+}
+
 // ---------------------------------------------------------------------------
 // conflicts ("Check these first") and missing ("We need one more number")
 // ---------------------------------------------------------------------------
@@ -587,6 +680,66 @@ export function conflicts(ctx: CheckCtx): ConflictCard[] {
           }
         }
       }
+    }
+  }
+
+  // Age mismatch (typed answer vs document-extracted age)
+  if (!dismissed.has('age')) {
+    const ageRow = rec(ctx, 'age')
+    const typedAge = parseAgeFactValue(ctx.answers.age)
+    const docAge = extractedAgeFact(ctx)
+    if (!ageRow.status && typedAge !== null && docAge !== null && Math.round(typedAge) !== Math.round(docAge.value)) {
+      const w = docWord(ctx, docAge.document)
+      out.push({
+        key: 'age',
+        title: 'Your age',
+        lead: `What you told us and what your ${w} says are different. Which is right?`,
+        document: {
+          value: docAge.value,
+          display: String(docAge.value),
+          quote: docAge.quote,
+          where: docAge.where ? sourceLine(ctx, docAge.document, docAge.where) : `Your ${w}`,
+          label: `What your ${w} says`,
+        },
+        answers: {
+          value: typedAge,
+          display: String(typedAge),
+          label: 'What you told us',
+        },
+      })
+    }
+  }
+
+  // Annual pay mismatch (typed salary vs document-extracted annual pay, > 2% tolerance)
+  if (!dismissed.has('pay')) {
+    const payRow = rec(ctx, 'pay')
+    const rawAnsPay = ctx.answers.salary ?? (typeof ctx.answers.pay === 'number' || typeof ctx.answers.pay === 'string' ? ctx.answers.pay : null)
+    const typedPay = num(rawAnsPay)
+    const docPay = extractedAnnualPayFact(ctx)
+    if (
+      !payRow.status &&
+      typedPay !== null &&
+      docPay !== null &&
+      Math.abs(typedPay - docPay.value) > 0.02 * Math.max(Math.abs(typedPay), Math.abs(docPay.value))
+    ) {
+      const w = docWord(ctx, docPay.document)
+      out.push({
+        key: 'pay',
+        title: 'Your yearly pay',
+        lead: `What you told us and what your ${w} says are different. Which is right?`,
+        document: {
+          value: docPay.value,
+          display: fmtMoney(docPay.value, ctx.country),
+          quote: docPay.quote,
+          where: docPay.where ? sourceLine(ctx, docPay.document, docPay.where) : `Your ${w}`,
+          label: `What your ${w} says`,
+        },
+        answers: {
+          value: typedPay,
+          display: fmtMoney(typedPay, ctx.country),
+          label: 'What you told us',
+        },
+      })
     }
   }
 
@@ -782,6 +935,25 @@ export function normalizeFoundValue(ctx: CheckCtx, key: string, raw: string | nu
   return normalizeDoc(ctx, d, raw)
 }
 
+const OPTIONAL_V08_FACT_KEYS = new Set([
+  'age_stated',
+  'base_salary',
+  'hire_date',
+  'severance_formula',
+  'cobra_terms',
+  'promotion_terms',
+  'bonus_forfeited',
+  'bonus_earned_when',
+  'pto_promised',
+  'confidentiality_clause',
+  'repayment_clause',
+  'non_disparagement',
+  'arbitration',
+  'effective_date',
+  'group_or_individual',
+  'adea_named',
+])
+
 /** Export for Call B: state.check -> confirmed_facts (spec section 4). */
 export function exportConfirmedFacts(ctx: CheckCtx) {
   const rows: Record<string, unknown> = {}
@@ -799,6 +971,22 @@ export function exportConfirmedFacts(ctx: CheckCtx) {
       where: o.where ?? null,
       change_ack: o.status === 'corrected' ? !!o.change_ack : undefined,
       change_ack_at: o.status === 'corrected' ? o.change_ack_at || null : undefined,
+    }
+  }
+  // v0.8 Note 13: forward optional extracted facts from Call A that are not separate check-page
+  // rows as confirmed rows sourced from the document, without overriding user-confirmed rows.
+  for (const f of ctx.callA?.facts || []) {
+    if (!OPTIONAL_V08_FACT_KEYS.has(f.key)) continue
+    if (rows[f.key] !== undefined) continue
+    if (f.value === null || f.value === undefined || String(f.value).trim() === '') continue
+    rows[f.key] = {
+      value: f.value,
+      source: f.document || 'letter',
+      status: 'confirmed',
+      doc_value: f.value,
+      user_value: null,
+      quote: f.quote ?? null,
+      where: f.where ?? null,
     }
   }
   const employee_name = confirmedValue(ctx, 'employee_name')

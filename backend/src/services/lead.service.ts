@@ -1,7 +1,11 @@
 /**
- * "Ask a lawyer to contact me" (phase 1: one lead form, routed by hand by the ops team).
+ * "Ask a lawyer to contact me" + "/lawyer-request" submissions.
  * Shared with a lawyer: name, email, phone, province/state, and a short summary of answers.
  * Never the uploaded documents or the report.
+ *
+ * Persistence guarantee: every submission is persisted to `public.leads` FIRST; confirmation
+ * emails are sent only after successful DB persistence, and email delivery failures never discard
+ * the saved database record.
  */
 import { db, check } from '../config/db'
 import { env } from '../config/env'
@@ -48,18 +52,147 @@ export function leadSummary(c: CaseRow | null) {
 }
 
 function leadView(l: any) {
-  return { requestId: l.public_id, status: l.status, region: l.region_name, createdAt: l.created_at }
+  return { requestId: l.public_id, id: l.id, status: l.status, region: l.region_name, createdAt: l.created_at }
 }
 
-/** In-memory deduplication cache for /lawyer-request page submissions */
+/** Deduplication TTL constants for /lawyer-request submissions */
 export const lawyerRequestDedupeCache = new Map<string, { timestamp: number; requestId: string }>()
 export const LAWYER_REQUEST_CASE_DEDUPE_TTL = 24 * 60 * 60 * 1000 // 24h case-specific duplicate protection
-export const LAWYER_REQUEST_NO_CASE_DEDUPE_TTL = 2 * 60 * 1000 // 2m short-lived idempotency for requests without a case ID (prevents accidental double-clicks without 24h lockout)
+export const LAWYER_REQUEST_NO_CASE_DEDUPE_TTL = 2 * 60 * 1000 // 2m short-lived idempotency for requests without a case ID
+
+const inFlightEmailSends = new Set<string>()
+
+export interface LawyerEmailDeliveryState {
+  status: 'pending' | 'sent' | 'failed' | 'disabled' | 'not_applicable'
+  attempts: number
+  template?: string
+  sent_at?: string | null
+  last_attempt_at?: string | null
+  last_error?: string | null
+  resend_id?: string | null
+}
+
+async function persistEmailDeliveryState(leadRow: any, state: LawyerEmailDeliveryState): Promise<any> {
+  const nextSummary = {
+    ...(leadRow.summary || {}),
+    email_delivery: state,
+  }
+  const upd = await db()
+    .from('leads')
+    .update({ summary: nextSummary, updated_at: new Date().toISOString() })
+    .eq('id', leadRow.id)
+    .select('*')
+    .maybeSingle()
+  if (upd.error || !upd.data) {
+    return { ...leadRow, summary: nextSummary }
+  }
+  return upd.data
+}
+
+async function sendAndRecordLawyerConfirmationEmail(
+  leadRow: any,
+  country: Country,
+  region: string,
+): Promise<{ lead: any; emailDelivery: LawyerEmailDeliveryState }> {
+  const existingState: LawyerEmailDeliveryState | undefined = leadRow.summary?.email_delivery
+  const templateName = country === 'US' ? 'lawyer-request-email-US' : 'lawyer-request-email-CA'
+
+  if (existingState?.status === 'sent') {
+    return { lead: leadRow, emailDelivery: existingState }
+  }
+
+  if (inFlightEmailSends.has(leadRow.id)) {
+    return {
+      lead: leadRow,
+      emailDelivery: existingState || { status: 'pending', attempts: 0, template: templateName },
+    }
+  }
+
+  if (env.EMAIL_MODE !== 'live') {
+    const disabledState: LawyerEmailDeliveryState = {
+      status: 'disabled',
+      attempts: existingState?.attempts || 0,
+      template: templateName,
+      last_attempt_at: existingState?.last_attempt_at || null,
+      last_error: null,
+    }
+    const updated = await persistEmailDeliveryState(leadRow, disabledState)
+    return { lead: updated, emailDelivery: disabledState }
+  }
+
+  inFlightEmailSends.add(leadRow.id)
+  const attempts = (existingState?.attempts || 0) + 1
+  const nowIso = new Date().toISOString()
+  try {
+    const res = await emailService.lawyerRequestConfirmation({
+      to: leadRow.email,
+      name: leadRow.name || '',
+      country,
+      region,
+      requestId: leadRow.public_id,
+    })
+
+    if (res.sent) {
+      const sentState: LawyerEmailDeliveryState = {
+        status: 'sent',
+        attempts,
+        template: templateName,
+        sent_at: nowIso,
+        last_attempt_at: nowIso,
+        last_error: null,
+        resend_id: res.id || null,
+      }
+      const updated = await persistEmailDeliveryState(leadRow, sentState)
+      return { lead: updated, emailDelivery: sentState }
+    }
+
+    const failedState: LawyerEmailDeliveryState = {
+      status: 'failed',
+      attempts,
+      template: templateName,
+      sent_at: null,
+      last_attempt_at: nowIso,
+      last_error: res.error || res.reason || 'Email delivery failed',
+      resend_id: null,
+    }
+    logger.warn('[LAWYER_REQUEST][EMAIL_FAILED]', {
+      requestId: leadRow.public_id,
+      leadId: leadRow.id,
+      country,
+      attempts,
+      error: failedState.last_error,
+    })
+    const updated = await persistEmailDeliveryState(leadRow, failedState)
+    return { lead: updated, emailDelivery: failedState }
+  } catch (err: any) {
+    const failedState: LawyerEmailDeliveryState = {
+      status: 'failed',
+      attempts,
+      template: templateName,
+      sent_at: null,
+      last_attempt_at: nowIso,
+      last_error: err?.message || 'Unexpected email delivery error',
+      resend_id: null,
+    }
+    logger.warn('[LAWYER_REQUEST][EMAIL_EXCEPTION]', {
+      requestId: leadRow.public_id,
+      leadId: leadRow.id,
+      country,
+      attempts,
+      error: failedState.last_error,
+    })
+    const updated = await persistEmailDeliveryState(leadRow, failedState)
+    return { lead: updated, emailDelivery: failedState }
+  } finally {
+    inFlightEmailSends.delete(leadRow.id)
+  }
+}
 
 export const leadService = {
   async create(input: {
     caseRow: CaseRow | null
     caseId?: string
+    reportId?: string
     country?: Country
     jurisdictionCode?: string
     regionName?: string
@@ -88,7 +221,7 @@ export const leadService = {
       if (!input.phone || input.phone.replace(/\D/g, '').length < 10) {
         throw ApiError.unprocessable('Please enter a valid 10-digit phone number.')
       }
-      // If a caseId was explicitly provided but no authorized caseRow resolved, reject
+      // If a caseId was explicitly provided without an authorized caseRow, reject
       if (input.caseId && !input.caseRow) {
         throw ApiError.forbidden('Invalid or unauthorized case context.')
       }
@@ -97,102 +230,116 @@ export const leadService = {
       throw ApiError.unprocessable('Add your name, a valid email and a 10-digit phone number.')
     }
 
+    // Server-side-only report reference linking (never exposed back to unauthenticated clients)
+    let reportCaseRow: CaseRow | null = null
+    if (!input.caseRow && input.reportId) {
+      const cleanRpt = input.reportId.trim()
+      if (/^[A-Za-z0-9_-]{3,64}$/.test(cleanRpt)) {
+        const rptRes = await db().from('cases').select('*').eq('report_id', cleanRpt).maybeSingle()
+        if (!rptRes.error && rptRes.data) {
+          const row = rptRes.data as CaseRow
+          if (!row.report_delete_after || new Date(row.report_delete_after).getTime() > Date.now()) {
+            reportCaseRow = row
+          }
+        }
+      }
+    }
+
     const c = input.caseRow
-    const country: Country = c?.country || (input.country === 'US' ? 'US' : 'CA')
-    const code = c?.jurisdiction_code || (input.jurisdictionCode ? normalizeCode(input.jurisdictionCode, country) : null)
+    const linkedCase = c || reportCaseRow
+    const country: Country = c?.country || reportCaseRow?.country || (input.country === 'US' ? 'US' : 'CA')
+    const code = c?.jurisdiction_code || reportCaseRow?.jurisdiction_code || (input.jurisdictionCode ? normalizeCode(input.jurisdictionCode, country) : null)
     const j = code ? buildJurisdiction(code) : null
     const region = input.regionName || j?.name || (country === 'US' ? 'United States' : 'Canada')
+    const lawyerWord = country === 'US' ? 'attorney' : 'lawyer'
 
     // ─────────────────────────────────────────────────────────────
-    // LAWYER REQUEST PAGE SUBMISSION HANDLING
-    // Requirements:
-    // 1. Record in backend logs with all relevant case & contact details.
-    // 2. DO NOT insert into database (leads table or any DB table).
-    // 3. DO NOT send email to support@fairexit.io or any other inbox.
-    // 4. Prevent duplicate submissions using in-memory deduplication.
+    // DB-BACKED DUPLICATE CHECK (checked before inserting or emailing)
     // ─────────────────────────────────────────────────────────────
-    if (isLawyerRequestPage) {
-      const dedupeKey = `${email}:${c ? c.id : 'no_case'}`.toLowerCase()
-      const now = Date.now()
-      const cached = lawyerRequestDedupeCache.get(dedupeKey)
-      const ttl = c ? LAWYER_REQUEST_CASE_DEDUPE_TTL : LAWYER_REQUEST_NO_CASE_DEDUPE_TTL
+    let existingLead: any = null
+    if (linkedCase?.id) {
+      const openByCase = await db().from('leads').select('*').eq('case_id', linkedCase.id).in('status', ['new', 'sent']).maybeSingle()
+      if (openByCase.data) existingLead = openByCase.data
+    }
 
-      if (cached && now - cached.timestamp < ttl) {
+    if (!existingLead) {
+      const openByEmailRes = await db()
+        .from('leads')
+        .select('*')
+        .eq('email', email)
+        .in('status', ['new', 'sent'])
+        .order('created_at', { ascending: false })
+        .limit(5)
+      const candidates = Array.isArray(openByEmailRes.data)
+        ? openByEmailRes.data
+        : (openByEmailRes.data ? [openByEmailRes.data] : [])
+
+      for (const row of candidates) {
+        const existingType = row.enquiry_type || row.summary?.enquiry_type || 'ask_lawyer'
+        if (existingType !== enquiryType) continue
+
+        if (isLawyerRequestPage && !linkedCase?.id) {
+          const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0
+          const ageMs = createdMs > 0 ? Date.now() - createdMs : 0
+          const priorDeliveryStatus = row.summary?.email_delivery?.status
+          // Short-lived idempotency window (2m) OR retry of a previously failed email on the same saved row
+          if (ageMs < LAWYER_REQUEST_NO_CASE_DEDUPE_TTL || priorDeliveryStatus === 'failed') {
+            existingLead = row
+            break
+          }
+        } else {
+          existingLead = row
+          break
+        }
+      }
+    }
+
+    if (existingLead) {
+      if (isLawyerRequestPage) {
+        const existingStatus = existingLead.summary?.email_delivery?.status
+        if (existingStatus === 'failed' || (existingStatus === 'pending' && env.EMAIL_MODE === 'live')) {
+          const retried = await sendAndRecordLawyerConfirmationEmail(existingLead, country, region)
+          return {
+            ...leadView(retried.lead),
+            duplicate: true,
+            emailDelivery: retried.emailDelivery,
+            contactWithinBusinessDays: 2,
+            lawyerWord,
+          }
+        }
         return {
-          requestId: cached.requestId,
-          status: 'submitted',
+          ...leadView(existingLead),
           duplicate: true,
+          emailDelivery: existingLead.summary?.email_delivery || { status: env.EMAIL_MODE === 'live' ? 'sent' : 'disabled', attempts: 0 },
           contactWithinBusinessDays: 2,
-          lawyerWord: country === 'US' ? 'attorney' : 'lawyer',
+          lawyerWord,
         }
       }
-
-      const publicId = 'lr_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 7)
-      
-      // Memory boundary defense: prune expired entries when cache size exceeds 2000 entries
-      if (lawyerRequestDedupeCache.size > 2000) {
-        for (const [k, v] of lawyerRequestDedupeCache.entries()) {
-          const itemTtl = k.endsWith(':no_case') ? LAWYER_REQUEST_NO_CASE_DEDUPE_TTL : LAWYER_REQUEST_CASE_DEDUPE_TTL
-          if (now - v.timestamp >= itemTtl) lawyerRequestDedupeCache.delete(k)
-        }
-      }
-
-      lawyerRequestDedupeCache.set(dedupeKey, { timestamp: now, requestId: publicId })
-
-      // Structured logging for administrative review
-      logger.info('[LAWYER_REQUEST][SUBMITTED]', {
-        requestId: publicId,
-        name: input.name ? input.name.trim() : null,
-        email,
-        phone: input.phone ? input.phone.trim() : null,
-        country,
-        region,
-        jurisdictionCode: code,
-        caseId: c ? c.id : null,
-        caseSummary: leadSummary(c),
-        sourcePage: input.sourcePage || '/lawyer-request',
-        submittedAt: new Date().toISOString(),
-      })
-
-      return {
-        requestId: publicId,
-        status: 'submitted',
-        duplicate: false,
-        contactWithinBusinessDays: 2,
-        lawyerWord: country === 'US' ? 'attorney' : 'lawyer',
-      }
+      return { ...leadView(existingLead), duplicate: true }
     }
 
     // ─────────────────────────────────────────────────────────────
-    // STANDARD / GENERAL LEADS FLOW (Database insert & ops alert)
+    // PERSIST TO DATABASE FIRST (NEVER send email prior to DB save)
     // ─────────────────────────────────────────────────────────────
-    // Check duplicate by case
-    if (c) {
-      const open = await db().from('leads').select('*').eq('case_id', c.id).in('status', ['new', 'sent']).maybeSingle()
-      if (open.data) return { ...leadView(open.data), duplicate: true }
-    }
-
-    // Check duplicate by email & enquiry type
-    const openByEmail = await db().from('leads').select('*').eq('email', email).in('status', ['new', 'sent']).maybeSingle()
-    if (openByEmail.data) {
-      const existingType = openByEmail.data.enquiry_type || openByEmail.data.summary?.enquiry_type || 'ask_lawyer'
-      if (existingType === enquiryType) {
-        return { ...leadView(openByEmail.data), duplicate: true }
-      }
-    }
-
     const consentStatus = input.consent ?? true
     const textConsent = isChecklist ? 'Consent to receive 3-point checklist by email.' : consentText(country, region)
-    const baseSummary = leadSummary(c)
+    const baseSummary = leadSummary(linkedCase)
+    const templateName = country === 'US' ? 'lawyer-request-email-US' : 'lawyer-request-email-CA'
+    const initialDelivery: LawyerEmailDeliveryState = isLawyerRequestPage
+      ? { status: env.EMAIL_MODE === 'live' ? 'pending' : 'disabled', attempts: 0, template: templateName }
+      : { status: 'not_applicable', attempts: 0 }
+
     const summary = {
       ...baseSummary,
+      ...(input.reportId ? { report_id: input.reportId.trim() } : {}),
       enquiry_type: enquiryType,
-      source_page: input.sourcePage || null,
+      source_page: input.sourcePage || (isLawyerRequestPage ? '/lawyer-request' : null),
       consent: consentStatus,
+      ...(isLawyerRequestPage ? { email_delivery: initialDelivery } : {}),
     }
 
     const basePayload = {
-      case_id: c?.id || input.caseId || null,
+      case_id: linkedCase?.id || input.caseId || null,
       name: input.name ? input.name.trim() : null,
       email,
       phone: input.phone ? input.phone.trim() : null,
@@ -208,7 +355,7 @@ export const leadService = {
     let insertRes = await db().from('leads').insert({
       ...basePayload,
       enquiry_type: enquiryType,
-      source_page: input.sourcePage || null,
+      source_page: input.sourcePage || (isLawyerRequestPage ? '/lawyer-request' : null),
       consent: consentStatus,
     }).select('*').single()
 
@@ -217,11 +364,68 @@ export const leadService = {
       insertRes = await db().from('leads').insert(basePayload).select('*').single()
     }
 
-    const lead = check(insertRes, 'lead')
+    let lead = check(insertRes, 'lead')
+
+    // ─────────────────────────────────────────────────────────────
+    // SEND BRANDED COUNTRY-SPECIFIC EMAIL AFTER DB PERSISTENCE
+    // ─────────────────────────────────────────────────────────────
+    let emailDelivery: LawyerEmailDeliveryState = initialDelivery
+    if (isLawyerRequestPage) {
+      logger.info('[LAWYER_REQUEST][SUBMITTED]', {
+        requestId: lead.public_id,
+        leadId: lead.id,
+        country,
+        region,
+        jurisdictionCode: code,
+        caseId: linkedCase ? linkedCase.id : null,
+        reportId: input.reportId || null,
+        sourcePage: input.sourcePage || '/lawyer-request',
+        submittedAt: lead.created_at || new Date().toISOString(),
+      })
+
+      const deliveryResult = await sendAndRecordLawyerConfirmationEmail(lead, country, region)
+      lead = deliveryResult.lead
+      emailDelivery = deliveryResult.emailDelivery
+    }
+
     if (env.EMAIL_MODE === 'live') {
       emailService.opsNewLead(lead.public_id, region).catch((e) => logger.warn('ops email failed', { message: (e as Error).message }))
     }
-    return { ...leadView(lead), duplicate: false, contactWithinBusinessDays: 2, lawyerWord: country === 'US' ? 'attorney' : 'lawyer' }
+
+    return {
+      ...leadView(lead),
+      duplicate: false,
+      ...(isLawyerRequestPage ? { emailDelivery } : {}),
+      contactWithinBusinessDays: 2,
+      lawyerWord,
+    }
+  },
+
+  /** Safe retry mechanism for failed lawyer-request confirmation emails (never creates duplicate DB rows or re-sends once sent). */
+  async retryConfirmationEmail(idOrPublicId: string) {
+    const clean = String(idOrPublicId || '').trim()
+    if (!clean) throw ApiError.badRequest('Lead ID is required')
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(clean)
+    const lookup = isUuid
+      ? await db().from('leads').select('*').eq('id', clean).maybeSingle()
+      : await db().from('leads').select('*').eq('public_id', clean).maybeSingle()
+
+    if (lookup.error || !lookup.data) throw ApiError.notFound('Lawyer request not found')
+    const leadRow = lookup.data
+    const prior: LawyerEmailDeliveryState | undefined = leadRow.summary?.email_delivery
+    if (prior?.status === 'sent') {
+      return { ...leadView(leadRow), alreadySent: true, emailDelivery: prior }
+    }
+
+    const country: Country = leadRow.country === 'US' ? 'US' : 'CA'
+    const region = leadRow.region_name || (country === 'US' ? 'United States' : 'Canada')
+    const res = await sendAndRecordLawyerConfirmationEmail(leadRow, country, region)
+    return {
+      ...leadView(res.lead),
+      alreadySent: false,
+      emailDelivery: res.emailDelivery,
+    }
   },
 
   async forCase(caseId: string) {

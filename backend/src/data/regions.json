@@ -4070,7 +4070,7 @@
       "code": "US-NY",
       "slug": "new-york",
       "name": "New York",
-      "kicker": "New York · NY WARN (Labor Law 860), Labor Law 191, 195, 198-c and 591",
+      "kicker": "New York · NY WARN (Labor Law 860), Labor Law 190, 191, 193, 195, 198-c, 591 and GOL 5-336",
       "region_rules": [
         {
           "id": "US-NY-F1",
@@ -4211,6 +4211,34 @@
           "fact": "Age-claim releases (OWBPA): 21 days to consider, 45 in a group, 7 days to revoke.",
           "source_id": null,
           "status": "confirmed"
+        },
+        {
+          "id": "US-NY-F10",
+          "topic": "Confidentiality of discrimination claims",
+          "fact": "Keeping the facts confidential must be your choice, and a release cannot make you repay or forfeit the payment for breaking it (General Obligations Law 5-336)",
+          "source_id": "NY-GOL-5-336",
+          "status": "confirmed"
+        },
+        {
+          "id": "US-NY-F11",
+          "topic": "Earned wages and bonus deductions",
+          "fact": "An employer may only deduct from earned wages what the law allows (Labor Law 190 and 193). Whether an unpaid or forfeited bonus counts as earned wages is a question for an attorney",
+          "source_id": "NY-LAB-193",
+          "status": "confirmed"
+        },
+        {
+          "id": "US-NY-D7",
+          "topic": "Confidentiality must be your choice",
+          "fact": "Under General Obligations Law 5-336, non-disclosure of the underlying facts in discrimination, harassment or retaliation claims must be your preference, and a release cannot make you repay the payment or pay damages for breaking it.",
+          "source_id": "NY-GOL-5-336",
+          "status": "confirmed"
+        },
+        {
+          "id": "US-NY-D8",
+          "topic": "Deductions from earned wages and bonuses",
+          "fact": "Labor Law 190 and 193 limit what an employer can deduct or withhold from earned wages. Whether a bonus counts as earned wages under your agreement or plan is a question for an attorney.",
+          "source_id": "NY-LAB-193",
+          "status": "confirmed"
         }
       ],
       "sources": [
@@ -4270,6 +4298,22 @@
           "url": "https://www.nysenate.gov/legislation/laws/LAB/195",
           "status": "verified",
           "checked": "2026-10-25"
+        },
+        {
+          "id": "NY-GOL-5-336",
+          "rule": "New York State Senate (statute text)",
+          "section": "General Obligations Law 5-336, confidentiality of discrimination claims; no repayment or forfeiture for breach",
+          "url": "https://www.nysenate.gov/legislation/laws/GOB/5-336",
+          "status": "verified",
+          "checked": "2026-11-24"
+        },
+        {
+          "id": "NY-LAB-193",
+          "rule": "New York State Senate (statute text)",
+          "section": "Labor Law 190 and 193, wages and deductions from wages",
+          "url": "https://www.nysenate.gov/legislation/laws/LAB/193",
+          "status": "verified",
+          "checked": "2026-11-24"
         }
       ]
     },

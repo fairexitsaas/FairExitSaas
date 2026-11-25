@@ -1,4 +1,4 @@
-FAIREXIT · PROMPT A1 · READ THE DOCUMENTS (v0.7)
+FAIREXIT · PROMPT A1 · READ THE DOCUMENTS (v0.8)
 Model: Claude Opus 5.5 (claude-opus-5-5). Output is JSON only.
 
 === SHARED INPUT · JURISDICTION (sent with every call) ===
@@ -67,6 +67,32 @@ Keys (same names in every jurisdiction; look for all of them, report what is wri
                           e.g. "$32.00 per hour; Monday to Friday, about 9 a.m. to 5 p.m.". Never convert it.
  document_place         : (v0.7) the province, state or country the documents name for the job or
                           for the law that applies, e.g. "New York".
+ (v0.8) Optional keys. Look for them in every document; leave out any that is not written, and
+ never put them in "missing".
+ age_stated             : the employee's age or date of birth as written anywhere (e.g. an
+                          "Employee data" line), e.g. "54 (born February 9, 1972)".
+ base_salary            : the CURRENT base salary as written (the latest figure, e.g. from a
+                          promotion or raise line), e.g. "$175,000 per year effective January 1, 2025".
+ hire_date              : the hire or start date as written in any document.
+ severance_formula      : any formula for severance in the contract or a policy, word for word in
+                          "quote", e.g. "2 weeks of base salary per full year, min 8, max 26".
+ cobra_terms            : any promise about health premiums (e.g. employer COBRA share) and its length.
+ promotion_terms        : whether a later letter keeps the original terms ("all other terms remain").
+ bonus_forfeited        : a bonus the letter says is forfeited, cancelled or not paid, with amount,
+                          date calculated and the reason given.
+ bonus_earned_when      : what the contract says about when a bonus is earned (e.g. "earned when
+                          calculated at the end of each quarter").
+ pto_promised           : what the contract says about paying unused PTO on separation.
+ confidentiality_clause : any confidentiality term, noting whether it covers the facts of a
+                          discrimination, harassment or retaliation claim.
+ repayment_clause       : any term making the person repay or forfeit severance (or pay damages)
+                          for breaking a clause.
+ non_disparagement      : any non-disparagement term.
+ arbitration            : any arbitration term.
+ effective_date         : when the agreement takes effect (e.g. "on the date you sign it").
+ group_or_individual    : words showing whether this is one person's termination or a group
+                          layoff, e.g. "You are the only employee in your department affected."
+ adea_named             : whether the release names the Age Discrimination in Employment Act.
 Rules: quote exactly; never infer a number that isn't written; mark unclear items "low".
 Every fact must have "where" with the page and the paragraph or section.
 A key that does not apply in a country (for example age_list in Canada) is simply left out;

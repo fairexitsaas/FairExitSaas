@@ -391,12 +391,20 @@ export const flowService = {
     if (!card) throw ApiError.notFound(`No open conflict for "${key}"`)
     ctx.check.dismissed = Array.from(new Set([...(ctx.check.dismissed || []), key]))
 
-    if (key === 'years') {
-      const v = body.choice === 'document' ? card.document.value : body.choice === 'answers' ? card.answers.value : body.choice === 'other' ? CP.coerce(ctx, 'years', body.value) : null
-      if (body.choice === 'not_sure') CP.setRow(ctx, 'years', card.answers.value, 'not_sure')
-      else {
-        CP.setRow(ctx, 'years', v, 'confirmed', { user: v })
-        CP.writeBackToAnswers(ctx, 'years', v)
+    if (key === 'years' || key === 'age' || key === 'pay') {
+      const v =
+        body.choice === 'document'
+          ? card.document.value
+          : body.choice === 'answers'
+          ? card.answers.value
+          : body.choice === 'other'
+          ? CP.coerce(ctx, key, body.value)
+          : null
+      if (body.choice === 'not_sure') {
+        CP.setRow(ctx, key, card.answers.value, 'not_sure', { user: card.answers.value, doc: card.document.value })
+      } else {
+        CP.setRow(ctx, key, v, 'confirmed', { user: card.answers.value, doc: card.document.value })
+        CP.writeBackToAnswers(ctx, key, v)
       }
     } else if (body.choice === 'document') {
       CP.setRow(ctx, key, card.document.value, 'confirmed')
@@ -431,6 +439,10 @@ export const flowService = {
     this.assertCheckable(c)
     if (!agreed) throw ApiError.unprocessable('Tick the final agreement to continue')
     const ctx = ctxOf(c)
+    const openMismatch = CP.conflicts(ctx).find((x) => x.key === 'age' || x.key === 'pay')
+    if (openMismatch) {
+      throw ApiError.unprocessable(`Resolve the mismatch for ${openMismatch.title.toLowerCase()} before continuing`)
+    }
     CP.autoConfirmAll(ctx)
     ctx.check.attested = true
     ctx.check.attested_at = new Date().toISOString()
@@ -589,6 +601,10 @@ export const flowService = {
 
     this.assertCheckable(c)
     const ctx = ctxOf(c)
+    const openMismatch = CP.conflicts(ctx).find((x) => x.key === 'age' || x.key === 'pay')
+    if (openMismatch) {
+      throw ApiError.unprocessable(`Resolve the mismatch for ${openMismatch.title.toLowerCase()} before building your report`)
+    }
     const model = CP.buildModel(ctx)
     if (!ctx.check.attested) throw ApiError.unprocessable('Tick the final agreement before building your report')
     if (!model.build.allRequiredConfirmed) throw ApiError.unprocessable(model.build.label)

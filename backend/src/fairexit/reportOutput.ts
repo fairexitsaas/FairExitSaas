@@ -8,6 +8,7 @@
 import fs from 'fs'
 import path from 'path'
 import { fmtLongDate, fmtMoney } from './values'
+import { reportQrSvg, reportLawyerUrl } from './reportQr'
 import type { SourceRow } from './regionData'
 import type { Jurisdiction } from './jurisdictions'
 
@@ -54,7 +55,18 @@ export interface ReportJson {
   }>
   questions: string[]
   next_steps: string[]
+  already_signed?: boolean
   citations_used: string[]
+  sources_used?: Array<{ id: string; short_name: string }>
+  contract_math?: {
+    formula?: string
+    weeks?: number
+    weekly_pay?: number
+    amount?: number
+    offer_weeks?: number | null
+    offer_amount?: number | null
+    math_line?: string
+  } | null
 }
 
 const REQUIRED = ['cover', 'glance', 'confirmed_line', 'checks', 'questions', 'next_steps', 'citations_used'] as const
@@ -65,7 +77,7 @@ export function validateShape(out: any): { ok: boolean; problems: string[]; repo
   if (out.error) return { ok: false, problems: [`model returned error: ${out.error}`], report: out }
   for (const k of REQUIRED) if (out[k] === undefined) problems.push(`missing key: ${k}`)
   if (out.checks && !Array.isArray(out.checks)) problems.push('checks is not an array')
-  for (const k of ['questions', 'next_steps', 'citations_used', 'myths', 'clauses', 'release_check']) {
+  for (const k of ['questions', 'next_steps', 'citations_used', 'myths', 'clauses', 'release_check', 'sources_used']) {
     if (out[k] !== undefined && !Array.isArray(out[k])) problems.push(`${k} is not an array`)
   }
   const report: ReportJson = {
@@ -106,6 +118,20 @@ export function ruleWarnings(
   const warn: string[] = []
   const ids = new Set(allowedSourceIds)
   const cited = new Set<string>(report.citations_used || [])
+  for (const su of report.sources_used || []) {
+    if (su?.id && typeof su.id === 'string') cited.add(su.id)
+  }
+
+  const cm = report.contract_math
+  const contractMathAmounts: number[] = []
+  if (cm && typeof cm === 'object') {
+    for (const v of [cm.weekly_pay, cm.amount, cm.offer_amount]) {
+      if (typeof v === 'number' && Number.isFinite(v)) contractMathAmounts.push(Math.round(v))
+    }
+    if (typeof cm.amount === 'number' && typeof cm.offer_amount === 'number' && Number.isFinite(cm.amount) && Number.isFinite(cm.offer_amount)) {
+      contractMathAmounts.push(Math.round(Math.abs(cm.amount - cm.offer_amount)))
+    }
+  }
 
   const ctx: AllowedContext | undefined = (allowedAmounts as AllowedAmountsList)?.context
 
@@ -134,15 +160,16 @@ export function ruleWarnings(
         const clauseCitesContract = !!(clauseIdxMatch && report.clauses?.[parseInt(clauseIdxMatch[1])]?.source_id === 'DOC-CONTRACT')
         const clauseCitesLetter = !!(clauseIdxMatch && report.clauses?.[parseInt(clauseIdxMatch[1])]?.source_id === 'DOC-LETTER')
 
-        // 1. Contract-stated fields: contract facts, confirmed facts, calculator
+        // 1. Contract-stated fields: contract facts, confirmed facts, calculator, and computed contract_math
         if (
           p.endsWith('.contract_says') ||
           p.endsWith('.contract_note') ||
           p.endsWith('.contract_quote') ||
           p.endsWith('.contract_excerpt') ||
+          p.startsWith('contract_math.') ||
           clauseCitesContract
         ) {
-          const allowedContract = [...ctx.contract, ...ctx.confirmed, ...ctx.calculator]
+          const allowedContract = [...ctx.contract, ...ctx.confirmed, ...ctx.calculator, ...contractMathAmounts]
           validForPath = allowedContract.some((a) => Math.abs(a - n) <= 1)
         }
         // 2. Severance letter fields: letter facts, confirmed facts
@@ -160,9 +187,13 @@ export function ruleWarnings(
           validForPath = ctx.all.some((a) => Math.abs(a - n) <= 1)
         }
         // 4. Statutory entitlements & legal minimums: STRICTLY calculator minimum/range and confirmed facts
-        //    (Contract salary like $128,000 or letter offer $15,000 CANNOT authorize a statutory claim!)
+        //    (plus explicit contract_math amounts in why/questions/glance when contract_math is supplied)
         else {
-          const allowedLegal = [...ctx.calculator, ...ctx.confirmed]
+          const allowedLegal = [
+            ...ctx.calculator,
+            ...ctx.confirmed,
+            ...(p.endsWith('.why') || p.startsWith('questions[') || p === 'glance' ? contractMathAmounts : []),
+          ]
           validForPath = allowedLegal.some((a) => Math.abs(a - n) <= 1)
         }
       } else {
@@ -539,7 +570,19 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
   const clientName = rawName && String(rawName).trim() !== '' && String(rawName).trim() !== 'Client' ? String(rawName).trim() : null
 
   // Weekly pay calculation (Change 12A: annual pay / 52 rounded to cent once at the end)
-  const salaryNum = typeof a.salary === 'number' ? a.salary : typeof a.pay === 'number' ? a.pay : null
+  const cfRows = m.input?.confirmed_facts?.rows || {}
+  const isRowConfirmed = (row: any) =>
+    row && (row.status === 'confirmed' || (row.status === 'corrected' && row.change_ack))
+  const confirmedPayRow = isRowConfirmed(cfRows.pay) ? cfRows.pay : null
+  const confirmedPayNum =
+    confirmedPayRow && confirmedPayRow.value != null && Number.isFinite(Number(confirmedPayRow.value))
+      ? Number(confirmedPayRow.value)
+      : null
+  const confirmedAgeRow = isRowConfirmed(cfRows.age) ? cfRows.age : null
+  const confirmedAgeVal = confirmedAgeRow && confirmedAgeRow.value != null ? confirmedAgeRow.value : null
+  const ageStr = (confirmedAgeVal ?? a.age) != null ? String(confirmedAgeVal ?? a.age) : null
+
+  const salaryNum = confirmedPayNum ?? (typeof a.salary === 'number' ? a.salary : typeof a.pay === 'number' ? a.pay : null)
   const weeklyPayNum = salaryNum ? Math.round((salaryNum / 52) * 100) / 100 : null
 
   // 2. Dates
@@ -559,7 +602,7 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
   if (!yearsStr) yearsStr = 'Not stated'
 
   // 5. Pay / Salary
-  let salaryStr = a.salary ? `$${Number(a.salary).toLocaleString()}${a.pay_unit ? ` / ${a.pay_unit}` : ' / year'}` : null
+  let salaryStr = salaryNum ? `$${Number(salaryNum).toLocaleString()}${a.pay_unit ? ` / ${a.pay_unit}` : ' / year'}` : null
   if (!salaryStr) {
     const payCheck = r.checks?.find((c) => /pay|salary|wage/i.test(c.topic))
     const sm = payCheck?.why ? payCheck.why.match(/\$\s?([0-9,]+(?:\s*(?:a|per)\s*year)?)/i) : null
@@ -631,6 +674,7 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
   return {
     clientName,
     dateFormatted,
+    ageStr,
     employerName,
     yearsStr,
     salaryStr,
@@ -663,7 +707,18 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
   const heroBandSrc = getHeroBandBase64()
   const logoSrc = getLogoBase64()
-  const qrSvgCode = getQrSvg()
+  let qrSvgCode = ''
+  let qrUrl = ''
+  try {
+    if (m.reportId) {
+      qrUrl = reportLawyerUrl(m.reportId)
+      qrSvgCode = reportQrSvg(m.reportId)
+    } else {
+      qrSvgCode = getQrSvg()
+    }
+  } catch {
+    qrSvgCode = getQrSvg()
+  }
 
   const dyn = deriveDynamicReportValues(r, m)
 
@@ -870,10 +925,10 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
             <span class="glance-col-label">${isUS ? 'Service' : 'Years of service'}</span>
             <span class="glance-col-val bold">${esc(dyn.yearsStr)}</span>
           </div>` : ''}
-          ${isUS && a.age ? `
+          ${isUS && dyn.ageStr ? `
             <div class="glance-row">
               <span class="glance-col-label">Age</span>
-              <span class="glance-col-val bold">${esc(String(a.age))}</span>
+              <span class="glance-col-val bold">${esc(dyn.ageStr)}</span>
             </div>` : ''}
           ${dyn.salaryStr && dyn.salaryStr !== 'Not stated' ? `
           <div class="glance-row">
@@ -1111,7 +1166,9 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
     // 1. Parse employee age (ADEA/OWBPA statutory protection applies to employees aged 40 and older)
     // Accept a validated numeric age; reject ambiguous text (e.g. "under 40", "unknown") or unrelated numbers.
-    const rawAge = a.age ?? a.raw?.age ?? m.input?.answers?.age ?? m.input?.confirmed_facts?.rows?.age?.value
+    const cfAgeRow = m.input?.confirmed_facts?.rows?.age
+    const confirmedAge = cfAgeRow && (cfAgeRow.status === 'confirmed' || (cfAgeRow.status === 'corrected' && cfAgeRow.change_ack)) ? cfAgeRow.value : undefined
+    const rawAge = confirmedAge ?? a.age ?? a.raw?.age ?? m.input?.answers?.age
     let ageNum: number | null = null
     if (typeof rawAge === 'number') {
       if (Number.isInteger(rawAge) && rawAge >= 16 && rawAge <= 120) {
@@ -1517,7 +1574,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     const interpretationText = highestFactors.length > 0
       ? `Your chart reaches furthest on <b>${highestFactors.join(' and ')}</b>${heavy === 2 ? ', two of the heaviest factors' : heavy === 1 && highestFactors.length === 1 ? ', one of the heaviest factors' : ''}.${reachText}`
       : `Your chart stays close to the centre on every factor.${reachText}`
-    const salaryNum = Number(a.salary)
+    const salaryNum = dyn.salaryNum ?? Number(a.salary)
     const payLine = Number.isFinite(salaryNum) && salaryNum > 0
       ? `${money(salaryNum)} a year (${money(salaryNum / 12)} a month)`
       : dyn.salaryStr
@@ -1978,6 +2035,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   const checkedDates = m.sources.map((x) => x.checked).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)).sort()
   const checkedLine = checkedDates.length ? ` (checked ${esc(fmtLongDate(checkedDates[checkedDates.length - 1]))})` : ''
 
+  const shortNameById = new Map<string, string>()
+  for (const su of r.sources_used || []) {
+    if (su?.id && su?.short_name) shortNameById.set(su.id, su.short_name)
+  }
+
   const s6Html = `
     <div class="page sources-page">
       <div class="section-kicker">SOURCES</div>
@@ -2000,7 +2062,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
               <td>${esc(row.how)}</td>
               <td>
                 <div class="src-id-title">${esc(row.src ? `${row.src.rule} · ${String(row.src.section || '').split(' (')[0]}` : row.srcText || '')}</div>
-                ${row.src?.url ? `<a class="src-url" href="${esc(row.src.url)}">${esc(sourceLabel(row.src))}</a>` : ''}
+                ${row.src?.url ? `<a class="src-url" href="${esc(row.src.url)}">${esc((row.src.id && shortNameById.get(row.src.id)) || sourceLabel(row.src))}</a>` : ''}
               </td>
             </tr>
           `).join('')}
@@ -2036,7 +2098,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="qr-box">
             ${qrSvgCode}
           </div>
-          <div class="qr-sub">Report ID <b>${esc(m.reportId)}</b></div>
+          <div class="qr-sub">Report ID <b>${esc(m.reportId)}</b>${qrUrl ? `<br/><a class="qr-link" href="${esc(qrUrl)}" style="color:#0D2B23;font-size:6.5pt;text-decoration:none;">${esc(displayUrl(qrUrl))}</a>` : ''}</div>
         </div>
       </div>
 

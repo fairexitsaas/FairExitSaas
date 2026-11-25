@@ -1,0 +1,20 @@
+/* Fix 4 styles. All class names start with fx-mm so they don't clash with the site. Swap colours for the site's tokens. */
+.fx-mm { border: 0; margin: 0; padding: 0; }
+.fx-mm__q { font-size: 1.375rem; font-weight: 700; color: #062c55; margin-bottom: .5rem; }
+.fx-mm__help { margin: 0 0 1rem; color: #5a6b78; }
+.fx-mm__tiles { display: grid; gap: .75rem; grid-template-columns: 1fr 1fr; }
+@media (max-width: 560px) { .fx-mm__tiles { grid-template-columns: 1fr; } }
+.fx-mm-tile { display: flex; flex-direction: column; gap: .25rem; text-align: left; padding: 1rem;
+  border: 2px solid #d8d3c8; border-radius: 12px; background: #fff; color: #062c55; cursor: pointer; min-height: 96px; transition: border-color .15s, background-color .15s; }
+.fx-mm-tile:hover { border-color: #0c8f72; }
+.fx-mm-tile:focus-visible { outline: 3px solid #0eb28d; outline-offset: 2px; }
+.fx-mm-tile--on { border-color: #0c8f72; background: #eef8f3; }
+.fx-mm-tile__title { font-size: .875rem; color: #5a6b78; font-weight: 600; }
+.fx-mm-tile__value { font-size: 1.5rem; font-weight: 700; color: #062c55; }
+.fx-mm-tile__note { font-size: .8125rem; color: #5a6b78; font-style: italic; }
+.fx-mm-step__count { font-size: .875rem; color: #5a6b78; font-weight: 700; margin: 0 0 .5rem; }
+.fx-mm-continue { margin-top: 1.25rem; width: 100%; padding: .9rem; border-radius: 10px; border: 0;
+  background: #0eb28d; color: #fff; font-weight: 700; font-size: 1rem; cursor: pointer; min-height: 44px; transition: background-color .15s; }
+.fx-mm-continue:hover:not(:disabled) { background: #0c8f72; }
+.fx-mm-continue:disabled { background: #c9d1d7; color: #fff; cursor: not-allowed; }
+.fx-mm-continue:focus-visible { outline: 3px solid #062c55; outline-offset: 2px; }

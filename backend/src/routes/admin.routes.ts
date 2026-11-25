@@ -9,6 +9,7 @@ import { adminService, toCsv } from '../services/admin.service'
 import { caseService } from '../services/case.service'
 import { flowService } from '../services/flow.service'
 import { jobsService } from '../services/jobs.service'
+import { leadService } from '../services/lead.service'
 import { promptInfo } from '../fairexit/prompts'
 
 /** Ops dashboard phase 1. Bearer token of a user whose profiles.role = 'ADMIN'. */
@@ -43,6 +44,7 @@ router.get('/enquiries', validate({ query: V.adminListQuery }), h(async (req, re
   offset: Number(req.query.offset) || 0,
 }), 'lawyer-enquiries')))
 router.patch('/leads/:id', validate({ params: V.idParams, body: V.adminLeadPatch }), h(async (req, res) => ApiResponse.ok(res, await adminService.updateLead(req.params.id, req.body))))
+router.post('/leads/:id/retry-email', validate({ params: V.idParams }), h(async (req, res) => ApiResponse.ok(res, await leadService.retryConfirmationEmail(req.params.id))))
 router.get('/reports', validate({ query: V.adminListQuery }), h(async (req, res) => out(req, res, await adminService.reports(req.query.country as any), 'reports')))
 router.get('/cases/:id', validate({ params: V.idParams }), h(async (req, res) => ApiResponse.ok(res, await adminService.caseDetail(req.params.id))))
 router.post('/cases/:id/retry', validate({ params: V.idParams }), h(async (req, res) => {

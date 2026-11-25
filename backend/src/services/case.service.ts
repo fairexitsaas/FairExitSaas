@@ -103,6 +103,19 @@ export const caseService = {
     return this.healStale(row)
   },
 
+  /** Looks up a ready, non-expired case by its human-facing report_id (e.g. RPT-XXXXXX). */
+  async getByReportId(reportId: string): Promise<CaseRow | null> {
+    const clean = String(reportId || '').trim()
+    if (!/^[A-Za-z0-9_-]{3,64}$/.test(clean)) return null
+    const res = await db().from('cases').select('*').eq('report_id', clean).maybeSingle()
+    if (res.error || !res.data) return null
+    const row = res.data as CaseRow
+    if (row.report_delete_after && new Date(row.report_delete_after).getTime() <= Date.now()) {
+      return null
+    }
+    return row
+  },
+
   /** A job that died with the server or timed out (> 3.5 min) becomes "failed" so the person can retry. */
   async healStale(row: CaseRow): Promise<CaseRow> {
     if ((row.status === 'reading' || row.status === 'building') && row.job_started_at && Date.now() - new Date(row.job_started_at).getTime() > STALE_JOB_MS) {

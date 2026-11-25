@@ -11,6 +11,9 @@ import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 import ChangeJurisdictionModal from "@/components/report/ChangeJurisdictionModal";
+import { MismatchStep, findMismatches, type Rows } from "@/components/report/mismatch-row";
+import "@/components/report/mismatch-row.css";
+import { buildMismatchRows, extractDocAge, extractDocAnnualPay } from "@/lib/confirmation-mismatch";
 
 interface CanadaReviewPageProps {
   caseId?: string | null;
@@ -273,6 +276,14 @@ export default function CanadaReviewPage({
   } | null>(null);
   const [locationMismatchDismissed, setLocationMismatchDismissed] = useState(false);
   const [showChangeRegionModal, setShowChangeRegionModal] = useState(false);
+
+  // Round 2 Fix 3: Age & annual pay mismatch resolution state
+  const [reviewLoaded, setReviewLoaded] = useState<boolean>(() => !(caseId || cs?.id));
+  const [mismatchRows, setMismatchRows] = useState<Rows>({});
+  const [mismatchesResolved, setMismatchesResolved] = useState<boolean>(false);
+  const [mismatchSaving, setMismatchSaving] = useState<boolean>(false);
+  const [mismatchError, setMismatchError] = useState<string>("");
+  const resolvedLocallyRef = useRef<boolean>(false);
 
 
   // Resolved intake answers (from server case answers or client storage)
@@ -634,6 +645,22 @@ export default function CanadaReviewPage({
       const hadBonus = isBonusInOtherPay(activeAnswers, data);
       setHasBonusQuestion(hadBonus);
 
+      // 3b. Detect age & annual pay mismatches (Round 2 Fix 3)
+      const docAge = extractDocAge(facts, false);
+      const docPay = extractDocAnnualPay(facts, false);
+      if (!resolvedLocallyRef.current) {
+        const mmRows = buildMismatchRows({
+          answers: activeAnswers,
+          data,
+          facts,
+          checkRows,
+          conflicts,
+          isUS: false,
+        });
+        setMismatchRows(mmRows);
+        setMismatchesResolved(findMismatches(mmRows).length === 0);
+      }
+
       // 4. Update items from extracted facts and review rows
       const allModelRows: any[] = [];
       if (res.reviewModel?.groups) {
@@ -713,7 +740,16 @@ export default function CanadaReviewPage({
           }
 
           if (checkRow) {
-            if (checkRow.status === 'confirmed') confirmed = true;
+            if (checkRow.status === 'confirmed') {
+              confirmed = true;
+              if (checkRow.value !== null && checkRow.value !== undefined && checkRow.value !== '') {
+                if (item.id === 'age') val = String(checkRow.value);
+                else if (item.id === 'salary') {
+                  const n = Number(String(checkRow.value).replace(/[^0-9.]/g, ''));
+                  val = Number.isFinite(n) && n > 0 ? `$${Math.round(n).toLocaleString()}` : String(checkRow.value);
+                }
+              }
+            }
             if (checkRow.status === 'corrected') {
               userChanged = true;
               val = String(checkRow.user_value ?? checkRow.value);
@@ -724,6 +760,14 @@ export default function CanadaReviewPage({
             val = String(correction.user_value);
             userChangeAck = !!correction.change_ack;
             if (correction.status === 'confirmed') confirmed = true;
+          }
+
+          if (!checkRow && !correction) {
+            if (item.id === 'age' && docAge) {
+              origVal = String(docAge.value);
+            } else if (item.id === 'salary' && docPay) {
+              origVal = `$${Math.round(docPay.value).toLocaleString()}`;
+            }
           }
 
           if (val && val.toLowerCase().includes('no date') && val.length > 25) {
@@ -747,7 +791,7 @@ export default function CanadaReviewPage({
           };
         })
       );
-    }).catch((e) => console.warn('Could not load review data:', e));
+    }).catch((e) => console.warn('Could not load review data:', e)).finally(() => setReviewLoaded(true));
   }, [caseId, cs, intakeOfferNum]);
 
   // Track changes made by user
@@ -782,7 +826,85 @@ export default function CanadaReviewPage({
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
   const isAllConfirmed = remainingCount === 0;
-  const canBuild = isAllConfirmed && declaredCorrect;
+  const activeMismatches = findMismatches(mismatchRows);
+  const needsMismatchStep = activeMismatches.length > 0 && !mismatchesResolved;
+  const canBuild = isAllConfirmed && declaredCorrect && !needsMismatchStep;
+
+  const handleMismatchesDone = async (fixed: Rows) => {
+    setMismatchSaving(true);
+    setMismatchError("");
+    const activeCaseId = caseId || cs?.id;
+    const resolvedAge = fixed.age?.value != null ? Number(String(fixed.age.value).replace(/[^0-9]/g, "")) : null;
+    const resolvedPay = fixed.annual_pay?.value != null ? Number(String(fixed.annual_pay.value).replace(/[^0-9.]/g, "")) : null;
+
+    try {
+      if (activeCaseId) {
+        if (fixed.age && (fixed.age.status === "confirmed_from_document" || fixed.age.status === "confirmed_by_user")) {
+          const choice = fixed.age.status === "confirmed_from_document" ? "document" : "answers";
+          try {
+            await fairexit.resolveConflict(activeCaseId, "age", choice);
+          } catch {
+            if (resolvedAge !== null && Number.isFinite(resolvedAge)) {
+              await fairexit.saveReviewData(activeCaseId, { key: "age", action: "change", value: resolvedAge });
+            }
+          }
+        }
+        if (fixed.annual_pay && (fixed.annual_pay.status === "confirmed_from_document" || fixed.annual_pay.status === "confirmed_by_user")) {
+          const choice = fixed.annual_pay.status === "confirmed_from_document" ? "document" : "answers";
+          try {
+            await fairexit.resolveConflict(activeCaseId, "pay", choice);
+          } catch {
+            if (resolvedPay !== null && Number.isFinite(resolvedPay)) {
+              await fairexit.saveReviewData(activeCaseId, { key: "pay", action: "change", value: resolvedPay });
+            }
+          }
+        }
+      }
+
+      const storagePatch: Partial<ReportInputs> = {};
+      if (resolvedAge !== null && Number.isFinite(resolvedAge)) storagePatch.age = resolvedAge;
+      if (resolvedPay !== null && Number.isFinite(resolvedPay)) storagePatch.salary = resolvedPay;
+      if (Object.keys(storagePatch).length > 0) {
+        saveReportInputs(storagePatch);
+      }
+
+      setItems((prev) =>
+        prev.map((item) => {
+          if (item.id === "age" && resolvedAge !== null && Number.isFinite(resolvedAge)) {
+            const fromDoc = fixed.age?.status === "confirmed_from_document";
+            return {
+              ...item,
+              value: String(resolvedAge),
+              source: fromDoc ? (fixed.age.source === "contract" ? "Your contract" : "Your letter") : "From your answers",
+              confirmed: true,
+              userChanged: false,
+              userChangeAck: false,
+            };
+          }
+          if (item.id === "salary" && resolvedPay !== null && Number.isFinite(resolvedPay)) {
+            const fromDoc = fixed.annual_pay?.status === "confirmed_from_document";
+            return {
+              ...item,
+              value: `$${Math.round(resolvedPay).toLocaleString()}`,
+              source: fromDoc ? (fixed.annual_pay.source === "contract" ? "Your contract" : "Your letter") : "From your answers",
+              confirmed: true,
+              userChanged: false,
+              userChangeAck: false,
+            };
+          }
+          return item;
+        })
+      );
+
+      resolvedLocallyRef.current = true;
+      setMismatchRows(fixed);
+      setMismatchesResolved(true);
+    } catch (e) {
+      setMismatchError(e instanceof Error ? e.message : "Could not save your selection. Please try again.");
+    } finally {
+      setMismatchSaving(false);
+    }
+  };
 
   // ── Handlers for Items ──
   const toggleConfirm = (id: string) => {
@@ -1277,9 +1399,25 @@ export default function CanadaReviewPage({
             We read your documents
           </div>
 
-          <h1 className="font-serif font-[500] text-[24px] sm:text-[27px] leading-[1.15] text-[#062C55] tracking-[-0.5px] mb-3">
-            Check everything your report will use
-          </h1>
+          {!reviewLoaded ? (
+            <div className="py-10 flex items-center gap-3 text-[#062C55] font-semibold">
+              <span className="inline-block w-5 h-5 rounded-full border-[3px] border-[#C7E6D6] border-t-[#0EB28D] animate-spin" />
+              <span>Loading what we read…</span>
+            </div>
+          ) : needsMismatchStep ? (
+            <div>
+              {mismatchError && (
+                <div role="alert" className="mb-4 rounded-xl bg-[#fbeceb] text-[#a3231f] px-3.5 py-2.5 text-[13.5px]">
+                  {mismatchError}
+                </div>
+              )}
+              <MismatchStep rows={mismatchRows} busy={mismatchSaving} onDone={handleMismatchesDone} />
+            </div>
+          ) : (
+            <>
+              <h1 className="font-serif font-[500] text-[24px] sm:text-[27px] leading-[1.15] text-[#062C55] tracking-[-0.5px] mb-3">
+                Check everything your report will use
+              </h1>
 
           <p className="font-sans font-normal text-[15px] sm:text-[15.5px] leading-[24px] text-[#17242F] mb-6">
             We&apos;ve read your letter and contract. Before we build your report, check that everything we found is right. Your report is built only on what you confirm here. About 2 minutes.
@@ -1965,6 +2103,8 @@ export default function CanadaReviewPage({
               )}
             </button>
           </div>
+            </>
+          )}
         </div>
       </main>
 

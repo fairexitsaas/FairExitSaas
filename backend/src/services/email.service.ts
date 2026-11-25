@@ -99,6 +99,84 @@ function getReportEmailTemplate(country: string): string {
   return isCanada ? INLINE_REPORT_EMAIL_CA : INLINE_REPORT_EMAIL_US
 }
 
+const INLINE_LAWYER_REQUEST_EMAIL_CA = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light">
+<title>We got your request</title>
+<style>@media (max-width:620px){.wrap{width:100%!important}.pad{padding:24px 20px!important}h1{font-size:26px!important}}</style></head>
+<body style="margin:0;padding:0;background:#F6F4EF;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">We got your request to talk to a lawyer.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F6F4EF" style="background:#F6F4EF;"><tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;">
+<tr><td style="padding:0 4px 18px 4px;"><img src="https://www.fairexit.io/email/fairexit-logo@2x.png" width="160" height="39" alt="FairExit" style="display:block;border:0;width:160px;height:auto;"></td></tr>
+<tr><td class="pad" bgcolor="#FFFFFF" style="background:#FFFFFF;border:1px solid #E4E0D6;border-radius:14px;padding:36px 40px;">
+<h1 style="margin:0 0 14px 0;font-family:Newsreader,Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;font-weight:600;color:#0D2B23;">We got your request</h1>
+<p style="margin:0 0 20px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:#17242F;">Hi [First name], thanks. We'll pass your details and your summary to a lawyer licensed in [Province].</p><p style="margin:0 0 20px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:#17242F;">You won't need to explain everything again.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;border-top:1px solid #E4E0D6;"><tr><td style="padding-top:22px;font-family:Newsreader,Georgia,'Times New Roman',serif;font-size:19px;font-weight:600;color:#0D2B23;">What happens next</td></tr></table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;"><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#0EB28D;width:22px;">1</td>
+<td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">We send your details to one lawyer in [Province].</td></tr><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#0EB28D;width:22px;">2</td>
+<td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">If they can help, they contact you by phone or email.</td></tr><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#0EB28D;width:22px;">3</td>
+<td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">You decide whether to go further. Connecting is free.</td></tr></table>
+<p style="margin:10px 0 0 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#5B6670;">Questions, or want to cancel your request? Just reply to this email.</p>
+</td></tr>
+<tr><td style="padding:22px 8px 0 8px;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:12.5px;line-height:1.55;color:#5B6670;" align="center">
+<span style="font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;color:#0EB28D;">Know your worth. Challenge your severance offer.</span><br>
+General information, not legal advice. FairExit is not a law firm, and only a licensed lawyer can tell you what applies to you.<br>
+<a href="mailto:support@fairexit.io" style="color:#0D2B23;">support@fairexit.io</a> · <a href="https://fairexit.io" style="color:#0D2B23;">fairexit.io</a></td></tr>
+</table></td></tr></table></body></html>`
+
+const INLINE_LAWYER_REQUEST_EMAIL_US = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light">
+<title>We got your request</title>
+<style>@media (max-width:620px){.wrap{width:100%!important}.pad{padding:24px 20px!important}h1{font-size:26px!important}}</style></head>
+<body style="margin:0;padding:0;background:#F6F4EF;">
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">We got your request to talk to an attorney.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F6F4EF" style="background:#F6F4EF;"><tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" class="wrap" width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;">
+<tr><td style="padding:0 4px 18px 4px;"><img src="https://www.fairexit.io/email/fairexit-logo@2x.png" width="160" height="39" alt="FairExit" style="display:block;border:0;width:160px;height:auto;"></td></tr>
+<tr><td class="pad" bgcolor="#FFFFFF" style="background:#FFFFFF;border:1px solid #E4E0D6;border-radius:14px;padding:36px 40px;">
+<h1 style="margin:0 0 14px 0;font-family:Newsreader,Georgia,'Times New Roman',serif;font-size:30px;line-height:1.2;font-weight:600;color:#0D2B23;">We got your request</h1>
+<p style="margin:0 0 20px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:#17242F;">Hi [First name], thanks. We'll pass your details and your summary to an attorney licensed in [State].</p><p style="margin:0 0 20px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:#17242F;">You won't need to explain everything again.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;border-top:1px solid #E4E0D6;"><tr><td style="padding-top:22px;font-family:Newsreader,Georgia,'Times New Roman',serif;font-size:19px;font-weight:600;color:#0D2B23;">What happens next</td></tr></table>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;"><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#0EB28D;width:22px;">1</td>
+<td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">We send your details to one attorney in [State].</td></tr><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#0EB28D;width:22px;">2</td>
+<td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">If they can help, they contact you by phone or email.</td></tr><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#0EB28D;width:22px;">3</td>
+<td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">You decide whether to go further. Connecting is free.</td></tr></table>
+<p style="margin:10px 0 0 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#5B6670;">Questions, or want to cancel your request? Just reply to this email.</p>
+</td></tr>
+<tr><td style="padding:22px 8px 0 8px;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:12.5px;line-height:1.55;color:#5B6670;" align="center">
+<span style="font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:14px;font-weight:700;color:#0EB28D;">Know your worth. Challenge your severance offer.</span><br>
+General information, not legal advice. FairExit is not a law firm, and only a licensed attorney can tell you what applies to you.<br>
+<a href="mailto:support@fairexit.io" style="color:#0D2B23;">support@fairexit.io</a> · <a href="https://fairexit.io" style="color:#0D2B23;">fairexit.io</a></td></tr>
+</table></td></tr></table></body></html>`
+
+function escEmailHtml(v: string): string {
+  return String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+}
+
+function getLawyerRequestEmailTemplate(country: string): string {
+  const isCanada = country === 'CA'
+  const filename = isCanada ? 'lawyer-request-email-CA.html' : 'lawyer-request-email-US.html'
+  const candidates = [
+    path.resolve(__dirname, '..', '..', 'assets', 'emails', filename),
+    path.resolve(process.cwd(), 'assets', 'emails', filename),
+    path.resolve(process.cwd(), 'backend', 'assets', 'emails', filename),
+    path.resolve(process.cwd(), 'codebase', '2026-11-24 Fixes round 2', 'Lawyer request email', filename),
+    path.resolve(process.cwd(), '..', 'codebase', '2026-11-24 Fixes round 2', 'Lawyer request email', filename),
+    path.resolve(__dirname, '..', '..', '..', 'codebase', '2026-11-24 Fixes round 2', 'Lawyer request email', filename),
+  ]
+
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p)) {
+        return fs.readFileSync(p, 'utf-8')
+      }
+    } catch {}
+  }
+  return isCanada ? INLINE_LAWYER_REQUEST_EMAIL_CA : INLINE_LAWYER_REQUEST_EMAIL_US
+}
+
 async function send(
   to: string,
   subject: string,
@@ -307,5 +385,29 @@ export const emailService = {
     const toEmail = env.OPS_EMAIL || 'support@fairexit.io'
     if (env.EMAIL_MODE !== 'live' || !toEmail) return Promise.resolve({ sent: false, reason: env.EMAIL_MODE !== 'live' ? 'email_mode_mock' : 'no_ops_email' })
     return send(toEmail, `New lawyer request ${publicId} (${region})`, `A new lawyer request ${publicId} for ${region} is waiting in the ops dashboard.`)
+  },
+
+  async lawyerRequestConfirmation(params: {
+    to: string
+    name: string
+    country: 'CA' | 'US'
+    region: string
+    requestId?: string
+  }): Promise<{ sent: boolean; error?: string; mocked?: boolean; reason?: string; id?: string }> {
+    if (!params.to) return { sent: false, reason: 'no_email' }
+    const isCanada = params.country === 'CA'
+    const lawyerWord = isCanada ? 'lawyer' : 'attorney'
+    const firstName = (params.name || '').trim().split(/\s+/)[0] || 'there'
+    const regionLabel = (params.region || '').trim() || (isCanada ? 'Canada' : 'the United States')
+
+    let htmlContent = getLawyerRequestEmailTemplate(params.country)
+    htmlContent = htmlContent
+      .replace(/\[First name\]/g, escEmailHtml(firstName))
+      .replace(/\[Province\]/g, escEmailHtml(regionLabel))
+      .replace(/\[State\]/g, escEmailHtml(regionLabel))
+
+    const textContent = `Hi ${firstName}, thanks. We'll pass your details and your summary to ${isCanada ? 'a' : 'an'} ${lawyerWord} licensed in ${regionLabel}.\n\nYou won't need to explain everything again.\n\nWhat happens next:\n1. We send your details to one ${lawyerWord} in ${regionLabel}.\n2. If they can help, they contact you by phone or email.\n3. You decide whether to go further. Connecting is free.\n\nQuestions, or want to cancel your request? Just reply to this email.\n\n--\nKnow your worth. Challenge your severance offer.\nGeneral information, not legal advice. FairExit is not a law firm, and only a licensed ${lawyerWord} can tell you what applies to you.\nsupport@fairexit.io · fairexit.io`
+
+    return send(params.to, 'We got your request', textContent, undefined, htmlContent)
   },
 }

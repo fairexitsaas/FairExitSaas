@@ -135,6 +135,7 @@ export function createFairExitClient(opts: FairExitClientOptions) {
     // lawyer request
     askLawyer: (body: {
       caseId?: string
+      reportId?: string
       token?: string
       country?: Country
       jurisdictionCode?: string

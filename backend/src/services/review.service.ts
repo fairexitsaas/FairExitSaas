@@ -38,6 +38,8 @@ function normalizeReviewKey(key: string, country?: string): string {
   const map: Record<string, string> = {
     salary: 'pay',
     pay: 'pay',
+    annual_pay: 'pay',
+    base_salary: 'pay',
     howEnded: 'ended',
     ended: 'ended',
     offerMoney: 'offer_amount',
@@ -177,7 +179,15 @@ export const reviewService = {
     let rowResult: any = null
     if (input.key) {
       const targetKey = normalizeReviewKey(input.key, c.country)
-      const action = input.action || 'change'
+      const requestedAction = input.action || 'change'
+      // For answer-sourced rows (age, pay), confirming with an explicit value should persist that value and sync answers
+      const action =
+        requestedAction === 'confirm' &&
+        (targetKey === 'age' || targetKey === 'pay') &&
+        input.value !== undefined &&
+        !isPlaceholderValue(input.value)
+          ? 'change'
+          : requestedAction
 
       // When state or province is changed via review key, trigger changeJurisdiction to ensure
       // recalculation of jurisdiction, location mismatch and invalidation of stale report outputs

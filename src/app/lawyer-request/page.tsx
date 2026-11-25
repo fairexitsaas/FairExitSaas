@@ -15,6 +15,7 @@ function LawyerRequestContent() {
   const searchParams = useSearchParams();
   const urlCountry = searchParams?.get("country")?.toUpperCase();
   const urlCaseId = searchParams?.get("case");
+  const urlReportId = searchParams?.get("report");
   const urlToken = searchParams?.get("t");
 
   const [fullName, setFullName] = useState("");
@@ -168,6 +169,7 @@ function LawyerRequestContent() {
       }
       await fairexit.askLawyer({
         caseId: activeCaseId || undefined,
+        reportId: urlReportId || undefined,
         token: activeToken,
         country: (caseContext?.country as CountryCode) || country,
         jurisdictionCode: caseContext?.jurisdiction_code || undefined,
@@ -276,6 +278,19 @@ function LawyerRequestContent() {
                 </div>
                 <p className="text-xs sm:text-[13px] text-[#416155] leading-relaxed">
                   We found your previous severance check ({caseContext.jurisdiction?.name || (isCanada ? "Canada" : "United States")}{caseContext.answers?.years ? ` · ${caseContext.answers.years} yrs service` : ""}{caseContext.answers?.salary ? ` · $${Math.round(Number(caseContext.answers.salary)).toLocaleString()}/yr` : ""}). This case summary will be securely attached to your inquiry.
+                </p>
+              </div>
+            )}
+            {!caseContext && urlReportId && (
+              <div className="mb-6 p-4 rounded-xl bg-[#F0F7F4] border border-[#CDE5DB] text-left">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="w-2 h-2 rounded-full bg-[#0EB28D]" />
+                  <span className="font-sans font-bold text-xs uppercase tracking-wider text-[#062C55]">
+                    Report Reference Linked
+                  </span>
+                </div>
+                <p className="text-xs sm:text-[13px] text-[#416155] leading-relaxed">
+                  Report ID <strong className="text-[#062C55]">{urlReportId}</strong> will be referenced with your consultation request. Please confirm your contact details below.
                 </p>
               </div>
             )}

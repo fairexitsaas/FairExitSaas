@@ -157,6 +157,7 @@ export const deviceSchema = z.object({
 
 export const leadSchema = z.object({
   caseId: uuid.optional(),
+  reportId: z.string().trim().regex(/^[A-Za-z0-9_-]{3,64}$/).optional(),
   token: z.string().optional(),
   country: country.optional(),
   jurisdictionCode: z.string().max(40).optional(),

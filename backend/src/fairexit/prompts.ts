@@ -14,7 +14,7 @@ import path from 'path'
 import crypto from 'crypto'
 import type { Jurisdiction } from './jurisdictions'
 
-export const PROMPT_VERSION = 'v0.7'
+export const PROMPT_VERSION = 'v0.8'
 
 export type PromptKey = 'A1' | 'A2' | 'B'
 

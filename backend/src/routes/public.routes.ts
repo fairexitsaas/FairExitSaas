@@ -10,6 +10,7 @@ import { regionPage, REGION_DATA_META } from '../fairexit/regionData'
 import { computeFreeResult } from '../fairexit/freeCheck'
 import { RULES_VERSION, RULES_LAST_UPDATED, getRule } from '../fairexit/severanceRules'
 import { PROMPT_VERSION } from '../fairexit/prompts'
+import { caseService } from '../services/case.service'
 
 /** Public reference data. No auth. */
 const router = Router()
@@ -47,5 +48,25 @@ router.get('/jurisdictions/:code', (req: Request, res: Response) => {
 router.post('/rules/estimate', validate({ body: V.estimateSchema }), h(async (req: Request, res: Response) =>
   ApiResponse.ok(res, computeFreeResult(req.body.country, req.body.answers)),
 ))
+
+/**
+ * Safe non-PII existence check for QR code scans (/r/[id]).
+ * Returns only validity, reportId, and country — never customer PII, case IDs, or report content.
+ */
+router.get('/reports/:reportId/qr-check', h(async (req: Request, res: Response) => {
+  const reportId = String(req.params.reportId || '').trim()
+  if (!/^[A-Za-z0-9_-]{3,64}$/.test(reportId)) {
+    throw ApiError.badRequest('Invalid report ID format')
+  }
+  const c = await caseService.getByReportId(reportId)
+  if (!c || c.status !== 'ready' || !c.report_ready_at || !c.report_id) {
+    return ApiResponse.ok(res, { valid: false, reportId: null })
+  }
+  return ApiResponse.ok(res, {
+    valid: true,
+    reportId: c.report_id,
+    country: c.country,
+  })
+}))
 
 export default router

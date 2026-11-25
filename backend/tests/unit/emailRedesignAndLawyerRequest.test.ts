@@ -3,6 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import { emailService } from '../../src/services/email.service'
 import { leadService } from '../../src/services/lead.service'
+import * as dbModule from '../../src/config/db'
 import { caseService, hashToken } from '../../src/services/case.service'
 import { caseAccess } from '../../src/middleware/caseAccess'
 import { caseController } from '../../src/controllers/case.controller'
@@ -421,106 +422,214 @@ describe('FairExit: Report Email Redesign, Lawyer Request & UI Corrections', () 
     })
   })
 
-  describe('3. Lawyer Request Page — Submission handling & logging', () => {
-    it('records lawyer request in backend logs ONLY, without inserting into DB or sending email', async () => {
-      const loggerSpy = vi.spyOn(logger, 'info')
-      const opsEmailSpy = vi.spyOn(emailService, 'opsNewLead')
+  describe('3. Lawyer Request Page — DB Persistence, Branded Emails & Deduplication', () => {
+    function createInMemoryLeadsDb(initialRows: any[] = []) {
+      const store: any[] = [...initialRows]
+      let seq = 1
+      const fromMock = (table: string) => {
+        if (table !== 'leads') throw new Error(`Unexpected table: ${table}`)
+        const filters: Array<(r: any) => boolean> = []
+        let limitN = Infinity
+        let updatePayload: any = null
+        let insertPayload: any = null
 
-      const result = await leadService.create({
-        caseRow: sampleCanadaCase,
-        caseId: sampleCanadaCase.id,
-        country: 'CA',
-        jurisdictionCode: 'CA-ON',
-        regionName: 'Ontario',
-        name: 'Jordan Miller',
-        phone: '4165551234',
-        email: 'jordan.miller@test.ca',
-        enquiryType: 'lawyer_request_page',
-        sourcePage: '/lawyer-request',
-        consent: true,
-        platform: 'web',
+        const builder: any = {
+          select: () => builder,
+          eq: (col: string, val: unknown) => {
+            filters.push((r) => r[col] === val)
+            return builder
+          },
+          in: (col: string, vals: unknown[]) => {
+            filters.push((r) => vals.includes(r[col]))
+            return builder
+          },
+          order: () => builder,
+          limit: (n: number) => {
+            limitN = n
+            return builder
+          },
+          insert: (row: any) => {
+            insertPayload = row
+            return builder
+          },
+          update: (upd: any) => {
+            updatePayload = upd
+            return builder
+          },
+          maybeSingle: async () => {
+            if (updatePayload) {
+              const idx = store.findIndex((r) => filters.every((f) => f(r)))
+              if (idx === -1) return { data: null, error: null }
+              store[idx] = { ...store[idx], ...updatePayload }
+              return { data: store[idx], error: null }
+            }
+            const match = store.filter((r) => filters.every((f) => f(r)))[0] || null
+            return { data: match, error: null }
+          },
+          single: async () => {
+            if (insertPayload) {
+              const row = {
+                id: `lead-uuid-${seq}`,
+                public_id: `REQ-TEST-${String(seq).padStart(4, '0')}`,
+                status: 'new',
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                ...insertPayload,
+              }
+              seq++
+              store.push(row)
+              return { data: row, error: null }
+            }
+            const match = store.filter((r) => filters.every((f) => f(r)))[0] || null
+            return { data: match, error: match ? null : { code: 'PGRST116', message: 'Not found' } }
+          },
+          then: (resolve: (v: any) => void) => {
+            const matched = store.filter((r) => filters.every((f) => f(r))).slice(0, limitN)
+            resolve({ data: matched, error: null })
+          },
+        }
+        return builder
+      }
+      return { store, client: { from: fromMock } as any }
+    }
+
+    it('persists lawyer request to DB first and sends country-specific branded email (CA)', async () => {
+      const { store, client } = createInMemoryLeadsDb()
+      vi.spyOn(dbModule, 'db').mockReturnValue(client)
+      const prevEmailMode = env.EMAIL_MODE
+      ;(env as any).EMAIL_MODE = 'live'
+      const orderLog: string[] = []
+      const origFrom = client.from
+      vi.spyOn(client, 'from').mockImplementation((table: string) => {
+        const b = origFrom(table)
+        const origInsert = b.insert
+        b.insert = (row: any) => {
+          orderLog.push('db_insert')
+          return origInsert(row)
+        }
+        return b
       })
 
-      expect(result.status).toBe('submitted')
-      expect(result.duplicate).toBe(false)
-      expect(result.requestId).toMatch(/^lr_/)
+      const confirmSpy = vi.spyOn(emailService, 'lawyerRequestConfirmation').mockImplementation(async () => {
+        orderLog.push('send_email')
+        expect(store.length).toBe(1) // Must already be in DB before email is sent
+        return { sent: true, id: 'resend_lr_ca_1' }
+      })
+      vi.spyOn(emailService, 'opsNewLead').mockResolvedValue({ sent: true, id: 'ops_1' })
 
-      expect(loggerSpy).toHaveBeenCalledWith(
-        '[LAWYER_REQUEST][SUBMITTED]',
-        expect.objectContaining({
+      try {
+        const result = await leadService.create({
+          caseRow: sampleCanadaCase,
+          caseId: sampleCanadaCase.id,
+          country: 'CA',
+          jurisdictionCode: 'CA-ON',
+          regionName: 'Ontario',
           name: 'Jordan Miller',
           phone: '4165551234',
           email: 'jordan.miller@test.ca',
-          country: 'CA',
-          caseId: sampleCanadaCase.id,
+          enquiryType: 'lawyer_request_page',
           sourcePage: '/lawyer-request',
+          consent: true,
+          platform: 'web',
         })
-      )
 
-      expect(opsEmailSpy).not.toHaveBeenCalled()
+        expect(orderLog).toEqual(['db_insert', 'send_email'])
+        expect(result.status).toBe('new')
+        expect(result.duplicate).toBe(false)
+        expect(result.requestId).toMatch(/^REQ-/)
+        expect(result.emailDelivery?.status).toBe('sent')
+        expect(store).toHaveLength(1)
+        expect(store[0].summary.email_delivery.status).toBe('sent')
+        expect(confirmSpy).toHaveBeenCalledWith(expect.objectContaining({
+          country: 'CA',
+          region: 'Ontario',
+          to: 'jordan.miller@test.ca',
+        }))
+      } finally {
+        ;(env as any).EMAIL_MODE = prevEmailMode
+      }
     })
 
-    it('prevents duplicate submissions within TTL with case ID and allows legitimate later requests without case ID', async () => {
+    it('prevents duplicate DB rows and duplicate emails on repeat submission, and safely retries failed email', async () => {
       vi.useFakeTimers()
       const baseTime = 1700000000000
       vi.setSystemTime(baseTime)
+      const { store, client } = createInMemoryLeadsDb()
+      vi.spyOn(dbModule, 'db').mockReturnValue(client)
+      const prevEmailMode = env.EMAIL_MODE
+      ;(env as any).EMAIL_MODE = 'live'
+      vi.spyOn(emailService, 'opsNewLead').mockResolvedValue({ sent: true, id: 'ops_1' })
 
-      // 1. With case ID: 24h duplicate protection
-      const submitParams = {
-        caseRow: sampleUSCase,
-        caseId: sampleUSCase.id,
-        country: 'US' as const,
-        name: 'Alex Johnson',
-        phone: '2125559876',
-        email: 'alex.dup.test@example.com',
-        enquiryType: 'lawyer_request_page',
-        sourcePage: '/lawyer-request',
-        consent: true,
-        platform: 'web' as const,
+      try {
+        // First email attempt fails -> DB row MUST still be preserved!
+        const confirmSpy = vi.spyOn(emailService, 'lawyerRequestConfirmation')
+          .mockResolvedValueOnce({ sent: false, error: 'Resend temporary timeout' })
+          .mockResolvedValueOnce({ sent: true, id: 'resend_retry_ok' })
+
+        const submitParams = {
+          caseRow: sampleUSCase,
+          caseId: sampleUSCase.id,
+          country: 'US' as const,
+          jurisdictionCode: 'US-NY',
+          regionName: 'New York',
+          name: 'Alex Johnson',
+          phone: '2125559876',
+          email: 'alex.dup.test@example.com',
+          enquiryType: 'lawyer_request_page',
+          sourcePage: '/lawyer-request',
+          consent: true,
+          platform: 'web' as const,
+        }
+
+        const first = await leadService.create(submitParams)
+        expect(first.duplicate).toBe(false)
+        expect(first.emailDelivery?.status).toBe('failed')
+        expect(store).toHaveLength(1) // Saved despite email failure
+
+        // Retry with same details: reuses existing DB row, retries email, succeeds!
+        const second = await leadService.create(submitParams)
+        expect(second.duplicate).toBe(true)
+        expect(second.requestId).toBe(first.requestId)
+        expect(second.emailDelivery?.status).toBe('sent')
+        expect(store).toHaveLength(1) // No duplicate DB record
+        expect(confirmSpy).toHaveBeenCalledTimes(2)
+
+        // Third submission after email already sent: MUST NOT send another email!
+        vi.setSystemTime(baseTime + 2 * 60 * 60 * 1000)
+        const third = await leadService.create(submitParams)
+        expect(third.duplicate).toBe(true)
+        expect(third.requestId).toBe(first.requestId)
+        expect(confirmSpy).toHaveBeenCalledTimes(2)
+
+        // Without case ID: double-click (<2m) is deduplicated; 5m later new request is allowed
+        const noCaseParams = {
+          caseRow: null,
+          country: 'CA' as const,
+          name: 'Anonymous Lead',
+          phone: '6045551234',
+          email: 'no.case.lead@example.com',
+          enquiryType: 'lawyer_request_page',
+          sourcePage: '/lawyer-request',
+          consent: true,
+          platform: 'web' as const,
+        }
+        confirmSpy.mockResolvedValue({ sent: true, id: 'resend_ok' })
+
+        const noCaseFirst = await leadService.create(noCaseParams)
+        expect(noCaseFirst.duplicate).toBe(false)
+
+        vi.setSystemTime(baseTime + 2 * 60 * 60 * 1000 + 10 * 1000)
+        const noCaseDouble = await leadService.create(noCaseParams)
+        expect(noCaseDouble.duplicate).toBe(true)
+
+        vi.setSystemTime(baseTime + 2 * 60 * 60 * 1000 + 5 * 60 * 1000)
+        const noCaseLater = await leadService.create(noCaseParams)
+        expect(noCaseLater.duplicate).toBe(false)
+        expect(noCaseLater.requestId).not.toBe(noCaseFirst.requestId)
+      } finally {
+        ;(env as any).EMAIL_MODE = prevEmailMode
+        vi.useRealTimers()
       }
-
-      const first = await leadService.create(submitParams)
-      expect(first.duplicate).toBe(false)
-
-      // Immediate retry within 24h -> blocked
-      const second = await leadService.create(submitParams)
-      expect(second.duplicate).toBe(true)
-      expect(second.requestId).toBe(first.requestId)
-
-      // Even 2 hours later, case-linked submission remains protected (24h TTL)
-      vi.setSystemTime(baseTime + 2 * 60 * 60 * 1000)
-      const afterTwoHours = await leadService.create(submitParams)
-      expect(afterTwoHours.duplicate).toBe(true)
-
-      // 2. Without case ID: short-lived idempotency protects against double-clicks (<2 min)
-      // but allows legitimate later requests (>=2 min) from the same email
-      const noCaseParams = {
-        caseRow: null,
-        country: 'CA' as const,
-        name: 'Anonymous Lead',
-        phone: '6045551234',
-        email: 'no.case.lead@example.com',
-        enquiryType: 'lawyer_request_page',
-        sourcePage: '/lawyer-request',
-        consent: true,
-        platform: 'web' as const,
-      }
-
-      const noCaseFirst = await leadService.create(noCaseParams)
-      expect(noCaseFirst.duplicate).toBe(false)
-
-      // Immediate double click (10 seconds later) -> intercepted as duplicate
-      vi.setSystemTime(baseTime + 2 * 60 * 60 * 1000 + 10 * 1000)
-      const noCaseDouble = await leadService.create(noCaseParams)
-      expect(noCaseDouble.duplicate).toBe(true)
-
-      // Legitimate later submission from same email (e.g. 5 minutes later) -> ALLOWED (not blocked for 24 hours!)
-      vi.setSystemTime(baseTime + 2 * 60 * 60 * 1000 + 5 * 60 * 1000)
-      const noCaseLater = await leadService.create(noCaseParams)
-      expect(noCaseLater.duplicate).toBe(false)
-      expect(noCaseLater.requestId).not.toBe(noCaseFirst.requestId)
-
-      vi.useRealTimers()
     })
 
     it('rejects submission if caseId is passed without authorized caseRow', async () => {

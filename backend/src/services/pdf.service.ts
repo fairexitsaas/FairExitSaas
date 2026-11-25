@@ -12,19 +12,24 @@ import { getPdfBrowser, releasePdfBrowser } from './pdfBrowser'
 
 type PdfLogContext = { caseId?: string; reportId?: string; generationId?: string; requestId?: string }
 
-const FOOT = `<div style="width:100%;padding:0 90px;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;">
- <div style="border:1px solid #d9d4c8;border-radius:6px;background:#f6f4ef;padding:6px 12px;font-size:9.5px;line-height:1.35;color:#3d4a55;text-align:center;"><b style="color:#062c55">General information, not legal advice.</b> We've done our best to make this clear and accurate, but please check the details before you act. If anything feels unclear, a lawyer can help.</div>
+function pdfFooterTemplate(isUS: boolean): string {
+  const lawyerPhrase = isUS ? 'an attorney' : 'a lawyer'
+  return `<div style="width:100%;padding:0 90px;font-family:Arial,Helvetica,sans-serif;-webkit-print-color-adjust:exact;">
+ <div style="border:1px solid #d9d4c8;border-radius:6px;background:#f6f4ef;padding:6px 12px;font-size:9.5px;line-height:1.35;color:#3d4a55;text-align:center;"><b style="color:#062c55">General information, not legal advice.</b> We've done our best to make this clear and accurate, but please check the details before you act. If anything feels unclear, ${lawyerPhrase} can help.</div>
  <div style="text-align:center;font-size:9.5px;font-weight:700;color:#062c55;margin-top:5px;">Page <span class="pageNumber"></span> of <span class="totalPages"></span></div>
 </div>`
+}
 
 /** One set of print options, used by every renderer so the PDF looks the same everywhere. */
-const PDF_OPTIONS = {
-  format: 'Letter',
-  printBackground: true,
-  preferCSSPageSize: true,
-  displayHeaderFooter: true,
-  headerTemplate: '<div></div>',
-  footerTemplate: FOOT,
+function pdfOptions(isUS: boolean) {
+  return {
+    format: 'Letter' as const,
+    printBackground: true,
+    preferCSSPageSize: true,
+    displayHeaderFooter: true,
+    headerTemplate: '<div></div>',
+    footerTemplate: pdfFooterTemplate(isUS),
+  }
 }
 
 /**
@@ -71,20 +76,21 @@ async function postBrowserless(url: string, body: Record<string, unknown>, timeo
   return buf
 }
 
-async function printViaBrowserlessRest(url: string, html: string, context: PdfLogContext): Promise<Buffer> {
+async function printViaBrowserlessRest(url: string, html: string, context: PdfLogContext, isUS: boolean): Promise<Buffer> {
+  const options = pdfOptions(isUS)
   const attempts: Array<{ name: string; body: Record<string, unknown> }> = [
     {
       name: 'load+fonts',
       body: {
         html,
-        options: PDF_OPTIONS,
+        options,
         gotoOptions: { waitUntil: 'load', timeout: 45000 },
         waitForFunction: { fn: "() => document.fonts.status === 'loaded'", timeout: 8000 },
         bestAttempt: true,
       },
     },
-    { name: 'domcontentloaded', body: { html, options: PDF_OPTIONS, gotoOptions: { waitUntil: 'domcontentloaded', timeout: 30000 }, bestAttempt: true } },
-    { name: 'minimal', body: { html, options: PDF_OPTIONS } },
+    { name: 'domcontentloaded', body: { html, options, gotoOptions: { waitUntil: 'domcontentloaded', timeout: 30000 }, bestAttempt: true } },
+    { name: 'minimal', body: { html, options } },
   ]
   let lastErr: unknown
   for (let i = 0; i < attempts.length; i++) {
@@ -105,7 +111,7 @@ async function printViaBrowserlessRest(url: string, html: string, context: PdfLo
   throw lastErr
 }
 
-async function printViaBrowser(html: string): Promise<Buffer> {
+async function printViaBrowser(html: string, isUS: boolean): Promise<Buffer> {
   const b = await getPdfBrowser()
   const page = await b.newPage()
   try {
@@ -114,7 +120,7 @@ async function printViaBrowser(html: string): Promise<Buffer> {
     try {
       await page.evaluate('document.fonts.ready.then(() => true)')
     } catch { /* proceed if fonts offline */ }
-    return Buffer.from(await page.pdf(PDF_OPTIONS))
+    return Buffer.from(await page.pdf(pdfOptions(isUS)))
   } finally {
     await page.close().catch(() => undefined)
     await releasePdfBrowser()
@@ -122,13 +128,13 @@ async function printViaBrowser(html: string): Promise<Buffer> {
 }
 
 /** Browserless REST first (no packages), then a browser (remote WS / @sparticuz / Playwright). */
-async function printPdf(html: string, context: PdfLogContext, startedAt: number): Promise<Buffer> {
+async function printPdf(html: string, context: PdfLogContext, startedAt: number, isUS: boolean): Promise<Buffer> {
   const errors: string[] = []
   const restUrl = browserlessPdfUrl()
   if (restUrl) {
     const t = Date.now()
     try {
-      const buf = await printViaBrowserlessRest(restUrl, html, context)
+      const buf = await printViaBrowserlessRest(restUrl, html, context, isUS)
       logger.info('[PDF][COMPLETE]', { ...context, renderer: 'browserless-rest', durationMs: Date.now() - startedAt, renderMs: Date.now() - t, bytes: buf.length })
       return buf
     } catch (err) {
@@ -140,7 +146,7 @@ async function printPdf(html: string, context: PdfLogContext, startedAt: number)
   }
   const t = Date.now()
   try {
-    const buf = await printViaBrowser(html)
+    const buf = await printViaBrowser(html, isUS)
     logger.info('[PDF][COMPLETE]', { ...context, renderer: 'browser', durationMs: Date.now() - startedAt, renderMs: Date.now() - t, bytes: buf.length })
     return buf
   } catch (err) {
@@ -152,6 +158,7 @@ async function printPdf(html: string, context: PdfLogContext, startedAt: number)
 
 export async function renderReportPdf(report: ReportJson, meta: RenderMeta, context: PdfLogContext = {}): Promise<Buffer> {
   const startedAt = Date.now()
+  const isUS = meta.jurisdiction?.country === 'US'
   logger.info('[PDF][START]', { ...context, reportId: context.reportId || meta.reportId })
   const layoutStartedAt = Date.now()
   const initialSections = reportSections(report, meta)
@@ -164,5 +171,5 @@ export async function renderReportPdf(report: ReportJson, meta: RenderMeta, cont
   }
   logger.info('[PDF][LAYOUT_COMPLETE]', { ...context, reportId: meta.reportId, pages, totalPages, durationMs: Date.now() - layoutStartedAt })
   const html = renderReportHtml(report, { ...meta, pages }, totalPages)
-  return printPdf(fixItalicSpaces(html), { ...context, reportId: meta.reportId }, startedAt)
+  return printPdf(fixItalicSpaces(html), { ...context, reportId: meta.reportId }, startedAt, isUS)
 }
