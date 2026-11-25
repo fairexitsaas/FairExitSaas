@@ -64,7 +64,7 @@ export default function ReportSalesPage({
     }
     return country === "US" ? defaultMockUSReportInputs : defaultMockReportInputs;
   });
-  const [explainEach, setExplainEach] = useState(true);
+  const explainEach = true;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [lawyerModalOpen, setLawyerModalOpen] = useState(false);
@@ -642,34 +642,11 @@ export default function ReportSalesPage({
           </div>
         </div>
 
-        {/* ── SUBHEADER (Report title & Explain toggle) ── */}
+        {/* ── SUBHEADER (Report title) ── */}
         <div className="flex items-center justify-between max-w-[760px] pt-3 pb-4">
           <span className="font-sans font-[700] text-[12px] text-[#5A6B78] uppercase tracking-wide">
             Your Severance Report
           </span>
-
-          {/* Explain each question toggle */}
-          <button
-            type="button"
-            onClick={() => setExplainEach(!explainEach)}
-            className="flex items-center gap-2 cursor-pointer focus:outline-none"
-            aria-pressed={explainEach}
-          >
-            <div
-              className={`w-[36px] h-[20px] rounded-full transition-colors p-[2px] relative flex items-center ${
-                explainEach ? "bg-[#0EB28D]" : "bg-[#CFD8DF]"
-              }`}
-            >
-              <div
-                className={`w-[16px] h-[16px] rounded-full bg-white transition-transform ${
-                  explainEach ? "translate-x-[16px]" : "translate-x-0"
-                }`}
-              />
-            </div>
-            <span className="font-sans font-[700] text-[12px] text-[#0C8F72] select-none">
-              Explain each question
-            </span>
-          </button>
         </div>
       </div>
 

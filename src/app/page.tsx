@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import { CountryContext, CountryCode } from "@/context/CountryContext";
 import Navbar from "@/components/layout/Navbar";
 import HeroSection from "@/components/landing/HeroSection";
@@ -26,6 +26,23 @@ export default function HomePage() {
   };
 
   const isCanada = currentCountry === "CA";
+
+  useEffect(() => {
+    const hash = window.location.hash?.slice(1);
+    if (!hash) return;
+    const scrollToHash = () => {
+      const el = document.getElementById(hash);
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth" });
+        return true;
+      }
+      return false;
+    };
+    if (!scrollToHash()) {
+      const timer = setTimeout(scrollToHash, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [currentCountry]);
 
   return (
     <div className="min-h-screen flex flex-col text-primary">

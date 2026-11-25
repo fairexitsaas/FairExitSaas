@@ -53,7 +53,6 @@ export default function ReportUploadPage({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [data] = useState<ReportInputs>(() => getReportInputs());
-  const [explainEach, setExplainEach] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [dataPrivacyOpen, setDataPrivacyOpen] = useState(false);
   const [noContractModalOpen, setNoContractModalOpen] = useState(false);
@@ -714,33 +713,11 @@ export default function ReportUploadPage({
             </div>
           </div>
 
-          {/* Subheader info line with toggle */}
+          {/* Subheader info line */}
           <div className="w-full flex items-center justify-between pt-[15.5px] pb-[16px]">
             <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#5A6B78]">
               Your report · Step 1 of 3 · Add your documents
             </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={explainEach}
-              onClick={() => setExplainEach(!explainEach)}
-              className="flex items-center gap-2 cursor-pointer focus:outline-none select-none"
-            >
-              <span
-                className={`relative inline-block w-9 h-5 shrink-0 rounded-full transition-colors duration-200 ease-in-out ${
-                  explainEach ? "bg-[#0EB28D]" : "bg-[#CFD8DF]"
-                }`}
-              >
-                <span
-                  className={`pointer-events-none absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ease-in-out ${
-                    explainEach ? "translate-x-4" : "translate-x-0"
-                  }`}
-                />
-              </span>
-              <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#0C8F72]">
-                Explain each question
-              </span>
-            </button>
           </div>
         </div>
 
@@ -777,28 +754,6 @@ export default function ReportUploadPage({
             <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#5A6B78]">
               Your report · Step 1 of 3 · Add your documents
             </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={explainEach}
-              onClick={() => setExplainEach(!explainEach)}
-              className="flex items-center gap-2 cursor-pointer focus:outline-none select-none"
-            >
-              <span
-                className={`relative inline-block w-9 h-5 shrink-0 rounded-full transition-colors duration-200 ease-in-out ${
-                  explainEach ? "bg-[#0EB28D]" : "bg-[#CFD8DF]"
-                }`}
-              >
-                <span
-                  className={`pointer-events-none absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-xs transition-transform duration-200 ease-in-out ${
-                    explainEach ? "translate-x-4" : "translate-x-0"
-                  }`}
-                />
-              </span>
-              <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#0C8F72]">
-                Explain each question
-              </span>
-            </button>
           </div>
         </div>
       </section>

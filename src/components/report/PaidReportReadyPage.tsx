@@ -37,7 +37,6 @@ export default function PaidReportReadyPage({
 }: PaidReportReadyPageProps) {
   const { showErrorModal } = useErrorModal();
   const [data] = useState<ReportInputs>(() => getReportInputs());
-  const [explainQuestions, setExplainQuestions] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [lawyerModalOpen, setLawyerModalOpen] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -678,31 +677,11 @@ export default function PaidReportReadyPage({
             </div>
           </div>
 
-          {/* Stepper sub-bar: step indicator & toggle */}
+          {/* Stepper sub-bar: step indicator */}
           <div className="flex items-center justify-between text-[12px] pb-4">
             <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#5A6B78]">
               {buildStatus === "ready" ? "Your Severance Report" : "Step 4 of 4 · Building your report"}
             </span>
-            <div className="flex items-center gap-2">
-              <span className="font-sans font-[700] text-[12px] leading-[18px] text-[#0C8F72]">
-                Explain each question
-              </span>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={explainQuestions}
-                onClick={() => setExplainQuestions(!explainQuestions)}
-                className={`w-[36px] h-[20px] rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer ${
-                  explainQuestions ? "bg-[#0EB28D]" : "bg-[#D8D3C8]"
-                }`}
-              >
-                <div
-                  className={`w-[16px] h-[16px] rounded-full bg-white shadow-xs transition-transform ${
-                    explainQuestions ? "translate-x-[16px]" : "translate-x-0"
-                  }`}
-                />
-              </button>
-            </div>
           </div>
         </div>
 

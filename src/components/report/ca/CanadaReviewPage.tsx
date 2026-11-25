@@ -258,7 +258,6 @@ export default function CanadaReviewPage({
   const router = useRouter();
   const [isDone, setIsDone] = useState(false);
   const [data] = useState<ReportInputs>(() => getReportInputs());
-  const [explainQuestions, setExplainQuestions] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [buildError, setBuildError] = useState("");
   const [isBuilding, setIsBuilding] = useState(false);
@@ -1364,30 +1363,6 @@ export default function CanadaReviewPage({
         <div className="flex items-center justify-between mt-3 text-[12px] text-[#5A6B78] border-b border-[#E7E4DD] pb-3">
           <div className="font-bold tracking-tight text-[#5A6B78]">
             Your report · Step 2 of 3 · Check everything
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`font-bold text-[12px] ${
-                isAllConfirmed ? "text-[#0C8F72]" : "text-[#5A6B78]"
-              }`}
-            >
-              Explain each question
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={explainQuestions}
-              onClick={() => setExplainQuestions(!explainQuestions)}
-              className={`w-[36px] h-[20px] rounded-full transition-colors relative flex items-center p-0.5 cursor-pointer ${
-                explainQuestions ? "bg-[#0EB28D]" : "bg-[#D8D3C8]"
-              }`}
-            >
-              <div
-                className={`w-[16px] h-[16px] rounded-full bg-white shadow-xs transition-transform ${
-                  explainQuestions ? "translate-x-[16px]" : "translate-x-0"
-                }`}
-              />
-            </button>
           </div>
         </div>
       </div>

@@ -780,17 +780,14 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // -------------------------------------------------------------------------
   // 2. CONTENTS PAGE ("What's in this report" - ca2.png / us2.png)
   // -------------------------------------------------------------------------
-  const p = m.pages || {}
-  const pr = (from?: number, to?: number) => (!from ? '' : !to || to <= from ? `page ${from}` : `pages ${from}–${to}`)
-  const before = (id: string) => (p[id] ? p[id] - 1 : undefined)
   const tocItems = [
-    { num: '1', title: 'Where you stand', desc: 'Your offer checked against the rules, and what lines up.', range: pr(p['s1_cover'], before('s2_cover')) },
-    { num: '2', title: isUS ? "Why there's no minimum" : 'Two numbers to understand', desc: isUS ? "What applies to you comes from what was promised." : 'The legal minimum, and what a court might award.', range: pr(p['s2_cover'], before('s3_cover')) },
-    { num: '3', title: "What's in your letter and contract", desc: 'Clause by clause, with sources.', range: pr(p['s3_cover'], before('s4_cover')) },
-    { num: '4', title: 'Questions to prepare', desc: "Calm questions for HR, and this week's steps.", range: pr(p['s4_cover'], before('s5_cover')) },
-    { num: '5', title: 'Your next step', desc: 'The three paths, side by side.', range: pr(p['s5_cover'], before('s6_sources')) },
-    { num: '·', title: 'Where every number comes from', desc: 'Every number and rule, with its official source.', range: pr(p['s6_sources']) },
-    { num: '·', title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', desc: isUS ? 'How to hand this report over, and your report ID.' : 'How to hand this report to a lawyer, and your report ID.', range: pr(p['s7_lawyer']) },
+    { num: '1', title: 'Where you stand', desc: 'Your offer checked against the rules, and what lines up.' },
+    { num: '2', title: isUS ? "Why there's no minimum" : 'Two numbers to understand', desc: isUS ? "What applies to you comes from what was promised." : 'The legal minimum, and what a court might award.' },
+    { num: '3', title: "What's in your letter and contract", desc: 'Clause by clause, with sources.' },
+    { num: '4', title: 'Questions to prepare', desc: "Calm questions for HR, and this week's steps." },
+    { num: '5', title: 'Your next step', desc: 'The three paths, side by side.' },
+    { num: '·', title: 'Where every number comes from', desc: 'Every number and rule, with its official source.' },
+    { num: '·', title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', desc: isUS ? 'How to hand this report over, and your report ID.' : 'How to hand this report to a lawyer, and your report ID.' },
   ]
 
   const tocHtml = `
@@ -808,7 +805,6 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
               <div class="toc-title">${esc(item.title)}</div>
               <div class="toc-desc">${esc(item.desc)}</div>
             </div>
-            <div class="toc-range">${esc(item.range)}</div>
           </div>
         `).join('')}
       </div>

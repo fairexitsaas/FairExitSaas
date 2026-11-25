@@ -265,34 +265,6 @@ export default function TermsConditionsModal({
     }
   };
 
-  // Download document as text
-  const handleDownload = () => {
-    const doc = currentDoc;
-    let text = `${doc.title.toUpperCase()}\n${doc.effectiveDate}\n\n`;
-    doc.sections.forEach((sec) => {
-      if (sec.heading) {
-        text += `\n--- ${sec.heading.toUpperCase()} ---\n`;
-      }
-      sec.paragraphs.forEach((p) => {
-        if (typeof p === "string") {
-          text += `${p}\n\n`;
-        } else {
-          text += `• ${p.bullet}\n`;
-        }
-      });
-    });
-
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `FairExit-${doc.id}-terms.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5"
@@ -525,15 +497,6 @@ export default function TermsConditionsModal({
                   className="px-4 py-2.5 rounded-[9px] border border-[#D8D3C8] bg-white hover:border-[#C3CCD3] hover:text-[#062C55] text-[#5A6B78] font-sans font-[700] text-[13.5px] transition cursor-pointer"
                 >
                   Decline
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleDownload}
-                  className="px-4 py-2.5 rounded-[9px] border border-[#D8D3C8] bg-white hover:border-[#0EB28D] text-[#062C55] font-sans font-[700] text-[13.5px] transition flex items-center gap-1.5 cursor-pointer"
-                  title="Download a copy of this document"
-                >
-                  <span>↓</span> Download
                 </button>
 
                 <button
