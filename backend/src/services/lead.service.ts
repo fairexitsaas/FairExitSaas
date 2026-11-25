@@ -55,11 +55,6 @@ function leadView(l: any) {
   return { requestId: l.public_id, id: l.id, status: l.status, region: l.region_name, createdAt: l.created_at }
 }
 
-/** Deduplication TTL constants for /lawyer-request submissions */
-export const lawyerRequestDedupeCache = new Map<string, { timestamp: number; requestId: string }>()
-export const LAWYER_REQUEST_CASE_DEDUPE_TTL = 24 * 60 * 60 * 1000 // 24h case-specific duplicate protection
-export const LAWYER_REQUEST_NO_CASE_DEDUPE_TTL = 2 * 60 * 1000 // 2m short-lived idempotency for requests without a case ID
-
 const inFlightEmailSends = new Set<string>()
 
 export interface LawyerEmailDeliveryState {
@@ -254,72 +249,8 @@ export const leadService = {
     const lawyerWord = country === 'US' ? 'attorney' : 'lawyer'
 
     // ─────────────────────────────────────────────────────────────
-    // DB-BACKED DUPLICATE CHECK (checked before inserting or emailing)
-    // ─────────────────────────────────────────────────────────────
-    let existingLead: any = null
-    if (linkedCase?.id) {
-      const openByCase = await db().from('leads').select('*').eq('case_id', linkedCase.id).in('status', ['new', 'sent']).maybeSingle()
-      if (openByCase.data) existingLead = openByCase.data
-    }
-
-    if (!existingLead) {
-      const openByEmailRes = await db()
-        .from('leads')
-        .select('*')
-        .eq('email', email)
-        .in('status', ['new', 'sent'])
-        .order('created_at', { ascending: false })
-        .limit(5)
-      const candidates = Array.isArray(openByEmailRes.data)
-        ? openByEmailRes.data
-        : (openByEmailRes.data ? [openByEmailRes.data] : [])
-
-      for (const row of candidates) {
-        const existingType = row.enquiry_type || row.summary?.enquiry_type || 'ask_lawyer'
-        if (existingType !== enquiryType) continue
-
-        if (isLawyerRequestPage && !linkedCase?.id) {
-          const createdMs = row.created_at ? new Date(row.created_at).getTime() : 0
-          const ageMs = createdMs > 0 ? Date.now() - createdMs : 0
-          const priorDeliveryStatus = row.summary?.email_delivery?.status
-          // Short-lived idempotency window (2m) OR retry of a previously failed email on the same saved row
-          if (ageMs < LAWYER_REQUEST_NO_CASE_DEDUPE_TTL || priorDeliveryStatus === 'failed') {
-            existingLead = row
-            break
-          }
-        } else {
-          existingLead = row
-          break
-        }
-      }
-    }
-
-    if (existingLead) {
-      if (isLawyerRequestPage) {
-        const existingStatus = existingLead.summary?.email_delivery?.status
-        if (existingStatus === 'failed' || (existingStatus === 'pending' && env.EMAIL_MODE === 'live')) {
-          const retried = await sendAndRecordLawyerConfirmationEmail(existingLead, country, region)
-          return {
-            ...leadView(retried.lead),
-            duplicate: true,
-            emailDelivery: retried.emailDelivery,
-            contactWithinBusinessDays: 2,
-            lawyerWord,
-          }
-        }
-        return {
-          ...leadView(existingLead),
-          duplicate: true,
-          emailDelivery: existingLead.summary?.email_delivery || { status: env.EMAIL_MODE === 'live' ? 'sent' : 'disabled', attempts: 0 },
-          contactWithinBusinessDays: 2,
-          lawyerWord,
-        }
-      }
-      return { ...leadView(existingLead), duplicate: true }
-    }
-
-    // ─────────────────────────────────────────────────────────────
     // PERSIST TO DATABASE FIRST (NEVER send email prior to DB save)
+    // Every valid submission creates a new independent DB record.
     // ─────────────────────────────────────────────────────────────
     const consentStatus = input.consent ?? true
     const textConsent = isChecklist ? 'Consent to receive 3-point checklist by email.' : consentText(country, region)

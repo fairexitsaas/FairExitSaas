@@ -167,7 +167,7 @@ describe('Lawyer Enquiry Capture & Admin Integration', () => {
       if (dbRow.data.id) createdLeadIds.push(dbRow.data.id)
     })
 
-    it('handles duplicate enquiry submissions gracefully without crashing', async () => {
+    it('creates independent database records for repeated submissions using the same email', async () => {
       const uniqueEmail = `test.dup.${Date.now()}@example.com`
       // First submission
       const res1 = await request(app)
@@ -184,10 +184,7 @@ describe('Lawyer Enquiry Capture & Admin Integration', () => {
       expect(res1.status).toBe(201)
       expect(res1.body.data.duplicate).toBe(false)
 
-      const dbRow = await db().from('leads').select('id').eq('email', uniqueEmail.toLowerCase()).single()
-      if (dbRow.data?.id) createdLeadIds.push(dbRow.data.id)
-
-      // Repeated submission with same email & enquiry type
+      // Repeated submission with same email & enquiry type must also create a separate record
       const res2 = await request(app)
         .post('/api/v1/leads')
         .send({
@@ -201,8 +198,14 @@ describe('Lawyer Enquiry Capture & Admin Integration', () => {
         })
 
       expect(res2.status).toBe(201)
-      expect(res2.body.data.duplicate).toBe(true)
-      expect(res2.body.message).toContain('already asked')
+      expect(res2.body.data.duplicate).toBe(false)
+      expect(res2.body.data.requestId).not.toBe(res1.body.data.requestId)
+
+      const dbRows = await db().from('leads').select('id').eq('email', uniqueEmail.toLowerCase())
+      expect(dbRows.data?.length).toBe(2)
+      for (const row of dbRows.data || []) {
+        if (row.id) createdLeadIds.push(row.id)
+      }
     })
   })
 

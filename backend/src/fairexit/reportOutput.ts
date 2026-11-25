@@ -1883,7 +1883,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     'Gather your pay stubs, contracts, and relevant employment records.',
     'Wait to sign anything until you understand your complete offer and entitlements.',
     `Apply for ${isUS ? 'unemployment' : 'EI'} promptly after your last day.`,
-    `Speak with a ${esc(w.lawyer)} to understand what applies to your situation.`,
+    `Speak with ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} to understand what applies to your situation.`,
   ]
 
   const s4PracticalHtml = `
@@ -1929,12 +1929,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       <div class="huge-section-digit">5</div>
       <h2 class="huge-section-title">Your next step</h2>
       <div class="heavy-divider"></div>
-      <p class="section-cover-desc">The three paths side by side, where every number in this report comes from, and how to hand it to a ${esc(w.lawyer)} if you want one.</p>
+      <p class="section-cover-desc">The three paths side by side, where every number in this report comes from, and how to hand it to ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} if you want one.</p>
       <div class="in-this-section-box">
         <div class="its-kicker">IN THIS SECTION</div>
         <div class="its-item">You don't have to sign today</div>
         <div class="its-item">Where every number comes from</div>
-        <div class="its-item">Talking to a ${esc(w.lawyer)}</div>
+        <div class="its-item">Talking to ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)}</div>
       </div>
       ${pageFooter(curPage, effTotal)}
     </div>
@@ -1968,14 +1968,14 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         </div>
         <div class="path-card">
           <div class="path-opt-kicker">OPTION 3</div>
-          <h3 class="path-title">Talk to a ${esc(w.lawyer)}</h3>
+          <h3 class="path-title">Talk to ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)}</h3>
           <p class="path-desc">They can tell you what applies to you.</p>
-          <p class="path-bold-note">First call often free. The contract question needs a ${esc(w.lawyer)} to read it.</p>
+          <p class="path-bold-note">First call often free. The contract question needs ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} to read it.</p>
         </div>
       </div>
 
       <div class="honest-note-card">
-        <b>Honest note:</b> this report helps you ask the right questions. The contract question in Section 3 is one a ${esc(w.lawyer)} needs to read your contract to answer.
+        <b>Honest note:</b> this report helps you ask the right questions. The contract question in Section 3 is one ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} needs to read your contract to answer.
       </div>
       ${pageFooter(curPage, effTotal)}
     </div>

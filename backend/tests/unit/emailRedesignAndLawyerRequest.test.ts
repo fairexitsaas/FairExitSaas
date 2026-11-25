@@ -469,7 +469,7 @@ describe('FairExit: Report Email Redesign, Lawyer Request & UI Corrections', () 
           single: async () => {
             if (insertPayload) {
               const row = {
-                id: `lead-uuid-${seq}`,
+                id: `00000000-0000-4000-8000-00000000000${seq}`,
                 public_id: `REQ-TEST-${String(seq).padStart(4, '0')}`,
                 status: 'new',
                 created_at: new Date().toISOString(),
@@ -550,10 +550,7 @@ describe('FairExit: Report Email Redesign, Lawyer Request & UI Corrections', () 
       }
     })
 
-    it('prevents duplicate DB rows and duplicate emails on repeat submission, and safely retries failed email', async () => {
-      vi.useFakeTimers()
-      const baseTime = 1700000000000
-      vi.setSystemTime(baseTime)
+    it('creates a new independent DB record and triggers its own confirmation email for every repeat submission, and retains/retries failed records independently', async () => {
       const { store, client } = createInMemoryLeadsDb()
       vi.spyOn(dbModule, 'db').mockReturnValue(client)
       const prevEmailMode = env.EMAIL_MODE
@@ -561,10 +558,12 @@ describe('FairExit: Report Email Redesign, Lawyer Request & UI Corrections', () 
       vi.spyOn(emailService, 'opsNewLead').mockResolvedValue({ sent: true, id: 'ops_1' })
 
       try {
-        // First email attempt fails -> DB row MUST still be preserved!
+        // Submission 1 fails email delivery -> DB row retained with failed delivery status
+        // Submission 2 (same email & case) creates a brand-new DB row and sends its own email
         const confirmSpy = vi.spyOn(emailService, 'lawyerRequestConfirmation')
           .mockResolvedValueOnce({ sent: false, error: 'Resend temporary timeout' })
-          .mockResolvedValueOnce({ sent: true, id: 'resend_retry_ok' })
+          .mockResolvedValueOnce({ sent: true, id: 'resend_second_ok' })
+          .mockResolvedValueOnce({ sent: true, id: 'resend_retry_first_ok' })
 
         const submitParams = {
           caseRow: sampleUSCase,
@@ -584,51 +583,25 @@ describe('FairExit: Report Email Redesign, Lawyer Request & UI Corrections', () 
         const first = await leadService.create(submitParams)
         expect(first.duplicate).toBe(false)
         expect(first.emailDelivery?.status).toBe('failed')
-        expect(store).toHaveLength(1) // Saved despite email failure
+        expect(store).toHaveLength(1)
 
-        // Retry with same details: reuses existing DB row, retries email, succeeds!
+        // Repeat submission with same email & case MUST create a second independent DB row and trigger a second email
         const second = await leadService.create(submitParams)
-        expect(second.duplicate).toBe(true)
-        expect(second.requestId).toBe(first.requestId)
+        expect(second.duplicate).toBe(false)
+        expect(second.requestId).not.toBe(first.requestId)
+        expect(second.id).not.toBe(first.id)
         expect(second.emailDelivery?.status).toBe('sent')
-        expect(store).toHaveLength(1) // No duplicate DB record
+        expect(store).toHaveLength(2)
         expect(confirmSpy).toHaveBeenCalledTimes(2)
 
-        // Third submission after email already sent: MUST NOT send another email!
-        vi.setSystemTime(baseTime + 2 * 60 * 60 * 1000)
-        const third = await leadService.create(submitParams)
-        expect(third.duplicate).toBe(true)
-        expect(third.requestId).toBe(first.requestId)
-        expect(confirmSpy).toHaveBeenCalledTimes(2)
-
-        // Without case ID: double-click (<2m) is deduplicated; 5m later new request is allowed
-        const noCaseParams = {
-          caseRow: null,
-          country: 'CA' as const,
-          name: 'Anonymous Lead',
-          phone: '6045551234',
-          email: 'no.case.lead@example.com',
-          enquiryType: 'lawyer_request_page',
-          sourcePage: '/lawyer-request',
-          consent: true,
-          platform: 'web' as const,
-        }
-        confirmSpy.mockResolvedValue({ sent: true, id: 'resend_ok' })
-
-        const noCaseFirst = await leadService.create(noCaseParams)
-        expect(noCaseFirst.duplicate).toBe(false)
-
-        vi.setSystemTime(baseTime + 2 * 60 * 60 * 1000 + 10 * 1000)
-        const noCaseDouble = await leadService.create(noCaseParams)
-        expect(noCaseDouble.duplicate).toBe(true)
-
-        vi.setSystemTime(baseTime + 2 * 60 * 60 * 1000 + 5 * 60 * 1000)
-        const noCaseLater = await leadService.create(noCaseParams)
-        expect(noCaseLater.duplicate).toBe(false)
-        expect(noCaseLater.requestId).not.toBe(noCaseFirst.requestId)
+        // Retrying email for the first failed record updates ONLY that record without creating a 3rd DB row
+        const retriedFirst = await leadService.retryConfirmationEmail(first.id)
+        expect(retriedFirst.alreadySent).toBe(false)
+        expect(retriedFirst.emailDelivery.status).toBe('sent')
+        expect(store).toHaveLength(2)
+        expect(confirmSpy).toHaveBeenCalledTimes(3)
       } finally {
         ;(env as any).EMAIL_MODE = prevEmailMode
-        vi.useRealTimers()
       }
     })
 
