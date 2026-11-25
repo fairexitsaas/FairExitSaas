@@ -27,6 +27,8 @@ export interface FullScreenLoadingExperienceProps {
   error?: string | null;
   /** Retry callback */
   onRetry?: () => Promise<void> | void;
+  /** Preserved previous completed PDF download URL if reprocessing failed */
+  previousReportPdfUrl?: string | null;
   /** Force allow region cards in production test environment */
   forceAllowRegionCards?: boolean;
 }
@@ -48,6 +50,7 @@ export default function FullScreenLoadingExperience({
   currentStage,
   error,
   onRetry,
+  previousReportPdfUrl,
   forceAllowRegionCards = false,
 }: FullScreenLoadingExperienceProps) {
   // ── Regional Cards & Jurisdiction Setup ──
@@ -424,15 +427,29 @@ export default function FullScreenLoadingExperience({
                 <p className="text-[#a3231f] text-[13px] leading-relaxed mb-3">
                   {error}
                 </p>
-                {onRetry && (
-                  <button
-                    type="button"
-                    onClick={handleRetryClick}
-                    disabled={isRetrying}
-                    className="px-4 py-2 bg-[#0eb28d] hover:bg-[#0c8f72] text-white rounded-[8px] font-bold text-[13px] transition cursor-pointer disabled:opacity-50"
-                  >
-                    {isRetrying ? "Retrying…" : "Try again"}
-                  </button>
+                {(onRetry || previousReportPdfUrl) && (
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    {onRetry && (
+                      <button
+                        type="button"
+                        onClick={handleRetryClick}
+                        disabled={isRetrying}
+                        className="px-4 py-2 bg-[#0eb28d] hover:bg-[#0c8f72] text-white rounded-[8px] font-bold text-[13px] transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isRetrying ? "Retrying…" : "Try again"}
+                      </button>
+                    )}
+                    {previousReportPdfUrl && (
+                      <a
+                        href={previousReportPdfUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-4 py-2 bg-white hover:bg-[#F6F4EF] border border-[#C9D1D7] text-[#062C55] rounded-[8px] font-bold text-[13px] transition no-underline"
+                      >
+                        Download previous report (PDF)
+                      </a>
+                    )}
+                  </div>
                 )}
               </div>
             </div>

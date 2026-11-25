@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getReportInputs, saveReportInputs, ReportInputs, isBonusInOtherPay } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs, isBonusInOtherPay, pickExtractedFact, buildReportStepUrl } from "@/lib/report-storage";
 export { isBonusInOtherPay };
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
@@ -270,6 +270,9 @@ export default function CanadaReviewPage({
   const [buildError, setBuildError] = useState("");
   const [isBuilding, setIsBuilding] = useState(false);
   const buildSubmitLock = useRef(false);
+  const navigateToClearerCopyUpload = () => {
+    router.push(buildReportStepUrl({ step: "upload", caseId: caseId || cs?.id, country: "CA" }));
+  };
   // Change 21: Location mismatch state & modal
   const [locationMismatch, setLocationMismatch] = useState<{
     detected: boolean;
@@ -569,7 +572,7 @@ export default function CanadaReviewPage({
 
       // 1. Process Offer Conflict
       const confOffer = conflicts.find((c: any) => c.key === 'offer_amount');
-      const fOffer = facts.find((f: any) => f.key === 'offer_amount');
+      const fOffer = pickExtractedFact(facts, 'offer_amount');
       const dOfferNum = fOffer?.value ? Number(String(fOffer.value).replace(/[^0-9.]/g, '')) : null;
       const iOfferNum = parseOfferNumber(res?.answers?.offer) ?? intakeOfferNum;
       const offerRowStatus = checkRows.offer_amount?.status;
@@ -581,11 +584,11 @@ export default function CanadaReviewPage({
         Boolean(corrections.offer_amount);
 
       // Sync extracted document facts into storage
-      const fSignBy = facts.find((f: any) => f.key === 'sign_by');
-      const fDays = facts.find((f: any) => f.key === 'days_to_decide');
-      const fRelease = facts.find((f: any) => f.key === 'release_required');
-      const fName = facts.find((f: any) => f.key === 'employee_name');
-      const fEmployer = facts.find((f: any) => f.key === 'employer_name');
+      const fSignBy = pickExtractedFact(facts, 'sign_by');
+      const fDays = pickExtractedFact(facts, 'days_to_decide');
+      const fRelease = pickExtractedFact(facts, 'release_required');
+      const fName = pickExtractedFact(facts, 'employee_name');
+      const fEmployer = pickExtractedFact(facts, 'employer_name');
       const syncUpdates: Partial<ReportInputs> = {
         documentsExtracted: true,
         extractionStatus: "success",
@@ -712,7 +715,7 @@ export default function CanadaReviewPage({
           const factKey = keyMap[item.id] || item.id;
           const modelRow = allModelRows.find((r: any) => r.key === factKey);
 
-          const fact = facts.find((f: any) => f.key === factKey);
+          const fact = pickExtractedFact(facts, factKey);
           const correction = corrections[factKey];
           const checkRow = checkRows[factKey];
 
@@ -1881,7 +1884,7 @@ export default function CanadaReviewPage({
                     onViewCitation={(cit) =>
                       setActiveCitation({ title: item.label, text: cit })
                     }
-                    onAddClearerCopy={() => router.push("/report?step=upload")}
+                    onAddClearerCopy={navigateToClearerCopyUpload}
                   />
                 );
               })}
@@ -1923,7 +1926,7 @@ export default function CanadaReviewPage({
                         }
                         onUseDocument={() => handleChooseOfferConflict("letter")}
                         onKeepCurrent={() => handleChooseOfferConflict("intake")}
-                        onAddClearerCopy={() => router.push("/report?step=upload")}
+                        onAddClearerCopy={navigateToClearerCopyUpload}
                       />
                     )
                   }
@@ -1938,7 +1941,7 @@ export default function CanadaReviewPage({
                   onViewCitation={(cit) =>
                     setActiveCitation({ title: item.label, text: cit })
                   }
-                  onAddClearerCopy={() => router.push("/report?step=upload")}
+                  onAddClearerCopy={navigateToClearerCopyUpload}
                 />
               ))}
             </div>
@@ -1971,7 +1974,7 @@ export default function CanadaReviewPage({
                   onViewCitation={(cit) =>
                     setActiveCitation({ title: item.label, text: cit })
                   }
-                  onAddClearerCopy={() => router.push("/report?step=upload")}
+                  onAddClearerCopy={navigateToClearerCopyUpload}
                 />
               ))}
             </div>

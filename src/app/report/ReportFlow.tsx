@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import NextLink from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
-import { detectIsUS } from "@/lib/report-storage";
+import { detectIsUS, buildReportStepUrl } from "@/lib/report-storage";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifyError, notifySuccess } from "@/lib/notifications";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
@@ -148,7 +148,12 @@ export default function ReportFlow() {
     setPrevUrlStep(urlStep);
     setView(null);
   }
-  const step = view || urlStep || cs?.nextStep;
+  const serverStep = cs?.nextStep === "check" ? "review" : cs?.nextStep;
+  const resolvedUrlStep =
+    urlStep === "pay" && cs?.paid && hasCompletedPostPaymentCollection(cs)
+      ? serverStep
+      : urlStep;
+  const step = view || resolvedUrlStep || cs?.nextStep;
   const countryParam = sp?.get("country")?.toUpperCase();
   const isUS = detectIsUS({
     country: countryParam,
@@ -334,10 +339,11 @@ export default function ReportFlow() {
         <ReadingLetterPage
           caseId={caseId}
           cs={cs}
-          onDone={() => {
+          onDone={async () => {
+            await refresh();
             setView("review");
             if (caseId) {
-              router.replace(`/report?step=review&case=${caseId}${isUS ? "&country=US" : ""}`);
+              router.replace(buildReportStepUrl({ step: "review", caseId, country }));
             }
           }}
         />
@@ -407,21 +413,21 @@ export default function ReportFlow() {
         <ReportUploadPage
           caseId={caseId}
           cs={cs}
-          onContinue={async () => {
-            setView("pay");
+          onContinue={async (targetStep = "pay") => {
+            setView(targetStep);
             if (caseId) {
-              router.push(`/report?step=pay&case=${caseId}${isUS ? "&country=US" : ""}`);
+              router.push(buildReportStepUrl({ step: targetStep, caseId, country }));
             } else {
-              router.push(`/report?step=pay${isUS ? "&country=US" : ""}`);
+              router.push(buildReportStepUrl({ step: targetStep, country }));
             }
-            refresh();
+            await refresh();
           }}
         />
       );
     }
 
-    // Second: Payment Page (accessible once documents are uploaded or when step is explicitly pay)
-    if (urlStep === "pay" || step === "pay" || !cs?.paid) {
+    // Second: Payment Page (accessible only while unpaid or while post-payment customer details are incomplete)
+    if ((urlStep === "pay" || step === "pay" || !cs?.paid) && (!cs?.paid || !hasCompletedPostPaymentCollection(cs))) {
       return (
         <ReportSalesPage
           caseId={caseId}
@@ -445,7 +451,20 @@ export default function ReportFlow() {
           <Card><Kicker>Step 2 of 4</Kicker><H1>Reading your documents…</H1><Spinner text="This usually takes under a minute." />
             <p className="text-[13px] text-[#5a6b78] mt-3">You can leave this page; your progress is saved.</p></Card>
         )}
-        {step === "check" && <CheckStep cs={cs} words={words} onAddClearerCopy={() => setView("upload")} onBuilt={() => { setView("building"); void refresh(); }} />}
+        {step === "check" && (
+          <CheckStep
+            cs={cs}
+            words={words}
+            onAddClearerCopy={() => {
+              setView("upload");
+              router.push(buildReportStepUrl({ step: "upload", caseId: caseId || cs?.id, country }));
+            }}
+            onBuilt={() => {
+              setView("building");
+              void refresh();
+            }}
+          />
+        )}
         {step === "building" && (
           <Card><Kicker>Step 4 of 4</Kicker><H1>Building your report…</H1><Spinner text="This takes a minute or two." />
             <p className="text-[13px] text-[#5a6b78] mt-3">We&apos;ll also email it to {cs?.email || "you"}.</p></Card>

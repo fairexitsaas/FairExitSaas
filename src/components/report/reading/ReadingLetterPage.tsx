@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { getReportInputs, saveReportInputs, ReportInputs, detectIsUS } from "@/lib/report-storage";
-import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
+import { getReportInputs, saveReportInputs, ReportInputs, detectIsUS, pickExtractedFact } from "@/lib/report-storage";
+import { fairexit, caseStore, FairExitApiError } from "@/lib/api/fairexit";
 import { startPollLoop } from "@/lib/reportPolling";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifySuccess } from "@/lib/notifications";
@@ -10,7 +10,14 @@ import FullScreenLoadingExperience from "@/components/report/loading/FullScreenL
 
 interface ReadingLetterPageProps {
   caseId?: string | null;
-  cs?: { id?: string; country?: string; jurisdiction?: { name?: string; code?: string }; [key: string]: unknown } | null;
+  cs?: {
+    id?: string;
+    country?: string;
+    jurisdiction?: { name?: string; code?: string };
+    report?: { reportId?: string; available?: boolean } | null;
+    report_pdf_path?: string | null;
+    [key: string]: unknown;
+  } | null;
   onDone?: () => void;
 }
 
@@ -62,12 +69,12 @@ export default function ReadingLetterPage({
             .getExtractedFacts(activeCaseId)
             .then((factsRes) => {
               const facts = factsRes?.facts || [];
-              const fOffer = facts.find((f: any) => f.key === "offer_amount");
-              const fSignBy = facts.find((f: any) => f.key === "sign_by");
-              const fDays = facts.find((f: any) => f.key === "days_to_decide");
-              const fRelease = facts.find((f: any) => f.key === "release_required");
-              const fName = facts.find((f: any) => f.key === "employee_name");
-              const fEmployer = facts.find((f: any) => f.key === "employer_name");
+              const fOffer = pickExtractedFact(facts, "offer_amount");
+              const fSignBy = pickExtractedFact(facts, "sign_by");
+              const fDays = pickExtractedFact(facts, "days_to_decide");
+              const fRelease = pickExtractedFact(facts, "release_required");
+              const fName = pickExtractedFact(facts, "employee_name");
+              const fEmployer = pickExtractedFact(facts, "employer_name");
 
               let extractedSignBy: string | undefined = undefined;
               if (fSignBy?.value) {
@@ -182,16 +189,29 @@ export default function ReadingLetterPage({
       ? `CA-${data.province}`
       : "CA-ON");
 
+  const activeCaseId = caseId || cs?.id;
+  const activeToken =
+    (activeCaseId ? caseStore.get(activeCaseId) : null) ||
+    (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("t") : null);
+  const previousReportPdfUrl =
+    activeCaseId &&
+    activeToken &&
+    Boolean(cs?.report?.available) &&
+    Boolean(cs?.report_pdf_path)
+      ? fairexit.reportPdfUrl(activeCaseId, activeToken)
+      : null;
+
   return (
     <FullScreenLoadingExperience
       mode="reading"
-      caseId={caseId || cs?.id}
+      caseId={activeCaseId}
       hasContract={hasContract}
       jurisdictionName={regionName}
       jurisdictionCode={regionCode}
       isUS={isUS}
       error={readState.failed ? readState.error || "We couldn't read your documents." : null}
       onRetry={handleRetry}
+      previousReportPdfUrl={previousReportPdfUrl}
     />
   );
 }

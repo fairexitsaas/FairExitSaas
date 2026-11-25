@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getReportInputs, saveReportInputs, ReportInputs, detectIsUS } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs, detectIsUS, buildReportStepUrl } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifySuccess } from "@/lib/notifications";
@@ -23,8 +23,8 @@ export interface UploadedFileItem {
 
 interface ReportUploadPageProps {
   caseId?: string | null;
-  cs?: { id?: string; [key: string]: unknown } | null;
-  onContinue?: () => void;
+  cs?: { id?: string; paid?: boolean; [key: string]: unknown } | null;
+  onContinue?: (targetStep?: "pay" | "reading" | "building") => void | Promise<void>;
 }
 
 function formatDollars(
@@ -75,6 +75,7 @@ export default function ReportUploadPage({
   const [removingDocId, setRemovingDocId] = useState<string | null>(null);
 
   const autoProceedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const submitLockRef = useRef(false);
 
   // Uploaded files list starts empty initially
   const [files, setFiles] = useState<UploadedFileItem[]>([]);
@@ -148,7 +149,9 @@ export default function ReportUploadPage({
     } else {
       setIsLoadingExistingDocs(false);
     }
-  }, [caseId, cs]);
+  }, [caseId, cs?.id]);
+
+  const isPaidCase = Boolean(cs?.paid);
 
   const isUS = detectIsUS({
     country: cs?.country,
@@ -498,7 +501,7 @@ export default function ReportUploadPage({
   };
 
   const handleContinue = async () => {
-    if (isSubmitting) return;
+    if (submitLockRef.current || isSubmitting) return;
 
     if (autoProceedTimeoutRef.current) {
       clearTimeout(autoProceedTimeoutRef.current);
@@ -519,6 +522,7 @@ export default function ReportUploadPage({
 
     if (!currentSatisfied && currentFiles.length === 0) return;
 
+    submitLockRef.current = true;
     setIsSubmitting(true);
     setErrorMessage("");
 
@@ -563,13 +567,31 @@ export default function ReportUploadPage({
           hasContract: currentHasContract,
         });
 
-        setIsSubmitting(false);
-        if (onContinue) {
-          onContinue();
-        } else {
-          router.push(`/report?case=${activeCaseId || "demo"}&step=pay${isUS ? "&country=US" : ""}`);
+        // Verify payment status from the backend before choosing checkout vs reprocessing
+        const freshCase = await fairexit.getCase(activeCaseId);
+        let nextStep: "pay" | "reading" | "building" = "pay";
+        if (freshCase?.paid) {
+          if (freshCase.hasCompletedCustomerInfo === false) {
+            nextStep = "pay";
+          } else if (freshCase.status === "building") {
+            nextStep = "building";
+          } else {
+            if (freshCase.status !== "reading") {
+              await fairexit.startRead(activeCaseId);
+            }
+            nextStep = "reading";
+          }
         }
+
+        if (onContinue) {
+          await onContinue(nextStep);
+        } else {
+          router.push(buildReportStepUrl({ step: nextStep, caseId: activeCaseId, country }));
+        }
+        setIsSubmitting(false);
+        submitLockRef.current = false;
       } catch (err: unknown) {
+        submitLockRef.current = false;
         setIsSubmitting(false);
         const apiErr =
           err instanceof FairExitApiError
@@ -578,7 +600,7 @@ export default function ReportUploadPage({
                 0,
                 err instanceof Error
                   ? err.message
-                  : "Failed to proceed to payment. Please check your files.",
+                  : "Failed to continue with your uploaded documents. Please check your files.",
               );
         setErrorMessage(apiErr.message);
         showErrorModal({
@@ -593,11 +615,12 @@ export default function ReportUploadPage({
         return;
       }
     } else {
+      submitLockRef.current = false;
       setIsSubmitting(false);
       if (onContinue) {
-        onContinue();
+        await onContinue("pay");
       } else {
-        router.push(`/report?case=demo&step=pay${isUS ? "&country=US" : ""}`);
+        router.push(buildReportStepUrl({ step: "pay", caseId: "demo", country }));
       }
     }
   };
@@ -1213,7 +1236,9 @@ export default function ReportUploadPage({
                       Both documents uploaded successfully!
                     </h4>
                     <p className="font-sans text-[12.5px] text-[#0C8F72]">
-                      Your documents are ready. Click continue to payment below.
+                      {isPaidCase
+                        ? "Your documents are updated. Click continue below to re-analyze without paying again."
+                        : "Your documents are ready. Click continue to payment below."}
                     </p>
                   </div>
                 </div>
@@ -1244,7 +1269,7 @@ export default function ReportUploadPage({
                 {isSubmitting ? (
                   <>
                     <span className="inline-block w-4 h-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-                    Continuing to payment…
+                    {isPaidCase ? "Starting analysis…" : "Continuing to payment…"}
                   </>
                 ) : isUploading ? (
                   <>
@@ -1252,15 +1277,15 @@ export default function ReportUploadPage({
                     Uploading documents…
                   </>
                 ) : bothAdded ? (
-                  "Continue to payment →"
+                  isPaidCase ? "Continue & re-analyze documents →" : "Continue to payment →"
                 ) : hasLetter && contractStatus === "never" ? (
-                  "Continue to payment without a contract →"
+                  isPaidCase ? "Continue & re-analyze without a contract →" : "Continue to payment without a contract →"
                 ) : hasLetter &&
                   (contractStatus === "missing" ||
                     contractStatus === "later") ? (
-                  "Continue to payment without it →"
+                  isPaidCase ? "Continue & re-analyze without it →" : "Continue to payment without it →"
                 ) : (
-                  "Continue to payment →"
+                  isPaidCase ? "Continue & re-analyze documents →" : "Continue to payment →"
                 )}
               </button>
 

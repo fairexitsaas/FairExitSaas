@@ -372,3 +372,39 @@ export function isBonusInOtherPay(
   return false;
 }
 
+/** Pick the highest-confidence non-empty extracted fact matching a given key. */
+export function pickExtractedFact<T extends { key?: string; value?: unknown; confidence?: string | null }>(
+  facts: T[] | null | undefined,
+  key: string,
+): T | undefined {
+  if (!Array.isArray(facts) || facts.length === 0) return undefined;
+  const matching = facts.filter((f) => f && f.key === key);
+  if (matching.length === 0) return undefined;
+  const hasValue = (f: T) => f.value !== null && f.value !== undefined && String(f.value).trim() !== "";
+  return (
+    matching.find((f) => f.confidence !== "low" && hasValue(f)) ||
+    matching.find(hasValue) ||
+    matching[0]
+  );
+}
+
+/** Build a /report URL preserving case, country, and recovery token across redirects. */
+export function buildReportStepUrl(opts: {
+  step: string;
+  caseId?: string | null;
+  country?: string | null;
+  token?: string | null;
+}): string {
+  const params = new URLSearchParams();
+  params.set("step", opts.step);
+  if (opts.caseId) params.set("case", opts.caseId);
+  if (opts.country === "US" || opts.country === "CA") {
+    params.set("country", opts.country);
+  }
+  const token =
+    opts.token ??
+    (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("t") : null);
+  if (token) params.set("t", token);
+  return `/report?${params.toString()}`;
+}
+

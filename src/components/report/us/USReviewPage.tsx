@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { getReportInputs, saveReportInputs, ReportInputs } from "@/lib/report-storage";
+import { getReportInputs, saveReportInputs, ReportInputs, pickExtractedFact, buildReportStepUrl } from "@/lib/report-storage";
 import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
@@ -261,6 +261,9 @@ export default function USReviewPage({
   const [buildError, setBuildError] = useState("");
   const [isBuilding, setIsBuilding] = useState(false);
   const buildSubmitLock = useRef(false);
+  const navigateToClearerCopyUpload = () => {
+    router.push(buildReportStepUrl({ step: "upload", caseId: caseId || cs?.id, country: "US" }));
+  };
   // Change 21: Location mismatch state & modal
   const [locationMismatch, setLocationMismatch] = useState<{
     detected: boolean;
@@ -545,7 +548,7 @@ export default function USReviewPage({
 
       // 1. Process Offer Conflict
       const confOffer = conflicts.find((c: any) => c.key === 'offer_amount');
-      const fOffer = facts.find((f: any) => f.key === 'offer_amount');
+      const fOffer = pickExtractedFact(facts, 'offer_amount');
       const offerNumFromFact = fOffer?.value ? Number(String(fOffer.value).replace(/[^0-9.]/g, '')) : NaN;
       const validFactOfferNum = Number.isFinite(offerNumFromFact) && offerNumFromFact > 0 ? offerNumFromFact : null;
       const serverIntakeOfferNum = parseOfferNumber(res?.answers?.offer) ?? intakeOfferNum;
@@ -580,11 +583,11 @@ export default function USReviewPage({
       setHasOfferConflict(offerConflictDetected);
 
       // Sync extracted document facts into storage
-      const fSignBy = facts.find((f: any) => f.key === 'sign_by');
-      const fDays = facts.find((f: any) => f.key === 'days_to_decide');
-      const fRelease = facts.find((f: any) => f.key === 'release_required');
-      const fName = facts.find((f: any) => f.key === 'employee_name');
-      const fEmployer = facts.find((f: any) => f.key === 'employer_name');
+      const fSignBy = pickExtractedFact(facts, 'sign_by');
+      const fDays = pickExtractedFact(facts, 'days_to_decide');
+      const fRelease = pickExtractedFact(facts, 'release_required');
+      const fName = pickExtractedFact(facts, 'employee_name');
+      const fEmployer = pickExtractedFact(facts, 'employer_name');
       const dOfferNum = fOffer?.value ? Number(String(fOffer.value).replace(/[^0-9.]/g, '')) : null;
       const syncUpdates: Partial<ReportInputs> = {
         documentsExtracted: true,
@@ -615,7 +618,7 @@ export default function USReviewPage({
 
       // 2. Process Notice Conflict
       const confNotice = conflicts.find((c: any) => c.key === 'advance_notice');
-      const fNotice = facts.find((f: any) => f.key === 'advance_notice');
+      const fNotice = pickExtractedFact(facts, 'advance_notice');
       const intakeNotice = answers.advanceNotice || data.userAnswers?.advanceNotice || (data.flagged ? "None, or the same day" : "");
 
       if (confNotice) {
@@ -700,7 +703,7 @@ export default function USReviewPage({
           const factKey = keyMap[item.id] || item.id;
           const modelRow = allModelRows.find((r: any) => r.key === factKey);
 
-          const fact = facts.find((f: any) => f.key === factKey);
+          const fact = pickExtractedFact(facts, factKey);
           const correction = corrections[factKey];
           const checkRow = checkRows[factKey];
 
@@ -1816,7 +1819,7 @@ export default function USReviewPage({
                     onViewCitation={(cit) =>
                       setActiveCitation({ title: item.label, text: cit })
                     }
-                    onAddClearerCopy={() => router.push("/report?step=upload")}
+                    onAddClearerCopy={navigateToClearerCopyUpload}
                   />
                 );
               })}
@@ -1858,7 +1861,7 @@ export default function USReviewPage({
                         }
                         onUseDocument={() => handleChooseOfferConflict("agreement")}
                         onKeepCurrent={() => handleChooseOfferConflict("told")}
-                        onAddClearerCopy={() => router.push("/report?step=upload")}
+                        onAddClearerCopy={navigateToClearerCopyUpload}
                       />
                     )
                   }
@@ -1873,7 +1876,7 @@ export default function USReviewPage({
                   onViewCitation={(cit) =>
                     setActiveCitation({ title: item.label, text: cit })
                   }
-                  onAddClearerCopy={() => router.push("/report?step=upload")}
+                  onAddClearerCopy={navigateToClearerCopyUpload}
                 />
               ))}
             </div>
@@ -1906,7 +1909,7 @@ export default function USReviewPage({
                   onViewCitation={(cit) =>
                     setActiveCitation({ title: item.label, text: cit })
                   }
-                  onAddClearerCopy={() => router.push("/report?step=upload")}
+                  onAddClearerCopy={navigateToClearerCopyUpload}
                 />
               ))}
             </div>
@@ -1979,14 +1982,14 @@ export default function USReviewPage({
                       onContinue("ready");
                     } else {
                       setIsDone(true);
-                      router.push(`/report?step=ready${activeCaseId ? `&case=${activeCaseId}` : ""}`);
+                      router.push(buildReportStepUrl({ step: "ready", caseId: activeCaseId, country: "US" }));
                     }
                   } else {
                     if (onContinue) {
                       onContinue("building");
                     } else {
                       setIsDone(true);
-                      router.push(`/report?step=building${activeCaseId ? `&case=${activeCaseId}` : ""}`);
+                      router.push(buildReportStepUrl({ step: "building", caseId: activeCaseId, country: "US" }));
                     }
                   }
                 } catch (err) {

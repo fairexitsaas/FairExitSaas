@@ -478,10 +478,16 @@ export const caseService = {
         deletedAt: row.docs_deleted_at,
         deleteAfter: row.docs_delete_after,
       },
-      report: row.report_id
-        ? { reportId: row.report_id, readyAt: row.report_ready_at, deleteAfter: row.report_delete_after, available: !!row.report }
+      report: (row.report_id || (row.report_inputs as any)?.previousReport?.report)
+        ? {
+            reportId: row.report_id || (row.report_inputs as any)?.previousReport?.report_id || null,
+            readyAt: row.report_ready_at || (row.report_inputs as any)?.previousReport?.report_ready_at || null,
+            deleteAfter: row.report_delete_after || (row.report_inputs as any)?.previousReport?.report_delete_after || null,
+            available: !!(row.report || (row.report_inputs as any)?.previousReport?.report),
+            previousAvailable: !!((row.report_inputs as any)?.previousReport?.report || (row.report && (row.report_inputs as any)?.reprocessPendingBuild)),
+          }
         : null,
-      report_pdf_path: row.report_pdf_path,
+      report_pdf_path: row.report_pdf_path || (row.report_inputs as any)?.previousReport?.report_pdf_path || null,
       hasExtractedDocs: Boolean(row.call_a?.facts && row.call_a.facts.length > 0),
       extractedFacts: row.call_a?.facts || null,
       attestedAt: row.attested_at,

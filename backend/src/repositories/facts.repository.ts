@@ -85,9 +85,9 @@ export const factsRepository = {
    */
   async saveExtractedFacts(caseId: string, analysisRunId: string | null, facts: CallAFact[]): Promise<void> {
     try {
-      if (!facts.length) return
       // Safe cleanup of any previous extracted facts for this case before inserting fresh run
       await db().from('extracted_facts').delete().eq('case_id', caseId)
+      if (!facts.length) return
 
       const rows: ExtractedFactRow[] = facts.map((f) => ({
         case_id: caseId,
@@ -178,6 +178,17 @@ export const factsRepository = {
       logger.warn('corrected_facts table read skipped/fallback', { error: (err as Error).message })
     }
     return {}
+  },
+
+  /**
+   * Clear user-corrected/confirmed facts when documents are reprocessed from scratch.
+   */
+  async clearCorrectedFacts(caseId: string): Promise<void> {
+    try {
+      await db().from('corrected_facts').delete().eq('case_id', caseId)
+    } catch (err) {
+      logger.warn('corrected_facts table clear skipped/fallback', { error: (err as Error).message })
+    }
   },
 }
 

@@ -9,6 +9,7 @@ import { logger } from '../utils/logger'
 import { reserveBackground, releaseBackground, runInBackground, runReservedBackground } from '../utils/background'
 import { caseService, hasCompletedPostPaymentCollection } from './case.service'
 import { aiService, assertDailyLimit } from './ai.service'
+import { factsRepository } from '../repositories/facts.repository'
 import { emailService } from './email.service'
 import { storageService } from './storage.service'
 import { renderReportPdf } from './pdf.service'
@@ -43,8 +44,77 @@ function generateReportId() {
   return 'RPT-' + Array.from(b, (x) => A[x % 32]).join('')
 }
 
+function existingPreviousReport(c: CaseRow): Record<string, any> | null {
+  const prev = (c.report_inputs as any)?.previousReport
+  if (prev && prev.report && prev.report_ready_at) return prev
+  if (c.report && c.report_ready_at) {
+    return {
+      report: c.report,
+      report_id: c.report_id,
+      report_ready_at: c.report_ready_at,
+      report_pdf_path: c.report_pdf_path,
+      report_delete_after: c.report_delete_after,
+      input: (c.report_inputs as any)?.input || null,
+      engine: (c.report_inputs as any)?.engine || null,
+      rulesAsOf: (c.report_inputs as any)?.rulesAsOf || null,
+      attested_at: c.attested_at || null,
+      answers: c.answers ? JSON.parse(JSON.stringify(c.answers)) : null,
+      jurisdiction: c.jurisdiction || null,
+    }
+  }
+  return null
+}
+
+function hasPendingReprocessBuild(c: CaseRow): boolean {
+  return Boolean((c.report_inputs as any)?.reprocessPendingBuild)
+}
+
+function completedReportRecord(c: CaseRow): {
+  report: Record<string, any>
+  report_id: string | null
+  report_ready_at: string | null
+  report_pdf_path: string | null
+  report_delete_after: string | null
+  input: any
+  attested_at: string | null
+  answers: Record<string, any>
+  jurisdiction: any
+  isPreviousFallback: boolean
+} | null {
+  if (c.status === 'ready' && c.report && !hasPendingReprocessBuild(c)) {
+    return {
+      report: c.report as Record<string, any>,
+      report_id: c.report_id,
+      report_ready_at: c.report_ready_at,
+      report_pdf_path: c.report_pdf_path,
+      report_delete_after: c.report_delete_after,
+      input: (c.report_inputs as any)?.input || null,
+      attested_at: c.attested_at,
+      answers: (c.answers || {}) as Record<string, any>,
+      jurisdiction: c.jurisdiction,
+      isPreviousFallback: false,
+    }
+  }
+  const prev = (c.report_inputs as any)?.previousReport
+  if (prev && prev.report && prev.report_ready_at) {
+    return {
+      report: prev.report,
+      report_id: prev.report_id || c.report_id,
+      report_ready_at: prev.report_ready_at,
+      report_pdf_path: prev.report_pdf_path || c.report_pdf_path,
+      report_delete_after: prev.report_delete_after || c.report_delete_after,
+      input: prev.input || (c.report_inputs as any)?.input || null,
+      attested_at: prev.attested_at || c.attested_at,
+      answers: (prev.answers || c.answers || {}) as Record<string, any>,
+      jurisdiction: prev.jurisdiction || c.jurisdiction,
+      isPreviousFallback: true,
+    }
+  }
+  return null
+}
+
 const pdfArtifactCache = new Map<string, Buffer>()
-const pdfArtifactJobs = new Map<string, Promise<{ buffer: Buffer; stored: boolean }>>()
+const pdfArtifactJobs = new Map<string, Promise<{ buffer: Buffer; stored: boolean; path?: string }>>()
 const PDF_ARTIFACT_CACHE_LIMIT = 3
 
 function rememberPdfArtifact(key: string, buffer: Buffer) {
@@ -55,28 +125,42 @@ function rememberPdfArtifact(key: string, buffer: Buffer) {
   pdfArtifactCache.set(key, buffer)
 }
 
-async function renderAndStorePdf(c: CaseRow, report: ReportJson, meta: RenderMeta, generationId: string, requestId?: string) {
-  const key = `${c.id}:${c.report_id}`
+async function renderAndStorePdf(
+  c: CaseRow,
+  report: ReportJson,
+  meta: RenderMeta,
+  generationId: string,
+  requestId?: string,
+  options?: { targetPath?: string; deferCaseUpdate?: boolean },
+) {
+  const key = options?.targetPath ? `${c.id}:${c.report_id}:${generationId}` : `${c.id}:${c.report_id}`
   const existingJob = pdfArtifactJobs.get(key)
   if (existingJob) return existingJob
 
   const job = (async () => {
     const buffer = pdfArtifactCache.get(key) || await renderReportPdf(report, meta, { requestId, caseId: c.id, reportId: c.report_id || undefined, generationId })
     rememberPdfArtifact(key, buffer)
-    const path = `${c.id}/${c.report_id}.pdf`
+    const path = options?.targetPath || `${c.id}/${c.report_id}.pdf`
     const uploadStartedAt = Date.now()
     try {
       await storageService.upload(env.REPORTS_BUCKET, path, buffer, 'application/pdf')
       logger.info('[STORAGE][UPLOAD_COMPLETE]', { requestId, caseId: c.id, reportId: c.report_id, generationId, durationMs: Date.now() - uploadStartedAt, path })
     } catch (error) {
       logger.error('[STORAGE][UPLOAD_ERROR]', { requestId, caseId: c.id, reportId: c.report_id, generationId, durationMs: Date.now() - uploadStartedAt, message: (error as Error).message })
+      if (options?.deferCaseUpdate) {
+        throw error
+      }
       await caseService.update(c.id, { status: 'ready', status_detail: 'pdf_pending', job_started_at: null })
       return { buffer, stored: false }
+    }
+    if (options?.deferCaseUpdate) {
+      pdfArtifactCache.delete(key)
+      return { buffer, stored: true, path }
     }
     try {
       await caseService.update(c.id, { status: 'ready', status_detail: null, job_started_at: null, report_pdf_path: path })
       pdfArtifactCache.delete(key)
-      return { buffer, stored: true }
+      return { buffer, stored: true, path }
     } catch (error) {
       logger.error('[REPORT][STATUS_PERSIST_ERROR]', { requestId, caseId: c.id, reportId: c.report_id, generationId, stage: 'pdf_saved', message: (error as Error).message })
       return { buffer, stored: false }
@@ -87,7 +171,9 @@ async function renderAndStorePdf(c: CaseRow, report: ReportJson, meta: RenderMet
   try {
     return await job
   } finally {
-    pdfArtifactJobs.delete(key)
+    if (pdfArtifactJobs.get(key) === job) {
+      pdfArtifactJobs.delete(key)
+    }
   }
 }
 
@@ -104,6 +190,7 @@ async function executeReportBuildJob(
   let stage = 'claude'
   let savedReport: ReportJson | undefined
   let done: CaseRow | undefined
+  const prevReport = existingPreviousReport(claimed) || existingPreviousReport(c)
 
   try {
     await caseService.update(c.id, { status_detail: 'claude' })
@@ -121,12 +208,97 @@ async function executeReportBuildJob(
     const warnings = ruleWarnings(report, (input.sources as Array<{ id: string }>).map((s) => s.id), allowedAmounts(input as Record<string, any>))
     if (warnings.length) logger.warn('[REPORT][RULE_WARNINGS]', { requestId, caseId: c.id, reportId, generationId, warnings })
 
+    const now = new Date()
+    const reportWithMeta = {
+      ...report,
+      _meta: {
+        warnings,
+        generated_at: now.toISOString(),
+        rules_as_of: rulesAsOf,
+        model: env.AI_MODE === 'mock' ? 'mock' : env.ANTHROPIC_MODEL,
+        generation_id: generationId,
+      },
+    }
+
+    if (prevReport) {
+      // Reprocessing a previously completed report: render & upload PDF to a fresh path BEFORE
+      // replacing the previous completed report, so a failure never loses the existing report.
+      stage = 'pdf'
+      await caseService.update(c.id, { status_detail: 'pdf' })
+      const j = claimed.jurisdiction || jurisdictionOf(c)
+      const sources = sourcesFor(j)
+      const candidateMeta: RenderMeta = {
+        reportId,
+        jurisdiction: j,
+        sources,
+        rulesAsOf: rulesAsOf || latestCheckedDate(sources),
+        attestedAt: claimed.attested_at || c.attested_at,
+        generatedAt: now.toISOString(),
+        numbers: reportNumbers(input),
+        answers: (claimed.answers || c.answers || {}) as Record<string, any>,
+        input,
+      }
+      const newPdfPath = `${c.id}/${reportId}-${generationId.slice(0, 8)}.pdf`
+      const pdfResult = await renderAndStorePdf(
+        { ...claimed, report_id: reportId },
+        report,
+        candidateMeta,
+        generationId,
+        requestId,
+        { targetPath: newPdfPath, deferCaseUpdate: true },
+      )
+      if (!pdfResult.stored) {
+        throw new Error('Failed to store updated PDF report')
+      }
+      const cleanReportInputs = { ...(claimed.report_inputs || {}) } as Record<string, unknown>
+      delete cleanReportInputs.previousReport
+      delete cleanReportInputs.reprocessPendingBuild
+      delete cleanReportInputs.lastError
+      delete cleanReportInputs.failedStage
+      delete cleanReportInputs.errorAt
+
+      stage = 'json_persistence'
+      done = await caseService.update(c.id, {
+        status: 'ready',
+        status_detail: null,
+        job_started_at: null,
+        report: reportWithMeta as any,
+        report_id: reportId,
+        report_ready_at: now.toISOString(),
+        report_pdf_path: newPdfPath,
+        report_inputs: cleanReportInputs,
+        docs_delete_after: new Date(now.getTime() + env.RETENTION_DOCS_DAYS * 864e5).toISOString(),
+        report_delete_after: new Date(new Date(now).setMonth(now.getMonth() + env.RETENTION_REPORT_MONTHS)).toISOString(),
+        rules_version: RULES_VERSION,
+        prompt_version: PROMPT_VERSION,
+        prompt_sha256: promptSha256('B'),
+      })
+      logger.info('[REPORT][COMPLETE]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: true, reprocessed: true })
+      releaseBackground(`build:${c.id}`)
+      const completedCase = await caseService.get(c.id).catch(() => done)
+      if (completedCase?.email && env.EMAIL_MODE === 'live') {
+        runInBackground(`email:${c.id}:${generationId}`, 'Report Email', async () => {
+          try {
+            const token = await caseService.addToken(completedCase)
+            await caseService.deliverReportEmail(completedCase, token, true)
+          } catch (error) {
+            logger.warn('[REPORT][EMAIL_ERROR]', { requestId, caseId: c.id, reportId, generationId, message: (error as Error).message })
+          }
+        })
+      }
+      return {
+        status: 'ready',
+        reportId,
+        readyAt: now.toISOString(),
+        pdfReady: true,
+      }
+    }
+
     stage = 'json_persistence'
     const persistenceStartedAt = Date.now()
-    const now = new Date()
     done = await caseService.update(c.id, {
       status: 'building', status_detail: 'pdf', job_started_at: claimed.job_started_at,
-      report: { ...report, _meta: { warnings, generated_at: now.toISOString(), rules_as_of: rulesAsOf, model: env.AI_MODE === 'mock' ? 'mock' : env.ANTHROPIC_MODEL, generation_id: generationId } },
+      report: reportWithMeta as any,
       report_ready_at: now.toISOString(),
       report_pdf_path: null,
       docs_delete_after: new Date(now.getTime() + env.RETENTION_DOCS_DAYS * 864e5).toISOString(),
@@ -139,14 +311,17 @@ async function executeReportBuildJob(
     const pdfResult = await renderAndStorePdf(done, report, flowService.renderMeta(done), generationId, requestId)
     if (pdfResult.stored) {
       logger.info('[REPORT][COMPLETE]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: true })
+      releaseBackground(`build:${c.id}`)
       const completedCase = await caseService.get(c.id).catch(() => null)
       if (completedCase?.email && env.EMAIL_MODE === 'live') {
-        try {
-          const token = await caseService.addToken(completedCase)
-          await caseService.deliverReportEmail(completedCase, token)
-        } catch (error) {
-          logger.warn('[REPORT][EMAIL_ERROR]', { requestId, caseId: c.id, reportId, generationId, message: (error as Error).message })
-        }
+        runInBackground(`email:${c.id}:${generationId}`, 'Report Email', async () => {
+          try {
+            const token = await caseService.addToken(completedCase)
+            await caseService.deliverReportEmail(completedCase, token)
+          } catch (error) {
+            logger.warn('[REPORT][EMAIL_ERROR]', { requestId, caseId: c.id, reportId, generationId, message: (error as Error).message })
+          }
+        })
       }
     } else {
       logger.warn('[REPORT][JSON_READY]', { requestId, caseId: c.id, reportId, generationId, durationMs: Date.now() - requestedAt, pdfReady: false, stage: 'pdf_pending' })
@@ -159,7 +334,7 @@ async function executeReportBuildJob(
       pdfReady: pdfResult.stored,
     }
   } catch (error) {
-    if (savedReport && (stage === 'json_persistence' || stage === 'pdf')) {
+    if (!prevReport && savedReport && (stage === 'json_persistence' || stage === 'pdf')) {
       const latest = done || await caseService.get(c.id).catch(() => null)
       const persistedForThisGeneration = latest?.report && latest.report_ready_at && (latest.report as any)?._meta?.generation_id === generationId
       if (persistedForThisGeneration && latest) {
@@ -181,8 +356,15 @@ async function executeReportBuildJob(
       status: 'failed',
       status_detail: stage === 'claude' ? 'claude_failed' : stage === 'validation' ? 'validation_failed' : 'build_failed',
       job_started_at: null,
+      ...(prevReport ? {
+        report: prevReport.report,
+        report_id: prevReport.report_id || reportId,
+        report_ready_at: prevReport.report_ready_at,
+        report_pdf_path: prevReport.report_pdf_path,
+      } : {}),
       report_inputs: {
         ...(claimed?.report_inputs || {}),
+        ...(prevReport ? { previousReport: prevReport, reprocessPendingBuild: true } : {}),
         lastError,
         failedStage,
         errorAt: new Date().toISOString(),
@@ -200,44 +382,88 @@ export const flowService = {
     if (!caseService.isPaid(c)) {
       throw ApiError.badRequest('Payment required before reading documents')
     }
-    const docs = await caseService.documents(c.id)
-    const r = caseService.readiness(c, docs)
-
     if (c.status === 'reading') return { started: false, status: c.status }
     if (c.status === 'building') throw ApiError.conflict('Your report is being built')
-    if (!r.letterPages) throw ApiError.badRequest('Add your severance letter first — the report needs at least that.')
-    if (!r.contractOk) throw ApiError.badRequest('Add your contract, or tell us you never signed one / could not add it.')
-    if (!hasCompletedPostPaymentCollection(c)) {
-      throw ApiError.badRequest('Customer name and email must be saved before document processing can begin')
-    }
-    const j = jurisdictionOf(c)
-    await assertDailyLimit(c.id, 'A')
-    const startedAt = new Date().toISOString()
-    await caseService.update(c.id, { status: 'reading', status_detail: null, job_started_at: startedAt })
 
-    runInBackground(`read:${c.id}`, 'Call A', async () => {
+    const readKey = `read:${c.id}`
+    if (!reserveBackground(readKey)) {
+      return { started: false, status: 'reading' }
+    }
+
+    let j: ReturnType<typeof jurisdictionOf>
+    let prevReport: Record<string, any> | null
+    try {
+      const docs = await caseService.documents(c.id)
+      const r = caseService.readiness(c, docs)
+      if (!r.letterPages) throw ApiError.badRequest('Add your severance letter first — the report needs at least that.')
+      if (!r.contractOk) throw ApiError.badRequest('Add your contract, or tell us you never signed one / could not add it.')
+      if (!hasCompletedPostPaymentCollection(c)) {
+        throw ApiError.badRequest('Customer name and email must be saved before document processing can begin')
+      }
+      j = jurisdictionOf(c)
+      await assertDailyLimit(c.id, 'A')
+      const startedAt = new Date().toISOString()
+      prevReport = existingPreviousReport(c)
+      const nextReportInputs = prevReport
+        ? {
+            ...(c.report_inputs || {}),
+            previousReport: prevReport,
+            reprocessPendingBuild: true,
+            lastError: null,
+            failedStage: null,
+          }
+        : c.report_inputs && ((c.report_inputs as any).lastError || (c.report_inputs as any).failedStage)
+        ? { ...(c.report_inputs || {}), lastError: null, failedStage: null }
+        : undefined
+
+      await caseService.update(c.id, {
+        status: 'reading',
+        status_detail: null,
+        job_started_at: startedAt,
+        ...(nextReportInputs ? { report_inputs: nextReportInputs } : {}),
+      })
+    } catch (error) {
+      releaseBackground(readKey)
+      throw error
+    }
+
+    runReservedBackground(readKey, 'Call A', async () => {
       try {
         const out = await aiService.callA(c, j)
         if (out.error === 'jurisdiction_not_covered') {
           await caseService.update(c.id, { status: 'failed', status_detail: 'jurisdiction_not_covered', job_started_at: null })
           return
         }
-        const fresh = await caseService.get(c.id)
+        const fresh = await caseService.get(c.id).catch(() => c)
+        // Reset all review confirmation states so fresh extraction and conflicts are evaluated against the complete updated document set
         const keep: CheckState = { rows: {}, attested: false, attested_at: null, dismissed: [] }
-        for (const [k, v] of Object.entries(fresh.check_state?.rows || {})) if (v.source === 'answers') keep.rows[k] = v
+        const freshPrev = existingPreviousReport(fresh) || prevReport
+        const cleanInputs = freshPrev
+          ? { ...(fresh.report_inputs || {}), previousReport: freshPrev, reprocessPendingBuild: true, lastError: null, failedStage: null }
+          : fresh.report_inputs
+          ? { ...(fresh.report_inputs || {}), lastError: null, failedStage: null }
+          : undefined
+
+        await factsRepository.saveExtractedFacts(c.id, null, out.facts || []).catch(() => undefined)
+        await factsRepository.clearCorrectedFacts(c.id).catch(() => undefined)
+
         await caseService.update(c.id, {
           status: 'checking', status_detail: null, call_a: out, call_a_at: new Date().toISOString(), check_state: keep,
           attested_at: null, job_started_at: null, prompt_version: PROMPT_VERSION, prompt_sha256: promptSha256('A1'),
+          ...(cleanInputs ? { report_inputs: cleanInputs } : {}),
         })
       } catch (err) {
         logger.error('Call A failed', { requestId, caseId: c.id, message: (err as Error).message })
+        const fresh = await caseService.get(c.id).catch(() => c)
+        const freshPrev = existingPreviousReport(fresh) || prevReport
         await caseService.update(c.id, {
           status: 'failed',
           status_detail: 'read_failed',
           job_started_at: null,
-          call_a: null,
+          ...(freshPrev ? {} : { call_a: null }),
           report_inputs: {
-            ...(c.report_inputs || {}),
+            ...(fresh.report_inputs || c.report_inputs || {}),
+            ...(freshPrev ? { previousReport: freshPrev, reprocessPendingBuild: true } : {}),
             lastError: (err as Error).message || 'Scanner could not read documents',
             failedStage: 'read',
           },
@@ -581,9 +807,10 @@ export const flowService = {
       return { started: false, status: 'building', reportId: c.report_id, generationId: (c.report_inputs as any)?.generationId }
     }
 
-    // Idempotency: If valid report JSON is already saved, NEVER invoke Claude Call B again.
-    // Recover only the PDF/storage stage directly.
-    if (c.report) {
+    // Idempotency: If valid report JSON is already saved and no reprocessing build is pending,
+    // NEVER invoke Claude Call B again. Recover only the PDF/storage stage directly.
+    const pendingReprocess = hasPendingReprocessBuild(c) || c.status === 'checking' || (c.status === 'failed' && (c.report_inputs as any)?.failedStage !== 'pdf')
+    if (c.report && !pendingReprocess) {
       if (!c.report_pdf_path) {
         logger.info('[REPORT][RECOVERING_PDF_FROM_SAVED_JSON]', { requestId, caseId: c.id, reportId: c.report_id, generationId: (c.report_inputs as any)?.generationId })
         const pdfResult = await renderAndStorePdf(
@@ -623,11 +850,21 @@ export const flowService = {
     }
 
     let claimed: CaseRow | null
+    const prevReport = existingPreviousReport(c)
     try {
       claimed = await caseService.claimBuild(c.id, {
         status: 'building', status_detail: 'preparing', job_started_at: new Date().toISOString(), report_id: reportId,
         jurisdiction, jurisdiction_code: jurisdiction.code,
-        report_inputs: { input, engine, rulesAsOf, generationId, rules_version: RULES_VERSION, prompt_version: PROMPT_VERSION, prompt_sha256: promptSha256() },
+        report_inputs: {
+          input,
+          engine,
+          rulesAsOf,
+          generationId,
+          rules_version: RULES_VERSION,
+          prompt_version: PROMPT_VERSION,
+          prompt_sha256: promptSha256(),
+          ...(prevReport ? { previousReport: prevReport, reprocessPendingBuild: true } : {}),
+        },
       })
     } catch (error) {
       releaseBackground(generationKey)
@@ -682,10 +919,12 @@ export const flowService = {
   },
 
   reportStatus(c: CaseRow) {
-    const isReady = c.status === 'ready' && !!c.report
+    const pendingReprocess = hasPendingReprocessBuild(c)
+    const isReady = c.status === 'ready' && !!c.report && !pendingReprocess
     const isFailed = c.status === 'failed'
     const lastError = (c.report_inputs as any)?.lastError || null
     const failedStage = (c.report_inputs as any)?.failedStage || null
+    const prevRec = completedReportRecord(c)
     return {
       status: c.status,
       statusDetail: c.status_detail,
@@ -694,6 +933,7 @@ export const flowService = {
       stage: c.status === 'building' ? (c.status_detail || 'building') : isReady && !c.report_pdf_path ? 'pdf_pending' : c.status,
       ready: isReady,
       pdfReady: isReady && !!c.report_pdf_path,
+      previousReportAvailable: Boolean(prevRec && (!isReady || prevRec.isPreviousFallback)),
       failed: isFailed,
       error: isFailed ? (lastError || (c.status_detail === 'build_failed' ? 'The AI analysis could not be completed for these documents. Please try again.' : c.status_detail || 'Report generation failed.')) : null,
       failedStage: isFailed ? failedStage : null,
@@ -703,66 +943,76 @@ export const flowService = {
   },
 
   renderMeta(c: CaseRow): RenderMeta {
-    const j = jurisdictionOf(c)
+    const rec = completedReportRecord(c)
+    const j = (rec?.jurisdiction || null) || jurisdictionOf(c)
     const sources = sourcesFor(j)
+    const activeReport = rec ? rec.report : (c.report as any)
+    const activeInput = rec ? rec.input : (c.report_inputs as any)?.input
     return {
-      reportId: c.report_id || 'RPT-PENDING',
+      reportId: (rec?.report_id ?? c.report_id) || 'RPT-PENDING',
       jurisdiction: j,
       sources,
-      rulesAsOf: (c.report as any)?._meta?.rules_as_of || latestCheckedDate(sources),
-      attestedAt: c.attested_at,
-      generatedAt: c.report_ready_at || new Date().toISOString(),
-      numbers: reportNumbers((c.report_inputs as any)?.input),
-      answers: (c.answers || {}) as Record<string, any>,
-      input: (c.report_inputs as any)?.input,
+      rulesAsOf: activeReport?._meta?.rules_as_of || latestCheckedDate(sources),
+      attestedAt: rec ? rec.attested_at : c.attested_at,
+      generatedAt: (rec?.report_ready_at ?? c.report_ready_at) || new Date().toISOString(),
+      numbers: reportNumbers(activeInput),
+      answers: rec ? rec.answers : ((c.answers || {}) as Record<string, any>),
+      input: activeInput,
     }
   },
 
   report(c: CaseRow) {
-    if (c.status !== 'ready' || !c.report) throw ApiError.conflict(c.report_id && !c.report && c.report_ready_at ? 'This report was deleted under the 12-month retention rule' : 'Your report is not ready yet')
-    const { _meta, ...report } = c.report as Record<string, any>
+    const rec = completedReportRecord(c)
+    if (!rec) throw ApiError.conflict(c.report_id && !c.report && c.report_ready_at ? 'This report was deleted under the 12-month retention rule' : 'Your report is not ready yet')
+    const { _meta, ...report } = rec.report
     const meta = this.renderMeta(c)
     return {
-      reportId: c.report_id,
-      readyAt: c.report_ready_at,
-      deleteAfter: c.report_delete_after,
+      reportId: rec.report_id,
+      readyAt: rec.report_ready_at,
+      deleteAfter: rec.report_delete_after,
       jurisdiction: meta.jurisdiction,
       rulesAsOf: meta.rulesAsOf,
       report,
       numbers: meta.numbers || null,
       sources: meta.sources.filter((s) => (report.citations_used || []).includes(s.id)),
+      isPreviousReport: rec.isPreviousFallback,
     }
   },
 
   html(c: CaseRow) {
-    if (c.status !== 'ready' || !c.report) throw ApiError.conflict('Your report is not ready yet')
-    return renderReportHtml(c.report as unknown as ReportJson, this.renderMeta(c))
+    const rec = completedReportRecord(c)
+    if (!rec) throw ApiError.conflict('Your report is not ready yet')
+    return renderReportHtml(rec.report as unknown as ReportJson, this.renderMeta(c))
   },
 
   async pdf(c: CaseRow, requestId?: string): Promise<Buffer> {
-    if (c.status !== 'ready' || !c.report) throw ApiError.conflict('Your report is not ready yet')
-    if (c.report_pdf_path) {
+    const rec = completedReportRecord(c)
+    if (!rec) throw ApiError.conflict('Your report is not ready yet')
+    if (rec.report_pdf_path) {
       try {
-        return await storageService.download(env.REPORTS_BUCKET, c.report_pdf_path)
+        return await storageService.download(env.REPORTS_BUCKET, rec.report_pdf_path)
       } catch {
         /* re-render below */
       }
     }
     try {
       const result = await renderAndStorePdf(
-        c,
-        c.report as unknown as ReportJson,
+        { ...c, report_id: rec.report_id },
+        rec.report as unknown as ReportJson,
         this.renderMeta(c),
         (c.report_inputs as any)?.generationId || 'recovery',
         requestId,
+        rec.isPreviousFallback ? { targetPath: rec.report_pdf_path || undefined, deferCaseUpdate: true } : undefined,
       )
       if (result.stored) {
-        logger.info('[REPORT][PDF_RECOVERED]', { requestId, caseId: c.id, reportId: c.report_id, generationId: (c.report_inputs as any)?.generationId })
+        logger.info('[REPORT][PDF_RECOVERED]', { requestId, caseId: c.id, reportId: rec.report_id, generationId: (c.report_inputs as any)?.generationId })
       }
       return result.buffer
     } catch (e) {
-      await caseService.update(c.id, { status: 'ready', status_detail: 'pdf_pending', job_started_at: null })
-      logger.error('[PDF][RETRY_ERROR]', { requestId, caseId: c.id, reportId: c.report_id, generationId: (c.report_inputs as any)?.generationId, message: (e as Error).message })
+      if (!rec.isPreviousFallback) {
+        await caseService.update(c.id, { status: 'ready', status_detail: 'pdf_pending', job_started_at: null })
+      }
+      logger.error('[PDF][RETRY_ERROR]', { requestId, caseId: c.id, reportId: rec.report_id, generationId: (c.report_inputs as any)?.generationId, message: (e as Error).message })
       throw e
     }
   },

@@ -18,7 +18,8 @@ interface PaidReportReadyPageProps {
     email?: string;
     country?: string;
     status?: string;
-    report?: { reportId?: string } | null;
+    report?: { reportId?: string; available?: boolean } | null;
+    report_pdf_path?: string | null;
     jurisdiction?: { name?: string } | null;
     answers?: Record<string, unknown>;
     [key: string]: unknown;
@@ -44,14 +45,17 @@ export default function PaidReportReadyPage({
 
   // Build state: 'building' | 'ready' | 'failed'
   const isInitiallyReady = cs?.status === "ready" && !!cs?.report;
+  const isInitiallyFailed = cs?.status === "failed";
   const [buildStatus, setBuildStatus] = useState<"building" | "ready" | "failed">(
-    isInitiallyReady ? "ready" : "building"
+    isInitiallyFailed ? "failed" : isInitiallyReady ? "ready" : "building"
   );
 
   useEffect(() => {
     if (cs?.status === "ready" && !!cs?.report) {
       setBuildStatus("ready");
       setPdfPending(false);
+    } else if (cs?.status === "failed") {
+      setBuildStatus("failed");
     }
   }, [cs?.status, cs?.report]);
   type FailureKind = "polling_timeout" | "claude_failed" | "pdf_failed" | "generic_failed" | null;
@@ -61,6 +65,7 @@ export default function PaidReportReadyPage({
   const [buildProgressStep, setBuildProgressStep] = useState<number>(2);
   const [pollVersion, setPollVersion] = useState(0);
   const retryLock = useRef(false);
+  const autoBuildAttemptedRef = useRef(false);
 
   // Email delivery & Private link state (Change 24)
   const [emailMode, setEmailMode] = useState<"mock" | "live">(() => {
@@ -173,12 +178,16 @@ export default function PaidReportReadyPage({
       return;
     }
 
-    // Ensure report build is triggered if not already in building or ready status
-    if (cs && cs.status !== "building" && cs.status !== "ready") {
+    // Ensure report build is triggered only if backend is genuinely still in 'checking'
+    if (cs && cs.status === "checking" && !autoBuildAttemptedRef.current) {
+      autoBuildAttemptedRef.current = true;
       (async () => {
         try {
-          await fairexit.attest(activeId);
-          await fairexit.buildReport(activeId);
+          const latestStatus = await fairexit.reportStatus(activeId);
+          if (latestStatus?.status === "checking") {
+            await fairexit.attest(activeId);
+            await fairexit.buildReport(activeId);
+          }
         } catch (err) {
           console.warn("Background report build trigger error:", err);
         }
@@ -540,7 +549,7 @@ export default function PaidReportReadyPage({
     }
   };
 
-  if (buildStatus === "building" || (buildStatus === "failed" && !cs?.report)) {
+  if (buildStatus === "building" || buildStatus === "failed") {
     const hasContract = Boolean(
       data.hasContract ?? (
         ((cs?.documents as any)?.contractPages ? (cs?.documents as any).contractPages > 0 : false) ||
@@ -565,6 +574,18 @@ export default function PaidReportReadyPage({
     const loadingMode: "reading" | "building" =
       cs?.status === "reading" || cs?.status === "checking" ? "reading" : "building";
 
+    const hasPreviousPdf = Boolean(
+      cs?.report?.available && cs?.report_pdf_path
+    );
+    const activeToken =
+      persistedToken ||
+      (activeId ? caseStore.get(activeId) : null) ||
+      (typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("t") : null);
+    const previousReportPdfUrl =
+      buildStatus === "failed" && hasPreviousPdf && activeId && activeToken
+        ? fairexit.reportPdfUrl(activeId, activeToken)
+        : null;
+
     return (
       <FullScreenLoadingExperience
         mode={loadingMode}
@@ -575,6 +596,7 @@ export default function PaidReportReadyPage({
         isUS={!isCanada}
         error={buildStatus === "failed" ? buildError || "Report generation could not be completed." : null}
         onRetry={handleRetryBuild}
+        previousReportPdfUrl={previousReportPdfUrl}
       />
     );
   }

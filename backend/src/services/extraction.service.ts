@@ -86,14 +86,19 @@ export const extractionService = {
         })
       }
 
-      // Persist original validated extracted facts (IMMUTABLE)
+      // Persist original validated extracted facts and clear stale review corrections on re-analysis
       await factsRepository.saveExtractedFacts(c.id, runId, normalizedFacts)
+      await factsRepository.clearCorrectedFacts(c.id)
 
-      // Also sync case state so existing review flow has immediate access
+      // Reset all review-page confirmation states so fresh extraction + conflicts are evaluated cleanly
       const keep = { rows: {}, attested: false, attested_at: null, dismissed: [] }
-      for (const [k, v] of Object.entries(c.check_state?.rows || {})) {
-        if (v.source === 'answers') (keep.rows as any)[k] = v
-      }
+      const existingPrev = (c.report_inputs as any)?.previousReport || (c.report && c.report_ready_at ? {
+        report: c.report,
+        report_id: c.report_id,
+        report_ready_at: c.report_ready_at,
+        report_pdf_path: c.report_pdf_path,
+        report_delete_after: c.report_delete_after,
+      } : null)
 
       await caseService.update(c.id, {
         status: 'checking',
@@ -105,6 +110,7 @@ export const extractionService = {
         job_started_at: null,
         prompt_version: CALL_A_PROMPT_VERSION,
         prompt_sha256: getPromptHash(),
+        ...(existingPrev ? { report_inputs: { ...(c.report_inputs || {}), previousReport: existingPrev, reprocessPendingBuild: true, lastError: null, failedStage: null } } : {}),
       })
 
       // Development Logging (Sanitized JSON)
@@ -134,11 +140,25 @@ export const extractionService = {
         })
       }
 
+      const existingPrev = (c.report_inputs as any)?.previousReport || (c.report && c.report_ready_at ? {
+        report: c.report,
+        report_id: c.report_id,
+        report_ready_at: c.report_ready_at,
+        report_pdf_path: c.report_pdf_path,
+        report_delete_after: c.report_delete_after,
+      } : null)
+
       await caseService.update(c.id, {
         status: 'failed',
         status_detail: 'read_failed',
-        call_a: null,
+        ...(existingPrev ? {} : { call_a: null }),
         job_started_at: null,
+        report_inputs: {
+          ...(c.report_inputs || {}),
+          ...(existingPrev ? { previousReport: existingPrev, reprocessPendingBuild: true } : {}),
+          lastError: errorMessage,
+          failedStage: 'read',
+        },
       })
 
       logger.error('Claude Call A document processing failed', {
