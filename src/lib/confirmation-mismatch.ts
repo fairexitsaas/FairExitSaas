@@ -255,3 +255,34 @@ export function buildMismatchRows(params: {
 
   return rows;
 }
+
+export function parseOfferNumber(v: unknown): number | null {
+  return parsePositiveNum(v);
+}
+
+/**
+ * Returns only mismatches whose row has not yet been confirmed/resolved by the user.
+ * Keeps sibling mismatch rows untouched when one row is resolved independently.
+ */
+export function findUnresolvedMismatches(
+  rows: Rows,
+  allMismatches: Array<{ key: string; label: string; userValue: number | string; docValue: number | string; docSource: RowSource; quote?: string; where?: string }>
+) {
+  return allMismatches.filter((m) => {
+    const status = rows[m.key]?.status;
+    return status !== "confirmed_by_user" && status !== "confirmed_from_document";
+  });
+}
+
+/** Resolves a single mismatch row in-place while preserving any other unresolved rows. */
+export function applySingleMismatchChoice(rows: Rows, key: string, pick: "user" | "doc"): Rows {
+  const existing = rows[key];
+  if (!existing) return rows;
+  return {
+    ...rows,
+    [key]:
+      pick === "user"
+        ? { ...existing, value: existing.user_value, source: "answers", status: "confirmed_by_user" }
+        : { ...existing, value: existing.doc_value, status: "confirmed_from_document" },
+  };
+}

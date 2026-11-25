@@ -22,6 +22,8 @@ export const metadata: Metadata = {
   },
   description:
     'Free severance check for Canada and layoff rights check for the United States.',
+  
+    robots: { index: false, follow: false },
 }
 
 export default function RootLayout({

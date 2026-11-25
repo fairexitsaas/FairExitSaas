@@ -18,10 +18,12 @@ import USReviewPage from "@/components/report/us/USReviewPage";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 import PostPaymentCustomerModal from "@/components/report/PostPaymentCustomerModal";
 import PaymentLoadingUI from "@/components/report/payment/PaymentLoadingUI";
-import { MismatchStep, findMismatches, type Rows } from "@/components/report/mismatch-row";
-import { ConfirmationCardModal } from "@/components/report/ConfirmationCardModal";
+import { InlineMismatchPrompt, findMismatches } from "@/components/report/mismatch-row";
 import "@/components/report/mismatch-row.css";
-import { buildMismatchRows } from "@/lib/confirmation-mismatch";
+import {
+  buildMismatchRows,
+  findUnresolvedMismatches,
+} from "@/lib/confirmation-mismatch";
 
 export function hasCompletedPostPaymentCollection(c: any): boolean {
   if (!c) return false;
@@ -676,6 +678,8 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
   const [err, setErr] = useState("");
   const buildPendingRef = useRef(false);
   const rowRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [resolvedMismatchKeys, setResolvedMismatchKeys] = useState<string[]>([]);
+  const [mismatchErrorByKey, setMismatchErrorByKey] = useState<Record<string, string>>({});
 
   useEffect(() => { fairexit.checkPage(cs.id).then(setPage).catch((e) => setErr(errText(e))); }, [cs.id]);
 
@@ -731,21 +735,28 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
     conflicts: page.conflicts,
     isUS: page.country === "US",
   });
-  const activeMismatches = findMismatches(mismatchRows);
-  const handleCheckMismatchesDone = async (fixed: Rows) => {
-    setBusyKey("mismatch:saving");
+  const allDetectedMismatches = findMismatches(mismatchRows);
+  const unresolvedMismatches = findUnresolvedMismatches(mismatchRows, allDetectedMismatches).filter(
+    (m) => !resolvedMismatchKeys.includes(m.key)
+  );
+  const ageMismatch = unresolvedMismatches.find((m) => m.key === "age");
+  const payMismatch = unresolvedMismatches.find(
+    (m) => m.key === "annual_pay" || m.key === "pay" || m.key === "base_salary" || m.key === "salary"
+  );
+  const handleResolveCheckMismatch = async (key: string, pick: "user" | "doc") => {
+    const apiKey = key === "age" ? "age" : "pay";
+    setBusyKey(`mismatch:${key}`);
+    setMismatchErrorByKey((prev) => ({ ...prev, [key]: "" }));
     setErr("");
     try {
-      let latestPage = page;
-      if (fixed.age && (fixed.age.status === "confirmed_from_document" || fixed.age.status === "confirmed_by_user")) {
-        latestPage = await fairexit.resolveConflict(cs.id, "age", fixed.age.status === "confirmed_from_document" ? "document" : "answers");
-      }
-      if (fixed.annual_pay && (fixed.annual_pay.status === "confirmed_from_document" || fixed.annual_pay.status === "confirmed_by_user")) {
-        latestPage = await fairexit.resolveConflict(cs.id, "pay", fixed.annual_pay.status === "confirmed_from_document" ? "document" : "answers");
-      }
+      const apiChoice = pick === "doc" ? "document" : "answers";
+      const latestPage = await fairexit.resolveConflict(cs.id, apiKey, apiChoice);
+      setResolvedMismatchKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
       setPage(latestPage);
     } catch (e) {
-      setErr(errText(e));
+      const msg = errText(e);
+      setMismatchErrorByKey((prev) => ({ ...prev, [key]: msg }));
+      setErr(msg);
     } finally {
       setBusyKey("");
     }
@@ -774,29 +785,41 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
           <h2 className="font-bold text-[#062c55] text-[17px]">{g.title} <span className="font-normal text-[#5a6b78] text-[13px]">· {g.subtitle}</span></h2>
           {g.id === "contract" && page.noContractNote && <p className="text-[13px] text-[#5a6b78] mt-1">{page.noContractNote}</p>}
           <div className="mt-2 space-y-2">
-            {g.rows.map((r: any) => (
-              <div key={r.key} ref={(el) => { rowRefs.current[r.key] = el; }}>
-                <Row r={r} words={words} busy={busyKey.startsWith(r.key + ":")} busyAction={busyKey} act={act} onAddClearerCopy={onAddClearerCopy} />
-              </div>
-            ))}
+            {g.rows.map((r: any) => {
+              const rowMismatch =
+                r.key === "age"
+                  ? ageMismatch
+                  : r.key === "pay" || r.key === "annual_pay"
+                  ? payMismatch
+                  : undefined;
+              return (
+                <div key={r.key} ref={(el) => { rowRefs.current[r.key] = el; }}>
+                  <Row
+                    r={r}
+                    words={words}
+                    busy={busyKey.startsWith(r.key + ":")}
+                    busyAction={busyKey}
+                    act={act}
+                    onAddClearerCopy={onAddClearerCopy}
+                    inlineMismatch={rowMismatch}
+                    mismatchBusy={Boolean(rowMismatch && busyKey === `mismatch:${rowMismatch.key}`)}
+                    mismatchError={rowMismatch ? mismatchErrorByKey[rowMismatch.key] : undefined}
+                    onResolveMismatch={handleResolveCheckMismatch}
+                  />
+                </div>
+              );
+            })}
           </div>
         </section>
       ))}
 
       <Card className="mt-6">
         <label className="flex gap-3 items-start text-[14px]">
-          <input type="checkbox" className="mt-1 w-5 h-5" checked={page.finalAgreement.attested} disabled={!page.build.allRequiredConfirmed} onChange={(e) => attest(e.target.checked)} />
+          <input type="checkbox" className="mt-1 w-5 h-5" checked={page.finalAgreement.attested} disabled={!page.build.allRequiredConfirmed || unresolvedMismatches.length > 0} onChange={(e) => attest(e.target.checked)} />
           <span>{page.finalAgreement.text}</span>
         </label>
       </Card>
-      <Btn className={`w-full mt-3 ${page.build.enabled ? "shadow-[0_0_0_4px_rgba(14,178,141,0.25)]" : ""}`} disabled={buildPending} onClick={build}>{buildPending ? "Starting your report…" : page.build.enabled ? page.build.label : page.build.allRequiredConfirmed ? "Tick the box above to build your report" : page.build.label}</Btn>
-
-      {activeMismatches.length > 0 && (
-        <ConfirmationCardModal ariaLabel="Confirm your details" kicker="CHECK THIS FIRST">
-          <ErrorBox text={err} />
-          <MismatchStep rows={mismatchRows} busy={busyKey === "mismatch:saving"} onDone={handleCheckMismatchesDone} />
-        </ConfirmationCardModal>
-      )}
+      <Btn className={`w-full mt-3 ${page.build.enabled && unresolvedMismatches.length === 0 ? "shadow-[0_0_0_4px_rgba(14,178,141,0.25)]" : ""}`} disabled={buildPending || unresolvedMismatches.length > 0} onClick={build}>{buildPending ? "Starting your report…" : page.build.enabled && unresolvedMismatches.length === 0 ? page.build.label : page.build.allRequiredConfirmed ? "Tick the box above to build your report" : page.build.label}</Btn>
     </div>
   );
 }
@@ -823,7 +846,29 @@ function ValueEditor({ r, initial, onSave, onCancel, extra }: { r: any; initial?
   );
 }
 
-function Row({ r, words, busy, busyAction, act, onAddClearerCopy }: { r: any; words: any; busy: boolean; busyAction: string; act: (k: string, a: string, x?: any) => void; onAddClearerCopy: () => void }) {
+function Row({
+  r,
+  words,
+  busy,
+  busyAction,
+  act,
+  onAddClearerCopy,
+  inlineMismatch,
+  mismatchBusy,
+  mismatchError,
+  onResolveMismatch,
+}: {
+  r: any;
+  words: any;
+  busy: boolean;
+  busyAction: string;
+  act: (k: string, a: string, x?: any) => void;
+  onAddClearerCopy: () => void;
+  inlineMismatch?: ReturnType<typeof findMismatches>[number];
+  mismatchBusy?: boolean;
+  mismatchError?: string;
+  onResolveMismatch?: (key: string, pick: "user" | "doc") => void;
+}) {
   const [editing, setEditing] = useState(false);
   const [showQuote, setShowQuote] = useState(false);
   const corrected = r.status === "corrected";
@@ -851,12 +896,21 @@ function Row({ r, words, busy, busyAction, act, onAddClearerCopy }: { r: any; wo
         </div>
         {!r.status && !editing && !sl && (
           <div className="flex gap-2 shrink-0">
-            {r.value !== null && r.value !== undefined && <Btn onClick={() => act(r.key, "confirm")} disabled={busy}>Yes</Btn>}
+            {!inlineMismatch && r.value !== null && r.value !== undefined && <Btn onClick={() => act(r.key, "confirm")} disabled={busy}>Yes</Btn>}
             <Btn kind="o" onClick={() => setEditing(true)} disabled={busy}>Change</Btn>
           </div>
         )}
         {r.status && !editing && <Btn kind="link" onClick={() => act(r.key, "reset")}>Undo</Btn>}
       </div>
+
+      {inlineMismatch && onResolveMismatch && !editing && !sl && (
+        <InlineMismatchPrompt
+          mismatch={inlineMismatch}
+          busy={mismatchBusy}
+          error={mismatchError}
+          onConfirm={onResolveMismatch}
+        />
+      )}
 
       {editing && !lookingAgain && (
         <ValueEditor r={r} initial={r.value} onCancel={() => setEditing(false)}

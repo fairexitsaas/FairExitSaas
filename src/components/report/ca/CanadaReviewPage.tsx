@@ -11,10 +11,17 @@ import { fairexit, FairExitApiError } from "@/lib/api/fairexit";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 import ChangeJurisdictionModal from "@/components/report/ChangeJurisdictionModal";
-import { MismatchStep, findMismatches, type Rows } from "@/components/report/mismatch-row";
-import { ConfirmationCardModal, OfferAmountConfirmationCard } from "@/components/report/ConfirmationCardModal";
+import { InlineMismatchPrompt, findMismatches, type Mismatch, type Rows } from "@/components/report/mismatch-row";
+import { InlineOfferConflictBanner } from "@/components/report/InlineOfferConflictBanner";
 import "@/components/report/mismatch-row.css";
-import { buildMismatchRows, extractDocAge, extractDocAnnualPay } from "@/lib/confirmation-mismatch";
+import {
+  buildMismatchRows,
+  extractDocAge,
+  extractDocAnnualPay,
+  findUnresolvedMismatches,
+  applySingleMismatchChoice,
+  parseOfferNumber,
+} from "@/lib/confirmation-mismatch";
 
 interface CanadaReviewPageProps {
   caseId?: string | null;
@@ -280,21 +287,15 @@ export default function CanadaReviewPage({
   // Round 2 Fix 3: Age & annual pay mismatch resolution state
   const [reviewLoaded, setReviewLoaded] = useState<boolean>(() => !(caseId || cs?.id));
   const [mismatchRows, setMismatchRows] = useState<Rows>({});
-  const [mismatchesResolved, setMismatchesResolved] = useState<boolean>(false);
-  const [mismatchSaving, setMismatchSaving] = useState<boolean>(false);
-  const [mismatchError, setMismatchError] = useState<string>("");
-  const resolvedLocallyRef = useRef<boolean>(false);
+  const [mismatchSavingKey, setMismatchSavingKey] = useState<string | null>(null);
+  const [mismatchErrorByKey, setMismatchErrorByKey] = useState<Record<string, string>>({});
+  const resolvedMismatchKeysRef = useRef<Set<string>>(new Set());
   const offerResolvedLocallyRef = useRef<boolean>(false);
 
 
   // Resolved intake answers (from server case answers or client storage)
-  const parseOfferNum = (v: unknown): number | null => {
-    if (v === undefined || v === null || v === "") return null;
-    const n = Number(String(v).replace(/[^0-9.]/g, ""));
-    return Number.isFinite(n) && n > 0 ? n : null;
-  };
   const answers = (cs?.answers as Record<string, any>) || {};
-  const intakeOfferNum = parseOfferNum(answers.offer) ?? parseOfferNum(data.offer);
+  const intakeOfferNum = parseOfferNumber(answers.offer) ?? parseOfferNumber(data.offer);
 
   // ══════════════════════════════════════════════════════════
   // Section 1: Conflict resolution ("Check these first")
@@ -570,7 +571,7 @@ export default function CanadaReviewPage({
       const confOffer = conflicts.find((c: any) => c.key === 'offer_amount');
       const fOffer = facts.find((f: any) => f.key === 'offer_amount');
       const dOfferNum = fOffer?.value ? Number(String(fOffer.value).replace(/[^0-9.]/g, '')) : null;
-      const iOfferNum = parseOfferNum(res?.answers?.offer) ?? intakeOfferNum;
+      const iOfferNum = parseOfferNumber(res?.answers?.offer) ?? intakeOfferNum;
       const offerRowStatus = checkRows.offer_amount?.status;
       const offerAlreadyResolved =
         offerResolvedLocallyRef.current ||
@@ -612,22 +613,38 @@ export default function CanadaReviewPage({
       if (fEmployer?.value) syncUpdates.employer_name = String(fEmployer.value);
       saveReportInputs(syncUpdates);
 
+      let docOffVal = "";
+      let intakeOffVal = "";
+      const offerConflictDetected =
+        !offerAlreadyResolved &&
+        (Boolean(confOffer) || (dOfferNum !== null && iOfferNum !== null && Math.abs(dOfferNum - iOfferNum) >= 1));
+
       if (!offerAlreadyResolved && confOffer) {
         setHasOfferConflict(true);
-        setDocOfferDisplay(confOffer.document.display || (dOfferNum ? `$${dOfferNum.toLocaleString()}` : String(fOffer?.value || "")));
+        docOffVal = confOffer.document.display || (dOfferNum ? `$${dOfferNum.toLocaleString()}` : String(fOffer?.value || ""));
+        intakeOffVal = confOffer.answers.display || (iOfferNum ? `$${iOfferNum.toLocaleString()}` : "");
+        setDocOfferDisplay(docOffVal);
         setDocOfferQuote(confOffer.document.quote || fOffer?.quote || "");
         setDocOfferWhere(confOffer.document.where || fOffer?.where || "");
-        setIntakeOfferDisplay(confOffer.answers.display || (iOfferNum ? `$${iOfferNum.toLocaleString()}` : ""));
+        setIntakeOfferDisplay(intakeOffVal);
       } else if (!offerAlreadyResolved && dOfferNum !== null && iOfferNum !== null && Math.abs(dOfferNum - iOfferNum) >= 1) {
         setHasOfferConflict(true);
-        setDocOfferDisplay(`$${dOfferNum.toLocaleString()}`);
+        docOffVal = `$${dOfferNum.toLocaleString()}`;
+        intakeOffVal = `$${iOfferNum.toLocaleString()}`;
+        setDocOfferDisplay(docOffVal);
         setDocOfferQuote(fOffer?.quote || "");
         setDocOfferWhere(fOffer?.where || "");
-        setIntakeOfferDisplay(`$${iOfferNum.toLocaleString()}`);
+        setIntakeOfferDisplay(intakeOffVal);
       } else {
         setHasOfferConflict(false);
-        if (dOfferNum !== null) setDocOfferDisplay(`$${dOfferNum.toLocaleString()}`);
-        if (iOfferNum !== null) setIntakeOfferDisplay(`$${iOfferNum.toLocaleString()}`);
+        if (dOfferNum !== null) {
+          docOffVal = `$${dOfferNum.toLocaleString()}`;
+          setDocOfferDisplay(docOffVal);
+        }
+        if (iOfferNum !== null) {
+          intakeOffVal = `$${iOfferNum.toLocaleString()}`;
+          setIntakeOfferDisplay(intakeOffVal);
+        }
       }
 
       // 2. Process Contract Conflict
@@ -659,18 +676,25 @@ export default function CanadaReviewPage({
       // 3b. Detect age & annual pay mismatches (Round 2 Fix 3)
       const docAge = extractDocAge(facts, false);
       const docPay = extractDocAnnualPay(facts, false);
-      if (!resolvedLocallyRef.current) {
-        const mmRows = buildMismatchRows({
-          answers: activeAnswers,
-          data,
-          facts,
-          checkRows,
-          conflicts,
-          isUS: false,
-        });
-        setMismatchRows(mmRows);
-        setMismatchesResolved(findMismatches(mmRows).length === 0);
-      }
+      const mmRows = buildMismatchRows({
+        answers: activeAnswers,
+        data,
+        facts,
+        checkRows,
+        conflicts,
+        isUS: false,
+      });
+      setMismatchRows((prev) => {
+        const next: Rows = { ...mmRows };
+        for (const resolvedKey of resolvedMismatchKeysRef.current) {
+          if (prev[resolvedKey]) {
+            next[resolvedKey] = prev[resolvedKey];
+          } else {
+            delete next[resolvedKey];
+          }
+        }
+        return next;
+      });
 
       // 4. Update items from extracted facts and review rows
       const allModelRows: any[] = [];
@@ -784,6 +808,20 @@ export default function CanadaReviewPage({
             }
           }
 
+          if (item.id === 'offerMoney' && offerConflictDetected) {
+            if (intakeOffVal) val = intakeOffVal;
+            else if (docOffVal) val = docOffVal;
+            if (docOffVal) origVal = docOffVal;
+            confirmed = false;
+            userChanged = false;
+          }
+          if (item.id === 'age' && mmRows.age && !resolvedMismatchKeysRef.current.has('age') && findMismatches({ age: mmRows.age }).length > 0) {
+            confirmed = false;
+          }
+          if (item.id === 'salary' && mmRows.annual_pay && !resolvedMismatchKeysRef.current.has('annual_pay') && findMismatches({ annual_pay: mmRows.annual_pay }).length > 0) {
+            confirmed = false;
+          }
+
           if (val && val.toLowerCase().includes('no date') && val.length > 25) {
             if (!cit) cit = `"${val}"`;
             val = "No date given";
@@ -814,7 +852,20 @@ export default function CanadaReviewPage({
   // Confirmation counting: 1-to-1 mapping with actual confirmation tasks
   const requiredItems = items.filter((i) => !i.isOptional);
 
+  const allDetectedMismatches = findMismatches(mismatchRows);
+  const unresolvedMismatches = findUnresolvedMismatches(mismatchRows, allDetectedMismatches);
+  const ageMismatch = unresolvedMismatches.find((m) => m.key === "age");
+  const payMismatch = unresolvedMismatches.find(
+    (m) => m.key === "annual_pay" || m.key === "pay" || m.key === "base_salary" || m.key === "salary"
+  );
+
   const isItemConfirmed = (item: ReviewItem) => {
+    if (item.id === "age" && ageMismatch) {
+      return false;
+    }
+    if (item.id === "salary" && payMismatch) {
+      return false;
+    }
     if (item.id === "offerNoticeWorked") {
       return workingWeeksSaved || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
     }
@@ -840,89 +891,123 @@ export default function CanadaReviewPage({
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
   const isAllConfirmed = remainingCount === 0;
-  const activeMismatches = findMismatches(mismatchRows);
-  const needsMismatchStep = activeMismatches.length > 0 && !mismatchesResolved;
-  const canBuild = isAllConfirmed && declaredCorrect && !needsMismatchStep;
+  const canBuild = isAllConfirmed && declaredCorrect && unresolvedMismatches.length === 0;
 
-  const handleMismatchesDone = async (fixed: Rows) => {
-    setMismatchSaving(true);
-    setMismatchError("");
+  const handleResolveSingleMismatch = async (key: string, pick: "user" | "doc") => {
+    const existingRow = mismatchRows[key];
+    if (!existingRow) return;
+    setMismatchSavingKey(key);
+    setMismatchErrorByKey((prev) => ({ ...prev, [key]: "" }));
+    const fixed = applySingleMismatchChoice(mismatchRows, key, pick);
+    const fixedRow = fixed[key];
+    const isAge = key === "age";
+    const resolvedNum =
+      fixedRow?.value != null
+        ? Number(String(fixedRow.value).replace(/[^0-9.]/g, ""))
+        : null;
     const activeCaseId = caseId || cs?.id;
-    const resolvedAge = fixed.age?.value != null ? Number(String(fixed.age.value).replace(/[^0-9]/g, "")) : null;
-    const resolvedPay = fixed.annual_pay?.value != null ? Number(String(fixed.annual_pay.value).replace(/[^0-9.]/g, "")) : null;
+    const apiKey = isAge ? "age" : "pay";
+    const apiChoice = pick === "doc" ? "document" : "answers";
 
     try {
       if (activeCaseId) {
-        if (fixed.age && (fixed.age.status === "confirmed_from_document" || fixed.age.status === "confirmed_by_user")) {
-          const choice = fixed.age.status === "confirmed_from_document" ? "document" : "answers";
-          try {
-            await fairexit.resolveConflict(activeCaseId, "age", choice);
-          } catch {
-            if (resolvedAge !== null && Number.isFinite(resolvedAge)) {
-              await fairexit.saveReviewData(activeCaseId, { key: "age", action: "change", value: resolvedAge });
-            }
-          }
-        }
-        if (fixed.annual_pay && (fixed.annual_pay.status === "confirmed_from_document" || fixed.annual_pay.status === "confirmed_by_user")) {
-          const choice = fixed.annual_pay.status === "confirmed_from_document" ? "document" : "answers";
-          try {
-            await fairexit.resolveConflict(activeCaseId, "pay", choice);
-          } catch {
-            if (resolvedPay !== null && Number.isFinite(resolvedPay)) {
-              await fairexit.saveReviewData(activeCaseId, { key: "pay", action: "change", value: resolvedPay });
-            }
+        try {
+          await fairexit.resolveConflict(activeCaseId, apiKey, apiChoice);
+        } catch {
+          if (resolvedNum !== null && Number.isFinite(resolvedNum)) {
+            await fairexit.saveReviewData(activeCaseId, {
+              key: apiKey,
+              action: "change",
+              value: isAge ? Math.round(resolvedNum) : resolvedNum,
+            });
           }
         }
       }
 
-      const storagePatch: Partial<ReportInputs> = {};
-      if (resolvedAge !== null && Number.isFinite(resolvedAge)) storagePatch.age = resolvedAge;
-      if (resolvedPay !== null && Number.isFinite(resolvedPay)) storagePatch.salary = resolvedPay;
-      if (Object.keys(storagePatch).length > 0) {
-        saveReportInputs(storagePatch);
+      if (resolvedNum !== null && Number.isFinite(resolvedNum)) {
+        saveReportInputs(isAge ? { age: Math.round(resolvedNum) } : { salary: resolvedNum });
       }
 
+      const itemId = isAge ? "age" : "salary";
+      const fromDoc = pick === "doc";
       setItems((prev) =>
         prev.map((item) => {
-          if (item.id === "age" && resolvedAge !== null && Number.isFinite(resolvedAge)) {
-            const fromDoc = fixed.age?.status === "confirmed_from_document";
-            return {
-              ...item,
-              value: String(resolvedAge),
-              source: fromDoc ? (fixed.age.source === "contract" ? "Your contract" : "Your letter") : "From your answers",
-              confirmed: true,
-              userChanged: false,
-              userChangeAck: false,
-            };
-          }
-          if (item.id === "salary" && resolvedPay !== null && Number.isFinite(resolvedPay)) {
-            const fromDoc = fixed.annual_pay?.status === "confirmed_from_document";
-            return {
-              ...item,
-              value: `$${Math.round(resolvedPay).toLocaleString()}`,
-              source: fromDoc ? (fixed.annual_pay.source === "contract" ? "Your contract" : "Your letter") : "From your answers",
-              confirmed: true,
-              userChanged: false,
-              userChangeAck: false,
-            };
-          }
-          return item;
+          if (item.id !== itemId || resolvedNum === null || !Number.isFinite(resolvedNum)) return item;
+          return {
+            ...item,
+            value: isAge ? String(Math.round(resolvedNum)) : `$${Math.round(resolvedNum).toLocaleString()}`,
+            source: fromDoc ? (fixedRow.source === "contract" ? "Your contract" : "Your letter") : "From your answers",
+            confirmed: true,
+            userChanged: false,
+            userChangeAck: false,
+            isEditingInline: false,
+            showSecondLook: false,
+          };
         })
       );
 
-      resolvedLocallyRef.current = true;
+      resolvedMismatchKeysRef.current.add(key);
       setMismatchRows(fixed);
-      setMismatchesResolved(true);
     } catch (e) {
-      setMismatchError(e instanceof Error ? e.message : "Could not save your selection. Please try again.");
+      setMismatchErrorByKey((prev) => ({
+        ...prev,
+        [key]: e instanceof Error ? e.message : "Could not save your selection. Please try again.",
+      }));
     } finally {
-      setMismatchSaving(false);
+      setMismatchSavingKey((prev) => (prev === key ? null : prev));
     }
   };
 
   // ── Handlers for Items ──
+  const handleChooseOfferConflict = (choice: "letter" | "intake" | "custom", customVal?: string) => {
+    offerResolvedLocallyRef.current = true;
+    setOfferConflictChoice(choice);
+    setShowOfferConflictCustom(false);
+    let chosenVal = docOfferDisplay;
+    if (choice === "intake") {
+      chosenVal = intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
+    } else if (choice === "custom" && customVal) {
+      const clean = Number(customVal.replace(/[^0-9.]/g, ""));
+      chosenVal = Number.isFinite(clean) && clean > 0 ? `$${clean.toLocaleString()}` : customVal;
+    }
+    const chosenNum = Number(String(chosenVal || "").replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(chosenNum) && chosenNum > 0) {
+      saveReportInputs({
+        offer: chosenNum,
+        offerSource: choice === "letter" ? "document" : choice === "intake" ? "questionnaire" : "user",
+      });
+    }
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true, userChanged: false, showSecondLook: false, isEditingInline: false } : i
+      )
+    );
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      const backendChoice = choice === "letter" ? "document" : choice === "intake" ? "answers" : "other";
+      const payloadVal = Number.isFinite(chosenNum) && chosenNum > 0 ? chosenNum : chosenVal;
+      fairexit.resolveConflict(activeCaseId, 'offer_amount', backendChoice, payloadVal).catch(() => {
+        fairexit.saveReviewData(activeCaseId, {
+          key: 'offer_amount',
+          action: choice === 'custom' || choice === 'intake' ? 'change' : 'confirm',
+          value: payloadVal,
+        }).catch(() => {});
+      });
+    }
+  };
+
   const toggleConfirm = (id: string) => {
     const item = items.find((i) => i.id === id);
+    if (id === "offerMoney" && hasOfferConflict && offerConflictChoice === null) {
+      const choice =
+        item?.value && docOfferDisplay && item.value === docOfferDisplay
+          ? "letter"
+          : item?.value && intakeOfferDisplay && item.value === intakeOfferDisplay
+          ? "intake"
+          : "custom";
+      handleChooseOfferConflict(choice, item?.value);
+      return;
+    }
     const newConfirmed = !item?.confirmed;
     setItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, confirmed: newConfirmed, userChanged: false, showSecondLook: false } : i))
@@ -948,6 +1033,14 @@ export default function CanadaReviewPage({
         userChangeAck: item.userChanged ? true : item.userChangeAck,
       }))
     );
+    setMismatchRows((prev) => {
+      let next = prev;
+      for (const k of Object.keys(prev)) {
+        resolvedMismatchKeysRef.current.add(k);
+        next = applySingleMismatchChoice(next, k, "doc");
+      }
+      return next;
+    });
     if (hasOfferConflict) setOfferConflictChoice("letter");
     if (hasContractConflict) setContractConflictChoice("contract");
     setWorkingWeeksSaved(true);
@@ -958,43 +1051,6 @@ export default function CanadaReviewPage({
     if (activeCaseId) {
       fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {});
       fairexit.attest(activeCaseId).catch(() => {});
-    }
-  };
-
-  const handleChooseOfferConflict = (choice: "letter" | "intake" | "custom", customVal?: string) => {
-    offerResolvedLocallyRef.current = true;
-    setOfferConflictChoice(choice);
-    setShowOfferConflictCustom(false);
-    let chosenVal = docOfferDisplay;
-    if (choice === "intake") {
-      chosenVal = intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
-    } else if (choice === "custom" && customVal) {
-      const clean = Number(customVal.replace(/[^0-9.]/g, ""));
-      chosenVal = Number.isFinite(clean) && clean > 0 ? `$${clean.toLocaleString()}` : customVal;
-    }
-    const chosenNum = Number(String(chosenVal || "").replace(/[^0-9.]/g, ""));
-    if (Number.isFinite(chosenNum) && chosenNum > 0) {
-      saveReportInputs({
-        offer: chosenNum,
-        offerSource: choice === "letter" ? "document" : choice === "intake" ? "questionnaire" : "user",
-      });
-    }
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true, userChanged: false, showSecondLook: false } : i
-      )
-    );
-    const activeCaseId = caseId || cs?.id;
-    if (activeCaseId) {
-      const backendChoice = choice === "letter" ? "document" : choice === "intake" ? "answers" : "other";
-      const payloadVal = Number.isFinite(chosenNum) && chosenNum > 0 ? chosenNum : chosenVal;
-      fairexit.resolveConflict(activeCaseId, 'offer_amount', backendChoice, payloadVal).catch(() => {
-        fairexit.saveReviewData(activeCaseId, {
-          key: 'offer_amount',
-          action: choice === 'custom' || choice === 'intake' ? 'change' : 'confirm',
-          value: payloadVal,
-        }).catch(() => {});
-      });
     }
   };
 
@@ -1154,7 +1210,10 @@ export default function CanadaReviewPage({
         } else {
           const keyMap = CA_KEY_MAP;
           fairexit.saveReviewData(activeCaseId, { key: keyMap[id] || id, action: 'change', value: formattedVal }).catch(() => {});
+          syncResolvedInlineItem(id, formattedVal === item.originalDocumentValue ? "doc" : "custom", formattedVal);
         }
+      } else {
+        syncResolvedInlineItem(id, formattedVal === item.originalDocumentValue ? "doc" : "custom", formattedVal);
       }
     }
   };
@@ -1210,6 +1269,33 @@ export default function CanadaReviewPage({
     }
   };
 
+  const syncResolvedInlineItem = (id: string, kind: "doc" | "custom", valStr?: string) => {
+    const cleanNum = valStr ? parseOfferNumber(valStr) : null;
+    if (id === "offerMoney") {
+      offerResolvedLocallyRef.current = true;
+      setOfferConflictChoice(kind === "doc" ? "letter" : "custom");
+      if (cleanNum !== null) {
+        saveReportInputs({
+          offer: cleanNum,
+          offerSource: kind === "doc" ? "document" : "user",
+        });
+      }
+      return;
+    }
+    if (id === "age") {
+      resolvedMismatchKeysRef.current.add("age");
+      setMismatchRows((prev) => applySingleMismatchChoice(prev, "age", kind === "doc" ? "doc" : "user"));
+      if (cleanNum !== null) saveReportInputs({ age: Math.round(cleanNum) });
+      return;
+    }
+    if (id === "salary") {
+      const targetKey = mismatchRows.annual_pay ? "annual_pay" : mismatchRows.pay ? "pay" : mismatchRows.base_salary ? "base_salary" : "salary";
+      resolvedMismatchKeysRef.current.add(targetKey);
+      setMismatchRows((prev) => applySingleMismatchChoice(prev, targetKey, kind === "doc" ? "doc" : "user"));
+      if (cleanNum !== null) saveReportInputs({ salary: Math.round(cleanNum) });
+    }
+  };
+
   const handleFixPlausibility = (id: string) => {
     setItems((prev) =>
       prev.map((i) => (i.id === id ? { ...i, showPlausibilityAlert: false, inlineInputValue: "" } : i))
@@ -1217,6 +1303,8 @@ export default function CanadaReviewPage({
   };
 
   const handleUseDocumentValue = (id: string) => {
+    const currentItem = items.find((i) => i.id === id);
+    const chosenVal = currentItem?.originalDocumentValue || currentItem?.value || "";
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
@@ -1231,30 +1319,30 @@ export default function CanadaReviewPage({
         };
       })
     );
+    syncResolvedInlineItem(id, "doc", chosenVal);
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
       const keyMap = CA_KEY_MAP;
       const factKey = keyMap[id] || id;
-      const currentItem = items.find((i) => i.id === id);
       fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: currentItem?.originalDocumentValue }).catch(() => {});
     }
   };
 
   const handleKeepUserValue = (id: string) => {
+    const currentItem = items.find((i) => i.id === id);
+    const cfg = CA_FIELD_CONFIGS[id];
+    let keptFormatted = currentItem?.inlineInputValue || currentItem?.value || "";
+    if (cfg?.type === "date" && keptFormatted.includes("-")) {
+      keptFormatted = formatDateFromISO(keptFormatted);
+    } else if (cfg?.formatSave) {
+      keptFormatted = cfg.formatSave(keptFormatted);
+    }
     setItems((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item;
-        const cfg = CA_FIELD_CONFIGS[id];
-        let formattedVal = item.inlineInputValue || item.value;
-        if (cfg?.type === "date" && formattedVal.includes("-")) {
-          formattedVal = formatDateFromISO(formattedVal);
-        } else if (cfg?.formatSave) {
-          formattedVal = cfg.formatSave(formattedVal);
-        }
-
         return {
           ...item,
-          value: formattedVal,
+          value: keptFormatted,
           userChanged: false,
           userChangeAck: true,
           confirmed: true,
@@ -1263,11 +1351,11 @@ export default function CanadaReviewPage({
         };
       })
     );
+    syncResolvedInlineItem(id, "custom", keptFormatted);
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
       const keyMap = CA_KEY_MAP;
       const factKey = keyMap[id] || id;
-      const currentItem = items.find((i) => i.id === id);
       fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'change', value: currentItem?.inlineInputValue || currentItem?.value }).catch(() => {});
     }
   };
@@ -1771,24 +1859,32 @@ export default function CanadaReviewPage({
             </div>
 
             <div className="space-y-2.5">
-              {items.filter((item) => item.section === "you").map((item) => (
-                <ItemCard
-                  key={item.id}
-                  item={item}
-                  onToggleConfirm={() => toggleConfirm(item.id)}
-                  onStartInlineEdit={() => startInlineEdit(item.id)}
-                  onCancelInlineEdit={() => cancelInlineEdit(item.id)}
-                  onSaveInline={(val, force) => handleSaveInline(item.id, val, force)}
-                  onFixPlausibility={() => handleFixPlausibility(item.id)}
-                  onUseDocumentValue={() => handleUseDocumentValue(item.id)}
-                  onKeepUserValue={() => handleKeepUserValue(item.id)}
-                  onToggleUserChangeAck={() => toggleUserChangeAck(item.id)}
-                  onViewCitation={(cit) =>
-                    setActiveCitation({ title: item.label, text: cit })
-                  }
-                  onAddClearerCopy={() => router.push("/report?step=upload")}
-                />
-              ))}
+              {items.filter((item) => item.section === "you").map((item) => {
+                const inlineMismatch =
+                  item.id === "age" ? ageMismatch : item.id === "salary" ? payMismatch : undefined;
+                return (
+                  <ItemCard
+                    key={item.id}
+                    item={item}
+                    inlineMismatch={inlineMismatch}
+                    mismatchBusy={Boolean(inlineMismatch && mismatchSavingKey === inlineMismatch.key)}
+                    mismatchError={inlineMismatch ? mismatchErrorByKey[inlineMismatch.key] : undefined}
+                    onResolveMismatch={handleResolveSingleMismatch}
+                    onToggleConfirm={() => toggleConfirm(item.id)}
+                    onStartInlineEdit={() => startInlineEdit(item.id)}
+                    onCancelInlineEdit={() => cancelInlineEdit(item.id)}
+                    onSaveInline={(val, force) => handleSaveInline(item.id, val, force)}
+                    onFixPlausibility={() => handleFixPlausibility(item.id)}
+                    onUseDocumentValue={() => handleUseDocumentValue(item.id)}
+                    onKeepUserValue={() => handleKeepUserValue(item.id)}
+                    onToggleUserChangeAck={() => toggleUserChangeAck(item.id)}
+                    onViewCitation={(cit) =>
+                      setActiveCitation({ title: item.label, text: cit })
+                    }
+                    onAddClearerCopy={() => router.push("/report?step=upload")}
+                  />
+                );
+              })}
             </div>
           </div>
 
@@ -1808,6 +1904,29 @@ export default function CanadaReviewPage({
                 <ItemCard
                   key={item.id}
                   item={item}
+                  offerConflictPanel={
+                    item.id === "offerMoney" && offerConflictChoice === null && hasOfferConflict && (
+                      <InlineOfferConflictBanner
+                        docSourceText={
+                          docOfferWhere
+                            ? /^your\s+(letter|agreement|contract)/i.test(docOfferWhere.trim())
+                              ? `${docOfferWhere.trim()}, says:`
+                              : `Your letter, ${docOfferWhere.trim()}, says:`
+                            : "Your letter says:"
+                        }
+                        docDisplay={docOfferDisplay}
+                        docQuote={docOfferQuote}
+                        keepDisplay={
+                          item.value ||
+                          intakeOfferDisplay ||
+                          (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "")
+                        }
+                        onUseDocument={() => handleChooseOfferConflict("letter")}
+                        onKeepCurrent={() => handleChooseOfferConflict("intake")}
+                        onAddClearerCopy={() => router.push("/report?step=upload")}
+                      />
+                    )
+                  }
                   onToggleConfirm={() => toggleConfirm(item.id)}
                   onStartInlineEdit={() => startInlineEdit(item.id)}
                   onCancelInlineEdit={() => cancelInlineEdit(item.id)}
@@ -1977,41 +2096,6 @@ export default function CanadaReviewPage({
         </div>
       </main>
 
-      {/* ── Centered Confirmation Card: Details Mismatch (Age / Annual Pay) ── */}
-      {reviewLoaded && needsMismatchStep && (
-        <ConfirmationCardModal ariaLabel="Confirm your details" kicker="CHECK THIS FIRST">
-          {mismatchError && (
-            <div role="alert" className="mb-4 rounded-xl bg-[#fbeceb] text-[#a3231f] px-3.5 py-2.5 text-[13.5px]">
-              {mismatchError}
-            </div>
-          )}
-          <MismatchStep rows={mismatchRows} busy={mismatchSaving} onDone={handleMismatchesDone} />
-        </ConfirmationCardModal>
-      )}
-
-      {/* ── Centered Confirmation Card: Offer Amount Confirmation ── */}
-      {reviewLoaded && !needsMismatchStep && offerConflictChoice === null && hasOfferConflict && (
-        <OfferAmountConfirmationCard
-          docLabel="Your letter says"
-          conflictLead="Your letter and your answers give different amounts. Which is right?"
-          docDisplay={docOfferDisplay}
-          docQuote={docOfferQuote}
-          docWhere={docOfferWhere}
-          intakeDisplay={intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "—")}
-          selectedChoice={null}
-          showCustom={showOfferConflictCustom}
-          onShowCustom={setShowOfferConflictCustom}
-          customVal={offerConflictCustomVal}
-          onCustomValChange={setOfferConflictCustomVal}
-          onChoose={(c, v) =>
-            handleChooseOfferConflict(
-              c === "document" ? "letter" : c === "answers" ? "intake" : "custom",
-              v
-            )
-          }
-        />
-      )}
-
       {/* ── Citation Modal ("See the words") ── */}
       {activeCitation && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/45 backdrop-blur-xs">
@@ -2070,6 +2154,11 @@ export default function CanadaReviewPage({
 // ── Single Review Item Card Component ──
 function ItemCard({
   item,
+  inlineMismatch,
+  mismatchBusy,
+  mismatchError,
+  onResolveMismatch,
+  offerConflictPanel,
   onToggleConfirm,
   onStartInlineEdit,
   onCancelInlineEdit,
@@ -2082,6 +2171,11 @@ function ItemCard({
   onAddClearerCopy,
 }: {
   item: ReviewItem;
+  inlineMismatch?: Mismatch;
+  mismatchBusy?: boolean;
+  mismatchError?: string;
+  onResolveMismatch?: (key: string, pick: "user" | "doc") => void;
+  offerConflictPanel?: React.ReactNode;
   onToggleConfirm: () => void;
   onStartInlineEdit: () => void;
   onCancelInlineEdit: () => void;
@@ -2096,7 +2190,7 @@ function ItemCard({
   const cfg = CA_FIELD_CONFIGS[item.id];
 
   // 1. CONFIRMED ROW STATE (Matches Image 1)
-  if (item.confirmed && !item.isEditingInline && !item.userChanged && !item.showSecondLook) {
+  if (item.confirmed && !item.isEditingInline && !item.userChanged && !item.showSecondLook && !inlineMismatch && !offerConflictPanel) {
     const rawVal = item.value || "Yes";
     const isLongVal = rawVal.length > 25;
     const isNoDate = rawVal.toLowerCase().includes("no date");
@@ -2204,7 +2298,7 @@ function ItemCard({
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
-          {!item.hasOnlyChange && (
+          {!item.hasOnlyChange && !inlineMismatch && (
             <button
               type="button"
               onClick={onToggleConfirm}
@@ -2223,8 +2317,20 @@ function ItemCard({
         </div>
       </div>
 
-      {/* Amber "We looked again" banner if user changed value (Image 3) */}
-      {(item.userChanged || item.showSecondLook) && !item.isEditingInline && (
+      {/* Inline client mismatch UI for Age / Pay per year */}
+      {inlineMismatch && onResolveMismatch && !item.isEditingInline && (
+        <InlineMismatchPrompt
+          mismatch={inlineMismatch}
+          busy={mismatchBusy}
+          error={mismatchError}
+          onConfirm={onResolveMismatch}
+        />
+      )}
+
+      {/* Inline Offer Amount Confirmation OR Amber "We looked again" banner */}
+      {offerConflictPanel && !item.isEditingInline ? (
+        offerConflictPanel
+      ) : (item.userChanged || item.showSecondLook) && !item.isEditingInline ? (
         <div className="bg-[#FAF9F5] border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[8px] p-3.5 sm:p-4 mt-3.5 animate-in fade-in duration-200">
           <p className="font-sans text-[13.5px] text-[#062C55] mb-3">
             We looked again. {item.source ? `${item.source} says:` : "Your letter says:"}{" "}
@@ -2259,7 +2365,7 @@ function ItemCard({
             </button>
           </div>
         </div>
-      )}
+      ) : null}
 
       {item.isEditingInline && (
         <div className="mt-4 pt-3.5 border-t border-[#F0EFEA]">

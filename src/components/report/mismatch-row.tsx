@@ -145,6 +145,35 @@ export function MismatchRow(props: {
   );
 }
 
+/** Inline mismatch card rendered directly inside a checklist item row. */
+export function InlineMismatchPrompt(props: {
+  mismatch: Mismatch;
+  busy?: boolean;
+  error?: string;
+  onConfirm: (key: string, pick: "user" | "doc") => void;
+}) {
+  const [choice, setChoice] = useState<"user" | "doc" | undefined>(undefined);
+  const { mismatch, busy, error, onConfirm } = props;
+  return (
+    <div className="fx-mm-inline" data-testid={`mismatch-inline-${mismatch.key}`}>
+      {error ? (
+        <div role="alert" className="fx-mm-inline__err">
+          {error}
+        </div>
+      ) : null}
+      <MismatchRow m={mismatch} choice={choice} onChoose={(_k, pick) => setChoice(pick)} />
+      <button
+        type="button"
+        className="fx-mm-continue"
+        disabled={busy || !choice}
+        onClick={() => choice && onConfirm(mismatch.key, choice)}
+      >
+        {busy ? "Saving…" : "Continue"}
+      </button>
+    </div>
+  );
+}
+
 /** Drop-in step: shows one mismatch at a time, Continue stays off until every one is picked. */
 export function MismatchStep(props: { rows: Rows; busy?: boolean; onDone: (rows: Rows) => void }) {
   const mismatches = findMismatches(props.rows);

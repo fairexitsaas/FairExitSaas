@@ -9,11 +9,16 @@ import { renderReportHtml } from '../../src/fairexit/reportOutput'
 import { buildJurisdiction } from '../../src/fairexit/jurisdictions'
 import { sourcesFor } from '../../src/fairexit/regionData'
 import { mockCallA, mockCallB } from '../../src/fairexit/mocks'
-import { MismatchStep, type Rows } from '../../../src/components/report/mismatch-row'
 import {
-  ConfirmationCardModal,
-  OfferAmountConfirmationCard,
-} from '../../../src/components/report/ConfirmationCardModal'
+  InlineMismatchPrompt,
+  findMismatches,
+  type Rows,
+} from '../../../src/components/report/mismatch-row'
+import { InlineOfferConflictBanner } from '../../../src/components/report/InlineOfferConflictBanner'
+import {
+  findUnresolvedMismatches,
+  applySingleMismatchChoice,
+} from '../../../src/lib/confirmation-mismatch'
 
 const rootDir = path.resolve(__dirname, '../../..')
 
@@ -97,74 +102,132 @@ describe('PDF Section 3 & Sources print pagination rules', () => {
   })
 })
 
-describe('Confirmation centered cards & independent Offer Amount confirmation', () => {
-  it('renders ConfirmationCardModal as a centered responsive card over visible page background', () => {
-    const mmRows: Rows = {
-      age: { value: 50, user_value: 50, doc_value: 54, source: 'agreement', quote: 'age 54', where: 'p. 2' },
-    }
+describe('Inline confirmation panels (Offer Amount, Age, Monthly/Annual Pay)', () => {
+  it('renders InlineOfferConflictBanner inline (no modal overlay) matching second-look checklist UI', () => {
     const markup = renderToStaticMarkup(
-      React.createElement(
-        ConfirmationCardModal,
-        { ariaLabel: 'Confirm your details', kicker: 'CHECK THIS FIRST' },
-        React.createElement(MismatchStep, { rows: mmRows, onDone: () => {} })
-      )
-    )
-    expect(markup).toContain('role="dialog"')
-    expect(markup).toContain('aria-modal="true"')
-    expect(markup).toContain('fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6')
-    expect(markup).toContain('max-w-[540px]')
-    expect(markup).toContain('p-5 sm:p-7')
-    expect(markup).toContain('Your age: which is right?')
-  })
-
-  it('renders OfferAmountConfirmationCard with both amounts, quote, custom option, and centered card shell', () => {
-    const markup = renderToStaticMarkup(
-      React.createElement(OfferAmountConfirmationCard, {
-        docLabel: 'Your agreement says',
-        conflictLead: 'Your agreement and your answers give different amounts. Which is right?',
-        docDisplay: '$20,192',
-        docQuote: 'twenty thousand one hundred ninety-two dollars',
-        docWhere: 'Section 2',
-        intakeDisplay: '$15,000',
-        selectedChoice: null,
-        showCustom: false,
-        onShowCustom: () => {},
-        customVal: '',
-        onCustomValChange: () => {},
-        onChoose: () => {},
+      React.createElement(InlineOfferConflictBanner, {
+        docSourceText: 'Your letter, paragraph 2, says:',
+        docDisplay: '$24,000',
+        docQuote: 'a lump sum of $24,000, less required deductions.',
+        keepDisplay: '$26,000',
+        onUseDocument: () => {},
+        onKeepCurrent: () => {},
+        onAddClearerCopy: () => {},
       })
     )
-    expect(markup).toContain('aria-label="Confirm money offered"')
-    expect(markup).toContain('max-w-[540px]')
-    expect(markup).toContain('Money offered')
-    expect(markup).toContain('$20,192')
-    expect(markup).toContain('$15,000')
-    expect(markup).toContain('Your agreement says')
-    expect(markup).toContain('You told us')
-    expect(markup).toContain('Use this')
-    expect(markup).toContain('Something else')
+    expect(markup).not.toContain('role="dialog"')
+    expect(markup).not.toContain('fixed inset-0')
+    expect(markup).toContain('We looked again.')
+    expect(markup).toContain('Your letter, paragraph 2, says:')
+    expect(markup).toContain('$24,000')
+    expect(markup).toContain('a lump sum of $24,000, less required deductions.')
+    expect(markup).toContain('Use $24,000')
+    expect(markup).toContain('Keep $26,000')
+    expect(markup).toContain('Add a clearer copy')
   })
 
-  it('keeps underlying Review page rendered (not full-screen replaced) and separates Mismatch vs Offer cards in both US and CA', () => {
+  it('renders client-provided MismatchRow UI inline for Age and Yearly Pay without modals', () => {
+    const rows: Rows = {
+      age: {
+        value: 50,
+        user_value: 50,
+        doc_value: 54,
+        source: 'letter',
+        quote: 'age 54',
+        where: 'paragraph 3',
+      },
+      annual_pay: {
+        value: 120000,
+        user_value: 120000,
+        doc_value: 175000,
+        source: 'letter',
+        quote: 'annual salary of $175,000',
+        where: 'paragraph 1',
+      },
+    }
+    const allMismatches = findMismatches(rows)
+    const ageMismatch = allMismatches.find((m) => m.key === 'age')!
+    const payMismatch = allMismatches.find((m) => m.key === 'annual_pay')!
+
+    const ageMarkup = renderToStaticMarkup(
+      React.createElement(InlineMismatchPrompt, {
+        mismatch: ageMismatch,
+        onConfirm: () => {},
+      })
+    )
+    expect(ageMarkup).not.toContain('fixed inset-0')
+    expect(ageMarkup).toContain('class="fx-mm-inline"')
+    expect(ageMarkup).toContain('Your age: which is right?')
+    expect(ageMarkup).toContain('What you told us')
+    expect(ageMarkup).toContain('>50<')
+    expect(ageMarkup).toContain('What your letter says')
+    expect(ageMarkup).toContain('>54<')
+    expect(ageMarkup).toMatch(/<button[^>]*class="fx-mm-continue"[^>]*disabled=""/)
+
+    const payMarkup = renderToStaticMarkup(
+      React.createElement(InlineMismatchPrompt, {
+        mismatch: payMismatch,
+        onConfirm: () => {},
+      })
+    )
+    expect(payMarkup).not.toContain('fixed inset-0')
+    expect(payMarkup).toContain('class="fx-mm-inline"')
+    expect(payMarkup).toContain('Your yearly pay: which is right?')
+    expect(payMarkup).toContain('$120,000')
+    expect(payMarkup).toContain('$175,000')
+    expect(payMarkup).toMatch(/<button[^>]*class="fx-mm-continue"[^>]*disabled=""/)
+  })
+
+  it('resolving Age or Pay independently leaves other active mismatches intact', () => {
+    const rows: Rows = {
+      age: { value: 50, user_value: 50, doc_value: 54, source: 'agreement' },
+      annual_pay: { value: 120000, user_value: 120000, doc_value: 175000, source: 'agreement' },
+    }
+    const initialUnresolved = findUnresolvedMismatches(rows, findMismatches(rows))
+    expect(initialUnresolved.map((m) => m.key)).toEqual(['age', 'annual_pay'])
+
+    // Resolving age alone must keep annual_pay unresolved
+    const afterAge = applySingleMismatchChoice(rows, 'age', 'doc')
+    expect(afterAge.age.status).toBe('confirmed_from_document')
+    expect(afterAge.age.value).toBe(54)
+    const remainingAfterAge = findUnresolvedMismatches(afterAge, findMismatches(afterAge))
+    expect(remainingAfterAge.map((m) => m.key)).toEqual(['annual_pay'])
+
+    // Then resolving annual_pay completes mismatches cleanly
+    const afterPay = applySingleMismatchChoice(afterAge, 'annual_pay', 'user')
+    expect(afterPay.annual_pay.status).toBe('confirmed_by_user')
+    expect(afterPay.annual_pay.value).toBe(120000)
+    expect(findUnresolvedMismatches(afterPay, findMismatches(afterPay))).toEqual([])
+  })
+
+  it('removes ConfirmationCardModal and keeps Offer, Age, and Pay confirmations inline in US, CA, and ReportFlow', () => {
+    const modalPath = path.join(rootDir, 'src/components/report/ConfirmationCardModal.tsx')
+    expect(fs.existsSync(modalPath)).toBe(false)
+
     const usSrc = fs.readFileSync(path.join(rootDir, 'src/components/report/us/USReviewPage.tsx'), 'utf8')
     const caSrc = fs.readFileSync(path.join(rootDir, 'src/components/report/ca/CanadaReviewPage.tsx'), 'utf8')
     const flowSrc = fs.readFileSync(path.join(rootDir, 'src/app/report/ReportFlow.tsx'), 'utf8')
+    const mmCss = fs.readFileSync(path.join(rootDir, 'src/components/report/mismatch-row.css'), 'utf8')
 
-    // Neither review page replaces the full review body with needsMismatchStep anymore
-    expect(usSrc).not.toContain(') : needsMismatchStep ? (')
-    expect(caSrc).not.toContain(') : needsMismatchStep ? (')
+    for (const src of [usSrc, caSrc, flowSrc]) {
+      expect(src).not.toContain('ConfirmationCardModal')
+      expect(src).not.toContain('OfferAmountConfirmationCard')
+      expect(src).not.toContain('needsMismatchStep')
+      expect(src).toContain('InlineMismatchPrompt')
+    }
 
-    // Both US & CA render centered MismatchStep AND restored centered OfferAmountConfirmationCard sequentially without duplication
     for (const src of [usSrc, caSrc]) {
-      expect(src).toContain('{reviewLoaded && needsMismatchStep && (')
-      expect(src).toContain('{reviewLoaded && !needsMismatchStep && offerConflictChoice === null && hasOfferConflict && (')
-      expect(src).toContain('<OfferAmountConfirmationCard')
-      expect(src).toContain('resolveConflict(activeCaseId, \'offer_amount\'')
+      expect(src).toContain('hasOfferConflict && (')
+      expect(src).toContain('<InlineOfferConflictBanner')
+      expect(src).toContain('handleResolveSingleMismatch')
       expect(src).toContain('offerResolvedLocallyRef')
+      expect(src).toContain('resolvedMismatchKeysRef')
       expect(src).not.toContain("action: 'conflict_choice'")
     }
 
-    // ReportFlow Step 3 also uses centered ConfirmationCardModal for MismatchStep
-    expect(flowSrc).toContain('<ConfirmationCardModal ariaLabel="Confirm your details"')
+    // Mobile responsive layout rules present in mismatch-row.css
+    expect(mmCss).toContain('.fx-mm-inline')
+    expect(mmCss).toContain('@media (max-width: 560px) { .fx-mm__tiles { grid-template-columns: 1fr; } }')
+    expect(mmCss).toContain('overflow-wrap: anywhere')
   })
 })
