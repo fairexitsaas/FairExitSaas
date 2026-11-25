@@ -11,6 +11,7 @@ import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 import ChangeJurisdictionModal from "@/components/report/ChangeJurisdictionModal";
 import { MismatchStep, findMismatches, type Rows } from "@/components/report/mismatch-row";
+import { ConfirmationCardModal, OfferAmountConfirmationCard } from "@/components/report/ConfirmationCardModal";
 import "@/components/report/mismatch-row.css";
 import { buildMismatchRows, extractDocAge, extractDocAnnualPay } from "@/lib/confirmation-mismatch";
 
@@ -274,6 +275,7 @@ export default function USReviewPage({
   const [mismatchSaving, setMismatchSaving] = useState<boolean>(false);
   const [mismatchError, setMismatchError] = useState<string>("");
   const resolvedLocallyRef = useRef<boolean>(false);
+  const offerResolvedLocallyRef = useRef<boolean>(false);
 
   // Change 19: Years of service conflict (contract start vs answered years)
   const [hasServiceConflict, setHasServiceConflict] = useState<boolean>(false);
@@ -287,10 +289,13 @@ export default function USReviewPage({
 
 
   // Resolved intake answers (from server case answers or client storage)
+  const parseOfferNum = (v: unknown): number | null => {
+    if (v === undefined || v === null || v === "") return null;
+    const n = Number(String(v).replace(/[^0-9.]/g, ""));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
   const answers = (cs?.answers as Record<string, any>) || {};
-  const intakeOfferNum = answers.offer !== undefined && answers.offer !== null && answers.offer !== ""
-    ? Number(answers.offer)
-    : (data.offer !== undefined && data.offer !== null && data.offer !== "" ? Number(data.offer) : null);
+  const intakeOfferNum = parseOfferNum(answers.offer) ?? parseOfferNum(data.offer);
 
   // ══════════════════════════════════════════════════════════
   // Section 1: Conflict resolution ("Check these first")
@@ -300,7 +305,7 @@ export default function USReviewPage({
   const [docOfferDisplay, setDocOfferDisplay] = useState<string>("");
   const [docOfferQuote, setDocOfferQuote] = useState<string>("");
   const [docOfferWhere, setDocOfferWhere] = useState<string>("");
-  const [intakeOfferDisplay, setIntakeOfferDisplay] = useState<string>(intakeOfferNum ? `${intakeOfferNum.toLocaleString()}` : "");
+  const [intakeOfferDisplay, setIntakeOfferDisplay] = useState<string>(intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
   const [offerConflictChoice, setOfferConflictChoice] = useState<"agreement" | "told" | "custom" | null>(null);
   const [showOfferConflictCustom, setShowOfferConflictCustom] = useState(false);
   const [offerConflictCustomVal, setOfferConflictCustomVal] = useState("");
@@ -540,21 +545,37 @@ export default function USReviewPage({
       // 1. Process Offer Conflict
       const confOffer = conflicts.find((c: any) => c.key === 'offer_amount');
       const fOffer = facts.find((f: any) => f.key === 'offer_amount');
+      const offerNumFromFact = fOffer?.value ? Number(String(fOffer.value).replace(/[^0-9.]/g, '')) : NaN;
+      const validFactOfferNum = Number.isFinite(offerNumFromFact) && offerNumFromFact > 0 ? offerNumFromFact : null;
+      const serverIntakeOfferNum = parseOfferNum(res?.answers?.offer) ?? intakeOfferNum;
+      const offerRowStatus = checkRows.offer_amount?.status;
+      const offerAlreadyResolved =
+        offerResolvedLocallyRef.current ||
+        offerRowStatus === 'confirmed' ||
+        offerRowStatus === 'corrected' ||
+        offerRowStatus === 'not_sure' ||
+        Boolean(corrections.offer_amount);
+
       let docOffVal = "";
       if (confOffer) {
-        docOffVal = confOffer.document.display || (fOffer?.value ? `${Number(fOffer.value).toLocaleString()}` : "");
-        setDocOfferQuote(confOffer.document.quote || fOffer?.quote || "");
-        setDocOfferWhere(confOffer.document.where || fOffer?.where || "");
+        docOffVal = confOffer.document?.display || (validFactOfferNum ? `$${validFactOfferNum.toLocaleString()}` : String(fOffer?.value || ""));
+        setDocOfferQuote(confOffer.document?.quote || fOffer?.quote || "");
+        setDocOfferWhere(confOffer.document?.where || fOffer?.where || "");
       } else if (fOffer?.value) {
-        docOffVal = `${Number(fOffer.value).toLocaleString()}`;
+        docOffVal = validFactOfferNum ? `$${validFactOfferNum.toLocaleString()}` : String(fOffer.value);
         setDocOfferQuote(fOffer.quote || "");
         setDocOfferWhere(fOffer.where || "");
       }
       setDocOfferDisplay(docOffVal);
+      if (confOffer?.answers?.display) {
+        setIntakeOfferDisplay(confOffer.answers.display);
+      } else if (serverIntakeOfferNum !== null) {
+        setIntakeOfferDisplay(`$${serverIntakeOfferNum.toLocaleString()}`);
+      }
 
-      if (confOffer) {
+      if (!offerAlreadyResolved && confOffer) {
         setHasOfferConflict(true);
-      } else if (intakeOfferNum && fOffer?.value && Math.abs(Number(fOffer.value) - intakeOfferNum) > 100) {
+      } else if (!offerAlreadyResolved && serverIntakeOfferNum !== null && validFactOfferNum !== null && Math.abs(validFactOfferNum - serverIntakeOfferNum) > 100) {
         setHasOfferConflict(true);
       } else {
         setHasOfferConflict(false);
@@ -735,6 +756,9 @@ export default function USReviewPage({
                 else if (item.id === 'salary') {
                   const n = Number(String(checkRow.value).replace(/[^0-9.]/g, ''));
                   val = Number.isFinite(n) && n > 0 ? `$${Math.round(n).toLocaleString()}` : String(checkRow.value);
+                } else if (item.id === 'offerMoney') {
+                  const n = Number(String(checkRow.value).replace(/[^0-9.]/g, ''));
+                  val = Number.isFinite(n) && n > 0 ? `$${n.toLocaleString()}` : String(checkRow.value);
                 }
               }
             }
@@ -903,21 +927,37 @@ export default function USReviewPage({
 
   // ── Handlers ──
   const handleChooseOfferConflict = (choice: "agreement" | "told" | "custom", customVal?: string) => {
+    offerResolvedLocallyRef.current = true;
     setOfferConflictChoice(choice);
     setShowOfferConflictCustom(false);
     let chosenVal = docOfferDisplay;
     if (choice === "told") {
-      chosenVal = intakeOfferDisplay;
+      chosenVal = intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
     } else if (choice === "custom" && customVal) {
-      const cleanNum = Number(customVal.replace(/[^0-9]/g, ""));
-      chosenVal = cleanNum ? `${cleanNum.toLocaleString()}` : customVal;
+      const cleanNum = Number(customVal.replace(/[^0-9.]/g, ""));
+      chosenVal = Number.isFinite(cleanNum) && cleanNum > 0 ? `$${cleanNum.toLocaleString()}` : customVal;
+    }
+    const chosenNum = Number(String(chosenVal || "").replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(chosenNum) && chosenNum > 0) {
+      saveReportInputs({
+        offer: chosenNum,
+        offerSource: choice === "agreement" ? "document" : choice === "told" ? "questionnaire" : "user",
+      });
     }
     setItems((prev) =>
-      prev.map((i) => (i.id === "offerMoney" ? { ...i, value: chosenVal, userChanged: false, showSecondLook: false } : i))
+      prev.map((i) => (i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true, userChanged: false, showSecondLook: false } : i))
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      fairexit.saveReviewData(activeCaseId, { key: 'offer_amount', action: 'conflict_choice', value: chosenVal }).catch(() => {});
+      const backendChoice = choice === "agreement" ? "document" : choice === "told" ? "answers" : "other";
+      const payloadVal = Number.isFinite(chosenNum) && chosenNum > 0 ? chosenNum : chosenVal;
+      fairexit.resolveConflict(activeCaseId, 'offer_amount', backendChoice, payloadVal).catch(() => {
+        fairexit.saveReviewData(activeCaseId, {
+          key: 'offer_amount',
+          action: choice === 'custom' || choice === 'told' ? 'change' : 'confirm',
+          value: payloadVal,
+        }).catch(() => {});
+      });
     }
   };
 
@@ -948,10 +988,10 @@ export default function USReviewPage({
         userChangeAck: item.userChanged ? true : item.userChangeAck,
       }))
     );
+    offerResolvedLocallyRef.current = true;
     if (hasOfferConflict) setOfferConflictChoice("agreement");
     if (hasNoticeConflict) setNoticeConflictChoice("agreement");
     if (hasServiceConflict) setServiceConflictChoice("contract");
-    if (hasOfferConflict) setOfferConflictChoice("agreement");
     setLastDayWork((prev) => prev || items.find(i => i.id === "lastDayAgreement")?.value || "");
     setLastDayWorkSaved(true);
     setDeclaredCorrect(true);
@@ -1402,15 +1442,6 @@ export default function USReviewPage({
             <div className="py-10 flex items-center gap-3 text-[#062C55] font-semibold">
               <span className="inline-block w-5 h-5 rounded-full border-[3px] border-[#C7E6D6] border-t-[#0EB28D] animate-spin" />
               <span>Loading what we read…</span>
-            </div>
-          ) : needsMismatchStep ? (
-            <div>
-              {mismatchError && (
-                <div role="alert" className="mb-4 rounded-xl bg-[#fbeceb] text-[#a3231f] px-3.5 py-2.5 text-[13.5px]">
-                  {mismatchError}
-                </div>
-              )}
-              <MismatchStep rows={mismatchRows} busy={mismatchSaving} onDone={handleMismatchesDone} />
             </div>
           ) : (
             <>
@@ -1899,6 +1930,41 @@ export default function USReviewPage({
           )}
         </div>
       </main>
+
+      {/* ── Centered Confirmation Card: Details Mismatch (Age / Annual Pay) ── */}
+      {reviewLoaded && needsMismatchStep && (
+        <ConfirmationCardModal ariaLabel="Confirm your details" kicker="CHECK THIS FIRST">
+          {mismatchError && (
+            <div role="alert" className="mb-4 rounded-xl bg-[#fbeceb] text-[#a3231f] px-3.5 py-2.5 text-[13.5px]">
+              {mismatchError}
+            </div>
+          )}
+          <MismatchStep rows={mismatchRows} busy={mismatchSaving} onDone={handleMismatchesDone} />
+        </ConfirmationCardModal>
+      )}
+
+      {/* ── Centered Confirmation Card: Offer Amount Confirmation ── */}
+      {reviewLoaded && !needsMismatchStep && offerConflictChoice === null && hasOfferConflict && (
+        <OfferAmountConfirmationCard
+          docLabel="Your agreement says"
+          conflictLead="Your agreement and your answers give different amounts. Which is right?"
+          docDisplay={docOfferDisplay}
+          docQuote={docOfferQuote}
+          docWhere={docOfferWhere}
+          intakeDisplay={intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "—")}
+          selectedChoice={null}
+          showCustom={showOfferConflictCustom}
+          onShowCustom={setShowOfferConflictCustom}
+          customVal={offerConflictCustomVal}
+          onCustomValChange={setOfferConflictCustomVal}
+          onChoose={(c, v) =>
+            handleChooseOfferConflict(
+              c === "document" ? "agreement" : c === "answers" ? "told" : "custom",
+              v
+            )
+          }
+        />
+      )}
 
       {/* ── Citation Modal ("See the words") ── */}
       {activeCitation && (

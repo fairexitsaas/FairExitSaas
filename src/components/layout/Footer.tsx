@@ -447,20 +447,6 @@ export default function Footer({
                     >
                       Legal, terms &amp; privacy
                     </Link>
-                    <button
-                      type="button"
-                      onClick={handleCountryToggle}
-                      className="text-left font-normal text-slate hover:text-navy dark:hover:text-white bg-transparent border-none p-0 cursor-pointer text-inherit whitespace-nowrap inline-flex items-center gap-1.5"
-                    >
-                      <Image
-                        src="/flag-ca.png"
-                        alt="Canada"
-                        width={16}
-                        height={11}
-                        className="w-4 h-[11px] object-cover rounded-[2px] shrink-0 inline-block"
-                      />
-                      <span>In Canada? →</span>
-                    </button>
                   </>
                 )}
               </div>
@@ -518,6 +504,20 @@ export default function Footer({
                     >
                       Are you an attorney? →
                     </Link>
+                    <button
+                      type="button"
+                      onClick={handleCountryToggle}
+                      className="text-left font-normal text-slate hover:text-navy dark:hover:text-white bg-transparent border-none p-0 cursor-pointer text-inherit whitespace-nowrap inline-flex items-center gap-1.5"
+                    >
+                      <Image
+                        src="/flag-ca.png"
+                        alt="Canada"
+                        width={16}
+                        height={11}
+                        className="w-4 h-[11px] object-cover rounded-[2px] shrink-0 inline-block"
+                      />
+                      <span>In Canada? →</span>
+                    </button>
                   </>
                 )}
               </div>

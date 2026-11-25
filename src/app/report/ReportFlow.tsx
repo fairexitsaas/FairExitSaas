@@ -19,6 +19,7 @@ import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 import PostPaymentCustomerModal from "@/components/report/PostPaymentCustomerModal";
 import PaymentLoadingUI from "@/components/report/payment/PaymentLoadingUI";
 import { MismatchStep, findMismatches, type Rows } from "@/components/report/mismatch-row";
+import { ConfirmationCardModal } from "@/components/report/ConfirmationCardModal";
 import "@/components/report/mismatch-row.css";
 import { buildMismatchRows } from "@/lib/confirmation-mismatch";
 
@@ -731,35 +732,24 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
     isUS: page.country === "US",
   });
   const activeMismatches = findMismatches(mismatchRows);
-  if (activeMismatches.length > 0) {
-    const handleCheckMismatchesDone = async (fixed: Rows) => {
-      setBusyKey("mismatch:saving");
-      setErr("");
-      try {
-        let latestPage = page;
-        if (fixed.age && (fixed.age.status === "confirmed_from_document" || fixed.age.status === "confirmed_by_user")) {
-          latestPage = await fairexit.resolveConflict(cs.id, "age", fixed.age.status === "confirmed_from_document" ? "document" : "answers");
-        }
-        if (fixed.annual_pay && (fixed.annual_pay.status === "confirmed_from_document" || fixed.annual_pay.status === "confirmed_by_user")) {
-          latestPage = await fairexit.resolveConflict(cs.id, "pay", fixed.annual_pay.status === "confirmed_from_document" ? "document" : "answers");
-        }
-        setPage(latestPage);
-      } catch (e) {
-        setErr(errText(e));
-      } finally {
-        setBusyKey("");
+  const handleCheckMismatchesDone = async (fixed: Rows) => {
+    setBusyKey("mismatch:saving");
+    setErr("");
+    try {
+      let latestPage = page;
+      if (fixed.age && (fixed.age.status === "confirmed_from_document" || fixed.age.status === "confirmed_by_user")) {
+        latestPage = await fairexit.resolveConflict(cs.id, "age", fixed.age.status === "confirmed_from_document" ? "document" : "answers");
       }
-    };
-    return (
-      <div>
-        <Kicker>Step 3 of 4</Kicker>
-        <Card>
-          <ErrorBox text={err} />
-          <MismatchStep rows={mismatchRows} busy={busyKey === "mismatch:saving"} onDone={handleCheckMismatchesDone} />
-        </Card>
-      </div>
-    );
-  }
+      if (fixed.annual_pay && (fixed.annual_pay.status === "confirmed_from_document" || fixed.annual_pay.status === "confirmed_by_user")) {
+        latestPage = await fairexit.resolveConflict(cs.id, "pay", fixed.annual_pay.status === "confirmed_from_document" ? "document" : "answers");
+      }
+      setPage(latestPage);
+    } catch (e) {
+      setErr(errText(e));
+    } finally {
+      setBusyKey("");
+    }
+  };
 
   return (
     <div>
@@ -800,6 +790,13 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
         </label>
       </Card>
       <Btn className={`w-full mt-3 ${page.build.enabled ? "shadow-[0_0_0_4px_rgba(14,178,141,0.25)]" : ""}`} disabled={buildPending} onClick={build}>{buildPending ? "Starting your report…" : page.build.enabled ? page.build.label : page.build.allRequiredConfirmed ? "Tick the box above to build your report" : page.build.label}</Btn>
+
+      {activeMismatches.length > 0 && (
+        <ConfirmationCardModal ariaLabel="Confirm your details" kicker="CHECK THIS FIRST">
+          <ErrorBox text={err} />
+          <MismatchStep rows={mismatchRows} busy={busyKey === "mismatch:saving"} onDone={handleCheckMismatchesDone} />
+        </ConfirmationCardModal>
+      )}
     </div>
   );
 }

@@ -12,6 +12,7 @@ import { useErrorModal } from "@/context/ErrorModalContext";
 import PaidReportReadyPage from "@/components/report/PaidReportReadyPage";
 import ChangeJurisdictionModal from "@/components/report/ChangeJurisdictionModal";
 import { MismatchStep, findMismatches, type Rows } from "@/components/report/mismatch-row";
+import { ConfirmationCardModal, OfferAmountConfirmationCard } from "@/components/report/ConfirmationCardModal";
 import "@/components/report/mismatch-row.css";
 import { buildMismatchRows, extractDocAge, extractDocAnnualPay } from "@/lib/confirmation-mismatch";
 
@@ -283,13 +284,17 @@ export default function CanadaReviewPage({
   const [mismatchSaving, setMismatchSaving] = useState<boolean>(false);
   const [mismatchError, setMismatchError] = useState<string>("");
   const resolvedLocallyRef = useRef<boolean>(false);
+  const offerResolvedLocallyRef = useRef<boolean>(false);
 
 
   // Resolved intake answers (from server case answers or client storage)
+  const parseOfferNum = (v: unknown): number | null => {
+    if (v === undefined || v === null || v === "") return null;
+    const n = Number(String(v).replace(/[^0-9.]/g, ""));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
   const answers = (cs?.answers as Record<string, any>) || {};
-  const intakeOfferNum = answers.offer !== undefined && answers.offer !== null && answers.offer !== ""
-    ? Number(answers.offer)
-    : (data.offer !== undefined && data.offer !== null && data.offer !== "" ? Number(data.offer) : null);
+  const intakeOfferNum = parseOfferNum(answers.offer) ?? parseOfferNum(data.offer);
 
   // ══════════════════════════════════════════════════════════
   // Section 1: Conflict resolution ("Check these first")
@@ -565,7 +570,14 @@ export default function CanadaReviewPage({
       const confOffer = conflicts.find((c: any) => c.key === 'offer_amount');
       const fOffer = facts.find((f: any) => f.key === 'offer_amount');
       const dOfferNum = fOffer?.value ? Number(String(fOffer.value).replace(/[^0-9.]/g, '')) : null;
-      const iOfferNum = intakeOfferNum;
+      const iOfferNum = parseOfferNum(res?.answers?.offer) ?? intakeOfferNum;
+      const offerRowStatus = checkRows.offer_amount?.status;
+      const offerAlreadyResolved =
+        offerResolvedLocallyRef.current ||
+        offerRowStatus === 'confirmed' ||
+        offerRowStatus === 'corrected' ||
+        offerRowStatus === 'not_sure' ||
+        Boolean(corrections.offer_amount);
 
       // Sync extracted document facts into storage
       const fSignBy = facts.find((f: any) => f.key === 'sign_by');
@@ -600,13 +612,13 @@ export default function CanadaReviewPage({
       if (fEmployer?.value) syncUpdates.employer_name = String(fEmployer.value);
       saveReportInputs(syncUpdates);
 
-      if (confOffer) {
+      if (!offerAlreadyResolved && confOffer) {
         setHasOfferConflict(true);
         setDocOfferDisplay(confOffer.document.display || (dOfferNum ? `$${dOfferNum.toLocaleString()}` : String(fOffer?.value || "")));
         setDocOfferQuote(confOffer.document.quote || fOffer?.quote || "");
         setDocOfferWhere(confOffer.document.where || fOffer?.where || "");
         setIntakeOfferDisplay(confOffer.answers.display || (iOfferNum ? `$${iOfferNum.toLocaleString()}` : ""));
-      } else if (dOfferNum !== null && iOfferNum !== null && Math.abs(dOfferNum - iOfferNum) >= 1) {
+      } else if (!offerAlreadyResolved && dOfferNum !== null && iOfferNum !== null && Math.abs(dOfferNum - iOfferNum) >= 1) {
         setHasOfferConflict(true);
         setDocOfferDisplay(`$${dOfferNum.toLocaleString()}`);
         setDocOfferQuote(fOffer?.quote || "");
@@ -746,6 +758,9 @@ export default function CanadaReviewPage({
                 else if (item.id === 'salary') {
                   const n = Number(String(checkRow.value).replace(/[^0-9.]/g, ''));
                   val = Number.isFinite(n) && n > 0 ? `$${Math.round(n).toLocaleString()}` : String(checkRow.value);
+                } else if (item.id === 'offerMoney') {
+                  const n = Number(String(checkRow.value).replace(/[^0-9.]/g, ''));
+                  val = Number.isFinite(n) && n > 0 ? `$${n.toLocaleString()}` : String(checkRow.value);
                 }
               }
             }
@@ -937,6 +952,7 @@ export default function CanadaReviewPage({
     if (hasContractConflict) setContractConflictChoice("contract");
     setWorkingWeeksSaved(true);
     if (hasBonusQuestion) setBonusSaved(true);
+    offerResolvedLocallyRef.current = true;
     setDeclaredCorrect(true);
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
@@ -946,23 +962,39 @@ export default function CanadaReviewPage({
   };
 
   const handleChooseOfferConflict = (choice: "letter" | "intake" | "custom", customVal?: string) => {
+    offerResolvedLocallyRef.current = true;
     setOfferConflictChoice(choice);
     setShowOfferConflictCustom(false);
     let chosenVal = docOfferDisplay;
     if (choice === "intake") {
       chosenVal = intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
     } else if (choice === "custom" && customVal) {
-      const clean = Number(customVal.replace(/[^0-9]/g, ""));
-      chosenVal = clean > 0 ? `$${clean.toLocaleString()}` : customVal;
+      const clean = Number(customVal.replace(/[^0-9.]/g, ""));
+      chosenVal = Number.isFinite(clean) && clean > 0 ? `$${clean.toLocaleString()}` : customVal;
+    }
+    const chosenNum = Number(String(chosenVal || "").replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(chosenNum) && chosenNum > 0) {
+      saveReportInputs({
+        offer: chosenNum,
+        offerSource: choice === "letter" ? "document" : choice === "intake" ? "questionnaire" : "user",
+      });
     }
     setItems((prev) =>
       prev.map((i) =>
-        i.id === "offerMoney" ? { ...i, value: chosenVal } : i
+        i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true, userChanged: false, showSecondLook: false } : i
       )
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      fairexit.saveReviewData(activeCaseId, { key: 'offer_amount', action: choice === 'custom' ? 'change' : 'confirm', value: chosenVal }).catch(() => {});
+      const backendChoice = choice === "letter" ? "document" : choice === "intake" ? "answers" : "other";
+      const payloadVal = Number.isFinite(chosenNum) && chosenNum > 0 ? chosenNum : chosenVal;
+      fairexit.resolveConflict(activeCaseId, 'offer_amount', backendChoice, payloadVal).catch(() => {
+        fairexit.saveReviewData(activeCaseId, {
+          key: 'offer_amount',
+          action: choice === 'custom' || choice === 'intake' ? 'change' : 'confirm',
+          value: payloadVal,
+        }).catch(() => {});
+      });
     }
   };
 
@@ -1379,15 +1411,6 @@ export default function CanadaReviewPage({
               <span className="inline-block w-5 h-5 rounded-full border-[3px] border-[#C7E6D6] border-t-[#0EB28D] animate-spin" />
               <span>Loading what we read…</span>
             </div>
-          ) : needsMismatchStep ? (
-            <div>
-              {mismatchError && (
-                <div role="alert" className="mb-4 rounded-xl bg-[#fbeceb] text-[#a3231f] px-3.5 py-2.5 text-[13.5px]">
-                  {mismatchError}
-                </div>
-              )}
-              <MismatchStep rows={mismatchRows} busy={mismatchSaving} onDone={handleMismatchesDone} />
-            </div>
           ) : (
             <>
               <h1 className="font-serif font-[500] text-[24px] sm:text-[27px] leading-[1.15] text-[#062C55] tracking-[-0.5px] mb-3">
@@ -1478,8 +1501,8 @@ export default function CanadaReviewPage({
 
           {!isAllConfirmed && (
             <>
-              {/* SECTION 1: Check these first (Only if conflict exists) */}
-              {(hasOfferConflict || hasContractConflict) && (
+              {/* SECTION 1: Check these first (Only if contract conflict exists; offer confirmation uses centered card) */}
+              {hasContractConflict && (
                 <div className="mb-8">
                   <div className="flex items-baseline gap-2 mb-3">
                     <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
@@ -1491,136 +1514,7 @@ export default function CanadaReviewPage({
                   </div>
 
                   <div className="space-y-4">
-                    {/* Conflict Card 1: Money offered */}
-                    {hasOfferConflict && (
-                      <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
-                        <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#B07A00] uppercase block mb-1">
-                          CHECK THIS
-                        </span>
-                        <h3 className="font-serif font-[600] text-[20px] leading-[26px] text-[#062C55] mb-1">
-                          Money offered
-                        </h3>
-                        <p className="font-sans text-[14px] text-[#5A6B78] leading-[21px] mb-4">
-                          Your letter and your answers give different amounts. Which is right?
-                        </p>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                          {/* Tile 1: Your letter says */}
-                          <div
-                            className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
-                              offerConflictChoice === "letter"
-                                ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                                : "bg-[#FAF9F5] border-[#E7E4DD]"
-                            }`}
-                          >
-                            <div>
-                              <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                                Your letter says
-                              </span>
-                              <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
-                                {docOfferDisplay || "—"}
-                              </span>
-                              {docOfferQuote && (
-                                <p className="font-sans italic text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
-                                  &ldquo;{docOfferQuote}&rdquo;{docOfferWhere ? ` · ${docOfferWhere}` : ""}
-                                </p>
-                              )}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleChooseOfferConflict("letter")}
-                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                                offerConflictChoice === "letter"
-                                  ? "bg-[#0C8F72] text-white"
-                                  : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
-                              }`}
-                            >
-                              {offerConflictChoice === "letter" ? "✓ Selected" : "Use this"}
-                            </button>
-                          </div>
-
-                          {/* Tile 2: You told us */}
-                          <div
-                            className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
-                              offerConflictChoice === "intake"
-                                ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                                : "bg-[#FAF9F5] border-[#E7E4DD]"
-                            }`}
-                          >
-                            <div>
-                              <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                                You told us
-                              </span>
-                              <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
-                                {intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "—")}
-                              </span>
-                              <p className="font-sans text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[17px]">
-                                Based on your initial intake answers.
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => handleChooseOfferConflict("intake")}
-                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
-                                offerConflictChoice === "intake"
-                                  ? "bg-[#0C8F72] text-white"
-                                  : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
-                              }`}
-                            >
-                              {offerConflictChoice === "intake" ? "✓ Selected" : "Use this"}
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* "Something else" link */}
-                        <div className="mt-3.5">
-                          {!showOfferConflictCustom ? (
-                            <button
-                              type="button"
-                              onClick={() => setShowOfferConflictCustom(true)}
-                              className="font-sans text-[13.5px] font-[700] text-[#0C8F72] underline hover:opacity-80 cursor-pointer"
-                            >
-                              Something else
-                            </button>
-                          ) : (
-                            <div className="p-3.5 bg-[#FAF9F5] border border-[#E7E4DD] rounded-[10px] mt-2 space-y-3">
-                              <label className="block text-[13px] font-[700] text-[#062C55]">
-                                Enter correct offer amount in dollars:
-                              </label>
-                              <div className="flex gap-2">
-                                <input
-                                  type="text"
-                                  placeholder="e.g. 25000"
-                                  value={offerConflictCustomVal}
-                                  onChange={(e) => setOfferConflictCustomVal(e.target.value)}
-                                  className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] bg-white text-[14px] text-[#062C55] w-[180px]"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (offerConflictCustomVal) {
-                                      handleChooseOfferConflict("custom", offerConflictCustomVal);
-                                    }
-                                  }}
-                                  className="h-[38px] px-4 rounded-[8px] bg-[#062C55] text-white text-[13px] font-bold"
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setShowOfferConflictCustom(false)}
-                                  className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] text-[#5A6B78] text-[13px]"
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Conflict Card 2: Limits you to the legal minimum */}
+                    {/* Conflict Card: Limits you to the legal minimum */}
                     {hasContractConflict && (
                       <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
                         <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#B07A00] uppercase block mb-1">
@@ -2082,6 +1976,41 @@ export default function CanadaReviewPage({
           )}
         </div>
       </main>
+
+      {/* ── Centered Confirmation Card: Details Mismatch (Age / Annual Pay) ── */}
+      {reviewLoaded && needsMismatchStep && (
+        <ConfirmationCardModal ariaLabel="Confirm your details" kicker="CHECK THIS FIRST">
+          {mismatchError && (
+            <div role="alert" className="mb-4 rounded-xl bg-[#fbeceb] text-[#a3231f] px-3.5 py-2.5 text-[13.5px]">
+              {mismatchError}
+            </div>
+          )}
+          <MismatchStep rows={mismatchRows} busy={mismatchSaving} onDone={handleMismatchesDone} />
+        </ConfirmationCardModal>
+      )}
+
+      {/* ── Centered Confirmation Card: Offer Amount Confirmation ── */}
+      {reviewLoaded && !needsMismatchStep && offerConflictChoice === null && hasOfferConflict && (
+        <OfferAmountConfirmationCard
+          docLabel="Your letter says"
+          conflictLead="Your letter and your answers give different amounts. Which is right?"
+          docDisplay={docOfferDisplay}
+          docQuote={docOfferQuote}
+          docWhere={docOfferWhere}
+          intakeDisplay={intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "—")}
+          selectedChoice={null}
+          showCustom={showOfferConflictCustom}
+          onShowCustom={setShowOfferConflictCustom}
+          customVal={offerConflictCustomVal}
+          onCustomValChange={setOfferConflictCustomVal}
+          onChoose={(c, v) =>
+            handleChooseOfferConflict(
+              c === "document" ? "letter" : c === "answers" ? "intake" : "custom",
+              v
+            )
+          }
+        />
+      )}
 
       {/* ── Citation Modal ("See the words") ── */}
       {activeCitation && (

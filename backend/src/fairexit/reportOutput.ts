@@ -1749,14 +1749,25 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
   const s3ClausesHtml = `
     <div class="page clause-page clauses-flow">
-      <div class="section-kicker-bar">
-        <span>SECTION 3 OF 5 · WHAT'S IN YOUR LETTER AND CONTRACT</span>
-        ${progressDots(3)}
-      </div>
-      <div class="header-divider"></div>
-      <h2 class="section-heading">The terms to understand and the <i>questions to ask.</i></h2>
-      <p class="section-sub">For each: what your documents say, what the rules say, and what it means.</p>
-
+      <table class="clauses-flow-table">
+        <thead>
+          <tr>
+            <th>
+              <div class="section-kicker-bar">
+                <span>SECTION 3 OF 5 · WHAT'S IN YOUR LETTER AND CONTRACT</span>
+                ${progressDots(3)}
+              </div>
+              <div class="header-divider"></div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="clauses-heading-row">
+            <td>
+              <h2 class="section-heading">The terms to understand and the <i>questions to ask.</i></h2>
+              <p class="section-sub">For each: what your documents say, what the rules say, and what it means.</p>
+            </td>
+          </tr>
       ${clauses.map((c, idx) => {
         const isBad = c.status === 'bad'
         const isOk = c.status === 'ok'
@@ -1769,10 +1780,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         const whyText = ruleCheck?.why && ruleCheck.why.length >= 8 ? ruleCheck.why : ''
 
         return `
-          <div class="clause-item">
-            <div class="clause-pill-badge">
-              <span class="pill ${pillClass}">${pillLabel}</span>
-            </div>
+          <tr class="clause-row">
+            <td>
+              <div class="clause-item">
+                <div class="clause-pill-badge">
+                  <span class="pill ${pillClass}">${pillLabel}</span>
+                </div>
 
             <h3 class="clause-single-heading">${idx + 1}. ${esc(c.title.replace(/^\d+[.)]\s+/, ''))}</h3>
 
@@ -1794,11 +1807,15 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
               <span>${esc(c.question_to_ask)}</span>
             </div>
 
-            <div class="clause-dashed-rule"></div>
-            <div class="clause-source-line">Where this comes from: ${srcHtml}</div>
-          </div>
+                <div class="clause-dashed-rule"></div>
+                <div class="clause-source-line">Where this comes from: ${srcHtml}</div>
+              </div>
+            </td>
+          </tr>
         `
       }).join('')}
+        </tbody>
+      </table>
       ${pageFooter(curPage, effTotal)}
     </div>
   `
@@ -2121,6 +2138,10 @@ const CSS = `
 @page {
   size: letter;
   margin: 0;
+}
+@page flow-page {
+  size: letter;
+  margin: 60pt 67.5pt 78pt 67.5pt;
 }
 * {
   box-sizing: border-box;
@@ -3547,13 +3568,52 @@ a.src-link {
   min-height: 11in !important;
   max-height: none !important;
   overflow: visible !important;
+  padding-bottom: 40pt;
   page-break-after: always;
   break-after: page;
+}
+.clauses-flow-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.clauses-flow-table thead {
+  display: table-header-group;
+}
+.clauses-flow-table th,
+.clauses-flow-table td {
+  padding: 0;
+  border: none;
+  vertical-align: top;
+  text-align: left;
+  font-weight: normal;
+}
+.clauses-flow-table .header-divider {
+  margin-bottom: 20px;
+}
+.clauses-heading-row {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+.clause-row {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.clauses-flow-table .clause-row > td {
+  padding-bottom: 24px;
+}
+.clauses-flow-table .clause-row:last-child > td {
+  padding-bottom: 0;
 }
 .clause-item {
   break-inside: avoid;
   page-break-inside: avoid;
   margin-bottom: 24px;
+}
+.clauses-flow-table .clause-item {
+  margin-bottom: 0;
 }
 
 /* Sources flowing & layout */
@@ -3562,6 +3622,7 @@ a.src-link {
   min-height: 11in !important;
   max-height: none !important;
   overflow: visible !important;
+  padding-bottom: 40pt;
   page-break-after: always;
   break-after: page;
 }
@@ -3579,6 +3640,22 @@ a.src-link {
 
 @media print {
   .page-footer { display: none !important; }
+  .page.clauses-flow,
+  .page.sources-page {
+    page: flow-page;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    display: block !important;
+    overflow: visible !important;
+  }
+  .page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
 }
 `
 
