@@ -13,8 +13,13 @@ const num = (v: unknown): number => {
 
 /** Engine inputs from the free-check answers (field names match the web flow's state). */
 export function engineInputs(answers: Record<string, any>) {
-  const payrollStr = String(answers.payroll || '').toLowerCase()
-  const isPayrollUnknown = answers.payrollUnknown ?? (payrollStr === 'unsure' || payrollStr === 'not_sure')
+  const payrollStr = String(answers.payroll || '').toLowerCase().trim()
+  const hasPayrollGlobal = typeof answers.payrollGlobal === 'number' && answers.payrollGlobal > 0
+  const isPayrollYes = payrollStr === 'yes' || payrollStr.startsWith('yes')
+  const isPayrollNo = payrollStr === 'no'
+  const isPayrollUnknown =
+    answers.payrollUnknown ??
+    (!isPayrollYes && !isPayrollNo && !hasPayrollGlobal && (payrollStr === 'unsure' || payrollStr === 'not_sure' || payrollStr === 'not sure' || payrollStr === ''))
   const isGroup = answers.groupLayoff === true || answers.groupLayoff === 'yes' || answers.reason === 'mass'
   let groupSize = num(answers.groupSize)
   if (!groupSize && answers.groupBand) {
@@ -35,7 +40,7 @@ export function engineInputs(answers: Record<string, any>) {
     years: num(answers.years),
     salary: num(answers.salary ?? answers.pay),
     roleFactor: num(answers.roleFactor ?? answers.roleF) || 1,
-    payrollGlobal: payrollStr === 'yes' ? 3000000 : 0,
+    payrollGlobal: isPayrollYes ? 3000000 : (hasPayrollGlobal ? answers.payrollGlobal : 0),
     payrollUnknown: isPayrollUnknown,
     groupLayoff: isGroup,
     groupSize,

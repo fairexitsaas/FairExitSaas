@@ -85,10 +85,10 @@ describe('check page + Call B input (Ontario sample)', () => {
 })
 
 describe('prompt file', () => {
-  it('matches verified v0.8 prompt hashes', () => {
-    expect(promptSha256('A1')).toBe('566883dbe26c5403bb4bda6fd073a4dae0ae7ae727fee1899016a7435722ce94')
-    expect(promptSha256('A2')).toBe('164cc114b35ecc34c970f7f80e4cd5c052cc4af0cce5513341bb55a6917f85f5')
-    expect(promptSha256('B')).toBe('76035c9c3edd30818a82d681f693c9787d945334afb33e4371b40e2d1d9501f6')
+  it('matches verified v0.9 prompt hashes', () => {
+    expect(promptSha256('A1')).toBe('ba2a7a622ff2b67a620f7ac5c7192c68c8852dbe116d5e683873ab5391cee038')
+    expect(promptSha256('A2')).toBe('ba2a7a622ff2b67a620f7ac5c7192c68c8852dbe116d5e683873ab5391cee038')
+    expect(promptSha256('B')).toBe('ba2a7a622ff2b67a620f7ac5c7192c68c8852dbe116d5e683873ab5391cee038')
     expect(systemPromptCallA(buildJurisdiction('US-CA')!)).toContain("person's separation agreement")
     expect(systemPromptCallA2()).toContain('=== CALL A2 · SECOND LOOK ===')
     expect(systemPromptCallB()).toContain('=== CALL B · WRITE THE REPORT ===')

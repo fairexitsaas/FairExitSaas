@@ -9,10 +9,10 @@
 import { buildJurisdiction, codeFromAnswers, normalizeCode, Jurisdiction } from './jurisdictions'
 import { estimate, marketAdjust, getRule, RULES_VERSION, TableRow } from './severanceRules'
 import { regionRulesFor, sourcesFor, latestCheckedDate } from './regionData'
-import { CheckCtx, confirmedValue, exportConfirmedFacts, ROLE_OPTIONS } from './checkPage'
+import { CheckCtx, confirmedValue, exportConfirmedFacts, extractedAgeFact, extractedAnnualPayFact, ROLE_OPTIONS } from './checkPage'
 import { engineInputs } from './freeCheck'
 import type { CaseRow } from './types'
-import { fmtMoney } from './values'
+import { fmtMoney, parseDate, parseWeeks, yearsBetween } from './values'
 
 const num = (v: unknown): number | null => {
   if (v === null || v === undefined || v === '') return null
@@ -44,12 +44,27 @@ export function finalJurisdiction(c: CaseRow, ctx: CheckCtx): Jurisdiction | nul
   return code ? buildJurisdiction(code) : null
 }
 
+function confirmedDocYears(ctx: CheckCtx): number | null {
+  const startRaw =
+    confirmedValue(ctx, 'contract_start') ??
+    ctx.callA?.facts?.find((f) => f.key === 'contract_start' || f.key === 'hire_date')?.value
+  const startIso = startRaw ? parseDate(startRaw) : null
+  if (!startIso) return null
+  const lastRaw =
+    confirmedValue(ctx, 'last_day') ??
+    ctx.callA?.facts?.find((f) => f.key === 'last_day')?.value
+  const lastIso = lastRaw ? parseDate(lastRaw) : null
+  const dy = yearsBetween(startIso, lastIso)
+  if (!Number.isFinite(dy) || dy <= 0) return null
+  return Math.round(dy * 10) / 10
+}
+
 /** The answers object the prompt describes, in plain keys, plus the raw free-check state. */
 export function answersForPrompt(c: CaseRow, j: Jurisdiction, ctx?: CheckCtx) {
   const a = c.answers || {}
-  const confirmedAge = ctx ? num(confirmedValue(ctx, 'age')) : null
-  const confirmedPay = ctx ? num(confirmedValue(ctx, 'pay')) : null
-  const confirmedYears = ctx ? num(confirmedValue(ctx, 'years')) : null
+  const confirmedAge = ctx ? (num(confirmedValue(ctx, 'age')) ?? extractedAgeFact(ctx)?.value ?? null) : null
+  const confirmedPay = ctx ? (num(confirmedValue(ctx, 'pay')) ?? extractedAnnualPayFact(ctx)?.value ?? null) : null
+  const confirmedYears = ctx ? (num(confirmedValue(ctx, 'years')) ?? confirmedDocYears(ctx)) : null
   const role = a.roleLabel || ROLE_OPTIONS.find((r) => r.factor === num(a.roleFactor ?? a.roleF))?.label || null
   const extras = Object.entries((c.country === 'US' ? a.comp : a.pay) || {}).filter(([, v]) => !!v).map(([k]) => k)
   return {
@@ -75,21 +90,45 @@ export function answersForPrompt(c: CaseRow, j: Jurisdiction, ctx?: CheckCtx) {
 
 export function buildMinimumAndRange(c: CaseRow, ctx: CheckCtx, j: Jurisdiction) {
   const base = engineInputs(c.answers)
-  const years = num(confirmedValue(ctx, 'years')) ?? base.years
-  const age = num(confirmedValue(ctx, 'age')) ?? base.age
-  const salary = num(confirmedValue(ctx, 'pay')) ?? base.salary
-  const inp = { ...base, years, age, salary }
+  const years = num(confirmedValue(ctx, 'years')) ?? confirmedDocYears(ctx) ?? base.years
+  const age = num(confirmedValue(ctx, 'age')) ?? extractedAgeFact(ctx)?.value ?? base.age
+  const salary = num(confirmedValue(ctx, 'pay')) ?? extractedAnnualPayFact(ctx)?.value ?? base.salary
+  const allFacts = [...(c.call_a?.facts || []), ...(ctx.callA?.facts || [])]
+  const letterPaysEsaSeverance = allFacts.some((f) => {
+    if (f.key !== 'severance_weeks' || f.value == null) return false
+    const raw = String(f.value).trim()
+    if (!raw || /^(no|none|not mentioned|missing|n\/a)$/i.test(raw)) return false
+    const parsed = parseWeeks(raw)
+    return parsed === null ? true : parsed > 0
+  })
+  const payrollGlobal = letterPaysEsaSeverance ? Math.max(base.payrollGlobal || 0, 2500000) : base.payrollGlobal
+  const payrollUnknown = !letterPaysEsaSeverance && base.payrollUnknown
+  const inp = { ...base, years, age, salary, payrollGlobal, payrollUnknown }
   const rule = getRule(j.code)
   const est = estimate(j.code, inp)
+  const calcInputs = { years, pay: salary, age }
 
   if (j.country === 'US') {
     const st = est.statutory
-    if (!st || st.none || !st.weeks) return { minimum: { none: true }, range: undefined, engine: { input: inp, rules_version: RULES_VERSION } }
+    const warn = est.warn
+    if (!st || st.none || !st.weeks) {
+      return {
+        minimum: {
+          none: true,
+          inputs: calcInputs,
+          ...(warn ? { warn } : {}),
+        },
+        range: undefined,
+        engine: { input: inp, rules_version: RULES_VERSION },
+      }
+    }
     return {
       minimum: {
         weeks: st.weeks, severanceWeeks: st.severanceWeeks, amount: st.amount,
         table: `${rule.perYearWeeks || 1} week of pay per full year of service`, note: rule.note,
         arithmetic: `${Math.floor(years)} full years × ${rule.perYearWeeks || 1} week × ${fmtMoney(salary / 52, 'US')} a week = ${fmtMoney(st.amount, 'US')}`,
+        inputs: calcInputs,
+        ...(warn ? { warn } : {}),
       },
       range: undefined,
       engine: { input: inp, rules_version: RULES_VERSION },
@@ -99,7 +138,8 @@ export function buildMinimumAndRange(c: CaseRow, ctx: CheckCtx, j: Jurisdiction)
   // ---- Canada
   const st = est.statutory!
   const weekly = salary / 52
-  const worked = num(confirmedValue(ctx, 'working_notice_weeks'))
+  const rawWorked = num(confirmedValue(ctx, 'working_notice_weeks'))
+  const worked = rawWorked !== null && rawWorked >= 0 ? rawWorked : null
   let terminationWeeks = st.terminationWeeks
   let arithmetic: string | undefined
   if (worked && worked > 0) {
@@ -116,10 +156,21 @@ export function buildMinimumAndRange(c: CaseRow, ctx: CheckCtx, j: Jurisdiction)
     statute_short: j.statute_short,
     table: tableText(rule.terminationTable) + (rule.severance ? `; severance pay: ${rule.severance.perYearWeeks} week per year, max ${rule.severance.maxWeeks} weeks, if ${rule.severance.minYears}+ years and payroll of $2.5 million or more` : '') + (rule.strategy === 'federalCA' ? '; severance pay: greater of 2 days per completed year or 5 days, after 12 months' : ''),
     notice_before_worked_weeks: worked && worked > 0 ? st.terminationWeeks : undefined,
-    working_notice_weeks: worked && worked > 0 ? Math.min(worked, st.terminationWeeks) : undefined,
+    working_notice_weeks: worked === 0 ? 0 : (worked && worked > 0 ? Math.min(worked, st.terminationWeeks) : undefined),
     arithmetic,
     weekly_pay: Math.round(weekly * 100) / 100,
     basis: 'regular wages (base pay)',
+    inputs: calcInputs,
+    ...(st.potentialSeveranceWeeks ? {
+      potentialSeveranceWeeks: st.potentialSeveranceWeeks,
+      potentialSeveranceAmount: st.potentialSeveranceAmount,
+      potentialSeveranceMessage: st.potentialSeveranceMessage,
+      severanceMaybe: {
+        weeks: st.potentialSeveranceWeeks,
+        amount: st.potentialSeveranceAmount,
+        message: st.potentialSeveranceMessage,
+      },
+    } : {}),
   }
 
   // Rule 16: a regular bonus counts in total pay for the common-law range only.
@@ -129,7 +180,7 @@ export function buildMinimumAndRange(c: CaseRow, ctx: CheckCtx, j: Jurisdiction)
   const rangeEst = marketAdjust(estimate(j.code, { ...inp, salary: salary + (regular ? bonus! : 0) }), c.answers.market)
   const cl = rangeEst.commonLaw
   const range = cl
-    ? { low: cl.lowAmount, high: cl.highAmount, lowMonths: cl.lowMonths, highMonths: cl.highMonths, basis: regular ? 'base pay plus regular bonus' : 'base pay', estimate: true }
+    ? { low: cl.lowAmount, high: cl.highAmount, lowMonths: cl.lowMonths, highMonths: cl.highMonths, basis: regular ? 'base pay plus regular bonus' : 'base pay', estimate: true, inputs: calcInputs }
     : undefined
   return { minimum, range, engine: { input: inp, bonus_regular: regular, rules_version: RULES_VERSION } }
 }

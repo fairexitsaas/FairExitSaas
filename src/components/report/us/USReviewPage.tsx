@@ -289,6 +289,7 @@ export default function USReviewPage({
   // Change 19: Years of service conflict (contract start vs answered years)
   const [hasServiceConflict, setHasServiceConflict] = useState<boolean>(false);
   const [docServiceDisplay, setDocServiceDisplay] = useState<string>("");
+  const [docYearsValue, setDocYearsValue] = useState<string>("");
   const [docServiceQuote, setDocServiceQuote] = useState<string>("");
   const [docServiceWhere, setDocServiceWhere] = useState<string>("");
   const [intakeServiceDisplay, setIntakeServiceDisplay] = useState<string>("");
@@ -643,13 +644,23 @@ export default function USReviewPage({
       }
 
             // 3. Process Service Conflict (contract start vs answered years)
-      const confService = conflicts.find((c: any) => c.key === 'contract_start');
+      const confService = conflicts.find((c: any) => c.key === 'years' || c.key === 'contract_start');
       if (confService) {
+        const docRawVal = confService.document?.value != null ? String(confService.document.value) : "";
+        const docDisp = confService.document?.display || (docRawVal ? `${docRawVal} years` : "");
         setHasServiceConflict(true);
-        setDocServiceDisplay(confService.document?.display || "");
+        setDocYearsValue(docRawVal);
+        setDocServiceDisplay(docDisp);
         setDocServiceQuote(confService.document?.quote || "");
         setDocServiceWhere(confService.document?.where || "");
         setIntakeServiceDisplay(confService.answers?.display || (answers.years ? `${answers.years} years` : ""));
+        if (confService.resolved) {
+          setServiceConflictChoice(
+            confService.resolved.choice === 'answers' ? 'told' : confService.resolved.choice === 'custom' ? 'custom' : 'contract'
+          );
+        } else if (checkRows.years?.status === 'confirmed') {
+          setServiceConflictChoice('contract');
+        }
       } else {
         setHasServiceConflict(false);
       }
@@ -697,8 +708,8 @@ export default function USReviewPage({
         }
       }
 
-      setItems((prev) =>
-        prev.map((item) => {
+      setItems((prev) => {
+        const mapped = prev.map((item) => {
           const keyMap = US_KEY_MAP;
           const factKey = keyMap[item.id] || item.id;
           const modelRow = allModelRows.find((r: any) => r.key === factKey);
@@ -761,7 +772,10 @@ export default function USReviewPage({
               confirmed = true;
               if (checkRow.value !== null && checkRow.value !== undefined && checkRow.value !== '') {
                 if (item.id === 'age') val = String(checkRow.value);
-                else if (item.id === 'salary') {
+                else if (item.id === 'years') {
+                  const s = String(checkRow.value);
+                  val = s.includes('year') ? s : `${s} years`;
+                } else if (item.id === 'salary') {
                   const n = Number(String(checkRow.value).replace(/[^0-9.]/g, ''));
                   val = Number.isFinite(n) && n > 0 ? `$${Math.round(n).toLocaleString()}` : String(checkRow.value);
                 } else if (item.id === 'offerMoney') {
@@ -829,8 +843,32 @@ export default function USReviewPage({
             userChanged,
             userChangeAck,
           };
-        })
-      );
+        });
+
+        const baseWithoutPayItems = mapped.filter((i) => !/^payment_items_\d+$/.test(i.id));
+        const paymentModelRows = allModelRows.filter((r: any) => /^payment_items_\d+$/.test(r.key));
+        if (!paymentModelRows.length) return baseWithoutPayItems;
+        const dynamicPayItems: USReviewItem[] = paymentModelRows.map((mr: any) => ({
+          id: mr.key,
+          section: "offer",
+          label: mr.label || mr.key,
+          value: mr.display || (mr.value != null ? String(mr.value) : ""),
+          originalDocumentValue: mr.docDisplay || (mr.docValue != null ? String(mr.docValue) : ""),
+          source: mr.sourceLine || "Your agreement",
+          citation: mr.quote ? (mr.where ? `"${mr.quote}" · ${mr.where}` : `"${mr.quote}"`) : "",
+          isOptional: true,
+          confirmed: mr.status === 'confirmed',
+          userChanged: mr.status === 'corrected',
+          userChangeAck: mr.status === 'corrected' ? Boolean(mr.needsChangeAck === false) : false,
+        }));
+        const offerIdx = baseWithoutPayItems.findIndex((i) => i.id === "offerMoney");
+        if (offerIdx === -1) return [...baseWithoutPayItems, ...dynamicPayItems];
+        return [
+          ...baseWithoutPayItems.slice(0, offerIdx + 1),
+          ...dynamicPayItems,
+          ...baseWithoutPayItems.slice(offerIdx + 1),
+        ];
+      });
     }).catch((e) => console.warn('Could not load US review data:', e)).finally(() => setReviewLoaded(true));
   }, [caseId, cs, intakeOfferNum]);
 
@@ -1054,13 +1092,24 @@ export default function USReviewPage({
     setItems((prev) =>
       prev.map((i) =>
         i.id === "years"
-          ? { ...i, value: chosenVal }
+          ? {
+              ...i,
+              value: chosenVal,
+              confirmed: choice !== "custom",
+              userChanged: choice === "custom",
+              userChangeAck: choice === "custom",
+            }
           : i
       )
     );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      fairexit.saveReviewData(activeCaseId, { key: 'years', action: choice === 'custom' ? 'change' : 'confirm', value: chosenVal }).catch(() => {});
+      const apiChoice = choice === "told" ? "answers" : choice === "custom" ? "other" : "document";
+      const parsedNum = Number(String(choice === "contract" && docYearsValue ? docYearsValue : chosenVal).replace(/[^0-9.]/g, ""));
+      const payloadVal = Number.isFinite(parsedNum) && parsedNum > 0 ? parsedNum : chosenVal;
+      fairexit.resolveConflict(activeCaseId, 'years', apiChoice, payloadVal).catch(() => {
+        fairexit.saveReviewData(activeCaseId, { key: 'years', action: choice === 'custom' ? 'change' : 'confirm', value: payloadVal }).catch(() => {});
+      });
     }
   };
 
@@ -1604,6 +1653,145 @@ export default function USReviewPage({
           )}
 
           {/* SECTION 1: Check these first (Conflict card if exists) */}
+          {hasServiceConflict && (
+            <div className="mb-8">
+              <div className="flex items-baseline gap-2 mb-3">
+                <h2 className="font-sans font-[700] text-[17px] text-[#062C55]">
+                  Check these first
+                </h2>
+                <span className="font-sans font-normal text-[12.5px] text-[#5A6B78]">
+                  your answers and your agreement don&apos;t match
+                </span>
+              </div>
+
+              <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
+                <span className="font-sans font-[700] text-[12px] tracking-[0.5px] text-[#5A6B78] uppercase block mb-1">
+                  YEARS WITH YOUR EMPLOYER
+                </span>
+                <h3 className="font-sans font-[700] text-[16px] leading-[24px] text-[#062C55] mb-3.5">
+                  Which is right?
+                </h3>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div
+                    className={`rounded-[12px] p-4 flex flex-col justify-between transition border ${
+                      serviceConflictChoice === "contract"
+                        ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
+                        : "bg-white border-[#D9DEE2]"
+                    }`}
+                  >
+                    <div>
+                      <span className="font-sans text-[12.5px] font-[600] text-[#5A6B78] block">
+                        From your documents
+                      </span>
+                      <span className="font-sans font-bold text-[18px] text-[#062C55] block mt-0.5">
+                        {docServiceDisplay || "—"}
+                      </span>
+                      {docServiceQuote && (
+                        <p className="font-serif italic text-[14.5px] text-[#17242F] mt-2 mb-3 leading-[20px]">
+                          &ldquo;{docServiceQuote}&rdquo;
+                        </p>
+                      )}
+                      <span className="font-sans text-[12px] text-[#5A6B78] block">
+                        {docServiceWhere ? `Your contract, ${docServiceWhere}` : "Your contract"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleChooseServiceConflict("contract")}
+                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                        serviceConflictChoice === "contract"
+                          ? "bg-[#0C8F72] text-white"
+                          : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
+                      }`}
+                    >
+                      {serviceConflictChoice === "contract" ? "✓ Selected" : "Use this"}
+                    </button>
+                  </div>
+
+                  <div
+                    className={`rounded-[12px] p-4 flex flex-col justify-between transition border ${
+                      serviceConflictChoice === "told"
+                        ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
+                        : "bg-white border-[#D9DEE2]"
+                    }`}
+                  >
+                    <div>
+                      <span className="font-sans text-[12.5px] font-[600] text-[#5A6B78] block">
+                        You told us
+                      </span>
+                      <span className="font-sans font-bold text-[18px] text-[#062C55] block mt-0.5">
+                        {intakeServiceDisplay || "—"}
+                      </span>
+                      <p className="font-sans text-[12.5px] text-[#5A6B78] mt-2 mb-3 leading-[18px]">
+                        Based on your initial intake answers.
+                      </p>
+                      <span className="font-sans text-[12px] text-[#5A6B78] block">
+                        From your answers
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleChooseServiceConflict("told")}
+                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                        serviceConflictChoice === "told"
+                          ? "bg-[#0C8F72] text-white"
+                          : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
+                      }`}
+                    >
+                      {serviceConflictChoice === "told" ? "✓ Selected" : "Use this"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-3.5">
+                  {!showServiceConflictCustom ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowServiceConflictCustom(true)}
+                      className="font-sans text-[13.5px] font-[700] text-[#0C8F72] underline hover:opacity-80 cursor-pointer"
+                    >
+                      Something else
+                    </button>
+                  ) : (
+                    <div className="p-3.5 bg-[#FAF9F5] border border-[#E7E4DD] rounded-[10px] mt-2 space-y-3">
+                      <label className="block text-[13px] font-[700] text-[#062C55]">
+                        Enter correct years on the job:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="e.g. 14.6 years"
+                          value={serviceConflictCustomVal}
+                          onChange={(e) => setServiceConflictCustomVal(e.target.value)}
+                          className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] bg-white text-[14px] text-[#062C55] w-[180px]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (serviceConflictCustomVal) {
+                              handleChooseServiceConflict("custom", serviceConflictCustomVal);
+                            }
+                          }}
+                          className="h-[38px] px-4 rounded-[8px] bg-[#062C55] text-white text-[13px] font-bold"
+                        >
+                          Save
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowServiceConflictCustom(false)}
+                          className="h-[38px] px-3 rounded-[8px] border border-[#D8D3C8] text-[#5A6B78] text-[13px]"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {hasNoticeConflict && (
             <div className="mb-8">
               <div className="flex items-baseline gap-2 mb-3">

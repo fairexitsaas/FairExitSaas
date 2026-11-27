@@ -1038,6 +1038,47 @@ function ReadyStep({ cs, caseId, words, onLawyer }: { cs: any; caseId: string; w
 
       {r.glance && <Section title="At a glance"><Card><p className="text-[15px]">{r.glance}</p>{r.contract_note && <p className="mt-2 rounded-lg bg-[#fbf3df] p-2 text-[13.5px]">{r.contract_note}</p>}</Card></Section>}
 
+      {r.payments && (r.payments.unconditional?.length > 0 || r.payments.conditional?.length > 0 || r.payments.held_or_forfeited?.length > 0 || r.payments.total_unconditional != null || r.payments.total_if_signed != null) && (
+        <Section title="Your offer breakdown">
+          <Card className="grid sm:grid-cols-2 gap-4">
+            <div>
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#5a6b78] mb-2">Paid either way</div>
+              <div className="space-y-1 text-[14px]">
+                {(r.payments.unconditional || []).map((item: any, idx: number) => (
+                  <div key={idx} className="flex justify-between gap-2 border-b border-[#f0ede6] pb-1">
+                    <span>{item.label}</span>
+                    {item.amount != null && <b>{money(Number(item.amount), country)}</b>}
+                  </div>
+                ))}
+                {r.payments.total_unconditional != null && (
+                  <div className="flex justify-between gap-2 pt-1 font-bold text-[#062c55]">
+                    <span>Total paid either way</span>
+                    <span>{money(Number(r.payments.total_unconditional), country)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-extrabold uppercase tracking-wider text-[#5a6b78] mb-2">Only if you sign</div>
+              <div className="space-y-1 text-[14px]">
+                {(r.payments.conditional || []).map((item: any, idx: number) => (
+                  <div key={idx} className="flex justify-between gap-2 border-b border-[#f0ede6] pb-1">
+                    <span>{item.label}{item.expired ? " (deadline passed)" : ""}</span>
+                    {item.amount != null && <b>{money(Number(item.amount), country)}</b>}
+                  </div>
+                ))}
+                {r.payments.total_if_signed != null && (
+                  <div className="flex justify-between gap-2 pt-1 font-bold text-[#062c55]">
+                    <span>Total if you sign</span>
+                    <span>{money(Number(r.payments.total_if_signed), country)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+        </Section>
+      )}
+
       {nb?.country === "CA" && nb.range && nb.minimum?.amount != null && (
         <Section title="Your range">
           <Card className="text-center">
@@ -1123,7 +1164,11 @@ function ReadyStep({ cs, caseId, words, onLawyer }: { cs: any; caseId: string; w
       <Section title="Before you use this">
         <Card className="text-[13.5px] space-y-1">
           <p>{r.confirmed_line}</p>
-          {data.rulesAsOf && <p>Rules as of {new Date(data.rulesAsOf + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}.</p>}
+          {typeof r.rules_as_of === "string" && r.rules_as_of.trim() ? (
+            <p>{r.rules_as_of.trim()}</p>
+          ) : data.rulesAsOf ? (
+            <p>Rules as of {new Date(data.rulesAsOf + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" })}.</p>
+          ) : null}
           <p>This report is information, not legal advice. Only a {words.lawyer} licensed in your {words.region} can tell you what you are owed.</p>
           <p className="text-[#5a6b78]">Report ID {data.reportId}</p>
         </Card>

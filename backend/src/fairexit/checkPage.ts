@@ -357,8 +357,42 @@ const GROUPS: Record<Country, Array<{ id: string; title: string; subtitle: strin
 export function rowDefs(country: Country): RowDef[] {
   return country === 'US' ? US_ROWS : CA_ROWS
 }
+
+function paymentItemFacts(ctx: CheckCtx): CallAFact[] {
+  return (ctx.callA?.facts || []).filter(
+    (f) => f.key === 'payment_items' && f.value !== null && f.value !== undefined && String(f.value).trim() !== ''
+  )
+}
+
+function paymentRowDefs(ctx: CheckCtx): RowDef[] {
+  const items = paymentItemFacts(ctx)
+  const group = ctx.country === 'US' ? 'agr' : 'offer'
+  const fallbackSource: RowSource = ctx.country === 'US' ? 'agreement' : 'letter'
+  return items.map((f, idx) => ({
+    key: `payment_items_${idx + 1}`,
+    group,
+    label: `Payment item ${idx + 1}`,
+    type: 'text' as ValueType,
+    source: (f.document as RowSource) || fallbackSource,
+    required: () => false,
+  }))
+}
+
+function rowDefsFor(ctx: CheckCtx): RowDef[] {
+  const base = rowDefs(ctx.country)
+  const extra = paymentRowDefs(ctx)
+  if (!extra.length) return base
+  const offerIdx = base.findIndex((r) => r.key === 'offer_amount')
+  if (offerIdx === -1) return [...base, ...extra]
+  return [...base.slice(0, offerIdx + 1), ...extra, ...base.slice(offerIdx + 1)]
+}
+
 function def(country: Country, key: string): RowDef | undefined {
   return rowDefs(country).find((r) => r.key === key)
+}
+
+function defFor(ctx: CheckCtx, key: string): RowDef | undefined {
+  return rowDefsFor(ctx).find((r) => r.key === key)
 }
 
 // ---------------------------------------------------------------------------
@@ -376,6 +410,10 @@ export function normalizeCallA(out: CallAOutput | null): CallAOutput | null {
 }
 
 function factFor(ctx: CheckCtx, d: RowDef): CallAFact | null {
+  const payIdx = d.key.match(/^payment_items_(\d+)$/)
+  if (payIdx) {
+    return paymentItemFacts(ctx)[Number(payIdx[1]) - 1] || null
+  }
   const facts = (ctx.callA?.facts || []).filter((f) => f.key === d.key && f.value !== null && f.value !== undefined && String(f.value).trim() !== '')
   if (!facts.length) return null
   const wantDocs: string[] = d.source === 'contract'
@@ -443,7 +481,7 @@ function rowRequired(ctx: CheckCtx, d: RowDef): boolean {
 
 /** Lazily creates the stored record for a row (mirrors rec() in the prototype). */
 export function rec(ctx: CheckCtx, key: string): CheckRowState {
-  const d = def(ctx.country, key)
+  const d = defFor(ctx, key)
   if (!d) throw new Error(`Unknown check row: ${key}`)
   if (!ctx.check.rows[key]) {
     const f = d.source === 'answers' ? null : factFor(ctx, d)
@@ -495,7 +533,7 @@ export function display(ctx: CheckCtx, d: RowDef, v: unknown): string {
 
 /** Coerce a value sent by a client to the row's type. Throws on invalid input. */
 export function coerce(ctx: CheckCtx, key: string, v: unknown): unknown {
-  const d = def(ctx.country, key)
+  const d = defFor(ctx, key)
   if (!d) throw new Error(`Unknown check row: ${key}`)
   if (v === null || v === undefined || v === '') throw new Error('A value is required')
   switch (d.type) {
@@ -744,18 +782,22 @@ export function conflicts(ctx: CheckCtx): ConflictCard[] {
   }
 
   // Contract start date vs years on the job (Canada and US)
-  if (contractIn(ctx) && !dismissed.has('years')) {
+  if ((contractIn(ctx) || !!ctx.callA?.facts?.some((f) => f.key === 'hire_date' && f.value)) && !dismissed.has('years')) {
     const start = rec(ctx, 'contract_start')
     const yrs = rec(ctx, 'years')
     const y = num(ctx.answers.years)
-    const startIso = typeof start.doc_value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(start.doc_value) ? start.doc_value : null
+    const hireFact = !start.doc_value ? ctx.callA?.facts?.find((f) => f.key === 'hire_date' && f.value) : null
+    const startIso = typeof start.doc_value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(start.doc_value)
+      ? start.doc_value
+      : (hireFact?.value ? parseDate(String(hireFact.value)) : null)
     if (y && startIso && !start.status && !yrs.status) {
-      const lastDay = docValue(ctx, 'last_day')
+      const lastDay = confirmedValue(ctx, 'last_day') ?? docValue(ctx, 'last_day')
       const dy = yearsBetween(startIso, typeof lastDay === 'string' && /^\d{4}/.test(lastDay) ? lastDay : null)
       if (Math.abs(y - dy) >= 1.5) {
+        const docYears = Math.round(dy * 10) / 10
         out.push({
           key: 'years', title: 'Years on the job', lead: "Your contract's start date doesn't match the years you gave us.",
-          document: { value: Math.round(dy), display: `About ${Math.round(dy)} years`, quote: start.quote, where: start.where, label: 'Your contract says' },
+          document: { value: docYears, display: `About ${docYears} years`, quote: start.quote || hireFact?.quote || null, where: start.where || hireFact?.where || null, label: 'Your contract says' },
           answers: { value: y, display: `About ${y} years`, label: 'You told us' },
         })
       }
@@ -790,7 +832,7 @@ export function changesCount(ctx: CheckCtx): number {
 }
 
 export function buildModel(ctx: CheckCtx) {
-  const defs = rowDefs(ctx.country).filter((d) => rowVisible(ctx, d))
+  const defs = rowDefsFor(ctx).filter((d) => rowVisible(ctx, d))
   const rows = defs.map((d) => {
     const o = rec(ctx, d.key)
     const value = current(ctx, d)
@@ -890,7 +932,7 @@ export function setRow(ctx: CheckCtx, key: string, value: unknown, status: RowSt
 }
 
 export function autoConfirmAll(ctx: CheckCtx) {
-  const defs = rowDefs(ctx.country).filter((d) => rowVisible(ctx, d))
+  const defs = rowDefsFor(ctx).filter((d) => rowVisible(ctx, d))
   for (const d of defs) {
     if (noContractRow(ctx, d)) continue
     const o = rec(ctx, d.key)
@@ -904,7 +946,7 @@ export function autoConfirmAll(ctx: CheckCtx) {
       }
       if (v === null || v === undefined || v === '') {
         if (d.ask) {
-          v = d.key === 'working_notice_weeks' ? '0' : d.key === 'bonus_amount' ? 0 : '0'
+          v = d.key === 'working_notice_weeks' ? 0 : d.key === 'bonus_amount' ? 0 : '0'
         } else {
           v = d.type === 'money' ? 0 : d.type === 'choice' ? 'none' : 'Not mentioned'
         }
@@ -919,18 +961,18 @@ export function autoConfirmAll(ctx: CheckCtx) {
 }
 
 export function writeBackToAnswers(ctx: CheckCtx, key: string, value: unknown) {
-  const d = def(ctx.country, key)
+  const d = defFor(ctx, key)
   if (d?.toAnswers && value !== null && value !== undefined) d.toAnswers(value, ctx.answers)
 }
 
 export function rowDef(ctx: CheckCtx, key: string) {
-  const d = def(ctx.country, key)
+  const d = defFor(ctx, key)
   if (!d || !rowVisible(ctx, d)) return null
   return d
 }
 
 export function normalizeFoundValue(ctx: CheckCtx, key: string, raw: string | null): unknown {
-  const d = def(ctx.country, key)
+  const d = defFor(ctx, key)
   if (!d || raw === null) return raw
   return normalizeDoc(ctx, d, raw)
 }
@@ -952,25 +994,44 @@ const OPTIONAL_V08_FACT_KEYS = new Set([
   'effective_date',
   'group_or_individual',
   'adea_named',
+  'bonus_history',
+  'cause_definition',
+  'commission_terms',
+  'notice_date',
+  'weekly_hours',
 ])
 
 /** Export for Call B: state.check -> confirmed_facts (spec section 4). */
 export function exportConfirmedFacts(ctx: CheckCtx) {
   const rows: Record<string, unknown> = {}
-  for (const d of rowDefs(ctx.country)) {
+  for (const d of rowDefsFor(ctx)) {
     if (!rowVisible(ctx, d) || noContractRow(ctx, d)) continue
     const o = ctx.check.rows[d.key]
-    if (!o || !o.status) continue
-    rows[d.key] = {
-      value: o.value,
-      source: o.source,
-      status: o.status,
-      doc_value: o.doc_value ?? null,
-      user_value: o.user_value ?? null,
-      quote: o.quote ?? null,
-      where: o.where ?? null,
-      change_ack: o.status === 'corrected' ? !!o.change_ack : undefined,
-      change_ack_at: o.status === 'corrected' ? o.change_ack_at || null : undefined,
+    if (o && o.status) {
+      rows[d.key] = {
+        value: o.value,
+        source: o.source,
+        status: o.status,
+        doc_value: o.doc_value ?? null,
+        user_value: o.user_value ?? null,
+        quote: o.quote ?? null,
+        where: o.where ?? null,
+        change_ack: o.status === 'corrected' ? !!o.change_ack : undefined,
+        change_ack_at: o.status === 'corrected' ? o.change_ack_at || null : undefined,
+      }
+    } else if (/^payment_items_\d+$/.test(d.key)) {
+      const f = factFor(ctx, d)
+      if (f && f.value !== null && f.value !== undefined && String(f.value).trim() !== '') {
+        rows[d.key] = {
+          value: f.value,
+          source: f.document || d.source,
+          status: 'confirmed',
+          doc_value: f.value,
+          user_value: null,
+          quote: f.quote ?? null,
+          where: f.where ?? null,
+        }
+      }
     }
   }
   // v0.8 Note 13: forward optional extracted facts from Call A that are not separate check-page

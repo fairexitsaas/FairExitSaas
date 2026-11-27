@@ -1,12 +1,9 @@
 /**
  * FairExit Prompts Loader
  *
- * Organizes and loads the prompt files for FairExit:
- *   - Prompt A1 (backend/prompts/prompt-a1/prompt-a1.txt): Call A · Read the Documents (Fact Extraction)
- *   - Prompt A2 (backend/prompts/prompt-a2/prompt-a2.txt): Call A2 · Second Look
- *   - Prompt B  (backend/prompts/prompt-b/prompt-b.txt)  : Call B · Write the Report
+ * Loads the client-provided unified FairExit prompt file:
+ *   - backend/prompts/report-prompt-v0.9.txt (Call A, Call A2, Call B + v0.9 RULES)
  *
- * Each prompt file is individually identifiable and separated by responsibility.
  * SHA-256 hashes are tracked to verify prompt integrity and stored with AI execution logs.
  */
 import fs from 'fs'
@@ -14,14 +11,14 @@ import path from 'path'
 import crypto from 'crypto'
 import type { Jurisdiction } from './jurisdictions'
 
-export const PROMPT_VERSION = 'v0.8'
+export const PROMPT_VERSION = 'v0.9'
 
 export type PromptKey = 'A1' | 'A2' | 'B'
 
 export const PROMPT_FILES = {
-  A1: path.join('prompt-a1', 'prompt-a1.txt'),
-  A2: path.join('prompt-a2', 'prompt-a2.txt'),
-  B: path.join('prompt-b', 'prompt-b.txt'),
+  A1: 'report-prompt-v0.9.txt',
+  A2: 'report-prompt-v0.9.txt',
+  B: 'report-prompt-v0.9.txt',
 } as const
 
 interface CachedPrompt {
@@ -56,7 +53,7 @@ function loadPrompt(key: PromptKey): CachedPrompt {
 
   // Extract the system prompt body, excluding trailing engineer NOTES or CHANGES
   let body = raw
-  const notesIdx = body.search(/^=== NOTES FOR PHASE 1/m)
+  const notesIdx = body.search(/^=== NOTES FOR (?:THE SITE|PHASE 1)/m)
   if (notesIdx !== -1) {
     body = body.slice(0, notesIdx).trimEnd()
   }

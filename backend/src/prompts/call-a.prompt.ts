@@ -1,8 +1,7 @@
 /**
  * FairExit Call A Prompt Module
  *
- * Source of truth: backend/prompts/prompt-a1/prompt-a1.txt
- * Exact SHA-256: 566883dbe26c5403bb4bda6fd073a4dae0ae7ae727fee1899016a7435722ce94
+ * Source of truth: backend/prompts/report-prompt-v0.9.txt
  *
  * This module exports the exact system prompt for Call A (Read the Documents),
  * ensuring zero unauthorized alterations to its instructions.

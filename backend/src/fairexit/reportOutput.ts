@@ -12,11 +12,28 @@ import { reportQrSvg, reportLawyerUrl } from './reportQr'
 import type { SourceRow } from './regionData'
 import type { Jurisdiction } from './jurisdictions'
 
+export interface PaymentItemEntry {
+  label: string
+  amount?: number | null
+  quote?: string | null
+  expired?: boolean
+}
+
+export interface ReportPayments {
+  unconditional?: PaymentItemEntry[]
+  conditional?: PaymentItemEntry[]
+  held_or_forfeited?: PaymentItemEntry[]
+  total_unconditional?: number | null
+  total_if_signed?: number | null
+}
+
 export interface ReportJson {
   cover: { role_line: string; place_line: string; name_line?: string | null }
   glance: string
   contract_note?: string
   confirmed_line: string
+  rules_as_of?: string | null
+  payments?: ReportPayments | null
   checks: Array<{
     topic: string
     letter_says?: string
@@ -133,6 +150,23 @@ export function ruleWarnings(
     }
   }
 
+  const paymentTotals: number[] = []
+  if (report.payments && typeof report.payments === 'object') {
+    const p = report.payments
+    for (const v of [p.total_unconditional, p.total_if_signed]) {
+      if (typeof v === 'number' && Number.isFinite(v)) paymentTotals.push(Math.round(v))
+    }
+    for (const group of [p.unconditional, p.conditional, p.held_or_forfeited]) {
+      if (Array.isArray(group)) {
+        for (const item of group) {
+          if (typeof item?.amount === 'number' && Number.isFinite(item.amount)) {
+            paymentTotals.push(Math.round(item.amount))
+          }
+        }
+      }
+    }
+  }
+
   const ctx: AllowedContext | undefined = (allowedAmounts as AllowedAmountsList)?.context
 
   const walk = (v: unknown, fn: (s: string, path: string) => void, path = '') => {
@@ -177,9 +211,10 @@ export function ruleWarnings(
           p.endsWith('.letter_says') ||
           p.endsWith('.letter_note') ||
           p.endsWith('.letter_quote') ||
+          p.startsWith('payments.') ||
           clauseCitesLetter
         ) {
-          const allowedLetter = [...ctx.letter, ...ctx.confirmed]
+          const allowedLetter = [...ctx.letter, ...ctx.confirmed, ...(p.startsWith('payments.') ? paymentTotals : [])]
           validForPath = allowedLetter.some((a) => Math.abs(a - n) <= 1)
         }
         // 3. Confirmed facts line: confirmed facts, answers, contract, letter
@@ -192,7 +227,7 @@ export function ruleWarnings(
           const allowedLegal = [
             ...ctx.calculator,
             ...ctx.confirmed,
-            ...(p.endsWith('.why') || p.startsWith('questions[') || p === 'glance' ? contractMathAmounts : []),
+            ...(p.endsWith('.why') || p.startsWith('questions[') || p === 'glance' ? [...contractMathAmounts, ...paymentTotals] : []),
           ]
           validForPath = allowedLegal.some((a) => Math.abs(a - n) <= 1)
         }
@@ -590,10 +625,20 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
   const dateFormatted = confirmedDateMatch ? confirmedDateMatch[1] : fmtLongDate(m.attestedAt || m.generatedAt)
 
   // 3. Employer
-  const employerName = a.employer || a.company || 'Not stated'
+  const confirmedEmployerRow = isRowConfirmed(cfRows.employer_name) ? cfRows.employer_name : null
+  const employerName =
+    (confirmedEmployerRow?.value ? String(confirmedEmployerRow.value) : null) ||
+    m.input?.confirmed_facts?.employer_name ||
+    a.employer ||
+    a.company ||
+    'Not stated'
 
   // 4. Service
+  const confirmedYearsRow = isRowConfirmed(cfRows.years) ? cfRows.years : null
   let yearsStr = nb?.factorValues?.service
+  if (!yearsStr && confirmedYearsRow?.value != null) {
+    yearsStr = `${confirmedYearsRow.value} years`
+  }
   if (!yearsStr && r.cover?.role_line) {
     const sm = r.cover.role_line.match(/\b(\d+(?:\.\d+)?\s*(?:years?|yrs?)(?:\s*(?:of\s*)?service)?(?:\s*\d+\s*(?:months?|mo))?)/i)
     if (sm) yearsStr = sm[1]
@@ -613,6 +658,9 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
   // 6. Offer
   const offerCheck = r.checks?.find((c) => /offer/i.test(c.topic))
   let offerStr = nb?.offer != null ? money(nb.offer) : null
+  if (!offerStr && r.payments?.total_unconditional != null && Number.isFinite(Number(r.payments.total_unconditional))) {
+    offerStr = money(Number(r.payments.total_unconditional))
+  }
   if (!offerStr && offerCheck?.letter_says) {
     offerStr = extractAmountStr(offerCheck.letter_says)
   }
@@ -638,7 +686,13 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
 
   // 8. Decide by / Deadline
   const deadlineCheck = r.checks?.find((c) => /deadline/i.test(c.topic))
-  let deadlineStr = a.sign_by ? String(a.sign_by) : null
+  const confirmedSignBy = isRowConfirmed(cfRows.sign_by) ? cfRows.sign_by : null
+  const confirmedDays = isRowConfirmed(cfRows.days_to_decide) ? cfRows.days_to_decide : null
+  let deadlineStr = confirmedSignBy?.value
+    ? String(confirmedSignBy.value)
+    : confirmedDays?.value != null
+      ? `${confirmedDays.value} days`
+      : (a.sign_by ? String(a.sign_by) : null)
   if (!deadlineStr && deadlineCheck?.letter_says) {
     if (/no deadline/i.test(deadlineCheck.letter_says)) {
       deadlineStr = 'No deadline written'
@@ -844,6 +898,8 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     { num: '6', title: `Once ${aLawyer} takes your case, follow them`, text: `Everything here is <b>general and organizational</b>. If you retain ${aLawyer}, their advice <b>supersedes</b> anything in this report — follow your ${w.lawyer}, not this document. <b>Do not rely on this report once you're working with ${aLawyer}</b>.` },
   ]
 
+  const rulesAsOfLine = typeof r.rules_as_of === 'string' && r.rules_as_of.trim() ? r.rules_as_of.trim() : null
+
   const beforeHtml = `
     <div class="page before-page">
       <div class="section-kicker">BEFORE YOU USE THIS</div>
@@ -859,6 +915,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           </div>
         `).join('')}
       </div>
+      ${rulesAsOfLine ? `<p class="before-rules-as-of">${esc(rulesAsOfLine)}</p>` : ''}
       ${pageFooter(curPage, effTotal)}
     </div>
   `
@@ -895,6 +952,48 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // 4.1 AT A GLANCE (ca5.png / us5.png)
   // -------------------------------------------------------------------------
   const a = m.answers || {}
+  const pmt = r.payments && typeof r.payments === 'object' ? r.payments : null
+  const pmtUncond = Array.isArray(pmt?.unconditional) ? pmt!.unconditional : []
+  const pmtCond = Array.isArray(pmt?.conditional) ? pmt!.conditional : []
+  const pmtHeld = Array.isArray(pmt?.held_or_forfeited) ? pmt!.held_or_forfeited : []
+  const hasPaymentsBlock = Boolean(
+    pmt &&
+    (pmtUncond.length > 0 || pmtCond.length > 0 || pmtHeld.length > 0 || pmt.total_unconditional != null || pmt.total_if_signed != null)
+  )
+  const fmtPayAmt = (amt: unknown) => (typeof amt === 'number' && Number.isFinite(amt) ? money(amt) : null)
+  const paymentsHtml = hasPaymentsBlock ? `
+    <div class="payments-block">
+      <div class="payments-grid">
+        <div class="payments-col">
+          <div class="payments-col-title">PAID EITHER WAY</div>
+          ${pmtUncond.length ? pmtUncond.map((item) => {
+            const amtStr = fmtPayAmt(item.amount)
+            return `<div class="payment-row"><span>${esc(item.label)}</span>${amtStr ? `<b>${esc(amtStr)}</b>` : ''}</div>`
+          }).join('') : '<div class="payment-row muted"><span>None listed</span></div>'}
+          ${pmt?.total_unconditional != null && Number.isFinite(Number(pmt.total_unconditional)) ? `
+          <div class="payment-total-row"><span>Total paid either way</span><b>${esc(money(Number(pmt.total_unconditional)))}</b></div>` : ''}
+        </div>
+        <div class="payments-col">
+          <div class="payments-col-title">ONLY IF YOU SIGN</div>
+          ${pmtCond.length ? pmtCond.map((item) => {
+            const amtStr = fmtPayAmt(item.amount)
+            return `<div class="payment-row"><span>${esc(item.label)}${item.expired ? ' (deadline passed)' : ''}</span>${amtStr ? `<b>${esc(amtStr)}</b>` : ''}</div>`
+          }).join('') : '<div class="payment-row muted"><span>None listed</span></div>'}
+          ${pmt?.total_if_signed != null && Number.isFinite(Number(pmt.total_if_signed)) ? `
+          <div class="payment-total-row"><span>Total if you sign</span><b>${esc(money(Number(pmt.total_if_signed)))}</b></div>` : ''}
+        </div>
+      </div>
+      ${pmtHeld.length ? `
+      <div class="payments-held">
+        <div class="payments-col-title">HELD OR FORFEITED</div>
+        ${pmtHeld.map((item) => {
+          const amtStr = fmtPayAmt(item.amount)
+          return `<div class="payment-row"><span>${esc(item.label)}</span>${amtStr ? `<b>${esc(amtStr)}</b>` : ''}</div>`
+        }).join('')}
+      </div>` : ''}
+    </div>
+  ` : ''
+
   const glanceHtml = `
     <div class="page glance-page">
       <div class="section-kicker-bar">
@@ -948,6 +1047,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           </div>` : ''}
         </div>
       </div>
+      ${paymentsHtml}
       ${pageFooter(curPage, effTotal)}
     </div>
   `
@@ -1774,10 +1874,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         const pillClass = isBad ? 'pill-red' : isOk ? 'pill-green' : c.status === 'info' ? 'pill-gray' : 'pill-yellow'
         const isInfo = c.status === 'info'
         const pillLabel = isBad ? "DOESN'T LINE UP" : isOk ? 'LINES UP' : isInfo ? 'GOOD TO KNOW' : 'ASK ABOUT IT'
-        const ruleCheck = matchingCheck(c, r.checks || [])
-        const srcHtml = sourceLink(c.source_id || ruleCheck?.source_id, m) || `Your ${esc(w.letter)} and ${esc(w.contract)}`
-        const rulesText = c.what_it_means
-        const whyText = ruleCheck?.why && ruleCheck.why.length >= 8 ? ruleCheck.why : ''
+        const matchedSource = c.source_id && !['from_documents', 'DOC-LETTER', 'DOC-CONTRACT'].includes(c.source_id)
+          ? m.sources.find((x) => x.id === c.source_id)
+          : undefined
+        const srcHtml = sourceLink(c.source_id, m) || `Your ${esc(w.letter)} and ${esc(w.contract)}`
+        const rulesText = matchedSource ? `${matchedSource.rule} · ${matchedSource.section}` : ''
+        const whyText = c.what_it_means || ''
 
         return `
           <tr class="clause-row">
@@ -1789,15 +1891,16 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
             <h3 class="clause-single-heading">${idx + 1}. ${esc(c.title.replace(/^\d+[.)]\s+/, ''))}</h3>
 
-            <div class="clause-two-boxes">
+            <div class="clause-two-boxes"${rulesText ? '' : ' style="grid-template-columns: 1fr;"'}>
               <div class="c-box c-box-white">
                 <div class="c-box-header">YOUR DOCUMENTS SAY</div>
                 <div class="c-box-body">${esc(c.what_it_says)}</div>
               </div>
+              ${rulesText ? `
               <div class="c-box c-box-beige">
                 <div class="c-box-header">WHAT THE RULES SAY</div>
                 <div class="c-box-body">${esc(rulesText)}</div>
-              </div>
+              </div>` : ''}
             </div>
 
             ${whyText ? `<p class="clause-why"><b>Why it matters:</b> ${esc(whyText)}</p>` : ''}
@@ -2121,7 +2224,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
       <div class="before-use-footer">
         <p>${esc(r.confirmed_line)}</p>
-        ${m.rulesAsOf && !/rules as of/i.test(r.confirmed_line || '') ? `<p>Rules as of ${esc(fmtLongDate(m.rulesAsOf))}.</p>` : ''}
+        ${rulesAsOfLine ? `<p>${esc(rulesAsOfLine)}</p>` : (m.rulesAsOf && !/rules as of/i.test(r.confirmed_line || '') ? `<p>Rules as of ${esc(fmtLongDate(m.rulesAsOf))}.</p>` : '')}
         <p class="rid">Report ID ${esc(m.reportId)} · generated ${esc(fmtLongDate(m.generatedAt))}</p>
       </div>
       ${pageFooter(curPage, effTotal)}
@@ -2467,6 +2570,11 @@ b, strong, .bold {
   background: #FDF3DC;
   border-color: #EBC873;
 }
+.before-rules-as-of {
+  font-size: 8.5pt;
+  color: #5A6B78;
+  margin: 10px 0 0;
+}
 .card-num-title {
   font-family: "Newsreader", Georgia, serif;
   font-size: 12pt;
@@ -2591,6 +2699,53 @@ b, strong, .bold {
   color: #062C55;
   text-align: right;
   font-weight: 700;
+}
+.payments-block {
+  border: 1px solid #E2E0D8;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  background: #FAF9F5;
+}
+.payments-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.payments-col-title {
+  font-size: 6.8pt;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: #5A6B78;
+  margin-bottom: 6px;
+}
+.payment-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 8.5pt;
+  color: #17242F;
+  padding: 3px 0;
+  border-bottom: 1px solid #EFECE6;
+}
+.payment-row.muted {
+  color: #6B7A86;
+  border-bottom: none;
+}
+.payment-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 9pt;
+  font-weight: 700;
+  color: #062C55;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+.payments-held {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #D8D4CA;
 }
 
 /* Myths */
@@ -3703,11 +3858,25 @@ export function extractContextualAmounts(input: Record<string, any>): AllowedCon
     return null
   }
 
+  const parseMoneyTokens = (v: unknown): number[] => {
+    if (typeof v !== 'string') return []
+    const out: number[] = []
+    for (const m of v.matchAll(/\$\s?([0-9][0-9,]*(?:\.\d+)?)/g)) {
+      const n = Math.round(parseFloat(m[1].replace(/,/g, '')))
+      if (Number.isFinite(n) && n > 0) out.push(n)
+    }
+    return out
+  }
+
   // 1. Calculator minimums and ranges
-  for (const k of ['amount', 'weekly_pay']) {
+  for (const k of ['amount', 'weekly_pay', 'potentialSeveranceAmount']) {
     const n = parseNum(input?.minimum?.[k])
     if (n !== null) calculator.push(n)
   }
+  const sevMaybeAmt = parseNum(input?.minimum?.severanceMaybe?.amount ?? input?.minimum?.severanceMaybe)
+  if (sevMaybeAmt !== null) calculator.push(sevMaybeAmt)
+  const warnMax = parseNum(input?.minimum?.warn?.backPayMaxAmount)
+  if (warnMax !== null) calculator.push(warnMax)
   for (const k of ['low', 'high']) {
     const n = parseNum(input?.range?.[k])
     if (n !== null) calculator.push(n)
@@ -3715,10 +3884,13 @@ export function extractContextualAmounts(input: Record<string, any>): AllowedCon
 
   // 2. Confirmed facts table rows
   const cfRows = input?.confirmed_facts?.rows || {}
-  for (const r of Object.values<any>(cfRows)) {
+  for (const [rk, r] of Object.entries<any>(cfRows)) {
     for (const v of [r?.value, r?.user_value, r?.doc_value]) {
       const n = parseNum(v)
       if (n !== null) confirmed.push(n)
+      if (rk.startsWith('payment_items')) {
+        for (const t of parseMoneyTokens(v)) confirmed.push(t)
+      }
     }
   }
 
@@ -3744,11 +3916,11 @@ export function extractContextualAmounts(input: Record<string, any>): AllowedCon
     const doc = String(f?.document || '').toLowerCase()
     const key = String(f?.key || '').toLowerCase()
     for (const v of [f?.value, f?.doc_value, f?.amount]) {
-      const n = parseNum(v)
-      if (n !== null) {
+      const nums = key.startsWith('payment_items') ? parseMoneyTokens(v) : (() => { const n = parseNum(v); return n !== null ? [n] : [] })()
+      for (const n of nums) {
         if (doc === 'contract' || key.includes('salary') || key.includes('remuneration')) {
           contract.push(n)
-        } else if (doc === 'letter' || doc === 'agreement' || key.includes('offer') || key.includes('severance')) {
+        } else if (doc === 'letter' || doc === 'agreement' || key.includes('offer') || key.includes('severance') || key.startsWith('payment_items')) {
           letter.push(n)
         } else {
           if (key.includes('salary') || key.includes('wage')) contract.push(n)

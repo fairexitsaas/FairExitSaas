@@ -41,15 +41,15 @@ describe('FairExit Round 2 — Remaining Important Changes & Regressions', () =>
       expect(usPrompt).toContain('never put them in "missing"')
     })
 
-    it('Call B prompt includes CONTRACT MATH, DOCUMENTS FIRST (respecting Fix 3 confirmed_facts), FLAGS F1-F6, W2/W8/W12, and optional v0.8 output fields', () => {
+    it('Call B prompt includes CONTRACT MATH, DOCUMENTS FIRST, FLAGS, W2/W8/W12, and optional v0.9 output fields', () => {
       const callBPrompt = systemPromptCallB()
-      expect(callBPrompt).toContain('CONTRACT MATH (v0.8)')
+      expect(callBPrompt).toContain('CONTRACT MATH')
       expect(callBPrompt).toContain('M1.')
       expect(callBPrompt).toContain('M2.')
       expect(callBPrompt).toContain('M3.')
-      expect(callBPrompt).toContain('DOCUMENTS FIRST (v0.8)')
-      expect(callBPrompt).toContain('Respect explicit user confirmations in confirmed_facts.rows first')
-      expect(callBPrompt).toContain('FLAGS FROM THE DOCUMENTS (v0.8)')
+      expect(callBPrompt).toContain('DOCUMENTS FIRST')
+      expect(callBPrompt).toContain('D1. Documents beat typed answers.')
+      expect(callBPrompt).toContain('FLAGS FROM THE DOCUMENTS')
       expect(callBPrompt).toContain('F1. Bonus forfeited')
       expect(callBPrompt).toContain('F2. Confidentiality of discrimination facts')
       expect(callBPrompt).toContain('F3. Non-disparagement')

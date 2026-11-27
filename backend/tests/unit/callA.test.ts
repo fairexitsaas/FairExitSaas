@@ -7,7 +7,7 @@ import { buildJurisdiction } from '../../src/fairexit/jurisdictions'
 describe('Claude Call A Prompt and Extraction Unit Tests', () => {
   it('verifies Call A prompt file integrity and SHA-256 hash', () => {
     const hash = getPromptHash()
-    expect(hash).toBe('566883dbe26c5403bb4bda6fd073a4dae0ae7ae727fee1899016a7435722ce94')
+    expect(hash).toBe('ba2a7a622ff2b67a620f7ac5c7192c68c8852dbe116d5e683873ab5391cee038')
   })
 
   it('verifies that Call A prompt replaces jurisdiction words correctly', () => {

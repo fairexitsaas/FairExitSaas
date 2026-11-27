@@ -96,6 +96,7 @@ export interface Estimate {
     lowAmount: number
     highAmount: number
   } | null
+  warn?: Record<string, unknown> | null
   note: string
 }
 
