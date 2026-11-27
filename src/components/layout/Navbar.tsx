@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { CountryCode } from "@/context/CountryContext";
 
 interface NavbarProps {
@@ -14,21 +14,25 @@ interface NavbarProps {
 
 export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isCanada = country === "CA";
+  const isHome = pathname === "/";
 
   const handleNavLinkClick = (href: string, e: React.MouseEvent) => {
     e.preventDefault();
     setMobileMenuOpen(false);
 
     if (href === "#how" || href === "#check" || href === "/#how" || href === "/#check") {
-      const targetId = isCanada ? "how" : "check";
-      const el =
-        document.getElementById(targetId) ||
-        document.getElementById("how") ||
-        document.getElementById("check");
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth" });
+      if (isHome) {
+        const targetId = isCanada ? "how" : "check";
+        const el =
+          document.getElementById(targetId) ||
+          document.getElementById("how") ||
+          document.getElementById("check");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+        }
       } else {
         router.push(isCanada ? "/#how" : "/#check");
       }
@@ -36,9 +40,11 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
     }
 
     if (href === "#paths" || href === "/#paths") {
-      const el = document.getElementById("paths");
-      if (el) {
-        el.scrollIntoView({ behavior: "smooth" });
+      if (isHome) {
+        const el = document.getElementById("paths");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+        }
       } else {
         router.push("/#paths");
       }
@@ -67,7 +73,7 @@ export default function Navbar({ country, onCountrySwitch }: NavbarProps) {
 
     if (href.startsWith("#")) {
       const targetId = href.slice(1);
-      const targetEl = document.getElementById(targetId);
+      const targetEl = isHome ? document.getElementById(targetId) : null;
       if (targetEl) {
         targetEl.scrollIntoView({ behavior: "smooth" });
       } else {

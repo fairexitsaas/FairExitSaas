@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter, usePathname } from "next/navigation";
 import { CountryCode } from "@/context/CountryContext";
 import { triggerGetApp } from "@/context/GetAppContext";
 
@@ -19,7 +20,10 @@ export default function Footer({
   onOpenAppModal,
   variant = "default",
 }: FooterProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const isCanada = country === "CA";
+  const isHome = pathname === "/";
 
   const handleOpenApp = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -39,12 +43,24 @@ export default function Footer({
 
   const handleNavLink = (href: string, e: React.MouseEvent) => {
     if (href.startsWith("#")) {
-      const el = document.getElementById(href.slice(1));
-      if (el) {
-        e.preventDefault();
-        el.scrollIntoView({ behavior: "smooth" });
+      e.preventDefault();
+      if (variant === "lawyers") {
+        const el = document.getElementById(href.slice(1));
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+        }
+        return;
+      }
+      if (isHome) {
+        const targetId = href.slice(1);
+        const el =
+          document.getElementById(targetId) ||
+          (targetId === "how" ? document.getElementById("check") : targetId === "check" ? document.getElementById("how") : null);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth" });
+        }
       } else {
-        window.location.href = "/" + href;
+        router.push("/" + href);
       }
     }
   };

@@ -43,7 +43,8 @@ const INLINE_REPORT_EMAIL_CA = `<!doctype html>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:22px;border-top:1px solid #E4E0D6;"><tr><td style="padding-top:22px;font-family:Newsreader,Georgia,'Times New Roman',serif;font-size:19px;font-weight:600;color:#0D2B23;">What to do next</td></tr></table>
 <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;"><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#0EB28D;width:22px;">1</td>
 <td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">Start with the "At a glance" page near the front.</td></tr><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#0EB28D;width:22px;">2</td>
-<td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">Use the HR questions before you sign anything.</td></tr><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">Check your sign-by date and give yourself time.</td></tr></table>
+<td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">Use the HR questions before you sign anything.</td></tr><tr><td valign="top" style="padding:0 12px 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;font-weight:700;color:#0EB28D;width:22px;">3</td>
+<td style="padding:0 0 12px 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#17242F;">Check your sign-by date and give yourself time.</td></tr></table>
 <p style="margin:10px 0 0 0;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:14px;line-height:1.5;color:#5B6670;">Can't find the attachment, or have a question? Just reply to this email.</p>
 </td></tr>
 <tr><td style="padding:22px 8px 0 8px;font-family:'DM Sans',Arial,Helvetica,sans-serif;font-size:12.5px;line-height:1.55;color:#5B6670;" align="center">
@@ -153,6 +154,27 @@ General information, not legal advice. FairExit is not a law firm, and only a li
 
 function escEmailHtml(v: string): string {
   return String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+}
+
+const UNSUITABLE_NAME_VALUES = new Set([
+  '[first name]',
+  'first name',
+  'null',
+  'undefined',
+  'none',
+  'n/a',
+  'na',
+  'unknown',
+])
+
+export function formatCustomerGreetingName(rawName: unknown): string {
+  if (typeof rawName !== 'string') return 'there'
+  const trimmed = rawName.trim()
+  if (!trimmed) return 'there'
+  if (UNSUITABLE_NAME_VALUES.has(trimmed.toLowerCase())) return 'there'
+  if (/[\r\n<>@]/.test(trimmed)) return 'there'
+  if (!/^[\p{L}]/u.test(trimmed)) return 'there'
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
 }
 
 function getLawyerRequestEmailTemplate(country: string): string {
@@ -334,9 +356,9 @@ export const emailService = {
     const countryCode = isCanada ? 'CA' : 'US'
     const lawyerWord = isCanada ? 'lawyer' : 'attorney'
 
-    // Extract recipient first name dynamically from case data
+    // Extract and format recipient greeting name dynamically from case data
     const rawName = (c as any).customerName || c.answers?.customer_name || c.answers?.name || ''
-    const firstName = rawName.trim().split(/\s+/)[0] || 'there'
+    const firstName = formatCustomerGreetingName(rawName)
 
     // Dedicated lawyer-request token (prefers dedicated fxl_ token, with safe fallback)
     const lawyerToken = dedicatedLawyerToken || (token && token.startsWith('fxl_') ? token : '') || token
@@ -349,7 +371,7 @@ export const emailService = {
 
     // Country-specific HTML email template
     let htmlContent = getReportEmailTemplate(countryCode)
-    htmlContent = htmlContent.replace(/\[First name\]/g, firstName)
+    htmlContent = htmlContent.replace(/\[First name\]/g, escEmailHtml(firstName))
     htmlContent = htmlContent.replace(/https:\/\/fairexit\.io\/legal-help/g, ctaUrl)
 
     const textContent = `Hi ${firstName},\n\nYour Severance Report is attached as a PDF. Save it somewhere safe.\n\nIt puts your offer, the rules that may apply where you work, and the questions to ask HR in one place.\n\nSee if a ${lawyerWord} can help (free):\n${ctaUrl}\n\nWhat to do next:\n1. Start with the "At a glance" page near the front.\n2. Use the HR questions before you sign anything.\n3. Check your sign-by date and give yourself time.\n\nCan't find the attachment, or have a question? Just reply to this email.\n\n--\nChallenge your severance offer\nGeneral information, not legal advice. FairExit is not a law firm, and only a licensed ${lawyerWord} can tell you what applies to you.\nsupport@fairexit.io · fairexit.io`

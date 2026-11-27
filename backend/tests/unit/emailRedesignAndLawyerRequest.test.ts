@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { emailService } from '../../src/services/email.service'
+import { emailService, formatCustomerGreetingName } from '../../src/services/email.service'
 import { leadService } from '../../src/services/lead.service'
 import * as dbModule from '../../src/config/db'
 import { caseService, hashToken } from '../../src/services/case.service'
@@ -376,9 +376,11 @@ describe('FairExit: Report Email Redesign, Lawyer Request & UI Corrections', () 
       expect(capturedPayload.subject).toBe('Your FairExit Severance Report is ready')
 
       // HTML template verification (Canada: "lawyer")
-      expect(capturedPayload.html).toContain('Hi Alex,')
+      expect(capturedPayload.html).toContain('Hi Alex Tremblay,')
       expect(capturedPayload.html).toContain('See if a lawyer can help (free)')
       expect(capturedPayload.html).toContain('only a licensed lawyer can tell you what applies to you')
+      // Step 3 has its own number cell in the number column
+      expect(capturedPayload.html).toMatch(/>3<\/td>\s*<td[^>]*>Check your sign-by date and give yourself time\.<\/td>/)
 
       // CTA link uses URL fragment (#t=...) to prevent URL token leakage to server logs/CDNs
       const expectedCta = `http://localhost:3000/lawyer-request?case=${sampleCanadaCase.id}#t=${encodeURIComponent(rawLawyerToken)}`
@@ -412,13 +414,58 @@ describe('FairExit: Report Email Redesign, Lawyer Request & UI Corrections', () 
       expect(capturedPayload.to).toEqual(['morgan.taylor@example.com'])
 
       // HTML template verification (US: "attorney")
-      expect(capturedPayload.html).toContain('Hi Morgan,')
+      expect(capturedPayload.html).toContain('Hi Morgan Taylor,')
       expect(capturedPayload.html).toContain('See if an attorney can help (free)')
+      expect(capturedPayload.html).toMatch(/>3<\/td>\s*<td[^>]*>Check your sign-by date and give yourself time\.<\/td>/)
 
       const expectedCta = `http://localhost:3000/lawyer-request?case=${sampleUSCase.id}#t=${encodeURIComponent(lawyerToken)}`
       expect(capturedPayload.html).toContain(expectedCta)
 
       expect(capturedPayload.attachments[0].filename).toBe('FairExit-Severance-Report-US.pdf')
+    })
+
+    it('formats customer greeting capitalization and falls back to "there" for missing or unsuitable names', () => {
+      expect(formatCustomerGreetingName('john')).toBe('John')
+      expect(formatCustomerGreetingName('JOHN')).toBe('JOHN')
+      expect(formatCustomerGreetingName('sarah smith')).toBe('Sarah smith')
+      expect(formatCustomerGreetingName('  john  ')).toBe('John')
+      expect(formatCustomerGreetingName('sp')).toBe('Sp')
+      expect(formatCustomerGreetingName('')).toBe('there')
+      expect(formatCustomerGreetingName('   ')).toBe('there')
+      expect(formatCustomerGreetingName(null)).toBe('there')
+      expect(formatCustomerGreetingName(undefined)).toBe('there')
+      expect(formatCustomerGreetingName('12345')).toBe('there')
+      expect(formatCustomerGreetingName('user@example.com')).toBe('there')
+      expect(formatCustomerGreetingName('N/A')).toBe('there')
+    })
+
+    it('renders INLINE_REPORT_EMAIL_CA fallback template with properly aligned Step 3 and formatted greeting', async () => {
+      ;(env as any).EMAIL_MODE = 'live'
+      ;(env as any).RESEND_API_KEY = 're_test_key_live'
+      ;(env as any).EMAIL_FROM = 'FairExit <reports@fairexit.io>'
+
+      let capturedPayload: any = null
+      vi.spyOn(globalThis, 'fetch').mockImplementation(async (_url: any, opts: any) => {
+        capturedPayload = JSON.parse(opts?.body || '{}')
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ id: 'resend_email_ca_fallback' }),
+        } as any
+      })
+      // Force fallback to INLINE_REPORT_EMAIL_CA (same path used in production when codebase/ is absent)
+      vi.spyOn(fs, 'existsSync').mockReturnValue(false)
+
+      const missingNameCase: CaseRow = {
+        ...sampleCanadaCase,
+        answers: { province: 'ON', years: 5, salary: 90000 },
+      }
+      const res = await emailService.reportReady(missingNameCase, 'fxc_tok', dummyPdfBytes, 'fxl_tok')
+
+      expect(res.sent).toBe(true)
+      expect(capturedPayload.html).toContain('Hi there,')
+      expect(capturedPayload.text).toContain('Hi there,')
+      expect(capturedPayload.html).toMatch(/<td[^>]*width:22px;[^>]*>3<\/td>\s*<td[^>]*>Check your sign-by date and give yourself time\.<\/td>/)
     })
   })
 

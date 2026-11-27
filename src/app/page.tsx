@@ -28,20 +28,36 @@ export default function HomePage() {
   const isCanada = currentCountry === "CA";
 
   useEffect(() => {
-    const hash = window.location.hash?.slice(1);
-    if (!hash) return;
-    const scrollToHash = () => {
-      const el = document.getElementById(hash);
-      if (el) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const scrollToHash = (attempt = 0) => {
+      const hash = window.location.hash?.slice(1);
+      if (!hash) return;
+      const el =
+        document.getElementById(hash) ||
+        (hash === "how"
+          ? document.getElementById("check")
+          : hash === "check"
+          ? document.getElementById("how")
+          : null);
+      if (el && el.getClientRects().length > 0) {
         el.scrollIntoView({ behavior: "smooth" });
-        return true;
+      } else if (attempt < 10) {
+        timer = setTimeout(() => scrollToHash(attempt + 1), 60);
       }
-      return false;
     };
-    if (!scrollToHash()) {
-      const timer = setTimeout(scrollToHash, 100);
-      return () => clearTimeout(timer);
-    }
+
+    // Defer slightly so Activity visibility and Next.js route scroll settle before scrolling to the section
+    timer = setTimeout(() => scrollToHash(0), 50);
+
+    const onHashChange = () => {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => scrollToHash(0), 50);
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("hashchange", onHashChange);
+    };
   }, [currentCountry]);
 
   return (

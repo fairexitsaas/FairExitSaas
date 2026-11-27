@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import Image from "next/image";
 import { CountryCode } from "@/context/CountryContext";
-import { CanadaFlagIcon, USFlagIcon } from "@/components/common/Icons";
+import { USFlagIcon } from "@/components/common/Icons";
 
 interface CountrySelectionDialogProps {
   isOpen: boolean;
@@ -104,7 +105,13 @@ export default function CountrySelectionDialog({
                 : "border-[#d8d3c8] dark:border-[#1e3b5c] bg-white dark:bg-[#091b2c] text-[#062c55] dark:text-[#f0f6fc] hover:border-[#0eb28d] hover:bg-[#f3faf6] dark:hover:bg-[#0c243b]"
             }`}
           >
-            <CanadaFlagIcon className="w-[26px] h-[18px] rounded-[2px] shadow-[0_0_0_1px_rgba(0,0,0,0.06)] shrink-0" />
+            <Image
+              src="/flag-ca.png"
+              alt="Canada flag"
+              width={26}
+              height={18}
+              className="w-[26px] h-[18px] rounded-[2px] object-cover shadow-[0_0_0_1px_rgba(0,0,0,0.06)] shrink-0"
+            />
             <span>Canada</span>
           </button>
 
