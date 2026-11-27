@@ -9,7 +9,7 @@
 import { buildJurisdiction, codeFromAnswers, normalizeCode, Jurisdiction } from './jurisdictions'
 import { estimate, marketAdjust, getRule, RULES_VERSION, TableRow } from './severanceRules'
 import { regionRulesFor, sourcesFor, latestCheckedDate } from './regionData'
-import { CheckCtx, confirmedValue, exportConfirmedFacts, extractedAgeFact, extractedAnnualPayFact, ROLE_OPTIONS } from './checkPage'
+import { CheckCtx, confirmedValue, exportConfirmedFacts, ROLE_OPTIONS } from './checkPage'
 import { engineInputs } from './freeCheck'
 import type { CaseRow } from './types'
 import { fmtMoney, parseDate, parseWeeks, yearsBetween } from './values'
@@ -47,23 +47,33 @@ export function finalJurisdiction(c: CaseRow, ctx: CheckCtx): Jurisdiction | nul
 function confirmedDocYears(ctx: CheckCtx): number | null {
   const startRaw =
     confirmedValue(ctx, 'contract_start') ??
-    ctx.callA?.facts?.find((f) => f.key === 'contract_start' || f.key === 'hire_date')?.value
+    confirmedValue(ctx, 'hire_date')
   const startIso = startRaw ? parseDate(startRaw) : null
   if (!startIso) return null
-  const lastRaw =
-    confirmedValue(ctx, 'last_day') ??
-    ctx.callA?.facts?.find((f) => f.key === 'last_day')?.value
+  const lastRaw = confirmedValue(ctx, 'last_day')
   const lastIso = lastRaw ? parseDate(lastRaw) : null
+  if (!lastIso && ctx.check?.rows?.['last_day']?.status !== 'not_in_docs') return null
   const dy = yearsBetween(startIso, lastIso)
   if (!Number.isFinite(dy) || dy <= 0) return null
   return Math.round(dy * 10) / 10
 }
 
+function normalizeSignedYet(a: Record<string, any>): 'yes' | 'no' | null {
+  const raw = a.signed_yet ?? a.signedYet ?? a.signed ?? a.already_signed
+  if (raw === undefined || raw === null || raw === '') return null
+  if (typeof raw === 'boolean') return raw ? 'yes' : 'no'
+  const s = String(raw).trim().toLowerCase()
+  if (!s) return null
+  if (s === 'yes' || s === 'true' || s === 'yes, already signed') return 'yes'
+  if (s === 'no' || s === 'false' || s === 'not yet' || s === 'no, not yet') return 'no'
+  return null
+}
+
 /** The answers object the prompt describes, in plain keys, plus the raw free-check state. */
 export function answersForPrompt(c: CaseRow, j: Jurisdiction, ctx?: CheckCtx) {
   const a = c.answers || {}
-  const confirmedAge = ctx ? (num(confirmedValue(ctx, 'age')) ?? extractedAgeFact(ctx)?.value ?? null) : null
-  const confirmedPay = ctx ? (num(confirmedValue(ctx, 'pay')) ?? extractedAnnualPayFact(ctx)?.value ?? null) : null
+  const confirmedAge = ctx ? num(confirmedValue(ctx, 'age')) : null
+  const confirmedPay = ctx ? num(confirmedValue(ctx, 'pay')) : null
   const confirmedYears = ctx ? (num(confirmedValue(ctx, 'years')) ?? confirmedDocYears(ctx)) : null
   const role = a.roleLabel || ROLE_OPTIONS.find((r) => r.factor === num(a.roleFactor ?? a.roleF))?.label || null
   const extras = Object.entries((c.country === 'US' ? a.comp : a.pay) || {}).filter(([, v]) => !!v).map(([k]) => k)
@@ -78,7 +88,7 @@ export function answersForPrompt(c: CaseRow, j: Jurisdiction, ctx?: CheckCtx) {
     employer_size: c.country === 'US' ? a.empsize || null : a.payroll ? `payroll over $2.5M: ${a.payroll}` : null,
     how_it_ended: ENDED[String(a.reason || a.ended)] || a.reason || a.ended || null,
     offer: num(a.offer),
-    signed_yet: a.signed || null,
+    signed_yet: normalizeSignedYet(a),
     similar_jobs: SIMILAR_JOBS[String(a.market)] || a.market || null,
     federal: c.country === 'CA' ? a.federal || 'no' : undefined,
     ...(c.country === 'US'
@@ -91,15 +101,16 @@ export function answersForPrompt(c: CaseRow, j: Jurisdiction, ctx?: CheckCtx) {
 export function buildMinimumAndRange(c: CaseRow, ctx: CheckCtx, j: Jurisdiction) {
   const base = engineInputs(c.answers)
   const years = num(confirmedValue(ctx, 'years')) ?? confirmedDocYears(ctx) ?? base.years
-  const age = num(confirmedValue(ctx, 'age')) ?? extractedAgeFact(ctx)?.value ?? base.age
-  const salary = num(confirmedValue(ctx, 'pay')) ?? extractedAnnualPayFact(ctx)?.value ?? base.salary
+  const age = num(confirmedValue(ctx, 'age')) ?? base.age
+  const salary = num(confirmedValue(ctx, 'pay')) ?? base.salary
   const allFacts = [...(c.call_a?.facts || []), ...(ctx.callA?.facts || [])]
   const letterPaysEsaSeverance = allFacts.some((f) => {
     if (f.key !== 'severance_weeks' || f.value == null) return false
+    if (String(f.document || '').toLowerCase() !== 'letter') return false
     const raw = String(f.value).trim()
     if (!raw || /^(no|none|not mentioned|missing|n\/a)$/i.test(raw)) return false
     const parsed = parseWeeks(raw)
-    return parsed === null ? true : parsed > 0
+    return parsed !== null && parsed > 0
   })
   const payrollGlobal = letterPaysEsaSeverance ? Math.max(base.payrollGlobal || 0, 2500000) : base.payrollGlobal
   const payrollUnknown = !letterPaysEsaSeverance && base.payrollUnknown

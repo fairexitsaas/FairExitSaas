@@ -793,7 +793,7 @@ export function conflicts(ctx: CheckCtx): ConflictCard[] {
     if (y && startIso && !start.status && !yrs.status) {
       const lastDay = confirmedValue(ctx, 'last_day') ?? docValue(ctx, 'last_day')
       const dy = yearsBetween(startIso, typeof lastDay === 'string' && /^\d{4}/.test(lastDay) ? lastDay : null)
-      if (Math.abs(y - dy) >= 1.5) {
+      if (Math.abs(y - dy) >= 0.5) {
         const docYears = Math.round(dy * 10) / 10
         out.push({
           key: 'years', title: 'Years on the job', lead: "Your contract's start date doesn't match the years you gave us.",

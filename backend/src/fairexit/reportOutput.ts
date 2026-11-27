@@ -7,7 +7,7 @@
  */
 import fs from 'fs'
 import path from 'path'
-import { fmtLongDate, fmtMoney } from './values'
+import { fmtLongDate, fmtMoney, parseDate, yearsBetween } from './values'
 import { reportQrSvg, reportLawyerUrl } from './reportQr'
 import type { SourceRow } from './regionData'
 import type { Jurisdiction } from './jurisdictions'
@@ -358,6 +358,21 @@ export interface ReportNumbers {
   factorValues: Record<string, string>
 }
 
+function confirmedDocYearsFromRows(rows: Record<string, any> | undefined): number | null {
+  if (!rows) return null
+  const isConfirmed = (r: any) =>
+    r && (r.status === 'confirmed' || (r.status === 'corrected' && r.change_ack))
+  const startRow = isConfirmed(rows.contract_start) ? rows.contract_start : isConfirmed(rows.hire_date) ? rows.hire_date : null
+  const startIso = startRow?.value ? parseDate(startRow.value) : null
+  if (!startIso) return null
+  const lastRow = isConfirmed(rows.last_day) ? rows.last_day : null
+  const lastIso = lastRow?.value ? parseDate(lastRow.value) : null
+  if (!lastIso && rows.last_day?.status !== 'not_in_docs') return null
+  const dy = yearsBetween(startIso, lastIso)
+  if (!Number.isFinite(dy) || dy <= 0) return null
+  return Math.round(dy * 10) / 10
+}
+
 export function reportNumbers(input: Record<string, any> | null | undefined): ReportNumbers | null {
   if (!input?.jurisdiction) return null
   const country = input.jurisdiction.country as 'CA' | 'US'
@@ -384,7 +399,7 @@ export function reportNumbers(input: Record<string, any> | null | undefined): Re
     gauge = { low: m.amount, high: range.high, offer, position, label }
   }
   const a = input.answers || {}
-  const years = val('years') ?? a.years
+  const years = val('years') ?? confirmedDocYearsFromRows(rows) ?? a.years
   const age = val('age') ?? a.age
   const factorValues: Record<string, string> = {}
   if (years != null) factorValues.service = `${years} years`
@@ -635,10 +650,8 @@ function deriveDynamicReportValues(r: ReportJson, m: RenderMeta) {
 
   // 4. Service
   const confirmedYearsRow = isRowConfirmed(cfRows.years) ? cfRows.years : null
-  let yearsStr = nb?.factorValues?.service
-  if (!yearsStr && confirmedYearsRow?.value != null) {
-    yearsStr = `${confirmedYearsRow.value} years`
-  }
+  const confirmedYearsVal = confirmedYearsRow?.value ?? confirmedDocYearsFromRows(cfRows)
+  let yearsStr = confirmedYearsVal != null ? `${confirmedYearsVal} years` : nb?.factorValues?.service
   if (!yearsStr && r.cover?.role_line) {
     const sm = r.cover.role_line.match(/\b(\d+(?:\.\d+)?\s*(?:years?|yrs?)(?:\s*(?:of\s*)?service)?(?:\s*\d+\s*(?:months?|mo))?)/i)
     if (sm) yearsStr = sm[1]
@@ -1372,8 +1385,15 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     // (b) Confirmed facts from review state
     if (!adeaWaiverApplies && m.input?.confirmed_facts?.rows) {
       const cfRows = m.input.confirmed_facts.rows
-      const adeaRow = cfRows.adea_waiver || cfRows.adea || cfRows.waives_adea
-      if (adeaRow && (adeaRow.value === 'yes' || adeaRow.value === true)) {
+      const adeaRow = cfRows.adea_waiver || cfRows.adea || cfRows.waives_adea || cfRows.adea_named
+      if (
+        adeaRow &&
+        adeaRow.value != null &&
+        (adeaRow.value === 'yes' ||
+          adeaRow.value === true ||
+          (/^(yes|named|included|waived)/i.test(String(adeaRow.value)) &&
+            !/^(no|false|missing|not mentioned|none)$/i.test(String(adeaRow.value).trim())))
+      ) {
         adeaWaiverApplies = true
       } else {
         const relRow = cfRows.release_required
@@ -1392,8 +1412,15 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     // (c) Extracted document facts from Call A
     if (!adeaWaiverApplies && Array.isArray(m.input?.call_a?.facts)) {
       for (const f of m.input.call_a.facts) {
-        if (f.key === 'adea_waiver' || f.key === 'adea') {
-          if (f.value === 'yes' || f.value === true || /yes|waived|included/i.test(String(f.value))) {
+        if (f.key === 'adea_waiver' || f.key === 'adea' || f.key === 'adea_named') {
+          const rawVal = String(f.value ?? '').trim()
+          if (
+            f.value === 'yes' ||
+            f.value === true ||
+            (rawVal &&
+              !/^(no|false|missing|not mentioned|not stated|none)$/i.test(rawVal) &&
+              (/yes|waived|included|named|adea/i.test(rawVal) || f.key === 'adea_named'))
+          ) {
             adeaWaiverApplies = true
             break
           }
@@ -1504,6 +1531,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
     const hasDisclosureWarning = hasEstablishedGroupProgram && !hasVerifiedCompleteDisclosures
 
+    const rcPointsText = rc.map((item) => item?.point).filter(Boolean).join(' · ')
     let keyDays: string | null = null
     let keyKicker = 'YOUR KEY NUMBER'
     let keyDesc = ''
@@ -1553,12 +1581,12 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         keyDays = null
       }
     } else {
-      // Age 40+ but ADEA waiver does not apply or is not established
+      // Age 40+ when ADEA waiver is not flagged: use actual release_check points rather than fixed contradiction wording
       hasRevocation = false
       if (docDaysNum !== null) {
         keyDays = `${docDaysNum} days`
         keyKicker = 'AGREEMENT DEADLINE'
-        keyDesc = 'The consideration period specified in your agreement. Because age discrimination (ADEA) claims are not waived, statutory consideration periods under OWBPA do not apply.'
+        keyDesc = rcPointsText || 'The consideration period specified in your agreement.'
       } else {
         keyDays = null
       }
@@ -1579,6 +1607,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="feature-card-kicker">${esc(keyKicker)}</div>
           <div class="feature-card-amount">${keyDays}</div>
           <p class="feature-card-desc">${esc(keyDesc)}</p>
+          ${rcPointsText && rcPointsText !== keyDesc ? `<p class="feature-card-desc">${esc(rcPointsText)}</p>` : ''}
           ${hasDisclosureWarning ? `
           <div class="disclosure-warning-panel">
             <div class="disclosure-warning-divider"></div>
@@ -1605,6 +1634,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         <div class="navy-feature-card flag-for-review-card">
           <div class="feature-card-kicker">FLAG FOR REVIEW</div>
           <p class="feature-card-desc">${esc(keyDesc)}</p>
+          ${rcPointsText ? `<p class="feature-card-desc">${esc(rcPointsText)}</p>` : ''}
           <div class="review-flag-panel">
             <div class="review-flag-header">
               <span class="review-flag-badge">FLAG FOR REVIEW</span>
@@ -1625,7 +1655,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
               Federal law gives you an additional <b>7 calendar days after you sign</b> to revoke an agreement waiving ADEA claims. This revocation period is separate from the consideration period and cannot be waived or shortened.
             </p>
           </div>` : ''}
-        </div>` : '')}
+        </div>` : (rcPointsText ? `
+        <div class="navy-feature-card">
+          <div class="feature-card-kicker">RELEASE CHECK</div>
+          <p class="feature-card-desc">${esc(rcPointsText)}</p>
+        </div>` : ''))}
 
         <div class="release-check-list">
           ${rc.map((item) => {
@@ -2039,6 +2073,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   // -------------------------------------------------------------------------
   // 8. SECTION 5: Your next step (ca20-ca21.png / us19-us20.png)
   // -------------------------------------------------------------------------
+  const isAlreadySigned = r.already_signed === true
   const s5CoverHtml = `
     <div class="page section-cover-page s5-cover">
       <div class="section-kicker">SECTION 5 OF 5 · YOUR NEXT STEP</div>
@@ -2048,7 +2083,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       <p class="section-cover-desc">The three paths side by side, where every number in this report comes from, and how to hand it to ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} if you want one.</p>
       <div class="in-this-section-box">
         <div class="its-kicker">IN THIS SECTION</div>
-        <div class="its-item">You don't have to sign today</div>
+        <div class="its-item">${isAlreadySigned ? "You've already signed: what still matters" : "You don't have to sign today"}</div>
         <div class="its-item">Where every number comes from</div>
         <div class="its-item">Talking to ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)}</div>
       </div>
@@ -2058,45 +2093,86 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
   sec.push({ id: 's5_cover', title: 'Section 5 · Your next step', html: s5CoverHtml })
   curPage += 1
 
-  // Page 21 / ca21.png: "You don't have to sign today" (Three paths)
-  const s5ThreePathsHtml = `
-    <div class="page three-paths-page">
-      <div class="section-kicker-bar">
-        <span>SECTION 5 OF 5 · YOUR NEXT STEP</span>
-        ${progressDots(5)}
-      </div>
-      <div class="header-divider"></div>
-      <h2 class="section-heading">You don't have to <i>sign today.</i></h2>
-      <p class="section-sub">Here's how the three paths compare.</p>
+  if (isAlreadySigned) {
+    const s5AlreadySignedHtml = `
+      <div class="page three-paths-page already-signed-page">
+        <div class="section-kicker-bar">
+          <span>SECTION 5 OF 5 · YOUR NEXT STEP</span>
+          ${progressDots(5)}
+        </div>
+        <div class="header-divider"></div>
+        <h2 class="section-heading">You've already <i>signed.</i></h2>
+        <p class="section-sub">What still matters once a release is signed.</p>
 
-      <div class="three-paths-grid">
-        <div class="path-card">
-          <div class="path-opt-kicker">OPTION 1</div>
-          <h3 class="path-title">Sign as-is</h3>
-          <p class="path-desc">Accept the offer and move on.</p>
-          <p class="path-bold-note">You get ${esc(dyn.offerStr)}. It gives up the contract question.</p>
+        <div class="three-paths-grid">
+          <div class="path-card">
+            <div class="path-opt-kicker">STEP 1</div>
+            <h3 class="path-title">Check any take-back window</h3>
+            <p class="path-desc">${isUS ? 'If you are 40 or older and waived ADEA age claims, federal rules give 7 days from signing to revoke in writing.' : 'Check whether any statutory or written revocation period applies and confirm the date you signed.'}</p>
+            <p class="path-bold-note">Check the date you signed right away.</p>
+          </div>
+          <div class="path-card">
+            <div class="path-opt-kicker">STEP 2</div>
+            <h3 class="path-title">Ask about unpaid items</h3>
+            <p class="path-desc">Some rights and earned pay (final wages, earned vacation, or items paid regardless) are checked separately in Section 4.</p>
+            <p class="path-bold-note">Use Section 4 to ask HR in writing.</p>
+          </div>
+          <div class="path-card">
+            <div class="path-opt-kicker">STEP 3</div>
+            <h3 class="path-title">Talk to ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)}</h3>
+            <p class="path-desc">They can say whether anything can still be raised or whether a release holds under local rules.</p>
+            <p class="path-bold-note">First call often free. ${w.lawyer==='attorney'? 'An attorney' : 'A lawyer'} can review what you signed.</p>
+          </div>
         </div>
-        <div class="path-card">
-          <div class="path-opt-kicker">OPTION 2</div>
-          <h3 class="path-title">Ask your questions</h3>
-          <p class="path-desc">Use Section 4 to raise it yourself.</p>
-          <p class="path-bold-note">You run it yourself, using Section 4.</p>
-        </div>
-        <div class="path-card">
-          <div class="path-opt-kicker">OPTION 3</div>
-          <h3 class="path-title">Talk to ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)}</h3>
-          <p class="path-desc">They can tell you what applies to you.</p>
-          <p class="path-bold-note">First call often free. The contract question needs ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} to read it.</p>
-        </div>
-      </div>
 
-      <div class="honest-note-card">
-        <b>Honest note:</b> this report helps you ask the right questions. The contract question in Section 3 is one ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} needs to read your contract to answer.
+        <div class="honest-note-card">
+          <b>Honest note:</b> this report helps you ask the right questions. Whether anything can still be done after signing needs ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} to read the agreement you signed.
+        </div>
+        ${pageFooter(curPage, effTotal)}
       </div>
-      ${pageFooter(curPage, effTotal)}
-    </div>
-  `
-  sec.push({ id: 's5_three_paths', title: "You don't have to sign today", html: s5ThreePathsHtml })
+    `
+    sec.push({ id: 's5_already_signed', title: "You've already signed: what still matters", html: s5AlreadySignedHtml })
+  } else {
+    // Page 21 / ca21.png: "You don't have to sign today" (Three paths)
+    const s5ThreePathsHtml = `
+      <div class="page three-paths-page">
+        <div class="section-kicker-bar">
+          <span>SECTION 5 OF 5 · YOUR NEXT STEP</span>
+          ${progressDots(5)}
+        </div>
+        <div class="header-divider"></div>
+        <h2 class="section-heading">You don't have to <i>sign today.</i></h2>
+        <p class="section-sub">Here's how the three paths compare.</p>
+
+        <div class="three-paths-grid">
+          <div class="path-card">
+            <div class="path-opt-kicker">OPTION 1</div>
+            <h3 class="path-title">Sign as-is</h3>
+            <p class="path-desc">Accept the offer and move on.</p>
+            <p class="path-bold-note">You get ${esc(dyn.offerStr)}. It gives up the contract question.</p>
+          </div>
+          <div class="path-card">
+            <div class="path-opt-kicker">OPTION 2</div>
+            <h3 class="path-title">Ask your questions</h3>
+            <p class="path-desc">Use Section 4 to raise it yourself.</p>
+            <p class="path-bold-note">You run it yourself, using Section 4.</p>
+          </div>
+          <div class="path-card">
+            <div class="path-opt-kicker">OPTION 3</div>
+            <h3 class="path-title">Talk to ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)}</h3>
+            <p class="path-desc">They can tell you what applies to you.</p>
+            <p class="path-bold-note">First call often free. The contract question needs ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} to read it.</p>
+          </div>
+        </div>
+
+        <div class="honest-note-card">
+          <b>Honest note:</b> this report helps you ask the right questions. The contract question in Section 3 is one ${w.lawyer==='attorney'? 'an' :'a'} ${esc(w.lawyer)} needs to read your contract to answer.
+        </div>
+        ${pageFooter(curPage, effTotal)}
+      </div>
+    `
+    sec.push({ id: 's5_three_paths', title: "You don't have to sign today", html: s5ThreePathsHtml })
+  }
   curPage += 1
 
   // -------------------------------------------------------------------------
@@ -2135,11 +2211,11 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
       srcRows.push({
         item: '60 days notice',
         how: 'WARN Act (plant closing or mass layoff with 100+ workers)',
-        srcText: 'Federal WARN Act · 20 U.S.C. § 2101',
+        srcText: 'Federal WARN Act · 29 U.S.C. § 2101',
         src: {
           id: 'US-FED-S1',
           rule: 'Federal WARN Act',
-          section: '20 U.S.C. § 2101',
+          section: '29 U.S.C. § 2101',
           url: 'https://www.dol.gov/agencies/eta/layoffs/warn',
           status: 'verified',
           checked: '2026-10-31',

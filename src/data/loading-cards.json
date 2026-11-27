@@ -194,6 +194,15 @@
     "section": "Section 30, layoffs not deemed terminations (3 months; fixed recall within 6 months)",
     "url": "https://laws-lois.justice.gc.ca/eng/regulations/C.R.C.,_c._986/section-30.html"
    }
+  },
+  {
+   "kind": "region",
+   "text": "Federally regulated · Unjust dismissal (section 240): after 12 consecutive months with the same employer, if you are not a manager and not covered by a collective agreement, you can file a complaint within 90 days of your dismissal. It does not apply when you were laid off because of lack of work or because your function ended (section 242(3.1)).",
+   "source": {
+    "name": "Government of Canada",
+    "section": "Filing a labour standards complaint: eligibility and timelines (unjust dismissal, 90 days)",
+    "url": "https://www.canada.ca/en/services/jobs/workplace/federal-labour-standards/eligibility-timelines.html"
+   }
   }
  ],
  "CA-MB": [
@@ -1993,6 +2002,15 @@
     "name": "Wisconsin Legislature",
     "section": "Wis. Stat. 109.01(3), wages include vacation and severance pay agreed or provided as established policy",
     "url": "https://docs.legis.wisconsin.gov/statutes/statutes/109/01"
+   }
+  },
+  {
+   "kind": "region",
+   "text": "Wisconsin · Severance and unemployment: severance or dismissal pay, and pay in lieu of notice, must be reported. If it is assigned to a week, it counts as wages for that week and can reduce or stop benefits for that week. You can still file a claim while you receive severance.",
+   "source": {
+    "name": "Wisconsin Department of Workforce Development",
+    "section": "Unemployment Insurance Claimant Handbook (UCB-10-P): reporting dismissal/severance pay and pay in lieu of notice",
+    "url": "https://dwd.wisconsin.gov/uiben/handbook/pdf/ucb10print.pdf"
    }
   }
  ],

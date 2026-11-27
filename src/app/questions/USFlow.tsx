@@ -400,6 +400,7 @@ export default function USFlow() {
         role: "Middle management / Senior / Director",
         union: state.union === "yes" ? "Yes" : state.union === "no" ? "No" : "Not sure",
         employment: "Regular employee",
+        ...(state.signed ? { signed: state.signed === "yes" ? "Yes" : "No" } : {}),
         payroll: state.empsize === "big" ? "100+" : state.empsize === "small" ? "Under 100" : "Not sure",
         otherPay: compList.length > 0 ? compList.join(", ") : "None",
         newJob: state.reemployed === "yes" ? "Yes" : state.reemployed === "no" ? "No" : "Not yet",
