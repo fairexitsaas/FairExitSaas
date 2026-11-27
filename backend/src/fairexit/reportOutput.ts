@@ -512,7 +512,7 @@ function sourceLabel(s: SourceRow): string {
   let host = ''
   try { host = new URL(s.url).hostname.replace(/^www\d?\./, '') } catch { /* no url */ }
   const section = String(s.section || '').split(' (')[0].replace(/^Your guide to the [A-Z]+,\s*/i, '').trim()
-  const short = section.length > 60 ? `${section.slice(0, 57).trim()}…` : section
+  const short = section
   return [host || s.rule, short].filter(Boolean).join(' · ')
 }
 
@@ -853,8 +853,8 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     { num: '3', title: "What's in your letter and contract", desc: 'Clause by clause, with sources.' },
     { num: '4', title: 'Questions to prepare', desc: "Calm questions for HR, and this week's steps." },
     { num: '5', title: 'Your next step', desc: 'The three paths, side by side.' },
-    { num: '·', title: 'Where every number comes from', desc: 'Every number and rule, with its official source.' },
-    { num: '·', title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', desc: isUS ? 'How to hand this report over, and your report ID.' : 'How to hand this report to a lawyer, and your report ID.' },
+    { num: String(m.pages?.s6_sources ?? '·'), title: 'Where every number comes from', desc: 'Every number and rule, with its official source.' },
+    { num: String(m.pages?.s7_lawyer ?? '·'), title: isUS ? 'Talking to an attorney' : 'Talking to a lawyer', desc: isUS ? 'How to hand this report over, and your report ID.' : 'How to hand this report to a lawyer, and your report ID.' },
   ]
 
   const tocHtml = `

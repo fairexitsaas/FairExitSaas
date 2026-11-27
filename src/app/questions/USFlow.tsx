@@ -8,7 +8,7 @@ import { QuestionBackButton, QuestionNextButton } from "@/components/common/Ques
 import ChecklistModal from "@/components/dialogs/ChecklistModal";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import { saveFreeCheck } from "@/lib/api/fairexit";
-import { saveReportInputs } from "@/lib/report-storage";
+import { saveReportInputs, resolveUSFlowEntryStep } from "@/lib/report-storage";
 import { useRouter } from "next/navigation";
 import SeveranceReportPreviewDialog from "@/components/dialogs/SeveranceReportPreviewDialog";
 import { triggerGetApp } from "@/context/GetAppContext";
@@ -315,6 +315,11 @@ export function getUsVerdict(s: {
 
 export default function USFlow() {
   const searchParams = useSearchParams();
+  const initialEntry = resolveUSFlowEntryStep({
+    stepParam: searchParams?.get("step"),
+    loadingParam: searchParams?.get("loading"),
+    stateParam: searchParams?.get("st") || searchParams?.get("state"),
+  });
 
   // Step 1: "us-situation-q1" .. "us-situation-q5"
   // Step 2: "step-basics" (The layoff)
@@ -322,7 +327,8 @@ export default function USFlow() {
   // Step 4: "step-clause" (Key question)
   // Step 5: "step-details" (Details)
   // Step 6: "step-analyzing" -> "step-results" (Your results)
-  const [currentStep, setCurrentStep] = useState<string>("us-situation-q1");
+  const [hasPrefilledState, setHasPrefilledState] = useState<boolean>(initialEntry.hasPrefilledState);
+  const [currentStep, setCurrentStep] = useState<string>(initialEntry.initialStep);
   const [explainOn, setExplainOn] = useState<boolean>(true);
 
   // Default "Explain each question" switch to off under 768px (phone), on for desktop
@@ -442,8 +448,8 @@ export default function USFlow() {
   };
 
   // US Form State matching demo-v3.html
-  const [state, setState] = useState({
-    usState: "",
+  const [state, setState] = useState(() => ({
+    usState: initialEntry.prefilledState || "",
     age: "",
     years: "",
     salary: "",
@@ -478,7 +484,7 @@ export default function USFlow() {
     market: "",
     redflag: "",
     nc: "",
-  });
+  }));
 
   const verdict = useMemo(() => {
     return getUsVerdict({
@@ -671,7 +677,9 @@ export default function USFlow() {
   };
 
   const [maxStepIndex, setMaxStepIndex] = useState<number>(0);
-  const [answeredFields, setAnsweredFields] = useState<Record<string, boolean>>({});
+  const [answeredFields, setAnsweredFields] = useState<Record<string, boolean>>(
+    (): Record<string, boolean> => (initialEntry.hasPrefilledState ? { usState: true } : {}),
+  );
 
   useEffect(() => {
     const curIdx = STEP_ORDER_INDEX[currentStep] || 1;
@@ -950,7 +958,7 @@ export default function USFlow() {
   // Prefill from URL query params
   useEffect(() => {
     if (!searchParams) return;
-    const st = searchParams.get("st") || searchParams.get("state");
+    const rawSt = searchParams.get("st") || searchParams.get("state");
     const y = searchParams.get("y") || searchParams.get("years");
     const s = searchParams.get("s") || searchParams.get("salary");
     const a = searchParams.get("age");
@@ -960,10 +968,19 @@ export default function USFlow() {
     const stepParam = searchParams.get("step");
     const loadingParam = searchParams.get("loading");
 
-    if (st || y || s || a || off || grp) {
+    const { prefilledState, initialStep, hasPrefilledState: skipStateQuestion } =
+      resolveUSFlowEntryStep({
+        stepParam,
+        loadingParam,
+        stateParam: rawSt,
+      });
+
+    setHasPrefilledState(skipStateQuestion);
+
+    if (prefilledState || y || s || a || off || grp) {
       setState((prev) => ({
         ...prev,
-        ...(st ? { usState: st } : {}),
+        ...(prefilledState ? { usState: prefilledState } : {}),
         ...(y ? { years: y.replace(/\D/g, "") } : {}),
         ...(s ? { salary: s.replace(/\D/g, "") } : {}),
         ...(a ? { age: a.replace(/\D/g, "") } : {}),
@@ -973,7 +990,7 @@ export default function USFlow() {
 
       setAnsweredFields((prev) => ({
         ...prev,
-        ...(st ? { usState: true } : {}),
+        ...(prefilledState ? { usState: true } : {}),
         ...(y ? { years: true } : {}),
         ...(s ? { salary: true } : {}),
         ...(a ? { age: true } : {}),
@@ -981,21 +998,11 @@ export default function USFlow() {
       }));
     }
 
-    if (stepParam === "loading" || loadingParam === "true") {
-      setCurrentStep("step-analyzing");
+    if (initialStep === "step-analyzing" || initialStep === "step-results") {
+      setCurrentStep(initialStep);
       populateAllAnswers(state);
-    } else if (stepParam === "results" || stepParam === "step-results") {
-      setCurrentStep("step-results");
-      populateAllAnswers(state);
-    } else if (
-      stepParam === "us-state-stop" ||
-      stepParam === "stop" ||
-      st === "Other state"
-    ) {
-      setCurrentStep("us-state-stop");
     } else {
-      // Normal flow entry: always display questions from the beginning!
-      setCurrentStep("us-situation-q1");
+      setCurrentStep(initialStep);
     }
   }, [searchParams]);
 
@@ -1241,7 +1248,7 @@ export default function USFlow() {
   }, [currentStep, isLayoffStep, isPapersStep, isClauseStep, isDetailsStep]);
 
   const usSteps = [
-    { key: "us-situation-q1", num: "1", label: "Situation" },
+    { key: hasPrefilledState ? "us-situation-q2" : "us-situation-q1", num: "1", label: "Situation" },
     { key: "layoff-q1", num: "2", label: "The layoff" },
     { key: "papers-q1", num: "3", label: "The papers" },
     { key: "clause-q1", num: "4", label: "Key question" },
@@ -1604,13 +1611,13 @@ export default function USFlow() {
             ════════════════════════════════════════════════════════════════ */}
             {isSituationStep && (
               <div className="bg-white border border-[#e7e4dd] rounded-[18px] p-4 sm:p-6 md:p-8 shadow-[0_30px_60px_-40px_rgba(6,44,85,0.35)] animate-fade">
-                {/* 5 Dots Indicator - Upper Right Corner */}
+                {/* Dots Indicator - Upper Right Corner */}
                 <div className="flex justify-end mb-2">
                   <div
                     className="flex items-center gap-2 shrink-0 py-1"
-                    aria-label={`Question ${situationQIndex} of 5`}
+                    aria-label={`Question ${hasPrefilledState ? Math.max(1, situationQIndex - 1) : situationQIndex} of ${hasPrefilledState ? 4 : 5}`}
                   >
-                    {[1, 2, 3, 4, 5].map((d) => (
+                    {(hasPrefilledState ? [2, 3, 4, 5] : [1, 2, 3, 4, 5]).map((d) => (
                       <i
                         key={d}
                         className={`inline-block w-2 h-2 rounded-full transition-all duration-200 ${
@@ -1810,15 +1817,17 @@ export default function USFlow() {
                     )}
 
                     {/* Navigation */}
-                    <div className="mt-8 flex items-center justify-between">
-                      <QuestionBackButton
-                        onClick={() => {
-                          setFieldErrors({});
-                          setErrorMessage("");
-                          setCurrentStep("us-situation-q1");
-                          window.scrollTo({ top: 0, behavior: "smooth" });
-                        }}
-                      />
+                    <div className={`mt-8 flex items-center ${hasPrefilledState ? "justify-end" : "justify-between"}`}>
+                      {!hasPrefilledState && (
+                        <QuestionBackButton
+                          onClick={() => {
+                            setFieldErrors({});
+                            setErrorMessage("");
+                            setCurrentStep("us-situation-q1");
+                            window.scrollTo({ top: 0, behavior: "smooth" });
+                          }}
+                        />
+                      )}
                       <QuestionNextButton
                         onClick={() => {
                           const ageNum = parseInt(state.age, 10);
@@ -2204,6 +2213,7 @@ export default function USFlow() {
                     <button
                       type="button"
                       onClick={() => {
+                        setHasPrefilledState(false);
                         setState({ ...state, usState: "California" });
                         setCurrentStep("us-situation-q1");
                         window.scrollTo({ top: 0, behavior: "smooth" });

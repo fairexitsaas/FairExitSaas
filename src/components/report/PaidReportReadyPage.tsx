@@ -6,6 +6,7 @@ import Image from "next/image";
 import { getReportInputs, saveReportInputs, ReportInputs, detectIsUS } from "@/lib/report-storage";
 import AskLawyerModal from "@/components/dialogs/AskLawyerModal";
 import { fairexit, caseStore, FairExitApiError, FAIREXIT_API_URL } from "@/lib/api/fairexit";
+import { toPlainReportErrorMessage } from "@/lib/confirmation-mismatch";
 import { startPollLoop } from "@/lib/reportPolling";
 import { useErrorModal } from "@/context/ErrorModalContext";
 import { notifySuccess } from "@/lib/notifications";
@@ -260,7 +261,7 @@ export default function PaidReportReadyPage({
     setBuildError("");
     setBuildProgressStep(2);
     try {
-      await fairexit.attest(activeId).catch(() => {});
+      await fairexit.attest(activeId);
       await fairexit.buildReport(activeId);
       setPollVersion((version) => version + 1);
     } catch (e: unknown) {
@@ -270,10 +271,14 @@ export default function PaidReportReadyPage({
         e instanceof FairExitApiError
           ? e
           : new FairExitApiError(0, e instanceof Error ? e.message : "Report generation could not be started.");
-      setBuildError(apiErr.message);
+      const plainMessage = toPlainReportErrorMessage(
+        apiErr,
+        "We couldn't build your report right now. Please try again."
+      );
+      setBuildError(plainMessage);
       showErrorModal({
         title: "Report Generation Failed",
-        message: apiErr.message,
+        message: plainMessage,
         stage: "Report Generation",
         statusCode: apiErr.status,
         requestId: apiErr.requestId,

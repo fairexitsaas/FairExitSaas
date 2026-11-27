@@ -286,3 +286,52 @@ export function applySingleMismatchChoice(rows: Rows, key: string, pick: "user" 
         : { ...existing, value: existing.doc_value, status: "confirmed_from_document" },
   };
 }
+
+/**
+ * Converts backend or network errors from mismatch resolution, confirmation,
+ * or report building into plain, customer-facing guidance with no HTTP codes or request IDs.
+ */
+export function toPlainReportErrorMessage(
+  err: unknown,
+  fallback = "We couldn't save your choice right now. Please try again."
+): string {
+  const raw =
+    err instanceof Error
+      ? err.message
+      : typeof err === "string"
+        ? err
+        : err && typeof err === "object" && "message" in err && typeof (err as { message?: unknown }).message === "string"
+          ? ((err as { message: string }).message)
+          : "";
+
+  const lower = raw.toLowerCase();
+  if (lower.includes("yearly pay") || lower.includes("annual_pay") || lower.includes("annual pay") || /resolve.*pay\b/.test(lower)) {
+    return "Your pay doesn't match your documents. Pick the right one in the red box above.";
+  }
+  if (lower.includes("your age") || /resolve.*age\b/.test(lower) || /mismatch.*age\b/.test(lower)) {
+    return "Your age doesn't match your documents. Pick the right one in the red box above.";
+  }
+  if (lower.includes("mismatch") || lower.includes("conflict") || lower.includes("doesn't match") || lower.includes("does not match")) {
+    return "One of your answers doesn't match your documents. Pick the right value in the red box above before continuing.";
+  }
+  if (lower.includes("confirm the check page") || lower.includes("attest") || lower.includes("agreed") || lower.includes("not ready")) {
+    return "Please confirm every detail above and tick the confirmation box before building your report.";
+  }
+  if (!raw || /failed to fetch|networkerror|network error|load failed|timeout|timed out/i.test(lower)) {
+    return fallback;
+  }
+
+  const sanitized = raw
+    .replace(/\bHTTP(?:\s+Status)?\s*:?\s*\d{3}\b/gi, "")
+    .replace(/\bstatus\s*(?:code)?\s*:?\s*\d{3}\b/gi, "")
+    .replace(/\bRequest\s*ID\s*:?\s*[a-zA-Z0-9-]+\b/gi, "")
+    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/^[\s:,-]+|[\s:,-]+$/g, "")
+    .trim();
+
+  if (!sanitized || /^\d{3}$/.test(sanitized) || sanitized.toLowerCase().includes("internal server error")) {
+    return fallback;
+  }
+  return sanitized;
+}

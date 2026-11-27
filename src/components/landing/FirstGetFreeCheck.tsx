@@ -173,7 +173,7 @@ export default function FirstGetFreeCheck({ country }: FirstGetFreeCheckProps) {
               </h4>
               <div className="text-sm text-slate leading-[1.55] flex-1 mb-5">
                 {isCanada
-                  ? "Your offer organized into a 13-page report — key terms, dates, questions to prepare — so you can push back on your own, or walk into a free lawyer call already prepared."
+                  ? "Your offer organized into a 25-page report — key terms, dates, questions to prepare — so you can push back on your own, or walk into a free lawyer call already prepared."
                   : "Add your paperwork and get it organized into a clear summary — key terms, dates, and the federal rules that may apply."}
               </div>
               <div className="text-[13.5px] font-bold text-greend inline-flex items-center gap-2 border-t border-line pt-3.5 w-full">

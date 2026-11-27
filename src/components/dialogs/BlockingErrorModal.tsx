@@ -39,6 +39,18 @@ export default function BlockingErrorModal({
     }
   }, [isOpen])
 
+  useEffect(() => {
+    if (isOpen && data) {
+      console.error("[BlockingErrorModal]", {
+        title: data.title,
+        stage: data.stage,
+        statusCode: data.statusCode,
+        requestId: data.requestId,
+        message: data.message,
+      })
+    }
+  }, [isOpen, data])
+
   // Handle Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -103,31 +115,16 @@ export default function BlockingErrorModal({
 
         {/* Safe Error Message */}
         <p id="blocking-error-desc" className="text-[#17242f] text-[14.5px] leading-relaxed my-3 whitespace-pre-line">
-          {data.message}
+          {data.message
+            .replace(/\bHTTP(?:\s+Status)?\s*:?\s*\d{3}\b/gi, "")
+            .replace(/\bRequest\s*ID\s*:?\s*[a-zA-Z0-9-]+\b/gi, "")
+            .trim() || "Something went wrong. Please review your details and try again."}
         </p>
 
         {/* Retry error feedback if retry failed */}
         {retryError && (
           <div className="p-3 mb-3 bg-[#fbeceb] rounded-xl border border-[#f5c2c0] text-[#a3231f] text-[13px]">
             <span className="font-semibold">Retry failed:</span> {retryError}
-          </div>
-        )}
-
-        {/* Status code & Request ID correlation (when available) */}
-        {(data.statusCode || data.requestId) && (
-          <div className="bg-[#f6f4ef] rounded-xl p-3 text-[12px] text-[#5a6b78] border border-[#e7e4dd] space-y-1 mb-5 font-mono">
-            {data.statusCode && (
-              <div className="flex items-center justify-between">
-                <span>HTTP Status</span>
-                <span className="font-semibold text-[#062c55]">{data.statusCode}</span>
-              </div>
-            )}
-            {data.requestId && (
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-0.5">
-                <span>Request ID</span>
-                <span className="font-semibold text-[#062c55] break-all">{data.requestId}</span>
-              </div>
-            )}
           </div>
         )}
 

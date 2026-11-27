@@ -1,14 +1,26 @@
 /* Fix 4 styles. All class names start with fx-mm so they don't clash with the site. Swap colours for the site's tokens. */
 .fx-mm-inline {
   margin-top: 0.875rem;
-  padding: 0.9rem 1rem;
-  border: 1px solid #e7e4dd;
-  border-left: 4px solid #b07a00;
+  padding: 0.95rem 1rem;
+  border: 2px solid #d42e2b;
+  border-left: 4px solid #d42e2b;
   border-radius: 10px;
-  background: #faf9f5;
+  background: #fff8f8;
   box-sizing: border-box;
   width: 100%;
   min-width: 0;
+}
+.fx-mm__badge {
+  display: inline-block;
+  margin-bottom: 0.45rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  background: #d42e2b;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .fx-mm-inline__err {
   margin-bottom: 0.75rem;
@@ -30,6 +42,7 @@
 .fx-mm-tile--on { border-color: #0c8f72; background: #eef8f3; }
 .fx-mm-tile__title { font-size: .875rem; color: #5a6b78; font-weight: 600; }
 .fx-mm-tile__value { font-size: clamp(1.2rem, 2.6vw, 1.45rem); font-weight: 700; color: #062c55; overflow-wrap: anywhere; }
+.fx-mm-tile__sub { font-size: .78rem; color: #0c8f72; font-weight: 700; margin-top: .15rem; }
 .fx-mm-tile__note { font-size: .8125rem; color: #5a6b78; font-style: italic; line-height: 1.35; overflow-wrap: anywhere; }
 .fx-mm-step__count { font-size: .875rem; color: #5a6b78; font-weight: 700; margin: 0 0 .5rem; }
 .fx-mm-continue { margin-top: 1rem; width: 100%; padding: .8rem 1rem; border-radius: 9px; border: 0;

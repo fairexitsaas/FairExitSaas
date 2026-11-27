@@ -20,6 +20,7 @@ import {
   findUnresolvedMismatches,
   applySingleMismatchChoice,
   parseOfferNumber,
+  toPlainReportErrorMessage,
 } from "@/lib/confirmation-mismatch";
 
 interface USReviewPageProps {
@@ -285,6 +286,11 @@ export default function USReviewPage({
   const [mismatchErrorByKey, setMismatchErrorByKey] = useState<Record<string, string>>({});
   const resolvedMismatchKeysRef = useRef<Set<string>>(new Set());
   const offerResolvedLocallyRef = useRef<boolean>(false);
+  const serviceResolvedLocallyRef = useRef<boolean>(false);
+  const noticeResolvedLocallyRef = useRef<boolean>(false);
+  const reviewRootRef = useRef<HTMLDivElement>(null);
+  const pendingSavesRef = useRef<Promise<unknown>[]>([]);
+  const [conflictBlockNotice, setConflictBlockNotice] = useState<string>("");
 
   // Change 19: Years of service conflict (contract start vs answered years)
   const [hasServiceConflict, setHasServiceConflict] = useState<boolean>(false);
@@ -294,6 +300,8 @@ export default function USReviewPage({
   const [docServiceWhere, setDocServiceWhere] = useState<string>("");
   const [intakeServiceDisplay, setIntakeServiceDisplay] = useState<string>("");
   const [serviceConflictChoice, setServiceConflictChoice] = useState<"contract" | "told" | "custom" | null>(null);
+  const [serviceConflictBusy, setServiceConflictBusy] = useState(false);
+  const [serviceConflictError, setServiceConflictError] = useState("");
   const [showServiceConflictCustom, setShowServiceConflictCustom] = useState(false);
   const [serviceConflictCustomVal, setServiceConflictCustomVal] = useState("");
 
@@ -312,6 +320,8 @@ export default function USReviewPage({
   const [docOfferWhere, setDocOfferWhere] = useState<string>("");
   const [intakeOfferDisplay, setIntakeOfferDisplay] = useState<string>(intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
   const [offerConflictChoice, setOfferConflictChoice] = useState<"agreement" | "told" | "custom" | null>(null);
+  const [offerConflictBusy, setOfferConflictBusy] = useState(false);
+  const [offerConflictError, setOfferConflictError] = useState("");
   const [showOfferConflictCustom, setShowOfferConflictCustom] = useState(false);
   const [offerConflictCustomVal, setOfferConflictCustomVal] = useState("");
 
@@ -322,6 +332,8 @@ export default function USReviewPage({
   const [docNoticeWhere, setDocNoticeWhere] = useState<string>("");
   const [intakeNoticeVal, setIntakeNoticeVal] = useState<string>("");
   const [noticeConflictChoice, setNoticeConflictChoice] = useState<"agreement" | "told" | "custom" | null>(null);
+  const [noticeConflictBusy, setNoticeConflictBusy] = useState(false);
+  const [noticeConflictError, setNoticeConflictError] = useState("");
   const [showNoticeConflictCustom, setShowNoticeConflictCustom] = useState(false);
   const [noticeConflictCustomVal, setNoticeConflictCustomVal] = useState("");
 
@@ -621,14 +633,20 @@ export default function USReviewPage({
       const confNotice = conflicts.find((c: any) => c.key === 'advance_notice');
       const fNotice = pickExtractedFact(facts, 'advance_notice');
       const intakeNotice = answers.advanceNotice || data.userAnswers?.advanceNotice || (data.flagged ? "None, or the same day" : "");
+      const noticeAlreadyResolved =
+        noticeResolvedLocallyRef.current ||
+        checkRows.advance_notice?.status === 'confirmed' ||
+        checkRows.advance_notice?.status === 'corrected' ||
+        checkRows.advance_notice?.status === 'not_sure' ||
+        Boolean(corrections.advance_notice);
 
-      if (confNotice) {
+      if (!noticeAlreadyResolved && confNotice) {
         setHasNoticeConflict(true);
         setDocNoticeVal(confNotice.document.display || String(fNotice?.value || ""));
         setDocNoticeQuote(confNotice.document.quote || fNotice?.quote || "");
         setDocNoticeWhere(confNotice.document.where || fNotice?.where || "");
         setIntakeNoticeVal(confNotice.answers.display || intakeNotice || "None, or the same day");
-      } else if (fNotice?.value && intakeNotice && String(fNotice.value).toLowerCase() !== intakeNotice.toLowerCase()) {
+      } else if (!noticeAlreadyResolved && fNotice?.value && intakeNotice && String(fNotice.value).toLowerCase() !== intakeNotice.toLowerCase()) {
         const dVal = String(fNotice.value).includes('day') ? String(fNotice.value) : `${fNotice.value} days`;
         setHasNoticeConflict(true);
         setDocNoticeVal(dVal);
@@ -643,9 +661,13 @@ export default function USReviewPage({
         }
       }
 
-            // 3. Process Service Conflict (contract start vs answered years)
+      // 3. Process Service Conflict (contract start vs answered years)
       const confService = conflicts.find((c: any) => c.key === 'years' || c.key === 'contract_start');
-      if (confService) {
+      const serviceAlreadyResolved =
+        serviceResolvedLocallyRef.current ||
+        Boolean(checkRows.years?.status) ||
+        Boolean(corrections.years);
+      if (confService && !serviceAlreadyResolved) {
         const docRawVal = confService.document?.value != null ? String(confService.document.value) : "";
         const docDisp = confService.document?.display || (docRawVal ? `${docRawVal} years` : "");
         setHasServiceConflict(true);
@@ -658,8 +680,6 @@ export default function USReviewPage({
           setServiceConflictChoice(
             confService.resolved.choice === 'answers' ? 'told' : confService.resolved.choice === 'custom' ? 'custom' : 'contract'
           );
-        } else if (checkRows.years?.status === 'confirmed') {
-          setServiceConflictChoice('contract');
         }
       } else {
         setHasServiceConflict(false);
@@ -786,7 +806,15 @@ export default function USReviewPage({
             }
             if (checkRow.status === 'corrected') {
               userChanged = true;
-              val = String(checkRow.user_value ?? checkRow.value);
+              const rawCorrected = checkRow.user_value ?? checkRow.value;
+              if (item.id === 'years') {
+                val = String(rawCorrected).includes('year') ? String(rawCorrected) : `${rawCorrected} years`;
+              } else if (item.id === 'salary' || item.id === 'offerMoney') {
+                const n = Number(String(rawCorrected).replace(/[^0-9.]/g, ''));
+                val = Number.isFinite(n) && n > 0 ? `$${Math.round(n).toLocaleString()}` : String(rawCorrected);
+              } else {
+                val = String(rawCorrected);
+              }
               userChangeAck = !!checkRow.change_ack;
             }
           } else if (correction) {
@@ -884,6 +912,30 @@ export default function USReviewPage({
   const payMismatch = unresolvedMismatches.find(
     (m) => m.key === "annual_pay" || m.key === "pay" || m.key === "base_salary" || m.key === "salary"
   );
+  const unresolvedOfferConflict = hasOfferConflict && offerConflictChoice === null;
+  const unresolvedServiceConflict = hasServiceConflict && serviceConflictChoice === null;
+  const unresolvedNoticeConflict = hasNoticeConflict && noticeConflictChoice === null;
+  const unresolvedMismatchesCount =
+    unresolvedMismatches.length +
+    (unresolvedOfferConflict ? 1 : 0) +
+    (unresolvedServiceConflict ? 1 : 0) +
+    (unresolvedNoticeConflict ? 1 : 0);
+  const hasBlockingMismatches = unresolvedMismatchesCount > 0;
+  const mismatchHelperText =
+    payMismatch || unresolvedOfferConflict
+      ? "Pick which pay is right (in red above) to continue."
+      : ageMismatch
+        ? "Pick which age is right (in red above) to continue."
+        : "Pick which value is right (in red above) to continue.";
+
+  const scrollToFirstUnresolvedMismatch = () => {
+    const firstEl = reviewRootRef.current?.querySelector<HTMLElement>(
+      '[data-unresolved-mismatch="true"], .needs-pick, .fx-mm-inline'
+    );
+    if (firstEl && typeof firstEl.scrollIntoView === "function") {
+      firstEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
 
   const isItemConfirmed = (item: USReviewItem) => {
     if (item.id === "age" && ageMismatch) {
@@ -892,17 +944,17 @@ export default function USReviewPage({
     if (item.id === "salary" && payMismatch) {
       return false;
     }
-    if (item.id === "advanceNotice" && hasNoticeConflict) {
-      return noticeConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    if (item.id === "advanceNotice" && unresolvedNoticeConflict) {
+      return false;
     }
     if (item.id === "lastDayAgreement" && hasMissingLastDay) {
       return lastDayWorkSaved || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
     }
-    if (item.id === "offerMoney" && hasOfferConflict) {
-      return offerConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    if (item.id === "offerMoney" && unresolvedOfferConflict) {
+      return false;
     }
-    if (item.id === "years" && hasServiceConflict) {
-      return serviceConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    if (item.id === "years" && unresolvedServiceConflict) {
+      return false;
     }
     if (item.userChanged) {
       return item.userChangeAck === true;
@@ -917,7 +969,7 @@ export default function USReviewPage({
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
   const isAllConfirmed = remainingCount === 0;
-  const canBuild = isAllConfirmed && declaredCorrect && unresolvedMismatches.length === 0;
+  const canBuild = isAllConfirmed && declaredCorrect && !hasBlockingMismatches;
   const changedItemsCount = items.filter((i) => i.userChanged).length;
 
   const handleResolveSingleMismatch = async (key: string, pick: "user" | "doc") => {
@@ -940,13 +992,20 @@ export default function USReviewPage({
       if (activeCaseId) {
         try {
           await fairexit.resolveConflict(activeCaseId, apiKey, apiChoice);
-        } catch {
-          if (resolvedNum !== null && Number.isFinite(resolvedNum)) {
+        } catch (apiErr) {
+          if (
+            apiErr instanceof FairExitApiError &&
+            apiErr.status === 404 &&
+            resolvedNum !== null &&
+            Number.isFinite(resolvedNum)
+          ) {
             await fairexit.saveReviewData(activeCaseId, {
               key: apiKey,
               action: "change",
               value: isAge ? Math.round(resolvedNum) : resolvedNum,
             });
+          } else {
+            throw apiErr;
           }
         }
       }
@@ -975,10 +1034,13 @@ export default function USReviewPage({
 
       resolvedMismatchKeysRef.current.add(key);
       setMismatchRows(fixed);
+      setConflictBlockNotice("");
+      setBuildError("");
     } catch (e) {
+      console.error("Failed to save mismatch choice:", key, e);
       setMismatchErrorByKey((prev) => ({
         ...prev,
-        [key]: e instanceof Error ? e.message : "Could not save your selection. Please try again.",
+        [key]: toPlainReportErrorMessage(e),
       }));
     } finally {
       setMismatchSavingKey((prev) => (prev === key ? null : prev));
@@ -986,10 +1048,7 @@ export default function USReviewPage({
   };
 
   // ── Handlers ──
-  const handleChooseOfferConflict = (choice: "agreement" | "told" | "custom", customVal?: string) => {
-    offerResolvedLocallyRef.current = true;
-    setOfferConflictChoice(choice);
-    setShowOfferConflictCustom(false);
+  const handleChooseOfferConflict = async (choice: "agreement" | "told" | "custom", customVal?: string) => {
     let chosenVal = docOfferDisplay;
     if (choice === "told") {
       chosenVal = intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
@@ -998,6 +1057,42 @@ export default function USReviewPage({
       chosenVal = Number.isFinite(cleanNum) && cleanNum > 0 ? `$${cleanNum.toLocaleString()}` : customVal;
     }
     const chosenNum = Number(String(chosenVal || "").replace(/[^0-9.]/g, ""));
+    const activeCaseId = caseId || cs?.id;
+    const backendChoice = choice === "agreement" ? "document" : choice === "told" ? "answers" : "other";
+    const payloadVal = Number.isFinite(chosenNum) && chosenNum > 0 ? chosenNum : chosenVal;
+
+    if (activeCaseId) {
+      setOfferConflictBusy(true);
+      setOfferConflictError("");
+      try {
+        try {
+          await fairexit.resolveConflict(activeCaseId, 'offer_amount', backendChoice, payloadVal);
+        } catch (apiErr) {
+          if (apiErr instanceof FairExitApiError && apiErr.status === 404) {
+            await fairexit.saveReviewData(activeCaseId, {
+              key: 'offer_amount',
+              action: choice === 'custom' || choice === 'told' ? 'change' : 'confirm',
+              value: payloadVal,
+            });
+          } else {
+            throw apiErr;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to save offer conflict choice:", err);
+        setOfferConflictError(toPlainReportErrorMessage(err));
+        setOfferConflictBusy(false);
+        return;
+      }
+      setOfferConflictBusy(false);
+    }
+
+    offerResolvedLocallyRef.current = true;
+    setOfferConflictChoice(choice);
+    setShowOfferConflictCustom(false);
+    setOfferConflictError("");
+    setConflictBlockNotice("");
+    setBuildError("");
     if (Number.isFinite(chosenNum) && chosenNum > 0) {
       saveReportInputs({
         offer: chosenNum,
@@ -1005,32 +1100,33 @@ export default function USReviewPage({
       });
     }
     setItems((prev) =>
-      prev.map((i) => (i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true, userChanged: false, showSecondLook: false, isEditingInline: false } : i))
+      prev.map((i) =>
+        i.id === "offerMoney"
+          ? {
+              ...i,
+              value: chosenVal,
+              source: choice === "agreement" ? "Your agreement" : "From your answers",
+              confirmed: true,
+              userChanged: false,
+              showSecondLook: false,
+              isEditingInline: false,
+            }
+          : i
+      )
     );
-    const activeCaseId = caseId || cs?.id;
-    if (activeCaseId) {
-      const backendChoice = choice === "agreement" ? "document" : choice === "told" ? "answers" : "other";
-      const payloadVal = Number.isFinite(chosenNum) && chosenNum > 0 ? chosenNum : chosenVal;
-      fairexit.resolveConflict(activeCaseId, 'offer_amount', backendChoice, payloadVal).catch(() => {
-        fairexit.saveReviewData(activeCaseId, {
-          key: 'offer_amount',
-          action: choice === 'custom' || choice === 'told' ? 'change' : 'confirm',
-          value: payloadVal,
-        }).catch(() => {});
-      });
-    }
   };
 
   const toggleConfirm = (id: string) => {
     const item = items.find((i) => i.id === id);
-    if (id === "offerMoney" && hasOfferConflict && offerConflictChoice === null) {
-      const choice =
-        item?.value && docOfferDisplay && item.value === docOfferDisplay
-          ? "agreement"
-          : item?.value && intakeOfferDisplay && item.value === intakeOfferDisplay
-          ? "told"
-          : "custom";
-      handleChooseOfferConflict(choice, item?.value);
+    if (
+      (id === "age" && ageMismatch) ||
+      (id === "salary" && payMismatch) ||
+      (id === "offerMoney" && unresolvedOfferConflict) ||
+      (id === "years" && unresolvedServiceConflict) ||
+      (id === "advanceNotice" && unresolvedNoticeConflict)
+    ) {
+      setConflictBlockNotice(mismatchHelperText);
+      scrollToFirstUnresolvedMismatch();
       return;
     }
     const newConfirmed = !item?.confirmed;
@@ -1041,11 +1137,35 @@ export default function USReviewPage({
     if (activeCaseId && newConfirmed) {
       const keyMap = US_KEY_MAP;
       const factKey = keyMap[id] || id;
-      fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: item?.value }).catch(() => {});
+      fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: item?.value }).catch((err) => {
+        console.error("Failed to confirm item:", factKey, err);
+      });
     }
   };
 
-  const handleConfirmAll = () => {
+  const handleConfirmAll = async () => {
+    if (hasBlockingMismatches) {
+      setConflictBlockNotice(mismatchHelperText);
+      scrollToFirstUnresolvedMismatch();
+      return;
+    }
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      try {
+        if (pendingSavesRef.current.length > 0) {
+          const pending = pendingSavesRef.current.splice(0, pendingSavesRef.current.length);
+          await Promise.allSettled(pending);
+        }
+        await fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' });
+        await fairexit.attest(activeCaseId);
+      } catch (err) {
+        console.error("Failed to confirm all:", err);
+        setBuildError(toPlainReportErrorMessage(err));
+        scrollToFirstUnresolvedMismatch();
+        return;
+      }
+    }
+
     setItems((prev) =>
       prev.map((item) => ({
         ...item,
@@ -1058,45 +1178,59 @@ export default function USReviewPage({
         userChangeAck: item.userChanged ? true : item.userChangeAck,
       }))
     );
-    setMismatchRows((prev) => {
-      let next = prev;
-      for (const k of Object.keys(prev)) {
-        resolvedMismatchKeysRef.current.add(k);
-        next = applySingleMismatchChoice(next, k, "doc");
-      }
-      return next;
-    });
-    offerResolvedLocallyRef.current = true;
-    if (hasOfferConflict) setOfferConflictChoice("agreement");
-    if (hasNoticeConflict) setNoticeConflictChoice("agreement");
-    if (hasServiceConflict) setServiceConflictChoice("contract");
     setLastDayWork((prev) => prev || items.find(i => i.id === "lastDayAgreement")?.value || "");
     setLastDayWorkSaved(true);
     setDeclaredCorrect(true);
-    const activeCaseId = caseId || cs?.id;
-    if (activeCaseId) {
-      const pYears = hasServiceConflict
-        ? (() => {
-            const parsedDocYears = Number(String(docYearsValue || "").replace(/[^0-9.]/g, ""));
-            const payloadYears = Number.isFinite(parsedDocYears) && parsedDocYears > 0 ? parsedDocYears : docYearsValue;
-            return fairexit.resolveConflict(activeCaseId, 'years', 'document', payloadYears);
-          })()
-        : Promise.resolve();
-      pYears
-        .then(() => fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {}))
-        .then(() => fairexit.attest(activeCaseId).catch(() => {}))
-        .catch(() => {});
-    }
+    setConflictBlockNotice("");
+    setBuildError("");
   };
 
-    const handleChooseServiceConflict = (choice: "contract" | "told" | "custom", customVal?: string) => {
-    setServiceConflictChoice(choice);
-    setShowServiceConflictCustom(false);
+  const handleChooseServiceConflict = async (choice: "contract" | "told" | "custom", customVal?: string) => {
     let chosenVal = docServiceDisplay;
     if (choice === "told") {
       chosenVal = intakeServiceDisplay;
     } else if (choice === "custom" && customVal) {
       chosenVal = customVal;
+    }
+    const activeCaseId = caseId || cs?.id;
+    const apiChoice = choice === "told" ? "answers" : choice === "custom" ? "other" : "document";
+    const parsedNum = Number(String(choice === "contract" && docYearsValue ? docYearsValue : chosenVal).replace(/[^0-9.]/g, ""));
+    const payloadVal = Number.isFinite(parsedNum) && parsedNum > 0 ? parsedNum : chosenVal;
+
+    if (activeCaseId) {
+      setServiceConflictBusy(true);
+      setServiceConflictError("");
+      try {
+        try {
+          await fairexit.resolveConflict(activeCaseId, 'years', apiChoice, payloadVal);
+        } catch (apiErr) {
+          if (apiErr instanceof FairExitApiError && apiErr.status === 404) {
+            await fairexit.saveReviewData(activeCaseId, {
+              key: 'years',
+              action: choice === 'custom' || choice === 'told' ? 'change' : 'confirm',
+              value: payloadVal,
+            });
+          } else {
+            throw apiErr;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to save years of service conflict choice:", err);
+        setServiceConflictError(toPlainReportErrorMessage(err));
+        setServiceConflictBusy(false);
+        return;
+      }
+      setServiceConflictBusy(false);
+    }
+
+    serviceResolvedLocallyRef.current = true;
+    setServiceConflictChoice(choice);
+    setShowServiceConflictCustom(false);
+    setServiceConflictError("");
+    setConflictBlockNotice("");
+    setBuildError("");
+    if (Number.isFinite(parsedNum) && parsedNum > 0) {
+      saveReportInputs({ years: parsedNum });
     }
     setItems((prev) =>
       prev.map((i) =>
@@ -1104,6 +1238,7 @@ export default function USReviewPage({
           ? {
               ...i,
               value: chosenVal,
+              source: choice === "contract" ? "Your contract" : "From your answers",
               confirmed: choice !== "custom",
               userChanged: choice === "custom",
               userChangeAck: choice === "custom",
@@ -1111,37 +1246,63 @@ export default function USReviewPage({
           : i
       )
     );
-    const activeCaseId = caseId || cs?.id;
-    if (activeCaseId) {
-      const apiChoice = choice === "told" ? "answers" : choice === "custom" ? "other" : "document";
-      const parsedNum = Number(String(choice === "contract" && docYearsValue ? docYearsValue : chosenVal).replace(/[^0-9.]/g, ""));
-      const payloadVal = Number.isFinite(parsedNum) && parsedNum > 0 ? parsedNum : chosenVal;
-      fairexit.resolveConflict(activeCaseId, 'years', apiChoice, payloadVal).catch(() => {
-        fairexit.saveReviewData(activeCaseId, { key: 'years', action: choice === 'custom' ? 'change' : 'confirm', value: payloadVal }).catch(() => {});
-      });
-    }
   };
 
-  const handleChooseNoticeConflict = (choice: "agreement" | "told" | "custom", customVal?: string) => {
-    setNoticeConflictChoice(choice);
-    setShowNoticeConflictCustom(false);
+  const handleChooseNoticeConflict = async (choice: "agreement" | "told" | "custom", customVal?: string) => {
     let chosenVal = docNoticeVal;
     if (choice === "told") {
       chosenVal = intakeNoticeVal || "None, or the same day";
     } else if (choice === "custom" && customVal) {
       chosenVal = customVal;
     }
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      setNoticeConflictBusy(true);
+      setNoticeConflictError("");
+      try {
+        try {
+          const backendChoice = choice === "agreement" ? "document" : choice === "told" ? "answers" : "other";
+          await fairexit.resolveConflict(activeCaseId, 'advance_notice', backendChoice, chosenVal);
+        } catch (apiErr) {
+          if (apiErr instanceof FairExitApiError && apiErr.status === 404) {
+            await fairexit.saveReviewData(activeCaseId, {
+              key: 'advance_notice',
+              action: choice === 'custom' || choice === 'told' ? 'change' : 'confirm',
+              value: chosenVal,
+            });
+          } else {
+            throw apiErr;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to save advance notice conflict choice:", err);
+        setNoticeConflictError(toPlainReportErrorMessage(err));
+        setNoticeConflictBusy(false);
+        return;
+      }
+      setNoticeConflictBusy(false);
+    }
+
+    noticeResolvedLocallyRef.current = true;
+    setNoticeConflictChoice(choice);
+    setShowNoticeConflictCustom(false);
+    setNoticeConflictError("");
+    setConflictBlockNotice("");
+    setBuildError("");
     setItems((prev) =>
       prev.map((i) =>
         i.id === "advanceNotice"
-          ? { ...i, value: chosenVal, warningNote: undefined }
+          ? {
+              ...i,
+              value: chosenVal,
+              source: choice === "agreement" ? "Your agreement" : "From your answers",
+              warningNote: undefined,
+              confirmed: true,
+              userChanged: false,
+            }
           : i
       )
     );
-    const activeCaseId = caseId || cs?.id;
-    if (activeCaseId) {
-      fairexit.saveReviewData(activeCaseId, { key: 'advance_notice', action: choice === 'custom' ? 'change' : 'confirm', value: chosenVal }).catch(() => {});
-    }
   };
 
   const handleSaveLastDay = (dayStr: string) => {
@@ -1367,6 +1528,17 @@ export default function USReviewPage({
       resolvedMismatchKeysRef.current.add(targetKey);
       setMismatchRows((prev) => applySingleMismatchChoice(prev, targetKey, kind === "doc" ? "doc" : "user"));
       if (cleanNum !== null) saveReportInputs({ salary: Math.round(cleanNum) });
+      return;
+    }
+    if (id === "years") {
+      serviceResolvedLocallyRef.current = true;
+      setServiceConflictChoice(kind === "doc" ? "contract" : "told");
+      if (cleanNum !== null) saveReportInputs({ years: cleanNum });
+      return;
+    }
+    if (id === "advanceNotice") {
+      noticeResolvedLocallyRef.current = true;
+      setNoticeConflictChoice(kind === "doc" ? "agreement" : "custom");
     }
   };
 
@@ -1562,7 +1734,7 @@ export default function USReviewPage({
       </div>
 
       {/* ── Main Single-Column 720px Card ── */}
-      <main className="w-full max-w-[720px] mx-auto px-4 mt-4">
+      <main ref={reviewRootRef} className="w-full max-w-[720px] mx-auto px-4 mt-4">
         <div className="bg-white border border-[#E7E4DD] rounded-[14px] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] p-5 sm:p-7 md:p-8">
           <div className="inline-flex items-center px-3 py-1 bg-white border border-[#E7E4DD] rounded-[6px] text-[12px] font-[700] text-[#062C55] mb-4">
             We read your documents
@@ -1605,14 +1777,30 @@ export default function USReviewPage({
                   {confirmedCount} of {totalCount} confirmed
                 </span>
                 <div className="flex items-center gap-3">
-                  {confirmedCount < totalCount && (
-                    <button
-                      type="button"
-                      onClick={handleConfirmAll}
-                      className="text-[12px] font-[700] text-[#0C8F72] hover:underline cursor-pointer"
+                  {(confirmedCount < totalCount || hasBlockingMismatches) && (
+                    <span
+                      onClick={() => {
+                        if (hasBlockingMismatches) {
+                          setConflictBlockNotice(mismatchHelperText);
+                          scrollToFirstUnresolvedMismatch();
+                        }
+                      }}
+                      className={hasBlockingMismatches ? "inline-block cursor-not-allowed" : "inline-block"}
                     >
-                      Confirm all
-                    </button>
+                      <button
+                        type="button"
+                        disabled={hasBlockingMismatches}
+                        onClick={handleConfirmAll}
+                        data-testid="confirm-all-btn"
+                        className={
+                          hasBlockingMismatches
+                            ? "text-[12px] font-[700] text-[#9AA6B2] cursor-not-allowed pointer-events-none"
+                            : "text-[12px] font-[700] text-[#0C8F72] hover:underline cursor-pointer"
+                        }
+                      >
+                        Confirm all
+                      </button>
+                    </span>
                   )}
                   <span className="font-sans text-[13px] text-[#5A6B78]">
                     {remainingCount} to go
@@ -1625,6 +1813,11 @@ export default function USReviewPage({
                   style={{ width: `${(confirmedCount / totalCount) * 100}%` }}
                 />
               </div>
+              {hasBlockingMismatches && (
+                <p data-testid="confirm-all-mismatch-help" className="mt-2.5 text-[12.5px] font-[600] text-[#A3231F]">
+                  {mismatchHelperText}
+                </p>
+              )}
             </div>
           )}
 
@@ -1673,13 +1866,37 @@ export default function USReviewPage({
                 </span>
               </div>
 
-              <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
-                <span className="font-sans font-[700] text-[12px] tracking-[0.5px] text-[#5A6B78] uppercase block mb-1">
-                  YEARS WITH YOUR EMPLOYER
-                </span>
+              <div
+                data-testid="years-conflict-card"
+                data-unresolved-mismatch={serviceConflictChoice === null ? "true" : undefined}
+                className={
+                  serviceConflictChoice === null
+                    ? "needs-pick bg-[#FFF8F8] border-2 border-[#D42E2B] border-l-4 border-l-[#D42E2B] rounded-[14px] p-5 sm:p-6 shadow-xs"
+                    : "bg-white border border-[#E7E4DD] border-l-4 border-l-[#0C8F72] rounded-[14px] p-5 sm:p-6 shadow-xs"
+                }
+              >
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span
+                    className={
+                      serviceConflictChoice === null
+                        ? "inline-flex items-center px-2 py-0.5 rounded bg-[#D42E2B] text-white text-[11px] font-[700] uppercase tracking-wider"
+                        : "font-sans font-[800] text-[11.5px] tracking-[1px] text-[#0C8F72] uppercase"
+                    }
+                  >
+                    {serviceConflictChoice === null ? "Mismatch" : "Resolved"}
+                  </span>
+                  <span className="font-sans font-[700] text-[12px] tracking-[0.5px] text-[#5A6B78] uppercase">
+                    YEARS WITH YOUR EMPLOYER
+                  </span>
+                </div>
                 <h3 className="font-sans font-[700] text-[16px] leading-[24px] text-[#062C55] mb-3.5">
-                  Which is right?
+                  Please choose which value is correct. Which is right?
                 </h3>
+                {serviceConflictError && (
+                  <div role="alert" className="mb-3 rounded-[8px] bg-[#FBECEB] border border-[#F5C6C5] px-3 py-2 text-[13px] font-[600] text-[#A3231F]">
+                    {serviceConflictError}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   <div
@@ -1691,7 +1908,7 @@ export default function USReviewPage({
                   >
                     <div>
                       <span className="font-sans text-[12.5px] font-[600] text-[#5A6B78] block">
-                        From your documents
+                        Document says
                       </span>
                       <span className="font-sans font-bold text-[18px] text-[#062C55] block mt-0.5">
                         {docServiceDisplay || "—"}
@@ -1707,14 +1924,17 @@ export default function USReviewPage({
                     </div>
                     <button
                       type="button"
+                      disabled={serviceConflictBusy}
                       onClick={() => handleChooseServiceConflict("contract")}
-                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                         serviceConflictChoice === "contract"
                           ? "bg-[#0C8F72] text-white"
                           : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
                       }`}
                     >
-                      {serviceConflictChoice === "contract" ? "✓ Selected" : "Use this"}
+                      {serviceConflictChoice === "contract"
+                        ? "✓ Selected (document)"
+                        : `Use document${docServiceDisplay ? ` — ${docServiceDisplay}` : ""}`}
                     </button>
                   </div>
 
@@ -1727,7 +1947,7 @@ export default function USReviewPage({
                   >
                     <div>
                       <span className="font-sans text-[12.5px] font-[600] text-[#5A6B78] block">
-                        You told us
+                        Your answer
                       </span>
                       <span className="font-sans font-bold text-[18px] text-[#062C55] block mt-0.5">
                         {intakeServiceDisplay || "—"}
@@ -1741,14 +1961,17 @@ export default function USReviewPage({
                     </div>
                     <button
                       type="button"
+                      disabled={serviceConflictBusy}
                       onClick={() => handleChooseServiceConflict("told")}
-                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                         serviceConflictChoice === "told"
                           ? "bg-[#0C8F72] text-white"
                           : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
                       }`}
                     >
-                      {serviceConflictChoice === "told" ? "✓ Selected" : "Use this"}
+                      {serviceConflictChoice === "told"
+                        ? "✓ Selected (my answer)"
+                        : `Use my answer${intakeServiceDisplay ? ` — ${intakeServiceDisplay}` : ""}`}
                     </button>
                   </div>
                 </div>
@@ -1812,13 +2035,37 @@ export default function USReviewPage({
                 </span>
               </div>
 
-              <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
-                <span className="font-sans font-[700] text-[12px] tracking-[0.5px] text-[#5A6B78] uppercase block mb-1">
-                  ADVANCE NOTICE YOU GOT
-                </span>
+              <div
+                data-testid="notice-conflict-card"
+                data-unresolved-mismatch={noticeConflictChoice === null ? "true" : undefined}
+                className={
+                  noticeConflictChoice === null
+                    ? "needs-pick bg-[#FFF8F8] border-2 border-[#D42E2B] border-l-4 border-l-[#D42E2B] rounded-[14px] p-5 sm:p-6 shadow-xs"
+                    : "bg-white border border-[#E7E4DD] border-l-4 border-l-[#0C8F72] rounded-[14px] p-5 sm:p-6 shadow-xs"
+                }
+              >
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span
+                    className={
+                      noticeConflictChoice === null
+                        ? "inline-flex items-center px-2 py-0.5 rounded bg-[#D42E2B] text-white text-[11px] font-[700] uppercase tracking-wider"
+                        : "font-sans font-[800] text-[11.5px] tracking-[1px] text-[#0C8F72] uppercase"
+                    }
+                  >
+                    {noticeConflictChoice === null ? "Mismatch" : "Resolved"}
+                  </span>
+                  <span className="font-sans font-[700] text-[12px] tracking-[0.5px] text-[#5A6B78] uppercase">
+                    ADVANCE NOTICE YOU GOT
+                  </span>
+                </div>
                 <h3 className="font-sans font-[700] text-[16px] leading-[24px] text-[#062C55] mb-3.5">
-                  Which is right?
+                  Please choose which value is correct. Which is right?
                 </h3>
+                {noticeConflictError && (
+                  <div role="alert" className="mb-3 rounded-[8px] bg-[#FBECEB] border border-[#F5C6C5] px-3 py-2 text-[13px] font-[600] text-[#A3231F]">
+                    {noticeConflictError}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                   {/* Tile 1: Your agreement says */}
@@ -1831,7 +2078,7 @@ export default function USReviewPage({
                   >
                     <div>
                       <span className="font-sans text-[12.5px] font-[600] text-[#5A6B78] block">
-                        Your agreement says
+                        Document says
                       </span>
                       <span className="font-sans font-bold text-[18px] text-[#062C55] block mt-0.5">
                         {docNoticeVal || "—"}
@@ -1847,14 +2094,15 @@ export default function USReviewPage({
                     </div>
                     <button
                       type="button"
+                      disabled={noticeConflictBusy}
                       onClick={() => handleChooseNoticeConflict("agreement")}
-                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                         noticeConflictChoice === "agreement"
                           ? "bg-[#0C8F72] text-white"
                           : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
                       }`}
                     >
-                      {noticeConflictChoice === "agreement" ? "✓ Selected" : "Use this"}
+                      {noticeConflictChoice === "agreement" ? "✓ Selected (document)" : "Use document"}
                     </button>
                   </div>
 
@@ -1868,7 +2116,7 @@ export default function USReviewPage({
                   >
                     <div>
                       <span className="font-sans text-[12.5px] font-[600] text-[#5A6B78] block">
-                        You told us
+                        Your answer
                       </span>
                       <span className="font-sans font-bold text-[18px] text-[#062C55] block mt-0.5">
                         {intakeNoticeVal || "None, or the same day"}
@@ -1882,14 +2130,15 @@ export default function USReviewPage({
                     </div>
                     <button
                       type="button"
+                      disabled={noticeConflictBusy}
                       onClick={() => handleChooseNoticeConflict("told")}
-                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                      className={`w-full h-[38px] mt-4 rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                         noticeConflictChoice === "told"
                           ? "bg-[#0C8F72] text-white"
                           : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
                       }`}
                     >
-                      {noticeConflictChoice === "told" ? "✓ Selected" : "Use this"}
+                      {noticeConflictChoice === "told" ? "✓ Selected (my answer)" : "Use my answer"}
                     </button>
                   </div>
                 </div>
@@ -2001,6 +2250,7 @@ export default function USReviewPage({
                   <USItemCard
                     key={item.id}
                     item={item}
+                    hasUnresolvedMismatch={Boolean(inlineMismatch || (item.id === "years" && unresolvedServiceConflict))}
                     inlineMismatch={inlineMismatch}
                     mismatchBusy={Boolean(inlineMismatch && mismatchSavingKey === inlineMismatch.key)}
                     mismatchError={inlineMismatch ? mismatchErrorByKey[inlineMismatch.key] : undefined}
@@ -2039,6 +2289,7 @@ export default function USReviewPage({
                 <USItemCard
                   key={item.id}
                   item={item}
+                  hasUnresolvedMismatch={item.id === "offerMoney" && unresolvedOfferConflict}
                   offerConflictPanel={
                     item.id === "offerMoney" && offerConflictChoice === null && hasOfferConflict && (
                       <InlineOfferConflictBanner
@@ -2056,6 +2307,8 @@ export default function USReviewPage({
                           intakeOfferDisplay ||
                           (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "")
                         }
+                        busy={offerConflictBusy}
+                        error={offerConflictError}
                         onUseDocument={() => handleChooseOfferConflict("agreement")}
                         onKeepCurrent={() => handleChooseOfferConflict("told")}
                         onAddClearerCopy={navigateToClearerCopyUpload}
@@ -2095,6 +2348,7 @@ export default function USReviewPage({
                 <USItemCard
                   key={item.id}
                   item={item}
+                  hasUnresolvedMismatch={item.id === "advanceNotice" && unresolvedNoticeConflict}
                   onToggleConfirm={() => toggleConfirm(item.id)}
                   onStartInlineEdit={() => startInlineEdit(item.id)}
                   onCancelInlineEdit={() => cancelInlineEdit(item.id)}
@@ -2112,20 +2366,45 @@ export default function USReviewPage({
             </div>
           </div>
 
+          {conflictBlockNotice && (
+            <p role="alert" className="mt-6 text-sm font-[600] text-[#A3231F]">
+              {conflictBlockNotice}
+            </p>
+          )}
+
           {/* Confirmation Checkbox Box */}
           <div
-            onClick={() => {
-              const nextVal = !declaredCorrect;
-              setDeclaredCorrect(nextVal);
-              const activeCaseId = caseId || cs?.id;
-              if (nextVal && activeCaseId) {
-                fairexit.attest(activeCaseId).catch(() => {});
+            onClick={async () => {
+              if (hasBlockingMismatches) {
+                setConflictBlockNotice(mismatchHelperText);
+                scrollToFirstUnresolvedMismatch();
+                return;
               }
+              const nextVal = !declaredCorrect;
+              setConflictBlockNotice("");
+              setBuildError("");
+              if (nextVal) {
+                const activeCaseId = caseId || cs?.id;
+                if (activeCaseId) {
+                  try {
+                    await fairexit.attest(activeCaseId);
+                  } catch (err) {
+                    console.error("Failed to attest US review page:", err);
+                    setDeclaredCorrect(false);
+                    setConflictBlockNotice(toPlainReportErrorMessage(err));
+                    scrollToFirstUnresolvedMismatch();
+                    return;
+                  }
+                }
+              }
+              setDeclaredCorrect(nextVal);
             }}
-            className={`rounded-[14px] p-4.5 sm:p-5 mt-8 mb-5 flex items-start gap-3.5 shadow-xs cursor-pointer transition border ${
-              declaredCorrect
-                ? "bg-[#EEF8F3] border-[#0C8F72]"
-                : "bg-white border-[#E7E4DD] hover:border-[#C9D1D7]"
+            className={`rounded-[14px] p-4.5 sm:p-5 ${conflictBlockNotice ? "mt-3" : "mt-8"} mb-5 flex items-start gap-3.5 shadow-xs transition border ${
+              hasBlockingMismatches
+                ? "bg-[#FAF9F5] border-[#E7E4DD] opacity-70 cursor-not-allowed"
+                : declaredCorrect
+                  ? "bg-[#EEF8F3] border-[#0C8F72] cursor-pointer"
+                  : "bg-white border-[#E7E4DD] hover:border-[#C9D1D7] cursor-pointer"
             }`}
           >
             <div
@@ -2150,10 +2429,23 @@ export default function USReviewPage({
           {/* Bottom Action CTA */}
           <div>
             {buildError && <p role="alert" className="mb-3 text-sm text-[#A3231F]">{buildError}</p>}
+            <div
+              onClick={() => {
+                if (hasBlockingMismatches) {
+                  setConflictBlockNotice(mismatchHelperText);
+                  scrollToFirstUnresolvedMismatch();
+                }
+              }}
+            >
             <button
               type="button"
               disabled={!canBuild || isBuilding}
               onClick={async () => {
+                if (hasBlockingMismatches) {
+                  setConflictBlockNotice(mismatchHelperText);
+                  scrollToFirstUnresolvedMismatch();
+                  return;
+                }
                 if (buildSubmitLock.current || isBuilding) return;
                 const activeCaseId = caseId || cs?.id;
                 if (!activeCaseId) {
@@ -2169,6 +2461,10 @@ export default function USReviewPage({
                 setBuildError("");
 
                 try {
+                  if (pendingSavesRef.current.length > 0) {
+                    const pending = pendingSavesRef.current.splice(0, pendingSavesRef.current.length);
+                    await Promise.allSettled(pending);
+                  }
                   // Keep attestation requirement before building report
                   await fairexit.attest(activeCaseId);
                   const buildRes = await fairexit.buildReport(activeCaseId);
@@ -2196,10 +2492,19 @@ export default function USReviewPage({
                     err instanceof FairExitApiError
                       ? err
                       : new FairExitApiError(0, err instanceof Error ? err.message : "Failed to start report generation");
-                  setBuildError(apiErr.message);
+                  console.error("Report generation failed:", {
+                    status: apiErr.status,
+                    requestId: apiErr.requestId,
+                    message: apiErr.message,
+                  });
+                  const plainMessage = toPlainReportErrorMessage(
+                    apiErr,
+                    "We couldn't build your report right now. Please check your confirmed details and try again."
+                  );
+                  setBuildError(plainMessage);
                   showErrorModal({
                     title: "Report Generation Failed",
-                    message: apiErr.message,
+                    message: plainMessage,
                     stage: "Report Generation",
                     statusCode: apiErr.status,
                     requestId: apiErr.requestId,
@@ -2209,7 +2514,7 @@ export default function USReviewPage({
               className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] transition flex items-center justify-center ${
                 canBuild && !isBuilding
                   ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
-                  : "bg-[#C9D1D7] text-white cursor-not-allowed opacity-90"
+                  : `bg-[#C9D1D7] text-white cursor-not-allowed opacity-90${hasBlockingMismatches ? " pointer-events-none" : ""}`
               }`}
             >
               {isBuilding ? (
@@ -2219,12 +2524,15 @@ export default function USReviewPage({
                 </div>
               ) : canBuild ? (
                 "Build my report (PDF) →"
+              ) : hasBlockingMismatches ? (
+                mismatchHelperText
               ) : remainingCount > 0 ? (
                 `Confirm ${remainingCount} more to build your report`
               ) : (
                 "Check the confirmation box above to proceed"
               )}
             </button>
+            </div>
           </div>
             </>
           )}
@@ -2289,6 +2597,7 @@ export default function USReviewPage({
 // ── US Single Review Item Card Component ──
 function USItemCard({
   item,
+  hasUnresolvedMismatch,
   inlineMismatch,
   mismatchBusy,
   mismatchError,
@@ -2306,6 +2615,7 @@ function USItemCard({
   onAddClearerCopy,
 }: {
   item: USReviewItem;
+  hasUnresolvedMismatch?: boolean;
   inlineMismatch?: Mismatch;
   mismatchBusy?: boolean;
   mismatchError?: string;
@@ -2323,9 +2633,10 @@ function USItemCard({
   onAddClearerCopy: () => void;
 }) {
   const cfg = US_FIELD_CONFIGS[item.id];
+  const showRedMismatchCard = Boolean(inlineMismatch || offerConflictPanel || hasUnresolvedMismatch);
 
   // 1. CONFIRMED ROW STATE (Matches Image 1)
-  if (item.confirmed && !item.isEditingInline && !item.userChanged && !item.showSecondLook && !inlineMismatch && !offerConflictPanel) {
+  if (item.confirmed && !item.isEditingInline && !item.userChanged && !item.showSecondLook && !showRedMismatchCard) {
     const rawVal = item.value || "Yes";
     const isLongVal = rawVal.length > 25;
     const isNoDate = rawVal.toLowerCase().includes("no date");
@@ -2399,7 +2710,14 @@ function USItemCard({
 
   // 2. NORMAL OR USER-CHANGED ROW STATE (Matches Image 3)
   return (
-    <div className="rounded-[10px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-4 sm:px-5 sm:py-4">
+    <div
+      data-unresolved-mismatch={showRedMismatchCard ? "true" : undefined}
+      className={
+        showRedMismatchCard
+          ? "needs-pick rounded-[10px] border-2 border-[#D42E2B] bg-[#FFF8F8] transition p-4 sm:px-5 sm:py-4"
+          : "rounded-[10px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-4 sm:px-5 sm:py-4"
+      }
+    >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1 pr-2">
           <div className="font-sans font-bold text-[14.5px] text-[#062C55]">
@@ -2433,7 +2751,7 @@ function USItemCard({
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
-          {!item.hasOnlyChange && !inlineMismatch && (
+          {!item.hasOnlyChange && !showRedMismatchCard && (
             <button
               type="button"
               onClick={onToggleConfirm}

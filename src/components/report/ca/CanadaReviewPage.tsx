@@ -21,6 +21,7 @@ import {
   findUnresolvedMismatches,
   applySingleMismatchChoice,
   parseOfferNumber,
+  toPlainReportErrorMessage,
 } from "@/lib/confirmation-mismatch";
 
 interface CanadaReviewPageProps {
@@ -294,6 +295,10 @@ export default function CanadaReviewPage({
   const [mismatchErrorByKey, setMismatchErrorByKey] = useState<Record<string, string>>({});
   const resolvedMismatchKeysRef = useRef<Set<string>>(new Set());
   const offerResolvedLocallyRef = useRef<boolean>(false);
+  const contractResolvedLocallyRef = useRef<boolean>(false);
+  const yearsResolvedLocallyRef = useRef<boolean>(false);
+  const reviewRootRef = useRef<HTMLDivElement>(null);
+  const [conflictBlockNotice, setConflictBlockNotice] = useState<string>("");
 
 
   // Resolved intake answers (from server case answers or client storage)
@@ -309,6 +314,8 @@ export default function CanadaReviewPage({
   const [docOfferWhere, setDocOfferWhere] = useState<string>("");
   const [intakeOfferDisplay, setIntakeOfferDisplay] = useState<string>(intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
   const [offerConflictChoice, setOfferConflictChoice] = useState<"letter" | "intake" | "custom" | null>(null);
+  const [offerConflictBusy, setOfferConflictBusy] = useState(false);
+  const [offerConflictError, setOfferConflictError] = useState("");
   const [showOfferConflictCustom, setShowOfferConflictCustom] = useState(false);
   const [offerConflictCustomVal, setOfferConflictCustomVal] = useState("");
 
@@ -319,6 +326,8 @@ export default function CanadaReviewPage({
   const [docContractLimitWhere, setDocContractLimitWhere] = useState<string>("");
   const [intakeContractLimitDisplay, setIntakeContractLimitDisplay] = useState<string>("");
   const [contractConflictChoice, setContractConflictChoice] = useState<"contract" | "told" | "custom" | null>(null);
+  const [contractConflictBusy, setContractConflictBusy] = useState(false);
+  const [contractConflictError, setContractConflictError] = useState("");
   const [showContractConflictCustom, setShowContractConflictCustom] = useState(false);
   const [contractConflictCustomVal, setContractConflictCustomVal] = useState("");
 
@@ -330,6 +339,8 @@ export default function CanadaReviewPage({
   const [docYearsWhere, setDocYearsWhere] = useState<string>("");
   const [intakeYearsDisplay, setIntakeYearsDisplay] = useState<string>("");
   const [yearsConflictChoice, setYearsConflictChoice] = useState<"contract" | "told" | null>(null);
+  const [yearsConflictBusy, setYearsConflictBusy] = useState(false);
+  const [yearsConflictError, setYearsConflictError] = useState("");
   const pendingSavesRef = useRef<Promise<unknown>[]>([]);
 
   // ══════════════════════════════════════════════════════════
@@ -664,14 +675,20 @@ export default function CanadaReviewPage({
       const confMin = conflicts.find((c: any) => c.key === 'min_only_clause');
       const fMin = facts.find((f: any) => f.key === 'min_only_clause');
       const iMin = answers.minClause || data.minClause;
+      const contractAlreadyResolved =
+        contractResolvedLocallyRef.current ||
+        checkRows.min_only_clause?.status === 'confirmed' ||
+        checkRows.min_only_clause?.status === 'corrected' ||
+        checkRows.min_only_clause?.status === 'not_sure' ||
+        Boolean(corrections.min_only_clause);
 
-      if (confMin) {
+      if (!contractAlreadyResolved && confMin) {
         setHasContractConflict(true);
         setDocContractLimitDisplay(confMin.document.display || "Yes, it limits me");
         setDocContractLimitQuote(confMin.document.quote || fMin?.quote || "");
         setDocContractLimitWhere(confMin.document.where || fMin?.where || "");
         setIntakeContractLimitDisplay(confMin.answers.display || (iMin === 'no' ? "No, it doesn't limit me" : "No"));
-      } else if (fMin?.value && /yes|limit|minimum/i.test(fMin.value) && (iMin === 'no' || iMin === 'unsure' || !iMin)) {
+      } else if (!contractAlreadyResolved && fMin?.value && /yes|limit|minimum/i.test(fMin.value) && (iMin === 'no' || iMin === 'unsure' || !iMin)) {
         setHasContractConflict(true);
         setDocContractLimitDisplay("Yes, it limits me");
         setDocContractLimitQuote(fMin.quote || "");
@@ -683,7 +700,11 @@ export default function CanadaReviewPage({
 
       // 2b. Process Years of Service Conflict (contract start date vs typed years)
       const confYears = conflicts.find((c: any) => c.key === 'years');
-      if (confYears && !checkRows.years?.status) {
+      const yearsAlreadyResolved =
+        yearsResolvedLocallyRef.current ||
+        Boolean(checkRows.years?.status) ||
+        Boolean(corrections.years);
+      if (confYears && !yearsAlreadyResolved) {
         setHasYearsConflict(true);
         const dv = typeof confYears.document?.value === 'number' ? confYears.document.value : Number(confYears.document?.value);
         setDocYearsValue(Number.isFinite(dv) ? dv : null);
@@ -818,7 +839,15 @@ export default function CanadaReviewPage({
             }
             if (checkRow.status === 'corrected') {
               userChanged = true;
-              val = String(checkRow.user_value ?? checkRow.value);
+              const rawCorrected = checkRow.user_value ?? checkRow.value;
+              if (item.id === 'years') {
+                val = String(rawCorrected).includes('year') ? String(rawCorrected) : `${rawCorrected} years`;
+              } else if (item.id === 'salary' || item.id === 'offerMoney') {
+                const n = Number(String(rawCorrected).replace(/[^0-9.]/g, ''));
+                val = Number.isFinite(n) && n > 0 ? `$${Math.round(n).toLocaleString()}` : String(rawCorrected);
+              } else {
+                val = String(rawCorrected);
+              }
               userChangeAck = !!checkRow.change_ack;
             }
           } else if (correction) {
@@ -910,6 +939,30 @@ export default function CanadaReviewPage({
   const payMismatch = unresolvedMismatches.find(
     (m) => m.key === "annual_pay" || m.key === "pay" || m.key === "base_salary" || m.key === "salary"
   );
+  const unresolvedOfferConflict = hasOfferConflict && offerConflictChoice === null;
+  const unresolvedContractConflict = hasContractConflict && contractConflictChoice === null;
+  const unresolvedYearsConflict = hasYearsConflict && yearsConflictChoice === null;
+  const unresolvedMismatchesCount =
+    unresolvedMismatches.length +
+    (unresolvedOfferConflict ? 1 : 0) +
+    (unresolvedContractConflict ? 1 : 0) +
+    (unresolvedYearsConflict ? 1 : 0);
+  const hasBlockingMismatches = unresolvedMismatchesCount > 0;
+  const mismatchHelperText =
+    payMismatch || unresolvedOfferConflict
+      ? "Pick which pay is right (in red above) to continue."
+      : ageMismatch
+        ? "Pick which age is right (in red above) to continue."
+        : "Pick which value is right (in red above) to continue.";
+
+  const scrollToFirstUnresolvedMismatch = () => {
+    const firstEl = reviewRootRef.current?.querySelector<HTMLElement>(
+      '[data-unresolved-mismatch="true"], .needs-pick, .fx-mm-inline'
+    );
+    if (firstEl && typeof firstEl.scrollIntoView === "function") {
+      firstEl.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
 
   const isItemConfirmed = (item: ReviewItem) => {
     if (item.id === "age" && ageMismatch) {
@@ -921,14 +974,14 @@ export default function CanadaReviewPage({
     if (item.id === "offerNoticeWorked") {
       return workingWeeksSaved || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
     }
-    if (item.id === "offerMoney" && hasOfferConflict) {
-      return offerConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    if (item.id === "offerMoney" && unresolvedOfferConflict) {
+      return false;
     }
-    if (item.id === "contractLimit" && hasContractConflict) {
-      return contractConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    if (item.id === "contractLimit" && unresolvedContractConflict) {
+      return false;
     }
-    if (item.id === "years" && hasYearsConflict) {
-      return yearsConflictChoice !== null || (item.userChanged ? item.userChangeAck === true : item.confirmed === true);
+    if (item.id === "years" && unresolvedYearsConflict) {
+      return false;
     }
     if (item.userChanged) {
       return item.userChangeAck === true;
@@ -946,7 +999,7 @@ export default function CanadaReviewPage({
   );
   const remainingCount = Math.max(0, totalCount - confirmedCount);
   const isAllConfirmed = remainingCount === 0;
-  const canBuild = isAllConfirmed && declaredCorrect && unresolvedMismatches.length === 0;
+  const canBuild = isAllConfirmed && declaredCorrect && !hasBlockingMismatches;
 
   const handleResolveSingleMismatch = async (key: string, pick: "user" | "doc") => {
     const existingRow = mismatchRows[key];
@@ -968,13 +1021,20 @@ export default function CanadaReviewPage({
       if (activeCaseId) {
         try {
           await fairexit.resolveConflict(activeCaseId, apiKey, apiChoice);
-        } catch {
-          if (resolvedNum !== null && Number.isFinite(resolvedNum)) {
+        } catch (apiErr) {
+          if (
+            apiErr instanceof FairExitApiError &&
+            apiErr.status === 404 &&
+            resolvedNum !== null &&
+            Number.isFinite(resolvedNum)
+          ) {
             await fairexit.saveReviewData(activeCaseId, {
               key: apiKey,
               action: "change",
               value: isAge ? Math.round(resolvedNum) : resolvedNum,
             });
+          } else {
+            throw apiErr;
           }
         }
       }
@@ -1003,10 +1063,13 @@ export default function CanadaReviewPage({
 
       resolvedMismatchKeysRef.current.add(key);
       setMismatchRows(fixed);
+      setConflictBlockNotice("");
+      setBuildError("");
     } catch (e) {
+      console.error("Failed to save mismatch choice:", key, e);
       setMismatchErrorByKey((prev) => ({
         ...prev,
-        [key]: e instanceof Error ? e.message : "Could not save your selection. Please try again.",
+        [key]: toPlainReportErrorMessage(e),
       }));
     } finally {
       setMismatchSavingKey((prev) => (prev === key ? null : prev));
@@ -1014,10 +1077,7 @@ export default function CanadaReviewPage({
   };
 
   // ── Handlers for Items ──
-  const handleChooseOfferConflict = (choice: "letter" | "intake" | "custom", customVal?: string) => {
-    offerResolvedLocallyRef.current = true;
-    setOfferConflictChoice(choice);
-    setShowOfferConflictCustom(false);
+  const handleChooseOfferConflict = async (choice: "letter" | "intake" | "custom", customVal?: string) => {
     let chosenVal = docOfferDisplay;
     if (choice === "intake") {
       chosenVal = intakeOfferDisplay || (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "");
@@ -1026,6 +1086,42 @@ export default function CanadaReviewPage({
       chosenVal = Number.isFinite(clean) && clean > 0 ? `$${clean.toLocaleString()}` : customVal;
     }
     const chosenNum = Number(String(chosenVal || "").replace(/[^0-9.]/g, ""));
+    const activeCaseId = caseId || cs?.id;
+    const backendChoice = choice === "letter" ? "document" : choice === "intake" ? "answers" : "other";
+    const payloadVal = Number.isFinite(chosenNum) && chosenNum > 0 ? chosenNum : chosenVal;
+
+    if (activeCaseId) {
+      setOfferConflictBusy(true);
+      setOfferConflictError("");
+      try {
+        try {
+          await fairexit.resolveConflict(activeCaseId, 'offer_amount', backendChoice, payloadVal);
+        } catch (apiErr) {
+          if (apiErr instanceof FairExitApiError && apiErr.status === 404) {
+            await fairexit.saveReviewData(activeCaseId, {
+              key: 'offer_amount',
+              action: choice === 'custom' || choice === 'intake' ? 'change' : 'confirm',
+              value: payloadVal,
+            });
+          } else {
+            throw apiErr;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to save offer conflict choice:", err);
+        setOfferConflictError(toPlainReportErrorMessage(err));
+        setOfferConflictBusy(false);
+        return;
+      }
+      setOfferConflictBusy(false);
+    }
+
+    offerResolvedLocallyRef.current = true;
+    setOfferConflictChoice(choice);
+    setShowOfferConflictCustom(false);
+    setOfferConflictError("");
+    setConflictBlockNotice("");
+    setBuildError("");
     if (Number.isFinite(chosenNum) && chosenNum > 0) {
       saveReportInputs({
         offer: chosenNum,
@@ -1034,33 +1130,32 @@ export default function CanadaReviewPage({
     }
     setItems((prev) =>
       prev.map((i) =>
-        i.id === "offerMoney" ? { ...i, value: chosenVal, confirmed: true, userChanged: false, showSecondLook: false, isEditingInline: false } : i
+        i.id === "offerMoney"
+          ? {
+              ...i,
+              value: chosenVal,
+              source: choice === "letter" ? "Your letter" : "From your answers",
+              confirmed: true,
+              userChanged: false,
+              showSecondLook: false,
+              isEditingInline: false,
+            }
+          : i
       )
     );
-    const activeCaseId = caseId || cs?.id;
-    if (activeCaseId) {
-      const backendChoice = choice === "letter" ? "document" : choice === "intake" ? "answers" : "other";
-      const payloadVal = Number.isFinite(chosenNum) && chosenNum > 0 ? chosenNum : chosenVal;
-      fairexit.resolveConflict(activeCaseId, 'offer_amount', backendChoice, payloadVal).catch(() => {
-        fairexit.saveReviewData(activeCaseId, {
-          key: 'offer_amount',
-          action: choice === 'custom' || choice === 'intake' ? 'change' : 'confirm',
-          value: payloadVal,
-        }).catch(() => {});
-      });
-    }
   };
 
   const toggleConfirm = (id: string) => {
     const item = items.find((i) => i.id === id);
-    if (id === "offerMoney" && hasOfferConflict && offerConflictChoice === null) {
-      const choice =
-        item?.value && docOfferDisplay && item.value === docOfferDisplay
-          ? "letter"
-          : item?.value && intakeOfferDisplay && item.value === intakeOfferDisplay
-          ? "intake"
-          : "custom";
-      handleChooseOfferConflict(choice, item?.value);
+    if (
+      (id === "age" && ageMismatch) ||
+      (id === "salary" && payMismatch) ||
+      (id === "offerMoney" && unresolvedOfferConflict) ||
+      (id === "contractLimit" && unresolvedContractConflict) ||
+      (id === "years" && unresolvedYearsConflict)
+    ) {
+      setConflictBlockNotice(mismatchHelperText);
+      scrollToFirstUnresolvedMismatch();
       return;
     }
     const newConfirmed = !item?.confirmed;
@@ -1071,11 +1166,38 @@ export default function CanadaReviewPage({
     if (activeCaseId && newConfirmed) {
       const keyMap = CA_KEY_MAP;
       const factKey = keyMap[id] || id;
-      fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: item?.value }).catch(() => {});
+      fairexit.saveReviewData(activeCaseId, { key: factKey, action: 'confirm', value: item?.value }).catch((err) => {
+        console.error("Failed to confirm item:", factKey, err);
+      });
     }
   };
 
-  const handleConfirmAll = () => {
+  const handleConfirmAll = async () => {
+    if (hasBlockingMismatches) {
+      setConflictBlockNotice(mismatchHelperText);
+      scrollToFirstUnresolvedMismatch();
+      return;
+    }
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      try {
+        if (pendingSavesRef.current.length > 0) {
+          const pending = pendingSavesRef.current.splice(0, pendingSavesRef.current.length);
+          await Promise.allSettled(pending);
+        }
+        if (!workingWeeksSaved && (!workingWeeks || workingWeeks === "0")) {
+          await fairexit.saveReviewData(activeCaseId, { key: 'working_notice_weeks', action: 'change', value: 0 });
+        }
+        await fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' });
+        await fairexit.attest(activeCaseId);
+      } catch (err) {
+        console.error("Failed to confirm all:", err);
+        setBuildError(toPlainReportErrorMessage(err));
+        scrollToFirstUnresolvedMismatch();
+        return;
+      }
+    }
+
     setItems((prev) =>
       prev.map((item) => ({
         ...item,
@@ -1088,73 +1210,121 @@ export default function CanadaReviewPage({
         userChangeAck: item.userChanged ? true : item.userChangeAck,
       }))
     );
-    setMismatchRows((prev) => {
-      let next = prev;
-      for (const k of Object.keys(prev)) {
-        resolvedMismatchKeysRef.current.add(k);
-        next = applySingleMismatchChoice(next, k, "doc");
-      }
-      return next;
-    });
-    if (hasOfferConflict) setOfferConflictChoice("letter");
-    if (hasContractConflict) setContractConflictChoice("contract");
-    if (hasYearsConflict) setYearsConflictChoice("contract");
     setWorkingWeeksSaved(true);
     if (hasBonusQuestion) setBonusSaved(true);
-    offerResolvedLocallyRef.current = true;
     setDeclaredCorrect(true);
-    const activeCaseId = caseId || cs?.id;
-    if (activeCaseId) {
-      if (hasYearsConflict) {
-        const pYears = fairexit.resolveConflict(activeCaseId, 'years', 'document').catch(() => {});
-        pendingSavesRef.current.push(pYears);
-      }
-      if (!workingWeeksSaved && (!workingWeeks || workingWeeks === "0")) {
-        const pWeeks = fairexit.saveReviewData(activeCaseId, { key: 'working_notice_weeks', action: 'change', value: 0 }).catch(() => {});
-        pendingSavesRef.current.push(pWeeks);
-      }
-      const pConfirm = fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {});
-      const pAttest = fairexit.attest(activeCaseId).catch(() => {});
-      pendingSavesRef.current.push(pConfirm, pAttest);
-    }
+    setConflictBlockNotice("");
+    setBuildError("");
   };
 
-  const handleChooseYearsConflict = (choice: "contract" | "told") => {
-    setYearsConflictChoice(choice);
+  const handleChooseYearsConflict = async (choice: "contract" | "told") => {
     const chosenVal = choice === "contract" && docYearsValue !== null ? `${docYearsValue} years` : (intakeYearsDisplay || docYearsDisplay);
-    if (choice === "contract" && docYearsValue !== null) {
-      saveReportInputs({ years: docYearsValue });
+    const activeCaseId = caseId || cs?.id;
+    if (activeCaseId) {
+      setYearsConflictBusy(true);
+      setYearsConflictError("");
+      try {
+        try {
+          await fairexit.resolveConflict(activeCaseId, 'years', choice === "contract" ? 'document' : 'answers');
+        } catch (apiErr) {
+          if (apiErr instanceof FairExitApiError && apiErr.status === 404) {
+            const numericYears = Number(String(chosenVal).replace(/[^0-9.]/g, ""));
+            await fairexit.saveReviewData(activeCaseId, {
+              key: 'years',
+              action: choice === 'contract' ? 'confirm' : 'change',
+              value: Number.isFinite(numericYears) && numericYears > 0 ? numericYears : chosenVal,
+            });
+          } else {
+            throw apiErr;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to save years conflict choice:", err);
+        setYearsConflictError(toPlainReportErrorMessage(err));
+        setYearsConflictBusy(false);
+        return;
+      }
+      setYearsConflictBusy(false);
+    }
+
+    yearsResolvedLocallyRef.current = true;
+    setYearsConflictChoice(choice);
+    setYearsConflictError("");
+    setConflictBlockNotice("");
+    setBuildError("");
+    const chosenNum = Number(String(chosenVal || "").replace(/[^0-9.]/g, ""));
+    if (Number.isFinite(chosenNum) && chosenNum > 0) {
+      saveReportInputs({ years: chosenNum });
     }
     setItems((prev) =>
       prev.map((i) =>
-        i.id === "years" ? { ...i, value: chosenVal, confirmed: true } : i
+        i.id === "years"
+          ? {
+              ...i,
+              value: chosenVal,
+              source: choice === "contract" ? "Your contract" : "From your answers",
+              confirmed: true,
+              userChanged: false,
+            }
+          : i
       )
     );
-    const activeCaseId = caseId || cs?.id;
-    if (activeCaseId) {
-      const p = fairexit.resolveConflict(activeCaseId, 'years', choice === "contract" ? 'document' : 'answers').catch(() => {});
-      pendingSavesRef.current.push(p);
-    }
   };
 
-  const handleChooseContractConflict = (choice: "contract" | "told" | "custom", customVal?: string) => {
-    setContractConflictChoice(choice);
-    setShowContractConflictCustom(false);
+  const handleChooseContractConflict = async (choice: "contract" | "told" | "custom", customVal?: string) => {
     let chosenVal = docContractLimitDisplay || "Yes";
     if (choice === "told") {
       chosenVal = intakeContractLimitDisplay || "No";
     } else if (choice === "custom" && customVal) {
       chosenVal = customVal;
     }
-    setItems((prev) =>
-      prev.map((i) =>
-        i.id === "contractLimit" ? { ...i, value: chosenVal } : i
-      )
-    );
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      fairexit.saveReviewData(activeCaseId, { key: 'min_only_clause', action: choice === 'custom' ? 'change' : 'confirm', value: chosenVal }).catch(() => {});
+      setContractConflictBusy(true);
+      setContractConflictError("");
+      try {
+        try {
+          const backendChoice = choice === "contract" ? "document" : choice === "told" ? "answers" : "other";
+          await fairexit.resolveConflict(activeCaseId, 'min_only_clause', backendChoice, chosenVal);
+        } catch (apiErr) {
+          if (apiErr instanceof FairExitApiError && apiErr.status === 404) {
+            await fairexit.saveReviewData(activeCaseId, {
+              key: 'min_only_clause',
+              action: choice === 'custom' || choice === 'told' ? 'change' : 'confirm',
+              value: chosenVal,
+            });
+          } else {
+            throw apiErr;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to save contract limit conflict choice:", err);
+        setContractConflictError(toPlainReportErrorMessage(err));
+        setContractConflictBusy(false);
+        return;
+      }
+      setContractConflictBusy(false);
     }
+
+    contractResolvedLocallyRef.current = true;
+    setContractConflictChoice(choice);
+    setShowContractConflictCustom(false);
+    setContractConflictError("");
+    setConflictBlockNotice("");
+    setBuildError("");
+    setItems((prev) =>
+      prev.map((i) =>
+        i.id === "contractLimit"
+          ? {
+              ...i,
+              value: chosenVal,
+              source: choice === "contract" ? "Your contract" : "From your answers",
+              confirmed: true,
+              userChanged: false,
+            }
+          : i
+      )
+    );
   };
 
   const handleSaveWorkingWeeks = (weeks: string) => {
@@ -1382,6 +1552,17 @@ export default function CanadaReviewPage({
       resolvedMismatchKeysRef.current.add(targetKey);
       setMismatchRows((prev) => applySingleMismatchChoice(prev, targetKey, kind === "doc" ? "doc" : "user"));
       if (cleanNum !== null) saveReportInputs({ salary: Math.round(cleanNum) });
+      return;
+    }
+    if (id === "years") {
+      yearsResolvedLocallyRef.current = true;
+      setYearsConflictChoice(kind === "doc" ? "contract" : "told");
+      if (cleanNum !== null) saveReportInputs({ years: cleanNum });
+      return;
+    }
+    if (id === "contractLimit") {
+      contractResolvedLocallyRef.current = true;
+      setContractConflictChoice(kind === "doc" ? "contract" : "custom");
     }
   };
 
@@ -1577,7 +1758,7 @@ export default function CanadaReviewPage({
       </div>
 
       {/* ── Main Single-Column 720px Card ── */}
-      <main className="w-full max-w-[720px] mx-auto px-4 mt-4">
+      <main ref={reviewRootRef} className="w-full max-w-[720px] mx-auto px-4 mt-4">
         <div className="bg-white border border-[#E7E4DD] rounded-[14px] shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] p-5 sm:p-7 md:p-8">
           <div className="inline-flex items-center px-3 py-1 bg-white border border-[#E7E4DD] rounded-[6px] text-[12px] font-[700] text-[#062C55] mb-4">
             We read your documents
@@ -1620,14 +1801,30 @@ export default function CanadaReviewPage({
                   {confirmedCount} of {totalCount} confirmed
                 </span>
                 <div className="flex items-center gap-3">
-                  {confirmedCount < totalCount && (
-                    <button
-                      type="button"
-                      onClick={handleConfirmAll}
-                      className="text-[12px] font-[700] text-[#0C8F72] hover:underline cursor-pointer"
+                  {(confirmedCount < totalCount || hasBlockingMismatches) && (
+                    <span
+                      onClick={() => {
+                        if (hasBlockingMismatches) {
+                          setConflictBlockNotice(mismatchHelperText);
+                          scrollToFirstUnresolvedMismatch();
+                        }
+                      }}
+                      className={hasBlockingMismatches ? "inline-block cursor-not-allowed" : "inline-block"}
                     >
-                      Confirm all
-                    </button>
+                      <button
+                        type="button"
+                        disabled={hasBlockingMismatches}
+                        onClick={handleConfirmAll}
+                        data-testid="confirm-all-btn"
+                        className={
+                          hasBlockingMismatches
+                            ? "text-[12px] font-[700] text-[#9AA6B2] cursor-not-allowed pointer-events-none"
+                            : "text-[12px] font-[700] text-[#0C8F72] hover:underline cursor-pointer"
+                        }
+                      >
+                        Confirm all
+                      </button>
+                    </span>
                   )}
                   <span className="font-sans text-[13px] text-[#5A6B78]">
                     {remainingCount} to go
@@ -1640,6 +1837,11 @@ export default function CanadaReviewPage({
                   style={{ width: `${(confirmedCount / totalCount) * 100}%` }}
                 />
               </div>
+              {hasBlockingMismatches && (
+                <p data-testid="confirm-all-mismatch-help" className="mt-2.5 text-[12.5px] font-[600] text-[#A3231F]">
+                  {mismatchHelperText}
+                </p>
+              )}
             </div>
           )}
 
@@ -1693,28 +1895,49 @@ export default function CanadaReviewPage({
                   <div className="space-y-4">
                     {/* Conflict Card: Years on the job */}
                     {hasYearsConflict && (
-                      <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
-                        <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#B07A00] uppercase block mb-1">
-                          CHECK THIS
-                        </span>
+                      <div
+                        data-testid="years-conflict-card"
+                        data-unresolved-mismatch={yearsConflictChoice === null ? "true" : undefined}
+                        className={
+                          yearsConflictChoice === null
+                            ? "needs-pick bg-[#FFF8F8] border-2 border-[#D42E2B] border-l-4 border-l-[#D42E2B] rounded-[14px] p-5 sm:p-6 shadow-xs"
+                            : "bg-white border border-[#E7E4DD] border-l-4 border-l-[#0C8F72] rounded-[14px] p-5 sm:p-6 shadow-xs"
+                        }
+                      >
+                        <div className="mb-1.5 flex items-center gap-2">
+                          <span
+                            className={
+                              yearsConflictChoice === null
+                                ? "inline-flex items-center px-2 py-0.5 rounded bg-[#D42E2B] text-white text-[11px] font-[700] uppercase tracking-wider"
+                                : "font-sans font-[800] text-[11.5px] tracking-[1px] text-[#0C8F72] uppercase"
+                            }
+                          >
+                            {yearsConflictChoice === null ? "Mismatch" : "Resolved"}
+                          </span>
+                        </div>
                         <h3 className="font-serif font-[600] text-[20px] leading-[26px] text-[#062C55] mb-1.5">
                           Years on the job
                         </h3>
                         <p className="font-sans text-[14px] text-[#5A6B78] leading-[21px] mb-4">
-                          Your contract&apos;s start date doesn&apos;t match the years you gave us. Which is right?
+                          Please choose which value is correct. Your contract&apos;s start date doesn&apos;t match the years you gave us.
                         </p>
+                        {yearsConflictError && (
+                          <div role="alert" className="mb-3 rounded-[8px] bg-[#FBECEB] border border-[#F5C6C5] px-3 py-2 text-[13px] font-[600] text-[#A3231F]">
+                            {yearsConflictError}
+                          </div>
+                        )}
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                           <div
                             className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
                               yearsConflictChoice === "contract"
                                 ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                                : "bg-[#FAF9F5] border-[#E7E4DD]"
+                                : "bg-white border-[#E7E4DD]"
                             }`}
                           >
                             <div>
                               <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                                Your contract says
+                                Document says (your contract)
                               </span>
                               <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
                                 {docYearsDisplay || (docYearsValue != null ? `${docYearsValue} years` : "")}
@@ -1727,14 +1950,17 @@ export default function CanadaReviewPage({
                             </div>
                             <button
                               type="button"
+                              disabled={yearsConflictBusy}
                               onClick={() => handleChooseYearsConflict("contract")}
-                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                                 yearsConflictChoice === "contract"
                                   ? "bg-[#0C8F72] text-white"
                                   : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
                               }`}
                             >
-                              {yearsConflictChoice === "contract" ? "✓ Selected" : "Use this"}
+                              {yearsConflictChoice === "contract"
+                                ? "✓ Selected (document)"
+                                : `Use document${docYearsDisplay ? ` — ${docYearsDisplay}` : docYearsValue != null ? ` — ${docYearsValue} years` : ""}`}
                             </button>
                           </div>
 
@@ -1742,12 +1968,12 @@ export default function CanadaReviewPage({
                             className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
                               yearsConflictChoice === "told"
                                 ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                                : "bg-[#FAF9F5] border-[#E7E4DD]"
+                                : "bg-white border-[#E7E4DD]"
                             }`}
                           >
                             <div>
                               <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                                You told us
+                                Your answer
                               </span>
                               <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
                                 {intakeYearsDisplay}
@@ -1758,14 +1984,17 @@ export default function CanadaReviewPage({
                             </div>
                             <button
                               type="button"
+                              disabled={yearsConflictBusy}
                               onClick={() => handleChooseYearsConflict("told")}
-                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                                 yearsConflictChoice === "told"
                                   ? "bg-[#0C8F72] text-white"
                                   : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
                               }`}
                             >
-                              {yearsConflictChoice === "told" ? "✓ Selected" : "Use this"}
+                              {yearsConflictChoice === "told"
+                                ? "✓ Selected (my answer)"
+                                : `Use my answer${intakeYearsDisplay ? ` — ${intakeYearsDisplay}` : ""}`}
                             </button>
                           </div>
                         </div>
@@ -1774,16 +2003,37 @@ export default function CanadaReviewPage({
 
                     {/* Conflict Card: Limits you to the legal minimum */}
                     {hasContractConflict && (
-                      <div className="bg-white border border-[#E7E4DD] border-l-4 border-l-[#B07A00] rounded-[14px] p-5 sm:p-6 shadow-xs">
-                        <span className="font-sans font-[800] text-[11.5px] tracking-[1px] text-[#B07A00] uppercase block mb-1">
-                          CHECK THIS
-                        </span>
+                      <div
+                        data-testid="contract-conflict-card"
+                        data-unresolved-mismatch={contractConflictChoice === null ? "true" : undefined}
+                        className={
+                          contractConflictChoice === null
+                            ? "needs-pick bg-[#FFF8F8] border-2 border-[#D42E2B] border-l-4 border-l-[#D42E2B] rounded-[14px] p-5 sm:p-6 shadow-xs"
+                            : "bg-white border border-[#E7E4DD] border-l-4 border-l-[#0C8F72] rounded-[14px] p-5 sm:p-6 shadow-xs"
+                        }
+                      >
+                        <div className="mb-1.5 flex items-center gap-2">
+                          <span
+                            className={
+                              contractConflictChoice === null
+                                ? "inline-flex items-center px-2 py-0.5 rounded bg-[#D42E2B] text-white text-[11px] font-[700] uppercase tracking-wider"
+                                : "font-sans font-[800] text-[11.5px] tracking-[1px] text-[#0C8F72] uppercase"
+                            }
+                          >
+                            {contractConflictChoice === null ? "Mismatch" : "Resolved"}
+                          </span>
+                        </div>
                         <h3 className="font-serif font-[600] text-[20px] leading-[26px] text-[#062C55] mb-1.5">
                           Limits you to the legal minimum
                         </h3>
                         <p className="font-sans text-[14px] text-[#5A6B78] leading-[21px] mb-4">
-                          You told us your contract doesn&apos;t limit you. Your contract seems to. Which is right?
+                          Please choose which value is correct. Your answer and your contract differ on whether your contract limits you.
                         </p>
+                        {contractConflictError && (
+                          <div role="alert" className="mb-3 rounded-[8px] bg-[#FBECEB] border border-[#F5C6C5] px-3 py-2 text-[13px] font-[600] text-[#A3231F]">
+                            {contractConflictError}
+                          </div>
+                        )}
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                           {/* Box 1: Your contract says */}
@@ -1791,12 +2041,12 @@ export default function CanadaReviewPage({
                             className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
                               contractConflictChoice === "contract"
                                 ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                                : "bg-[#FAF9F5] border-[#E7E4DD]"
+                                : "bg-white border-[#E7E4DD]"
                             }`}
                           >
                             <div>
                               <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                                Your contract says
+                                Document says (your contract)
                               </span>
                               <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
                                 {docContractLimitDisplay || "Yes, it limits me"}
@@ -1809,14 +2059,15 @@ export default function CanadaReviewPage({
                             </div>
                             <button
                               type="button"
+                              disabled={contractConflictBusy}
                               onClick={() => handleChooseContractConflict("contract")}
-                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                                 contractConflictChoice === "contract"
                                   ? "bg-[#0C8F72] text-white"
                                   : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
                               }`}
                             >
-                              {contractConflictChoice === "contract" ? "✓ Selected" : "Use this"}
+                              {contractConflictChoice === "contract" ? "✓ Selected (document)" : "Use document"}
                             </button>
                           </div>
 
@@ -1825,12 +2076,12 @@ export default function CanadaReviewPage({
                             className={`rounded-[10px] p-4 flex flex-col justify-between transition border ${
                               contractConflictChoice === "told"
                                 ? "bg-[#EEF8F3] border-[#0C8F72] ring-1 ring-[#0C8F72]"
-                                : "bg-[#FAF9F5] border-[#E7E4DD]"
+                                : "bg-white border-[#E7E4DD]"
                             }`}
                           >
                             <div>
                               <span className="font-sans text-[12.5px] text-[#5A6B78] block">
-                                You told us
+                                Your answer
                               </span>
                               <span className="font-sans font-bold text-[19px] text-[#062C55] block mt-0.5">
                                 {intakeContractLimitDisplay || "No, it doesn't"}
@@ -1841,14 +2092,15 @@ export default function CanadaReviewPage({
                             </div>
                             <button
                               type="button"
+                              disabled={contractConflictBusy}
                               onClick={() => handleChooseContractConflict("told")}
-                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 ${
+                              className={`w-full h-[38px] rounded-[8px] font-sans font-[700] text-[13px] transition cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 ${
                                 contractConflictChoice === "told"
                                   ? "bg-[#0C8F72] text-white"
                                   : "border border-[#0C8F72] text-[#0C8F72] bg-white hover:bg-[#0C8F72]/5"
                               }`}
                             >
-                              {contractConflictChoice === "told" ? "✓ Selected" : "Use this"}
+                              {contractConflictChoice === "told" ? "✓ Selected (my answer)" : "Use my answer"}
                             </button>
                           </div>
                         </div>
@@ -2036,6 +2288,7 @@ export default function CanadaReviewPage({
                   <ItemCard
                     key={item.id}
                     item={item}
+                    hasUnresolvedMismatch={Boolean(inlineMismatch || (item.id === "years" && unresolvedYearsConflict))}
                     inlineMismatch={inlineMismatch}
                     mismatchBusy={Boolean(inlineMismatch && mismatchSavingKey === inlineMismatch.key)}
                     mismatchError={inlineMismatch ? mismatchErrorByKey[inlineMismatch.key] : undefined}
@@ -2074,6 +2327,7 @@ export default function CanadaReviewPage({
                 <ItemCard
                   key={item.id}
                   item={item}
+                  hasUnresolvedMismatch={item.id === "offerMoney" && unresolvedOfferConflict}
                   offerConflictPanel={
                     item.id === "offerMoney" && offerConflictChoice === null && hasOfferConflict && (
                       <InlineOfferConflictBanner
@@ -2091,6 +2345,8 @@ export default function CanadaReviewPage({
                           intakeOfferDisplay ||
                           (intakeOfferNum ? `$${intakeOfferNum.toLocaleString()}` : "")
                         }
+                        busy={offerConflictBusy}
+                        error={offerConflictError}
                         onUseDocument={() => handleChooseOfferConflict("letter")}
                         onKeepCurrent={() => handleChooseOfferConflict("intake")}
                         onAddClearerCopy={navigateToClearerCopyUpload}
@@ -2130,6 +2386,7 @@ export default function CanadaReviewPage({
                 <ItemCard
                   key={item.id}
                   item={item}
+                  hasUnresolvedMismatch={item.id === "contractLimit" && unresolvedContractConflict}
                   onToggleConfirm={() => toggleConfirm(item.id)}
                   onStartInlineEdit={() => startInlineEdit(item.id)}
                   onCancelInlineEdit={() => cancelInlineEdit(item.id)}
@@ -2147,20 +2404,45 @@ export default function CanadaReviewPage({
             </div>
           </div>
 
+          {conflictBlockNotice && (
+            <p role="alert" className="mt-6 text-sm font-[600] text-[#A3231F]">
+              {conflictBlockNotice}
+            </p>
+          )}
+
           {/* Confirmation Checkbox Box */}
           <div
-            onClick={() => {
-              const nextVal = !declaredCorrect;
-              setDeclaredCorrect(nextVal);
-              const activeCaseId = caseId || cs?.id;
-              if (nextVal && activeCaseId) {
-                fairexit.attest(activeCaseId).catch(() => {});
+            onClick={async () => {
+              if (hasBlockingMismatches) {
+                setConflictBlockNotice(mismatchHelperText);
+                scrollToFirstUnresolvedMismatch();
+                return;
               }
+              const nextVal = !declaredCorrect;
+              setConflictBlockNotice("");
+              setBuildError("");
+              if (nextVal) {
+                const activeCaseId = caseId || cs?.id;
+                if (activeCaseId) {
+                  try {
+                    await fairexit.attest(activeCaseId);
+                  } catch (err) {
+                    console.error("Failed to attest review page:", err);
+                    setDeclaredCorrect(false);
+                    setConflictBlockNotice(toPlainReportErrorMessage(err));
+                    scrollToFirstUnresolvedMismatch();
+                    return;
+                  }
+                }
+              }
+              setDeclaredCorrect(nextVal);
             }}
-            className={`rounded-[14px] p-4.5 sm:p-5 mt-8 mb-5 flex items-start gap-3.5 shadow-xs cursor-pointer transition border ${
-              declaredCorrect
-                ? "bg-[#EEF8F3] border-[#0C8F72]"
-                : "bg-white border-[#E7E4DD] hover:border-[#C9D1D7]"
+            className={`rounded-[14px] p-4.5 sm:p-5 ${conflictBlockNotice ? "mt-3" : "mt-8"} mb-5 flex items-start gap-3.5 shadow-xs transition border ${
+              hasBlockingMismatches
+                ? "bg-[#FAF9F5] border-[#E7E4DD] opacity-70 cursor-not-allowed"
+                : declaredCorrect
+                  ? "bg-[#EEF8F3] border-[#0C8F72] cursor-pointer"
+                  : "bg-white border-[#E7E4DD] hover:border-[#C9D1D7] cursor-pointer"
             }`}
           >
             <div
@@ -2185,10 +2467,23 @@ export default function CanadaReviewPage({
           {/* Bottom Action CTA */}
           <div>
             {buildError && <p role="alert" className="mb-3 text-sm text-[#A3231F]">{buildError}</p>}
+            <div
+              onClick={() => {
+                if (hasBlockingMismatches) {
+                  setConflictBlockNotice(mismatchHelperText);
+                  scrollToFirstUnresolvedMismatch();
+                }
+              }}
+            >
             <button
               type="button"
               disabled={!canBuild || isBuilding}
               onClick={async () => {
+                if (hasBlockingMismatches) {
+                  setConflictBlockNotice(mismatchHelperText);
+                  scrollToFirstUnresolvedMismatch();
+                  return;
+                }
                 if (buildSubmitLock.current || isBuilding) return;
                 const activeCaseId = caseId || cs?.id;
                 if (!activeCaseId) {
@@ -2235,10 +2530,19 @@ export default function CanadaReviewPage({
                     err instanceof FairExitApiError
                       ? err
                       : new FairExitApiError(0, err instanceof Error ? err.message : "Failed to start report generation");
-                  setBuildError(apiErr.message);
+                  console.error("Report generation failed:", {
+                    status: apiErr.status,
+                    requestId: apiErr.requestId,
+                    message: apiErr.message,
+                  });
+                  const plainMessage = toPlainReportErrorMessage(
+                    apiErr,
+                    "We couldn't build your report right now. Please check your confirmed details and try again."
+                  );
+                  setBuildError(plainMessage);
                   showErrorModal({
                     title: "Report Generation Failed",
-                    message: apiErr.message,
+                    message: plainMessage,
                     stage: "Report Generation",
                     statusCode: apiErr.status,
                     requestId: apiErr.requestId,
@@ -2248,7 +2552,7 @@ export default function CanadaReviewPage({
               className={`w-full h-[48px] rounded-[9px] font-sans font-[700] text-[16px] transition flex items-center justify-center ${
                 canBuild && !isBuilding
                   ? "bg-[#0EB28D] hover:bg-[#0C8F72] text-white shadow-[0px_18px_40px_-18px_rgba(5,43,84,0.12)] cursor-pointer"
-                  : "bg-[#C9D1D7] text-white cursor-not-allowed opacity-90"
+                  : `bg-[#C9D1D7] text-white cursor-not-allowed opacity-90${hasBlockingMismatches ? " pointer-events-none" : ""}`
               }`}
             >
               {isBuilding ? (
@@ -2258,12 +2562,15 @@ export default function CanadaReviewPage({
                 </div>
               ) : canBuild ? (
                 "Build my report (PDF) →"
+              ) : hasBlockingMismatches ? (
+                mismatchHelperText
               ) : remainingCount > 0 ? (
                 `Confirm ${remainingCount} more to build your report`
               ) : (
                 "Check the confirmation box above to proceed"
               )}
             </button>
+            </div>
           </div>
             </>
           )}
@@ -2328,6 +2635,7 @@ export default function CanadaReviewPage({
 // ── Single Review Item Card Component ──
 function ItemCard({
   item,
+  hasUnresolvedMismatch,
   inlineMismatch,
   mismatchBusy,
   mismatchError,
@@ -2345,6 +2653,7 @@ function ItemCard({
   onAddClearerCopy,
 }: {
   item: ReviewItem;
+  hasUnresolvedMismatch?: boolean;
   inlineMismatch?: Mismatch;
   mismatchBusy?: boolean;
   mismatchError?: string;
@@ -2362,9 +2671,10 @@ function ItemCard({
   onAddClearerCopy: () => void;
 }) {
   const cfg = CA_FIELD_CONFIGS[item.id];
+  const showRedMismatchCard = Boolean(inlineMismatch || offerConflictPanel || hasUnresolvedMismatch);
 
   // 1. CONFIRMED ROW STATE (Matches Image 1)
-  if (item.confirmed && !item.isEditingInline && !item.userChanged && !item.showSecondLook && !inlineMismatch && !offerConflictPanel) {
+  if (item.confirmed && !item.isEditingInline && !item.userChanged && !item.showSecondLook && !showRedMismatchCard) {
     const rawVal = item.value || "Yes";
     const isLongVal = rawVal.length > 25;
     const isNoDate = rawVal.toLowerCase().includes("no date");
@@ -2436,7 +2746,14 @@ function ItemCard({
 
   // 2. NORMAL OR USER-CHANGED ROW STATE (Matches Image 3)
   return (
-    <div className="rounded-[10px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-4 sm:px-5 sm:py-4">
+    <div
+      data-unresolved-mismatch={showRedMismatchCard ? "true" : undefined}
+      className={
+        showRedMismatchCard
+          ? "needs-pick rounded-[10px] border-2 border-[#D42E2B] bg-[#FFF8F8] transition p-4 sm:px-5 sm:py-4"
+          : "rounded-[10px] border border-[#E7E4DD] bg-white hover:border-[#D0CBC0] transition p-4 sm:px-5 sm:py-4"
+      }
+    >
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex-1 pr-2">
           <div className="flex items-center gap-2">
@@ -2472,7 +2789,7 @@ function ItemCard({
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-center shrink-0">
-          {!item.hasOnlyChange && !inlineMismatch && (
+          {!item.hasOnlyChange && !showRedMismatchCard && (
             <button
               type="button"
               onClick={onToggleConfirm}

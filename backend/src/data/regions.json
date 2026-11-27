@@ -5806,7 +5806,7 @@
       {
         "id": "US-FED-S1",
         "rule": "U.S. Department of Labor",
-        "section": "WARN Act (Worker Adjustment and Retraining Notification)",
+        "section": "WARN Act (Worker Adjustment and Retraining Notification), 29 U.S.C. § 2101",
         "url": "https://www.dol.gov/agencies/eta/layoffs/warn",
         "status": "verified",
         "checked": "2026-10-25"

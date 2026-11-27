@@ -23,6 +23,7 @@ import "@/components/report/mismatch-row.css";
 import {
   buildMismatchRows,
   findUnresolvedMismatches,
+  toPlainReportErrorMessage,
 } from "@/lib/confirmation-mismatch";
 
 export function hasCompletedPostPaymentCollection(c: any): boolean {
@@ -704,17 +705,17 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
 
   async function act(key: string, action: string, extra: { value?: unknown; agreed?: boolean } = {}) {
     setBusyKey(key + ":" + action); setErr("");
-    try { const r = await fairexit.rowAction(cs.id, key, action, extra); setPage(r.page); } catch (e) { setErr(errText(e)); }
+    try { const r = await fairexit.rowAction(cs.id, key, action, extra); setPage(r.page); } catch (e) { console.error("CheckStep row action failed:", e); setErr(toPlainReportErrorMessage(e, errText(e))); }
     setBusyKey("");
   }
   async function resolve(key: string, choice: "document" | "answers" | "other" | "not_sure", value?: unknown) {
     setBusyKey(key + ":conflict"); setErr("");
-    try { setPage(await fairexit.resolveConflict(cs.id, key, choice, value)); } catch (e) { setErr(errText(e)); }
+    try { setPage(await fairexit.resolveConflict(cs.id, key, choice, value)); } catch (e) { console.error("CheckStep conflict resolution failed:", e); setErr(toPlainReportErrorMessage(e, errText(e))); }
     setBusyKey("");
   }
   async function attest(on: boolean) {
     if (!on) return;
-    try { setPage(await fairexit.attest(cs.id)); } catch (e) { setErr(errText(e)); }
+    try { setPage(await fairexit.attest(cs.id)); } catch (e) { console.error("CheckStep attest failed:", e); setErr(toPlainReportErrorMessage(e, errText(e))); }
   }
   async function build() {
     if (buildPendingRef.current) return;
@@ -731,10 +732,19 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
       onBuilt();
     } catch (e: unknown) {
       const apiErr = e instanceof FairExitApiError ? e : new FairExitApiError(0, errText(e));
-      setErr(apiErr.message);
+      console.error("CheckStep report generation failed:", {
+        status: apiErr.status,
+        requestId: apiErr.requestId,
+        message: apiErr.message,
+      });
+      const plainMessage = toPlainReportErrorMessage(
+        apiErr,
+        "We couldn't build your report right now. Please check your confirmed details and try again."
+      );
+      setErr(plainMessage);
       showErrorModal({
         title: "Report Generation Failed",
-        message: apiErr.message,
+        message: plainMessage,
         stage: "Report Generation",
         statusCode: apiErr.status,
         requestId: apiErr.requestId,
@@ -762,6 +772,12 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
   const payMismatch = unresolvedMismatches.find(
     (m) => m.key === "annual_pay" || m.key === "pay" || m.key === "base_salary" || m.key === "salary"
   );
+  const hasBlockingCheckMismatches = unresolvedMismatches.length > 0 || (page.conflicts?.length || 0) > 0;
+  const checkMismatchHelp = payMismatch
+    ? "Pick which pay is right (in red above) to continue."
+    : ageMismatch
+      ? "Pick which age is right (in red above) to continue."
+      : "Pick which value is right (in red above) to continue.";
   const handleResolveCheckMismatch = async (key: string, pick: "user" | "doc") => {
     const apiKey = key === "age" ? "age" : "pay";
     setBusyKey(`mismatch:${key}`);
@@ -773,7 +789,8 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
       setResolvedMismatchKeys((prev) => (prev.includes(key) ? prev : [...prev, key]));
       setPage(latestPage);
     } catch (e) {
-      const msg = errText(e);
+      console.error("Failed to save CheckStep mismatch choice:", key, e);
+      const msg = toPlainReportErrorMessage(e);
       setMismatchErrorByKey((prev) => ({ ...prev, [key]: msg }));
       setErr(msg);
     } finally {
@@ -834,11 +851,14 @@ function CheckStep({ cs, words, onAddClearerCopy, onBuilt }: { cs: any; words: a
 
       <Card className="mt-6">
         <label className="flex gap-3 items-start text-[14px]">
-          <input type="checkbox" className="mt-1 w-5 h-5" checked={page.finalAgreement.attested} disabled={!page.build.allRequiredConfirmed || unresolvedMismatches.length > 0} onChange={(e) => attest(e.target.checked)} />
+          <input type="checkbox" className="mt-1 w-5 h-5" checked={page.finalAgreement.attested} disabled={!page.build.allRequiredConfirmed || hasBlockingCheckMismatches} onChange={(e) => attest(e.target.checked)} />
           <span>{page.finalAgreement.text}</span>
         </label>
+        {hasBlockingCheckMismatches && (
+          <p className="mt-2 text-[12.5px] font-[600] text-[#a3231f]">{checkMismatchHelp}</p>
+        )}
       </Card>
-      <Btn className={`w-full mt-3 ${page.build.enabled && unresolvedMismatches.length === 0 ? "shadow-[0_0_0_4px_rgba(14,178,141,0.25)]" : ""}`} disabled={buildPending || unresolvedMismatches.length > 0} onClick={build}>{buildPending ? "Starting your report…" : page.build.enabled && unresolvedMismatches.length === 0 ? page.build.label : page.build.allRequiredConfirmed ? "Tick the box above to build your report" : page.build.label}</Btn>
+      <Btn className={`w-full mt-3 ${page.build.enabled && !hasBlockingCheckMismatches ? "shadow-[0_0_0_4px_rgba(14,178,141,0.25)]" : ""}`} disabled={buildPending || hasBlockingCheckMismatches} onClick={build}>{buildPending ? "Starting your report…" : hasBlockingCheckMismatches ? checkMismatchHelp : page.build.enabled ? page.build.label : page.build.allRequiredConfirmed ? "Tick the box above to build your report" : page.build.label}</Btn>
     </div>
   );
 }
@@ -899,7 +919,16 @@ function Row({
     return <Card className="!p-3 opacity-70"><div className="flex justify-between text-[14px]"><span>{r.label}</span><b className="text-[#5a6b78]">Not added</b></div></Card>;
   }
   return (
-    <Card className="!p-3" style={corrected ? { background: C.violetbg, borderColor: "#d9cdf5" } : undefined}>
+    <Card
+      className={inlineMismatch ? "!p-3 needs-pick" : "!p-3"}
+      style={
+        inlineMismatch
+          ? { background: "#fff8f8", border: "2px solid #d42e2b" }
+          : corrected
+            ? { background: C.violetbg, borderColor: "#d9cdf5" }
+            : undefined
+      }
+    >
       <div className="flex justify-between gap-3 items-start">
         <div className="min-w-0">
           <div className="text-[13px] text-[#5a6b78]">{r.label}{!r.required && " (optional)"}</div>
@@ -969,17 +998,18 @@ function Row({
 function ConflictCard({ c, busy, onResolve }: { c: any; busy: boolean; onResolve: (k: string, ch: "document" | "answers" | "other" | "not_sure", v?: unknown) => void }) {
   const [other, setOther] = useState(false);
   return (
-    <Card className="mb-3 !p-4" style={{ borderLeft: `4px solid ${C.amber}` }}>
-      <div className="text-[12px] font-extrabold uppercase tracking-wide text-[#b07a00]">{c.title}</div>
-      <p className="text-[14px] mt-1 mb-3">{c.lead}</p>
+    <Card className="mb-3 !p-4 needs-pick" style={{ border: "2px solid #d42e2b", borderLeft: "4px solid #d42e2b", background: "#fff8f8" }}>
+      <div className="inline-block mb-1.5 px-2 py-0.5 rounded bg-[#d42e2b] text-white text-[11px] font-[700] uppercase tracking-wider">Mismatch</div>
+      <div className="text-[12px] font-extrabold uppercase tracking-wide text-[#9e1f1d]">{c.title}</div>
+      <p className="text-[14px] mt-1 mb-3">Please choose which value is correct. {c.lead}</p>
       <div className="grid sm:grid-cols-2 gap-2">
-        <button disabled={busy} onClick={() => onResolve(c.key, "document")} className="text-left rounded-xl border-2 border-[#e7e4dd] hover:border-[#0eb28d] p-3 min-h-[44px]">
-          <div className="text-[12px] text-[#5a6b78]">{c.document.label}</div>
+        <button disabled={busy} onClick={() => onResolve(c.key, "document")} className="text-left rounded-xl border-2 border-[#e7e4dd] bg-white hover:border-[#0eb28d] p-3 min-h-[44px]">
+          <div className="text-[12px] text-[#5a6b78]">Document says ({c.document.label})</div>
           <div className="font-bold text-[#062c55] text-[18px]">{c.document.display}</div>
           {c.document.quote && <div className="text-[12px] italic text-[#5a6b78] mt-1">&ldquo;{c.document.quote}&rdquo;</div>}
         </button>
-        <button disabled={busy} onClick={() => onResolve(c.key, "answers")} className="text-left rounded-xl border-2 border-[#e7e4dd] hover:border-[#0eb28d] p-3 min-h-[44px]">
-          <div className="text-[12px] text-[#5a6b78]">{c.answers.label}</div>
+        <button disabled={busy} onClick={() => onResolve(c.key, "answers")} className="text-left rounded-xl border-2 border-[#e7e4dd] bg-white hover:border-[#0eb28d] p-3 min-h-[44px]">
+          <div className="text-[12px] text-[#5a6b78]">Your answer ({c.answers.label})</div>
           <div className="font-bold text-[#062c55] text-[18px]">{c.answers.display}</div>
         </button>
       </div>

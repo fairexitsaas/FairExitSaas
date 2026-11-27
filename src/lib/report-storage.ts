@@ -183,6 +183,67 @@ export function isUSState(val?: unknown): boolean {
   return US_STATE_SET_LOWER.has(s);
 }
 
+const US_STATE_BY_LOWER_KEY: Record<string, string> = (() => {
+  const map: Record<string, string> = {};
+  US_STATES.forEach((name, idx) => {
+    map[name.toLowerCase()] = name;
+    const code = US_STATE_CODES[idx];
+    if (code) {
+      map[code.toLowerCase()] = name;
+      map[`us-${code.toLowerCase()}`] = name;
+    }
+  });
+  map["district of columbia"] = "Washington, DC";
+  map["washington dc"] = "Washington, DC";
+  return map;
+})();
+
+/**
+ * Normalizes a US state query parameter (full name, 2-letter code, or "Other state").
+ * Returns an empty string when unset or invalid so the state question is shown instead.
+ */
+export function normalizeUSStateParam(raw?: string | null): string {
+  if (!raw || typeof raw !== "string") return "";
+  const trimmed = raw.trim();
+  if (!trimmed) return "";
+  if (/^other\s*state$/i.test(trimmed)) return "Other state";
+  return US_STATE_BY_LOWER_KEY[trimmed.toLowerCase()] || "";
+}
+
+/**
+ * Resolves the initial step and prefilled state when entering the US free-check flow.
+ * If a covered US state was already chosen on the homepage (or state page),
+ * skips the duplicate "Which state did you physically work in?" step ("us-situation-q1").
+ */
+export function resolveUSFlowEntryStep(params?: {
+  stepParam?: string | null;
+  loadingParam?: string | null;
+  stateParam?: string | null;
+}): { prefilledState: string; initialStep: string; hasPrefilledState: boolean } {
+  const prefilledState = normalizeUSStateParam(params?.stateParam);
+  const step = params?.stepParam || "";
+  const loading = params?.loadingParam || "";
+  const hasCoveredState = Boolean(prefilledState && prefilledState !== "Other state");
+
+  if (step === "loading" || loading === "true") {
+    return { prefilledState, initialStep: "step-analyzing", hasPrefilledState: hasCoveredState };
+  }
+  if (step === "results" || step === "step-results") {
+    return { prefilledState, initialStep: "step-results", hasPrefilledState: hasCoveredState };
+  }
+  if (step === "us-state-stop" || step === "stop" || prefilledState === "Other state") {
+    return {
+      prefilledState: prefilledState || "Other state",
+      initialStep: "us-state-stop",
+      hasPrefilledState: false,
+    };
+  }
+  if (hasCoveredState) {
+    return { prefilledState, initialStep: "us-situation-q2", hasPrefilledState: true };
+  }
+  return { prefilledState: "", initialStep: "us-situation-q1", hasPrefilledState: false };
+}
+
 export function detectIsUS(opts?: {
   country?: unknown;
   cs?: any;

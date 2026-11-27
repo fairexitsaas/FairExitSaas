@@ -118,6 +118,7 @@ export function MismatchRow(props: {
   const { m, choice, onChoose } = props;
   const tile = (pick: "user" | "doc", title: string, value: string, note?: string) => {
     const on = choice === pick;
+    const actionHint = pick === "user" ? `Use my answer — ${value}` : `Use document — ${value}`;
     return (
       <button
         type="button"
@@ -129,13 +130,17 @@ export function MismatchRow(props: {
         <span className="fx-mm-tile__title">{title}</span>
         <span className="fx-mm-tile__value">{value}</span>
         {note ? <span className="fx-mm-tile__note">{note}</span> : null}
+        <span className="fx-mm-tile__sub">{actionHint}</span>
       </button>
     );
   };
   return (
     <fieldset className="fx-mm">
+      <span className="fx-mm__badge">Mismatch</span>
       <legend className="fx-mm__q">{m.label}: which is right?</legend>
-      <p className="fx-mm__help">What you told us and what {DOC_WORD[m.docSource]} says are different.</p>
+      <p className="fx-mm__help">
+        Please choose which value is correct. What you told us and what {DOC_WORD[m.docSource]} says are different.
+      </p>
       <div role="radiogroup" aria-label={`${m.label}: which is right?`} className="fx-mm__tiles">
         {tile("user", "What you told us", show(m.userValue, m.key))}
         {tile("doc", `What ${DOC_WORD[m.docSource]} says`, show(m.docValue, m.key),
