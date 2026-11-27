@@ -125,6 +125,10 @@ export default function BlockingErrorModal({
         {retryError && (
           <div className="p-3 mb-3 bg-[#fbeceb] rounded-xl border border-[#f5c2c0] text-[#a3231f] text-[13px]">
             <span className="font-semibold">Retry failed:</span> {retryError}
+            {retryError
+            .replace(/\bHTTP(?:\s+Status)?\s*:?\s*\d{3}\b/gi, "")
+            .replace(/\bRequest\s*ID\s*:?\s*[a-zA-Z0-9-]+\b/gi, "")
+            .trim() || "We couldn't complete the retry. Please try again."}
           </div>
         )}
 
