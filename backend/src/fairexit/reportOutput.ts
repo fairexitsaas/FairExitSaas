@@ -1269,7 +1269,7 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     sec.push({ id: 's1_range', title: 'Your estimated range', html: rangeHtml })
     curPage += 1
   } else if (isUS) {
-    const rc = r.release_check || []
+    const rc = Array.isArray(r.release_check) ? r.release_check.filter((item): item is NonNullable<typeof item> => Boolean(item && typeof item === 'object')) : []
     // "Your key number": the federal release consideration period (21 or 45 days under OWBPA rules).
     // The severance/offer amount ($12,500 or any amount) must NEVER appear as the key number.
 
@@ -1531,25 +1531,74 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
 
     const hasDisclosureWarning = hasEstablishedGroupProgram && !hasVerifiedCompleteDisclosures
 
-    const rcPointsText = rc.map((item) => item?.point).filter(Boolean).join(' · ')
+    const rcPointsText = rc
+      .map((item) => item?.point)
+      .filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+      .map((p) => p.trim())
+      .join(' · ')
+    const rcTextFor = (item: any) => `${item?.point || ''} ${item?.detail || ''}`.trim()
+    const hasRcPeriodDays = (days: number) =>
+      rc.some((item) => {
+        const t = rcTextFor(item)
+        if (!t) return false
+        const re = new RegExp(`\\b${days}\\s*(?:calendar\\s*)?(?:days?|-\\s*day)\\b`, 'i')
+        if (!re.test(t)) return false
+        const negRe = new RegExp(`\\b(?:no|not|without|does not apply|do not apply|n\\/a|none)\\b[^.]{0,40}\\b${days}\\s*(?:calendar\\s*)?(?:days?|-\\s*day)\\b`, 'i')
+        return !negRe.test(t)
+      })
+    const rcHas21Days = hasRcPeriodDays(21)
+    const rcHas45Days = hasRcPeriodDays(45)
+    const rcHas7DayRevocation = rc.some((item) => {
+      const t = rcTextFor(item)
+      if (!t) return false
+      const has7AndRevoke =
+        /(?:revok|revocation)[^.]{0,100}\b7\s*(?:calendar\s*)?(?:days?|-\s*day)\b|\b7\s*(?:calendar\s*)?(?:days?|-\s*day)\b[^.]{0,100}(?:revok|revocation)/i.test(t)
+      if (!has7AndRevoke) return false
+      const negRe = /\b(?:no|not|without|does not apply|do not apply|n\/a|none)\b[^.]{0,40}\b7\s*(?:calendar\s*)?(?:days?|-\s*day)\b/i
+      return !negRe.test(t)
+    })
+
     let keyDays: string | null = null
     let keyKicker = 'YOUR KEY NUMBER'
     let keyDesc = ''
     let hasRevocation = false
     let showReviewFlag = false
 
+    const disclosureWarningHtml = hasDisclosureWarning ? `
+          <div class="disclosure-warning-panel">
+            <div class="disclosure-warning-divider"></div>
+            <div class="disclosure-warning-header">
+              <span class="disclosure-warning-badge">DISCLOSURE WARNING</span>
+              <span class="disclosure-warning-title">Missing or incomplete disclosures</span>
+            </div>
+            <p class="disclosure-warning-desc">
+              Disclosure warning: Federal law (OWBPA, 29 U.S.C. § 626(f)(1)(H)) requires employers in group layoffs or exit-incentive programs to provide written disclosures detailing the decisional unit, eligibility criteria, and job titles and ages of all individuals selected and not selected. These disclosures appear missing or incomplete in your documents, which may affect the validity of the age discrimination release.
+            </p>
+          </div>` : ''
+
+    const docDaysAllowed = (days: number | null) =>
+      days !== null && (days !== 21 || rcHas21Days) && (days !== 45 || rcHas45Days)
+
     if (isOver40 && adeaWaiverApplies) {
-      hasRevocation = true
+      hasRevocation = rcHas7DayRevocation
       if (hasEstablishedGroupProgram) {
-        keyDays = '45 days'
-        keyDesc = 'The time federal rules give you to consider a release in an exit incentive or group termination program at your age (45 days under OWBPA rules).'
+        if (rcHas45Days) {
+          keyDays = '45 days'
+          keyDesc = 'The time federal rules give you to consider a release in an exit incentive or group termination program at your age (45 days under OWBPA rules).'
+        } else if (docDaysNum !== null && docDaysAllowed(docDaysNum) && hasRcPeriodDays(docDaysNum)) {
+          keyDays = `${docDaysNum} days`
+          keyKicker = 'AGREEMENT DEADLINE'
+          keyDesc = rcPointsText || 'The consideration period specified in your agreement.'
+        } else {
+          keyDays = null
+        }
       } else if (isGroupProgramUndetermined) {
         // Group-program status cannot be determined: Do not guess statutory period; flag for review
         showReviewFlag = true
-        if (docDaysNum !== null) {
+        if (docDaysNum !== null && docDaysAllowed(docDaysNum)) {
           keyDays = `${docDaysNum} days`
           keyKicker = 'AGREEMENT DEADLINE'
-          keyDesc = 'The review deadline specified in your agreement. Because group-program status cannot be determined from your documents, statutory OWBPA consideration periods (21 days for individual terminations or 45 days for group programs) are flagged for attorney review.'
+          keyDesc = 'The review deadline specified in your agreement. Because group-program status cannot be determined from your documents, statutory OWBPA consideration rules are flagged for attorney review.'
         } else {
           keyDays = null
           keyKicker = 'FLAG FOR REVIEW'
@@ -1557,13 +1606,21 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         }
       } else {
         // Individual termination or ordinary layoff without an established group program
-        keyDays = '21 days'
-        keyDesc = 'The time federal rules give you to consider a release at your age (21 days for an individual termination or ordinary layoff without an established group program).'
+        if (rcHas21Days) {
+          keyDays = '21 days'
+          keyDesc = 'The time federal rules give you to consider a release at your age (21 days for an individual termination or ordinary layoff without an established group program).'
+        } else if (docDaysNum !== null && docDaysAllowed(docDaysNum) && hasRcPeriodDays(docDaysNum)) {
+          keyDays = `${docDaysNum} days`
+          keyKicker = 'AGREEMENT DEADLINE'
+          keyDesc = rcPointsText || 'The consideration period specified in your agreement.'
+        } else {
+          keyDays = null
+        }
       }
     } else if (hasAge && !isOver40) {
       // Under 40: statutory consideration and revocation periods under federal OWBPA rules do not apply
       hasRevocation = false
-      if (docDaysNum !== null) {
+      if (docDaysNum !== null && docDaysAllowed(docDaysNum)) {
         keyDays = `${docDaysNum} days`
         keyKicker = 'AGREEMENT DEADLINE'
         keyDesc = 'The review deadline specified in your agreement. Because you are under 40, statutory consideration periods under federal OWBPA rules do not apply; your deadline is governed by contract terms and state law.'
@@ -1573,17 +1630,17 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
     } else if (!hasAge) {
       // Age not specified / unknown / ambiguous: do not guess federal statutory periods
       hasRevocation = false
-      if (docDaysNum !== null) {
+      if (docDaysNum !== null && docDaysAllowed(docDaysNum)) {
         keyDays = `${docDaysNum} days`
         keyKicker = 'AGREEMENT DEADLINE'
-        keyDesc = 'The consideration period specified in your agreement. Federal statutory consideration periods (21 days for individual terminations or 45 days for group programs) apply if you are age 40 or older and waiving ADEA claims.'
+        keyDesc = 'The consideration period specified in your agreement. Have an attorney confirm which federal statutory rules apply based on your age and termination circumstances.'
       } else {
         keyDays = null
       }
     } else {
       // Age 40+ when ADEA waiver is not flagged: use actual release_check points rather than fixed contradiction wording
       hasRevocation = false
-      if (docDaysNum !== null) {
+      if (docDaysNum !== null && docDaysAllowed(docDaysNum)) {
         keyDays = `${docDaysNum} days`
         keyKicker = 'AGREEMENT DEADLINE'
         keyDesc = rcPointsText || 'The consideration period specified in your agreement.'
@@ -1591,6 +1648,18 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
         keyDays = null
       }
     }
+
+    const revocationPanelHtml = hasRevocation ? `
+          <div class="revocation-panel">
+            <div class="revocation-divider"></div>
+            <div class="revocation-header">
+              <span class="revocation-badge">REVOCATION PERIOD</span>
+              <span class="revocation-days">7 days after signing</span>
+            </div>
+            <p class="revocation-desc">
+              Federal law gives you an additional <b>7 calendar days after you sign</b> to revoke an agreement waiving ADEA claims. This revocation period is separate from the consideration period and cannot be waived or shortened.
+            </p>
+          </div>` : ''
 
     const releaseHtml = `
       <div class="page release-page">
@@ -1608,28 +1677,8 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
           <div class="feature-card-amount">${keyDays}</div>
           <p class="feature-card-desc">${esc(keyDesc)}</p>
           ${rcPointsText && rcPointsText !== keyDesc ? `<p class="feature-card-desc">${esc(rcPointsText)}</p>` : ''}
-          ${hasDisclosureWarning ? `
-          <div class="disclosure-warning-panel">
-            <div class="disclosure-warning-divider"></div>
-            <div class="disclosure-warning-header">
-              <span class="disclosure-warning-badge">DISCLOSURE WARNING</span>
-              <span class="disclosure-warning-title">Missing or incomplete disclosures</span>
-            </div>
-            <p class="disclosure-warning-desc">
-              Disclosure warning: Federal law (OWBPA, 29 U.S.C. § 626(f)(1)(H)) requires employers in group layoffs or exit-incentive programs to provide written disclosures detailing the decisional unit, eligibility criteria, and job titles and ages of all individuals selected and not selected. These disclosures appear missing or incomplete in your documents, which may affect the validity of the age discrimination release.
-            </p>
-          </div>` : ''}
-          ${hasRevocation ? `
-          <div class="revocation-panel">
-            <div class="revocation-divider"></div>
-            <div class="revocation-header">
-              <span class="revocation-badge">REVOCATION PERIOD</span>
-              <span class="revocation-days">7 days after signing</span>
-            </div>
-            <p class="revocation-desc">
-              Federal law gives you an additional <b>7 calendar days after you sign</b> to revoke an agreement waiving ADEA claims. This revocation period is separate from the consideration period and cannot be waived or shortened.
-            </p>
-          </div>` : ''}
+          ${disclosureWarningHtml}
+          ${revocationPanelHtml}
         </div>` : (showReviewFlag ? `
         <div class="navy-feature-card flag-for-review-card">
           <div class="feature-card-kicker">FLAG FOR REVIEW</div>
@@ -1644,21 +1693,13 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
               Flag for review: Your documents do not establish whether your departure is part of an established group termination program or an individual separation. Have an attorney review whether group program rules apply to your agreement.
             </p>
           </div>
-          ${hasRevocation ? `
-          <div class="revocation-panel">
-            <div class="revocation-divider"></div>
-            <div class="revocation-header">
-              <span class="revocation-badge">REVOCATION PERIOD</span>
-              <span class="revocation-days">7 days after signing</span>
-            </div>
-            <p class="revocation-desc">
-              Federal law gives you an additional <b>7 calendar days after you sign</b> to revoke an agreement waiving ADEA claims. This revocation period is separate from the consideration period and cannot be waived or shortened.
-            </p>
-          </div>` : ''}
-        </div>` : (rcPointsText ? `
+          ${revocationPanelHtml}
+        </div>` : (rcPointsText || hasDisclosureWarning || hasRevocation ? `
         <div class="navy-feature-card">
           <div class="feature-card-kicker">RELEASE CHECK</div>
-          <p class="feature-card-desc">${esc(rcPointsText)}</p>
+          ${rcPointsText ? `<p class="feature-card-desc">${esc(rcPointsText)}</p>` : ''}
+          ${disclosureWarningHtml}
+          ${revocationPanelHtml}
         </div>` : ''))}
 
         <div class="release-check-list">
@@ -1668,8 +1709,8 @@ export function reportSections(r: ReportJson, m: RenderMeta, totalPages?: number
               <div class="release-check-row">
                 ${statusIcon(st)}
                 <div class="release-check-content">
-                  <div class="rc-point bold">${esc(item.point)}</div>
-                  <div class="rc-detail">${esc(item.detail)}</div>
+                  <div class="rc-point bold">${esc(item.point ?? '')}</div>
+                  <div class="rc-detail">${esc(item.detail ?? '')}</div>
                 </div>
               </div>
             `

@@ -59,7 +59,8 @@ function confirmedDocYears(ctx: CheckCtx): number | null {
 }
 
 function normalizeSignedYet(a: Record<string, any>): 'yes' | 'no' | null {
-  const raw = a.signed_yet ?? a.signedYet ?? a.signed ?? a.already_signed
+  const candidates = [a.signed_yet, a.signedYet, a.signed, a.already_signed]
+  const raw = candidates.find((v) => v !== undefined && v !== null && String(v).trim() !== '')
   if (raw === undefined || raw === null || raw === '') return null
   if (typeof raw === 'boolean') return raw ? 'yes' : 'no'
   const s = String(raw).trim().toLowerCase()

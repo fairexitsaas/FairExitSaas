@@ -65,6 +65,25 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
     ],
   }
 
+  // Group-program report fixture whose release_check actually specifies 45-day group consideration + 7-day revocation
+  const reportWith45GroupCheck: ReportJson = {
+    ...baseReport,
+    release_check: [
+      {
+        status: 'bad',
+        point: '45 days to consider',
+        detail: 'Under federal OWBPA rules, employees 40 and older in a group termination program receive 45 days to consider.',
+        source_id: 'SRC-1',
+      },
+      {
+        status: 'ok',
+        point: 'Revocation period',
+        detail: 'Agreement provides 7 days to revoke after signing.',
+        source_id: 'SRC-1',
+      },
+    ],
+  }
+
   const createMeta = (answers: Record<string, any>, offer: number = 12500, jurisdiction = usJurisdiction): RenderMeta => ({
     reportId: 'RPT-US-TEST',
     jurisdiction,
@@ -139,7 +158,7 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
     expect(html).toContain('class="revocation-panel"')
   })
 
-  // 3. Established group program + complete disclosures -> 45 days (no disclosure warning)
+  // 3. Established group program + complete disclosures -> 45 days when present in release_check (no disclosure warning)
   it('3. Established group program + complete disclosures -> 45 days and separate 7-day revocation without disclosure warning', () => {
     const meta = createMeta({
       age: 45,
@@ -150,7 +169,7 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
       offer: 12500,
     })
 
-    const sections = reportSections(baseReport, meta)
+    const sections = reportSections(reportWith45GroupCheck, meta)
     const releaseSec = sections.find((s) => s.id === 's1_release')!
     const html = releaseSec.html
 
@@ -167,7 +186,7 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
     expect(html).toContain('7 days after signing')
   })
 
-  // 4. Established group program + missing disclosures -> 45 days plus disclosure warning
+  // 4. Established group program + missing disclosures -> 45 days when present in release_check plus disclosure warning
   it('4. Established group program + missing disclosures -> 45 days plus disclosure warning', () => {
     const meta = createMeta({
       age: 45,
@@ -178,11 +197,11 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
       offer: 12500,
     })
 
-    const sections = reportSections(baseReport, meta)
+    const sections = reportSections(reportWith45GroupCheck, meta)
     const releaseSec = sections.find((s) => s.id === 's1_release')!
     const html = releaseSec.html
 
-    // Consideration period is still 45 days under OWBPA rules!
+    // Consideration period is 45 days when present in release_check
     expect(html).toContain('<div class="feature-card-kicker">YOUR KEY NUMBER</div>')
     expect(html).toContain('<div class="feature-card-amount">45 days</div>')
     expect(html).not.toContain('<div class="feature-card-amount">21 days</div>')
@@ -193,11 +212,11 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
     expect(html.toLowerCase()).toContain('disclosure warning')
     expect(html).toContain('Missing or incomplete disclosures')
 
-    // 7-day revocation remains present
+    // 7-day revocation remains present when in release_check
     expect(html).toContain('class="revocation-panel"')
   })
 
-  // 5. Established group program + incomplete disclosures -> 45 days plus disclosure warning
+  // 5. Established group program + incomplete disclosures -> 45 days when present in release_check plus disclosure warning
   it('5. Established group program + incomplete disclosures -> 45 days plus disclosure warning', () => {
     // (a) disclosures_verified: false
     const metaIncomplete = createMeta({
@@ -209,7 +228,7 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
       offer: 12500,
     })
 
-    const secIncomplete = reportSections(baseReport, metaIncomplete).find((s) => s.id === 's1_release')!
+    const secIncomplete = reportSections(reportWith45GroupCheck, metaIncomplete).find((s) => s.id === 's1_release')!
     expect(secIncomplete.html).toContain('<div class="feature-card-amount">45 days</div>')
     expect(secIncomplete.html).not.toContain('<div class="feature-card-amount">21 days</div>')
     expect(secIncomplete.html).toContain('disclosure-warning')
@@ -225,14 +244,14 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
       offer: 12500,
     })
 
-    const secExplicit = reportSections(baseReport, metaExplicitIncomplete).find((s) => s.id === 's1_release')!
+    const secExplicit = reportSections(reportWith45GroupCheck, metaExplicitIncomplete).find((s) => s.id === 's1_release')!
     expect(secExplicit.html).toContain('<div class="feature-card-amount">45 days</div>')
     expect(secExplicit.html).not.toContain('<div class="feature-card-amount">21 days</div>')
     expect(secExplicit.html).toContain('disclosure-warning')
     expect(secExplicit.html).toContain('DISCLOSURE WARNING')
   })
 
-  // 6. A few employees laid off with a verified standardized additional-consideration program -> 45 days
+  // 6. A few employees laid off with a verified standardized additional-consideration program -> 45 days when present in release_check
   it('6. A few employees laid off with a verified standardized additional-consideration program -> 45 days', () => {
     const meta = createMeta({
       age: 45,
@@ -242,7 +261,7 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
       offer: 12500,
     })
 
-    const sections = reportSections(baseReport, meta)
+    const sections = reportSections(reportWith45GroupCheck, meta)
     const releaseSec = sections.find((s) => s.id === 's1_release')!
     const html = releaseSec.html
 
@@ -304,8 +323,8 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
     expect(html).not.toContain('<div class="feature-card-amount">45 days</div>')
   })
 
-  // 9. Generated release-check text mentioning 45 days alone must not determine classification
-  it('9. Generated release-check text mentioning 45 days alone must not determine classification', () => {
+  // 9. When release_check mentions 45 days (and not 21 days), do not inject hardcoded 21 days contradicting release_check
+  it('9. Does not contradict release_check by injecting absent 21-day period', () => {
     const reportWith45Check: ReportJson = {
       ...baseReport,
       release_check: [
@@ -329,12 +348,13 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
     const releaseSec = sections.find((s) => s.id === 's1_release')!
     const html = releaseSec.html
 
-    // Circular release_check text must not trigger 45 days; falls back to 21 days
-    expect(html).toContain('<div class="feature-card-amount">21 days</div>')
-    expect(html).not.toContain('<div class="feature-card-amount">45 days</div>')
+    // Must preserve actual release_check summary and NOT invent an absent 21-day or 7-day period
+    expect(html).toContain('45 days to consider')
+    expect(html).not.toContain('<div class="feature-card-amount">21 days</div>')
+    expect(html).not.toContain('revocation-panel')
   })
 
-  // 10. Unknown group-program status must not produce an unsupported statutory conclusion
+  // 10. Unknown group-program status must not produce an unsupported statutory conclusion or invent absent revocation
   it('10. Unknown group-program status must not produce an unsupported statutory conclusion (flag for review)', () => {
     const metaUnknown = createMeta({
       age: 45,
@@ -360,9 +380,9 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
     expect(html).toContain('Group program status undetermined')
     expect(html).toContain('Flag for review')
 
-    // Revocation panel is still preserved because ADEA waiver applies
-    expect(html).toContain('class="revocation-panel"')
-    expect(html).toContain('7 days after signing')
+    // Must NOT invent 7-day revocation panel when absent from release_check
+    expect(html).not.toContain('class="revocation-panel"')
+    expect(html).not.toContain('7 days after signing')
   })
 
   // 11. Age 45, general release present but ADEA waiver not established -> must not assert OWBPA periods
@@ -491,7 +511,7 @@ describe('US Release Check - Key Number, Consideration Period, and OWBPA Group P
       { age: 50, others: 'few', group_program: true, disclosures_complete: true, adea_waiver: true, offer: 250000 },
       250000
     )
-    const secB = reportSections(baseReport, metaB).find((s) => s.id === 's1_release')!
+    const secB = reportSections(reportWith45GroupCheck, metaB).find((s) => s.id === 's1_release')!
     expect(secB.html).not.toContain('<div class="feature-card-amount">$250,000</div>')
     expect(secB.html).toContain('<div class="feature-card-amount">45 days</div>')
 

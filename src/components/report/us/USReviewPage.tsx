@@ -1075,8 +1075,17 @@ export default function USReviewPage({
     setDeclaredCorrect(true);
     const activeCaseId = caseId || cs?.id;
     if (activeCaseId) {
-      fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {});
-      fairexit.attest(activeCaseId).catch(() => {});
+      const pYears = hasServiceConflict
+        ? (() => {
+            const parsedDocYears = Number(String(docYearsValue || "").replace(/[^0-9.]/g, ""));
+            const payloadYears = Number.isFinite(parsedDocYears) && parsedDocYears > 0 ? parsedDocYears : docYearsValue;
+            return fairexit.resolveConflict(activeCaseId, 'years', 'document', payloadYears);
+          })()
+        : Promise.resolve();
+      pYears
+        .then(() => fairexit.saveReviewData(activeCaseId, { action: 'confirm_all' }).catch(() => {}))
+        .then(() => fairexit.attest(activeCaseId).catch(() => {}))
+        .catch(() => {});
     }
   };
 

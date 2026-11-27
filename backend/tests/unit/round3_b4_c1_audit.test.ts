@@ -508,4 +508,123 @@ describe('Round 3 Part 3: Previous implementation audit findings 1 & 2', () => {
       expect(range!.inputs).toEqual({ years: 14.6, pay: 112500, age: 60 })
     })
   })
+
+  describe('Post-Push Audit Additions (B4.1 empty-string edge case & B4.2 US release box)', () => {
+    const ny = buildJurisdiction('US-NY')!
+    const baseUsReport = (release_check: any): ReportJson => ({
+      cover: { name_line: 'Jordan Lee', role_line: 'Analyst · 5 years', place_line: 'New York' },
+      glance: 'Your employer offered $15,000 for a release.',
+      confirmed_line: 'Confirmed facts',
+      checks: [],
+      release_check,
+      myths: [],
+      clauses: [],
+      questions: [],
+      next_steps: [],
+      citations_used: [],
+    })
+    const makeUsMeta = (answers: Record<string, any>, alreadySigned = false): RenderMeta => ({
+      reportId: 'RPT-AUDIT-B42',
+      jurisdiction: ny,
+      sources: [],
+      rulesAsOf: '2026-10-01',
+      attestedAt: '2026-10-15T12:00:00Z',
+      generatedAt: '2026-10-15T12:05:00Z',
+      answers: { ...answers, signed_yet: alreadySigned ? 'yes' : 'no' },
+      numbers: {
+        country: 'US',
+        minimum: { amount: null, weeks: null, none: true },
+        range: null,
+        offer: 15000,
+        gauge: null,
+        factorValues: { service: '5 years' },
+      },
+    })
+
+    it('B4.1: empty signed_yet does not shadow signed="no"', () => {
+      const c = makeCase('US', 'US-NY', { state: 'NY', age: 45, years: 5, salary: 100000, signed_yet: '', signed: 'no' })
+      expect(answersForPrompt(c, ny).signed_yet).toBe('no')
+    })
+
+    it('B4.2.1: release box displays actual release_check points joined with middle dot', () => {
+      const rep = baseUsReport([
+        { status: 'info', point: 'General release clause', detail: 'Covers employment claims.', source_id: null },
+        { status: 'ask', point: 'Attorney review term', detail: 'Encourages consulting counsel.', source_id: null },
+      ])
+      const sec = reportSections(rep, makeUsMeta({ age: 45, adea_waiver: true, others: 'me' })).find((s) => s.id === 's1_release')!
+      expect(sec.html).toContain('General release clause · Attorney review term')
+    })
+
+    it('B4.2.2–4: no 21-day, 45-day, or 7-day revocation period is invented when absent from release_check', () => {
+      const rep = baseUsReport([
+        { status: 'info', point: 'Agreement signed or under review', detail: 'No federal waiting period stated.', source_id: null },
+      ])
+      const indivHtml = reportSections(rep, makeUsMeta({ age: 45, adea_waiver: true, others: 'me' })).find((s) => s.id === 's1_release')!.html
+      expect(indivHtml).not.toContain('21 days')
+      expect(indivHtml).not.toContain('45 days')
+      expect(indivHtml).not.toContain('7 days after signing')
+      expect(indivHtml).not.toContain('revocation-panel')
+
+      const groupHtml = reportSections(rep, makeUsMeta({ age: 45, adea_waiver: true, others: 'few', group_program: true })).find((s) => s.id === 's1_release')!.html
+      expect(groupHtml).not.toContain('21 days')
+      expect(groupHtml).not.toContain('45 days')
+      expect(groupHtml).not.toContain('7 days after signing')
+      expect(groupHtml).not.toContain('revocation-panel')
+    })
+
+    it('B4.2.5: existing consideration and revocation periods are displayed when present in release_check', () => {
+      const repIndiv = baseUsReport([
+        { status: 'ok', point: '21 days to consider', detail: 'Agreement gives 21 days for individual separation.', source_id: null },
+        { status: 'ok', point: '7-day revocation right', detail: '7 days after signing to revoke under OWBPA.', source_id: null },
+      ])
+      const indivHtml = reportSections(repIndiv, makeUsMeta({ age: 45, adea_waiver: true, others: 'me' })).find((s) => s.id === 's1_release')!.html
+      expect(indivHtml).toContain('<div class="feature-card-amount">21 days</div>')
+      expect(indivHtml).toContain('class="revocation-panel"')
+      expect(indivHtml).toContain('7 days after signing')
+      expect(indivHtml).toContain('21 days to consider · 7-day revocation right')
+
+      const repGroup = baseUsReport([
+        { status: 'ok', point: '45 days to consider', detail: 'Agreement gives 45 days for group layoff program.', source_id: null },
+        { status: 'ok', point: '7-day revocation right', detail: '7 days after signing to revoke.', source_id: null },
+      ])
+      const groupHtml = reportSections(repGroup, makeUsMeta({ age: 52, adea_waiver: true, others: 'few', group_program: true, disclosures_complete: true })).find((s) => s.id === 's1_release')!.html
+      expect(groupHtml).toContain('<div class="feature-card-amount">45 days</div>')
+      expect(groupHtml).toContain('class="revocation-panel"')
+      expect(groupHtml).toContain('45 days to consider · 7-day revocation right')
+    })
+
+    it('B4.2.6: null, missing, empty, or incomplete-point release_check never crashes or invents periods', () => {
+      for (const rc of [undefined, null, [], [{ status: 'info', point: '', detail: 'No deadline given.' }], [{ status: 'info', detail: 'Missing point key' }]]) {
+        const rep = baseUsReport(rc)
+        const html = renderReportHtml(rep, makeUsMeta({ age: 50, adea_waiver: true, group_program: true }))
+        expect(html).not.toContain('<div class="feature-card-amount">21 days</div>')
+        expect(html).not.toContain('<div class="feature-card-amount">45 days</div>')
+        expect(html).not.toContain('7 days after signing')
+        expect(html).not.toContain('class="revocation-panel"')
+      }
+    })
+
+    it('B4.2.7: signed vs unsigned, under-40, unknown-age, and individual vs group stay consistent without fabricated periods', () => {
+      const repNoPeriods = baseUsReport([
+        { status: 'info', point: 'General waiver of claims', detail: 'Agreement includes release language.', source_id: null },
+      ])
+      for (const ans of [
+        { age: 30, adea_waiver: true, others: 'me' },
+        { age: 'unknown', adea_waiver: true, others: 'few', group_program: 'unknown', days_to_decide: 10 },
+        { age: 45, adea_waiver: true, others: 'few', group_program: 'unknown', days_to_decide: 10 },
+        { age: 45, adea_waiver: true, others: 'me' },
+        { age: 45, adea_waiver: true, others: 'few', group_program: true },
+      ]) {
+        for (const signedFlag of [false, true]) {
+          const fullHtml = renderReportHtml({ ...repNoPeriods, already_signed: signedFlag }, makeUsMeta(ans, signedFlag))
+          expect(fullHtml).not.toContain('21 days')
+          expect(fullHtml).not.toContain('45 days')
+          expect(fullHtml).not.toContain('7 days after signing')
+          expect(fullHtml).toContain(signedFlag ? "You've already signed" : "don't have to sign")
+          if (signedFlag) expect(fullHtml).not.toContain("You don't have to sign today")
+          else expect(fullHtml).not.toContain("You've already signed")
+        }
+      }
+    })
+  })
 })
